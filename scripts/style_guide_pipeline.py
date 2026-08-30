@@ -659,7 +659,9 @@ def write_output_json(name: str, result: dict) -> Path:
     return path
 
 
-_CONST_PREFIX = {"warn": "WARN", "depart": "DEPART", "move": "MOVE"}
+# Shared with the sign-off gate (roster_data.verified_line_types) rather than restated,
+# so the writer and the gate can never disagree about which constant a line type lives in.
+_CONST_PREFIX = roster_data.LINE_TYPE_PREFIX
 _ANCHOR_CONST = {"warn": "WARN_GENERIC", "depart": "DEPART_GENERIC", "move": "MOVE_GENERIC"}
 _DICT_NAMES = {"warn": ["_WARN_STRUCTURE", "_WARN_HOME"], "depart": ["_DEPART"], "move": ["_MOVE"]}
 
@@ -716,6 +718,18 @@ def write_displacement_copy(species_id: str, display_name: str, line_type: str, 
     return f"wrote {const_name} to {DISPLACEMENT_COPY_PATH.relative_to(REPO_ROOT)} ({', '.join(_DICT_NAMES[line_type])})"
 
 
+def _plan_line_types(species_id: str, line_types: list) -> tuple:
+    """Split the requested line types into (regenerate, leave alone).
+
+    The sign-off gate is per LINE TYPE because the writer is: a species with one verified
+    type and two unverified ones regenerates the two and skips the one, instead of either
+    overwriting human-approved copy or refusing the species outright.
+    """
+    verified = roster_data.verified_line_types(
+        species_id, REPO_ROOT / roster_data.DISPLACEMENT_COPY, line_types)
+    return [lt for lt in line_types if lt not in verified], verified
+
+
 # ---------------------------------------------------------------------------
 # Self-test: proves the deterministic Evaluator catches each violation class, no LLM
 # calls -- runnable for grading without API access.
@@ -761,6 +775,28 @@ def selftest() -> int:
             print(f"         - {p}")
 
     print()
+    # REGRESSION, review CRITICAL 2: the sign-off gate was per-species while this
+    # pipeline's writer is per-line-type, so a default `--line-type all` run overwrote
+    # human-approved DEPART_/MOVE_ lines whenever WARN_ was still marked AWAITING.
+    # Against real displacement_copy.gd: fox is signed off on all three, horse on none.
+    _all = list(LINE_TYPES)
+    _fox_todo, _fox_kept = _plan_line_types("fox", _all)
+    _fox_ok = _fox_todo == [] and _fox_kept == _all
+    print(f"[{'PASS' if _fox_ok else 'FAIL'}] fox's signed-off copy is left alone on "
+          f"every line type (regenerate {_fox_todo}, keep {_fox_kept})")
+    ok = ok and _fox_ok
+
+    _horse_todo, _horse_kept = _plan_line_types("horse", _all)
+    _horse_ok = _horse_todo == _all and _horse_kept == []
+    print(f"[{'PASS' if _horse_ok else 'FAIL'}] horse's still-AWAITING copy is fully "
+          f"regenerable (regenerate {_horse_todo}, keep {_horse_kept})")
+    ok = ok and _horse_ok
+
+    _prefix_ok = _CONST_PREFIX is roster_data.LINE_TYPE_PREFIX
+    print(f"[{'PASS' if _prefix_ok else 'FAIL'}] the writer's const prefixes ARE the "
+          f"gate's -- they cannot drift apart")
+    ok = ok and _prefix_ok
+
     _tres_count = len(list((REPO_ROOT / roster_data.ANIMALS_DIR).glob("*.tres")))
     _derived_ok = len(ROSTER) == _tres_count and _tres_count > 0
     print(f"[{'PASS' if _derived_ok else 'FAIL'}] ROSTER is derived from the data dir "
@@ -825,24 +861,33 @@ def main() -> int:
             print(f"ERROR: unknown species id {species_id!r} -- not in ROSTER", file=sys.stderr)
             exit_code = 1
             continue
-        # Refuse only copy a HUMAN has verified. Three states exist: verified copy is
-        # protected; copy this pipeline generated but nobody has reviewed (still marked
-        # AWAITING CONTENT-WRITER SIGN-OFF) is regenerable; a species with no copy at all
-        # -- including a newly imported one -- is the target. The old CLEARED_POOL_IDS
-        # allowlist could not tell the second state from the first, and refused every
-        # species it did not already name.
-        if roster_data.has_verified_copy(
-                species_id, REPO_ROOT / roster_data.DISPLACEMENT_COPY):
+        # Refuse only copy a HUMAN has verified, and only the LINE TYPES they verified.
+        # Three states exist per line type: verified copy is protected; copy this pipeline
+        # generated but nobody has reviewed (still marked AWAITING CONTENT-WRITER SIGN-OFF)
+        # is regenerable; a line type with no copy at all -- including a newly imported
+        # species -- is the target. The old CLEARED_POOL_IDS allowlist could not tell the
+        # second state from the first; its per-species replacement could not tell one line
+        # type from another, and so both overwrote signed-off DEPART_/MOVE_ lines on a
+        # default run and locked them out when only WARN_ had been signed off.
+        todo, verified = _plan_line_types(species_id, line_types)
+        if verified:
             print(
-                f"ERROR: {species_id!r} already has human-verified displacement copy "
-                f"-- refusing to overwrite it. (Copy still marked "
-                f"{roster_data.AWAITING_MARKER!r} would be regenerable.)",
+                f"NOTE: leaving {species_id!r}'s human-verified "
+                f"{', '.join(verified)} copy alone -- refusing to overwrite it. (Copy "
+                f"still marked {roster_data.AWAITING_MARKER!r} would be regenerable.)",
+                file=sys.stderr,
+            )
+        if not todo:
+            print(
+                f"ERROR: every requested line type for {species_id!r} "
+                f"({', '.join(line_types)}) is already human-verified -- nothing to "
+                f"generate.",
                 file=sys.stderr,
             )
             exit_code = 1
             continue
 
-        result = run_species(species_id, line_types, generator_model_id, evaluator_model_id, refiner_model_id, args.max_refine)
+        result = run_species(species_id, todo, generator_model_id, evaluator_model_id, refiner_model_id, args.max_refine)
         json_path = write_output_json(species_id, result)
         _progress(f"  archive log: {json_path.relative_to(REPO_ROOT)}")
 

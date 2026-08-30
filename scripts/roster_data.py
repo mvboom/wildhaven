@@ -25,10 +25,16 @@ BUILDINGS_DIR = Path("project") / "data" / "buildings"
 DISPLACEMENT_COPY = Path("project") / "scripts" / "ui" / "displacement_copy.gd"
 
 # The marker the style-guide pipeline writes beside copy it generated but a human has not
-# yet reviewed. CONVENTION: sign-off must REMOVE this marker. `has_verified_copy` treats a
+# yet reviewed. CONVENTION: sign-off must REMOVE this marker. `verified_line_types` treats a
 # line still carrying it as regenerable, so a marker left in place after review would let
 # the pipeline overwrite copy you had actually approved.
 AWAITING_MARKER = "AWAITING CONTENT-WRITER SIGN-OFF"
+
+# The constant prefix displacement_copy.gd uses for each Gentle Displacement line type.
+# style_guide_pipeline imports this rather than restating it, so the sign-off GATE and the
+# WRITER can never disagree about which constant a line type lives in -- the exact class
+# of drift that let a per-species gate stand in front of a per-line-type writer.
+LINE_TYPE_PREFIX = {"warn": "WARN", "depart": "DEPART", "move": "MOVE"}
 
 
 @dataclass
@@ -126,22 +132,44 @@ def load_buildings(repo_root: Path) -> dict:
     return _load_dir(repo_root, BUILDINGS_DIR)
 
 
-def has_verified_copy(species_id: str, displacement_copy_path: Path) -> bool:
-    """True when this species has displacement copy a human has signed off.
+def verified_line_types(species_id: str, displacement_copy_path: Path,
+                        line_types) -> list:
+    """Which of `line_types` this species has displacement copy a human has signed off.
 
-    Three states exist, and only the first is protected:
-      - a WARN_ constant with no AWAITING marker -> verified, refuse to overwrite
-      - a WARN_ constant still marked AWAITING    -> generated, not yet reviewed, regenerable
-      - no WARN_ constant at all                  -> nothing to lose
+    Three states exist PER LINE TYPE, and only the first is protected:
+      - a constant with no AWAITING marker -> verified, refuse to overwrite
+      - a constant still marked AWAITING   -> generated, not yet reviewed, regenerable
+      - no constant at all                 -> nothing to lose
+
+    PER LINE TYPE is the whole point. The predecessor answered one bool per SPECIES from
+    `WARN_<ID>` alone, while `style_guide_pipeline.write_displacement_copy` writes
+    WARN_/DEPART_/MOVE_ according to `--line-type` (default `all`). Both directions were
+    destructive: a species whose DEPART_ and MOVE_ were signed off but whose WARN_ was
+    still marked read as "not verified", so a default run OVERWROTE two human-approved
+    lines -- exactly the hazard the marker convention exists to prevent; and a species
+    whose WARN_ alone was signed off read as "verified", so DEPART_/MOVE_ could never be
+    generated at all.
+
+    Returns the verified subset, in `line_types` order, so the caller can regenerate the
+    rest and name which ones it left alone.
     """
     if not displacement_copy_path.is_file():
-        return False
-    match = re.search(
-        rf"^const WARN_{re.escape(species_id.upper())}: String = .*$",
-        displacement_copy_path.read_text(),
-        re.MULTILINE,
-    )
-    return match is not None and AWAITING_MARKER not in match.group(0)
+        return []
+    text = displacement_copy_path.read_text()
+    out: list = []
+    for line_type in line_types:
+        prefix = LINE_TYPE_PREFIX.get(line_type)
+        if prefix is None:
+            raise ValueError(
+                f"unknown displacement line type {line_type!r} -- expected one of "
+                f"{sorted(LINE_TYPE_PREFIX)}")
+        match = re.search(
+            rf"^const {prefix}_{re.escape(species_id.upper())}: String = .*$",
+            text, re.MULTILINE,
+        )
+        if match is not None and AWAITING_MARKER not in match.group(0):
+            out.append(line_type)
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -196,14 +224,55 @@ def selftest() -> int:
         check(raised, "a roster missing floor species raises rather than running short")
 
     copy_path = repo / DISPLACEMENT_COPY
-    check(has_verified_copy("fox", copy_path),
-          "fox's human-verified copy is protected")
-    check(not has_verified_copy("horse", copy_path),
-          "horse's copy is still AWAITING sign-off, so regenerable")
-    check(not has_verified_copy("stag", copy_path),
+    all_types = list(LINE_TYPE_PREFIX)
+    check(verified_line_types("fox", copy_path, all_types) == all_types,
+          "fox's human-verified copy is protected, all three line types")
+    check(verified_line_types("horse", copy_path, all_types) == [],
+          "horse's copy is still AWAITING sign-off, so every line type is regenerable")
+    check(verified_line_types("stag", copy_path, all_types) == [],
           "stag has no copy at all, so nothing to protect")
-    check(not has_verified_copy("otter", copy_path),
+    check(verified_line_types("otter", copy_path, all_types) == [],
           "an unknown species has nothing to protect")
+    check(verified_line_types("fox", copy_path, ["move"]) == ["move"],
+          "the gate answers only for the line types asked about")
+
+    # REGRESSION, review CRITICAL 2: the gate was per-SPECIES (it inspected WARN_ alone)
+    # while the writer is per-LINE-TYPE. Both directions were reproduced against real
+    # displacement_copy.gd states, and both are destructive:
+    #   - DEPART_/MOVE_ signed off but WARN_ still marked -> the gate said "not verified"
+    #     and a default `--line-type all` run OVERWROTE two human-approved lines.
+    #   - WARN_ signed off but the others still marked -> the gate said "verified" and the
+    #     species was refused entirely, so DEPART_/MOVE_ could never be generated.
+    with tempfile.TemporaryDirectory() as td:
+        gd = Path(td) / "displacement_copy.gd"
+        signed = 'const {name}: String = "human copy."\n'
+        marked = ('const {name}: String = "pipeline copy."  '
+                  f"# pipeline-generated -- {AWAITING_MARKER}\n")
+
+        gd.write_text(signed.format(name="DEPART_HORSE") +
+                      signed.format(name="MOVE_HORSE") +
+                      marked.format(name="WARN_HORSE"))
+        check(verified_line_types("horse", gd, all_types) == ["depart", "move"],
+              "signed-off DEPART_/MOVE_ are protected even while WARN_ is still marked")
+
+        gd.write_text(signed.format(name="WARN_HORSE") +
+                      marked.format(name="DEPART_HORSE") +
+                      marked.format(name="MOVE_HORSE"))
+        check(verified_line_types("horse", gd, all_types) == ["warn"],
+              "a signed-off WARN_ does not lock DEPART_/MOVE_ out of regeneration")
+
+        gd.write_text("".join(signed.format(name=f"{p}_HORSE")
+                              for p in LINE_TYPE_PREFIX.values()))
+        check(verified_line_types("horse", gd, all_types) == all_types,
+              "an all-verified species protects every line type")
+
+        gd.write_text("".join(marked.format(name=f"{p}_HORSE")
+                              for p in LINE_TYPE_PREFIX.values()))
+        check(verified_line_types("horse", gd, all_types) == [],
+              "a none-verified species protects nothing")
+
+        check(verified_line_types("horse", Path(td) / "absent.gd", all_types) == [],
+              "no displacement_copy.gd at all means nothing to protect")
 
     buildings = load_buildings(repo)
     check(len(buildings) >= 9, f"buildings derived from the data dir ({len(buildings)})")
