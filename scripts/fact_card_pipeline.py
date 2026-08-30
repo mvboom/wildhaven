@@ -638,7 +638,17 @@ def update_content_pipeline_status(species_id: str, accepted_fact_texts: list, a
 # ---------------------------------------------------------------------------
 
 def selftest() -> int:
-    shiba = ROSTER["shiba_inu"]
+    # With the ROSTER hardcode gone this fixture is a DATA dependency: renaming
+    # project/data/animals/shiba_inu.tres used to turn the whole selftest into a KeyError
+    # traceback, which reads as "the suite is broken" rather than "the suite's fixture
+    # moved". An explicit failed check says which, and names what was actually derived.
+    shiba = ROSTER.get("shiba_inu")
+    if shiba is None:
+        print("[FAIL] the selftest's fixture species 'shiba_inu' is not in the derived "
+              "ROSTER -- project/data/animals/shiba_inu.tres was renamed or removed. "
+              f"Derived instead: {sorted(ROSTER) or 'nothing'}.")
+        print("SELFTEST FAILED")
+        return 1
     cases = [
         ("Shiba Inus were originally bred in Japan to hunt small game in mountainous terrain.",
          "hunt", False),
