@@ -178,6 +178,37 @@ def write_wrapper(project: Path, category: str, name: str, display: str,
     return path
 
 
+_TRANSFORM = re.compile(
+    r"^transform = Transform3D\("
+    r"[-\d.eE+]+, 0, 0, 0, [-\d.eE+]+, 0, 0, 0, [-\d.eE+]+, 0, 0, 0\)$", re.MULTILINE)
+
+
+def rescale_wrapper(path: Path, scale: float) -> str:
+    """Put the human's ruled model_scale into a wrapper that already exists.
+
+    run() writes the wrapper BEFORE the checkpoint, with a hardcoded 0.2, because Godot
+    must import something before its AnimationPlayer can be probed. The ruled scale
+    arrives at the checkpoint, after that -- and every adapter strips model_scale before
+    rendering its .tres, so the wrapper is the ONLY place scale lives. Without this a
+    building ruled 1.0 shipped at 0.2, and in terrain variant mode, where scale is the
+    only field the human is asked for, the whole checkpoint was decorative.
+
+    Rewriting the one transform line rather than re-rendering the wrapper preserves the
+    model filename, the licence line and the AnimationPlayer index run() determined --
+    none of which resume() can re-derive without another Godot probe.
+    """
+    text = path.read_text()
+    replacement = (f"transform = Transform3D({scale}, 0, 0, 0, {scale}, 0, 0, 0, "
+                   f"{scale}, 0, 0, 0)")
+    text, count = _TRANSFORM.subn(lambda _m: replacement, text, count=1)
+    if count != 1:
+        raise RuntimeError(
+            f"no uniform Transform3D line in {path} -- refusing to guess where the "
+            f"ruled model_scale belongs")
+    path.write_text(text)
+    return f"model_scale {scale} written into {path.name}"
+
+
 def selftest_cases(c) -> None:
     import tempfile
     from assetpipe.formats import ModelProbe, Resolution
@@ -277,6 +308,33 @@ def selftest_cases(c) -> None:
         c.check('autoplay = "Idle"' in withanim, "autoplay set")
         c.check('[editable path="Model"]' in withanim,
                 "editable marker present -- without it the override is ignored")
+
+        # REGRESSION, whole-branch review IMPORTANT 5: the human's ruled model_scale was
+        # discarded. run() hardcodes 0.2 before the checkpoint, every adapter strips
+        # model_scale before rendering, and resume() never rewrote the wrapper.
+        dest_dir(proj, "buildings", "well").mkdir(parents=True, exist_ok=True)
+        wp = write_wrapper(proj, "buildings", "well", "Well", "Well.obj", 0.2, "CC0-1.0", 2,
+                           "PlaceableDefinition")
+        summary = rescale_wrapper(wp, 1.0)
+        after = wp.read_text()
+        c.check("transform = Transform3D(1.0, 0, 0, 0, 1.0, 0, 0, 0, 1.0, 0, 0, 0)" in after,
+                "the ruled scale replaces the pre-checkpoint 0.2")
+        c.check("Transform3D(0.2" not in after, "no 0.2 transform survives the rewrite")
+        c.check("1.0" in summary, "rescale summary names the scale it wrote")
+        c.check('[node name="AnimationPlayer" parent="Model" index="2"]' in after,
+                "rescale preserves the AnimationPlayer index run() determined")
+        c.check('path="res://assets/buildings/well/Well.obj"' in after,
+                "rescale preserves the model file reference")
+        c.check("CC0-1.0" in after, "rescale preserves the licence line")
+
+        refused = False
+        try:
+            noscale = proj / "noscale.tscn"
+            noscale.write_text("[gd_scene format=3]\n")
+            rescale_wrapper(noscale, 1.0)
+        except RuntimeError as exc:
+            refused = "refusing to guess" in str(exc)
+        c.check(refused, "a wrapper with no transform line refuses rather than guessing")
 
         # Verify FBX_IMPORT_PARAMS fidelity against the real Bush_1.fbx.import file.
         # Skip gracefully if the reference file is missing.

@@ -17,6 +17,7 @@ import argparse
 import re
 import subprocess
 import sys
+import traceback
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -43,6 +44,7 @@ def _selftest_cli(c) -> None:
         c.eq(module.SPEC.name, name, f"{name} module's SPEC matches its key")
         c.check(hasattr(module, "decisions"), f"{name} exposes decisions()")
 
+    import inspect
     import tempfile
     with tempfile.TemporaryDirectory() as td:
         log_path = Path(td) / "build.log"
@@ -78,6 +80,123 @@ def _selftest_cli(c) -> None:
         payload["decisions"][0]["value"] = 25
         c.check(review.ready(payload), "resume proceeds once every field is ruled")
 
+        # REGRESSION, whole-branch review IMPORTANT 8: buildings' copy row targets the
+        # buildings directory, and terrain has no copy row at all.
+        c.check('cmd += ["--target", "building_text"]' in src,
+                "the fact-card pipeline is given --target building_text for buildings")
+        c.check('if adapter_name == "terrain":' in src,
+                "terrain skips the fact-card pipeline -- its spec copy row is 'none'")
+
+        # REGRESSION, whole-branch review IMPORTANT 7: both copy pipelines ran with
+        # check=False and printed a success line regardless of outcome.
+        copy_src = inspect.getsource(_copy_stage)
+        c.eq(copy_src.count("check=False).returncode"), 2,
+             "both copy pipelines' return codes are captured, not discarded")
+        c.eq(copy_src.count("FAILED rc={rc}"), 2,
+             "a non-zero copy stage reports the code instead of printing success")
+        c.check("if rc == 0:" in copy_src,
+                "the success line is printed only on a zero return code")
+        c.check("ROSTER" in copy_src,
+                "the failure message names the hardcoded ROSTER the operator must edit")
+
+        # REGRESSION, whole-branch review IMPORTANT 5: the ruled model_scale never reached
+        # the wrapper, which is the only place scale lives.
+        stages_src = inspect.getsource(_resume_stages)
+        c.check("importer.rescale_wrapper(wrapper, scale)" in stages_src,
+                "resume rewrites the wrapper with the ruled scale, not the 0.2 run() wrote")
+        c.check('values.get("model_scale")' in stages_src,
+                "the scale rewritten is the one from the review, not a constant")
+        code_only = [line for line in stages_src.splitlines()
+                     if not line.lstrip().startswith("#")]
+        c.check(not any("0.2" in line for line in code_only),
+                "resume hardcodes no scale of its own")
+
+        # REGRESSION, whole-branch review IMPORTANT 17: copy_license_text was implemented,
+        # hardened, tested and never called.
+        c.check("attribution.copy_license_text" in inspect.getsource(_preserve_license),
+                "stage 9 preserves the pack's licence text offline")
+        c.check("_preserve_license(pack, project, tree)" in stages_src,
+                "stage 9 actually invokes it")
+
+    # REGRESSION, whole-branch review IMPORTANT 4/14: resume()'s validation dispatch
+    # reached only animal.py, so an unknown hotbar_category was written straight through.
+    c.check(_validate(building, "building", "well", None, {"hotbar_category": "workshop"}),
+            "an unknown hotbar_category is caught by the path resume() uses")
+    c.eq(_validate(building, "building", "well", None,
+                   {"hotbar_category": "farm_building"}), [],
+         "a known hotbar_category passes that path")
+    c.check(_validate(terrain, "terrain", "wild_grass", terrain.MODE_NEW_TYPE,
+                      {"emitted_tags": ["forest"]}),
+            "terrain new_type gets the inert-land check through resume()'s path")
+    c.eq(_validate(terrain, "terrain", "wild_grass", terrain.MODE_VARIANT,
+                   {"model_scale": 1.0}), [],
+         "variant mode writes no terrain id, so the inert-land check does not apply")
+    c.eq(_validate(animal, "animal", "pig", None,
+                   {"habitat_needs": ["forest"], "avoids": [], "scout_radius": 10,
+                    "capacity_radius": 0, "tiles_per_individual": 5,
+                    "max_individuals": 6, "personality": "Shy"}), [],
+         "animal's existing validation still runs through the shared path")
+
+    # PROMOTED MINOR: formats.pack_root's unguarded relative_to raised a bare ValueError
+    # from inside run()'s try -- after the worktree existed, stranding it.
+    with tempfile.TemporaryDirectory() as td:
+        outside = Path(td) / "Loose.fbx"
+        outside.write_bytes(b"\x00")
+        problems = validate_asset_path(outside)
+        c.check(any("not under" in p for p in problems),
+                "an asset outside the assets root is refused before the worktree exists")
+        c.check(any("is not a file" in p
+                    for p in validate_asset_path(Path(td) / "nope.fbx")),
+                "a nonexistent asset is refused too")
+        inside_root = Path(td) / "assets"
+        (inside_root / "Pack" / "FBX").mkdir(parents=True)
+        good = inside_root / "Pack" / "FBX" / "Pig.fbx"
+        good.write_bytes(b"\x00")
+        c.eq(validate_asset_path(good, assets_root=inside_root), [],
+             "a real asset under the assets root passes")
+
+    c.check("traceback.print_exc()" in inspect.getsource(run),
+            "run()'s handler prints the traceback, not just str(exc)")
+    c.check("traceback.print_exc()" in inspect.getsource(resume),
+            "resume() has a broad handler that prints the traceback")
+    c.check("worktree KEPT at" in inspect.getsource(resume),
+            "resume()'s handler names the worktree it kept")
+
+    # REGRESSION, whole-branch review IMPORTANT 9: --abandon could not clean up a crashed
+    # run, and the stranded worktree then blocked every future run at preflight.
+    c.eq(worktree_of("20260830-shiba_inu-ab12", Path("/r")),
+         (Path("/r/.worktrees/asset-shiba_inu"), "asset/shiba_inu"),
+         "worktree path and branch are recoverable from the run id alone")
+
+    with tempfile.TemporaryDirectory() as td:
+        import subprocess as _sp
+        repo = Path(td) / "repo"
+        (repo / "project").mkdir(parents=True)
+        (repo / "project" / "a.tres").write_text("one\n")
+        for args in (["init", "-b", "main"], ["add", "."],
+                     ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-m", "init"]):
+            _sp.run(["git", *args], cwd=repo, check=True, capture_output=True)
+        worktree.create(repo, "asset/pig", repo / ".worktrees" / "asset-pig")
+
+        run_id = "20260830-pig-ab12"
+        c.check(not (repo / "runs" / run_id / "review.json").is_file(),
+                "the crashed-run fixture has no review.json, as a crash before stage 1 does")
+        c.eq(abandon_run(run_id, repo), 0,
+             "abandon_run succeeds when review.json is absent")
+        c.check(not (repo / ".worktrees" / "asset-pig").exists(),
+                "the stranded worktree is actually removed")
+        c.eq(preflight_names(repo), [],
+             "and preflight is unblocked afterwards")
+
+    c.check('"incomplete": True' in src,
+            "run() writes an abandon-able stub before any stage runs")
+    c.check('payload.get("incomplete")' in inspect.getsource(resume),
+            "resume refuses that stub -- its empty decisions list is not 'nothing to rule'")
+
+
+def preflight_names(repo: Path) -> list[str]:
+    return [p for p in worktree.preflight(repo) if "stale worktree" in p]
+
 
 def selftest() -> int:
     from assetpipe.adapters import base
@@ -111,6 +230,46 @@ def _format_cost_line(cost: dict) -> str:
     return f"{tokens} (dollar cost not reported by this backend)"
 
 
+def validate_asset_path(asset: Path, assets_root: Path = formats.ASSETS_ROOT) -> list[str]:
+    """Checked BEFORE the worktree is created, and that ordering is the point.
+
+    formats.pack_root() calls Path.relative_to() unguarded, so an asset outside
+    source-content/assets/ raised a bare ValueError from inside run()'s try -- by which
+    time the worktree existed. It was then stranded (--abandon had no review.json to read)
+    and blocked every later run at preflight. Failing here costs nothing.
+    """
+    problems: list[str] = []
+    if not asset.is_file():
+        problems.append(f"{asset} is not a file")
+        return problems
+    try:
+        formats.pack_root(asset, assets_root)
+    except ValueError:
+        problems.append(
+            f"{asset} is not under {assets_root}/ -- this pipeline only imports assets "
+            f"that live in the source-content drop, because the pack folder is where the "
+            f"licence and the attribution entry are found")
+    return problems
+
+
+def _validate(module, adapter_name: str, ident: str, mode: str | None,
+              values: dict) -> list[str]:
+    """Every adapter's pre-write validation, in one place.
+
+    resume() used to call module.validate_values(values) behind a hasattr guard, and only
+    animal.py had one -- so buildings wrote an unvalidated hotbar_category and terrain got
+    no pass at all. building.py now has validate_values; terrain's check needs the IDENT,
+    which a validate_values(values) signature cannot carry, so it is called directly, and
+    only in new_type mode -- variant mode writes no .tres and defines no terrain id.
+    """
+    problems: list[str] = []
+    if hasattr(module, "validate_values"):
+        problems += module.validate_values(values)
+    if adapter_name == "terrain" and mode == terrain.MODE_NEW_TYPE:
+        problems += module.check_new_type(ident, values)
+    return problems
+
+
 def run(asset: Path, adapter_name: str, repo: Path, notes: str = "",
         dry_run: bool = False, variant_of: str | None = None) -> int:
     module = ADAPTER_MODULES[adapter_name]
@@ -119,7 +278,7 @@ def run(asset: Path, adapter_name: str, repo: Path, notes: str = "",
     ident = slug(display)
     mode = "variant" if variant_of else ("new_type" if adapter_name == "terrain" else None)
 
-    problems = worktree.preflight(repo)
+    problems = validate_asset_path(asset) + worktree.preflight(repo)
     if problems:
         for p in problems:
             print(f"PREFLIGHT: {p}")
@@ -131,6 +290,16 @@ def run(asset: Path, adapter_name: str, repo: Path, notes: str = "",
     branch = f"asset/{ident}"
     tree = worktree.create(repo, branch, repo / ".worktrees" / f"asset-{ident}")
     print(f"[0/10] worktree..... {tree}  ({worktree.seed_import_cache(repo, tree)})")
+
+    # Written BEFORE any stage runs, so --abandon always has something to read. review.json
+    # used to appear only at the checkpoint; a crash in stages 1-6 therefore left
+    # abandon_run raising FileNotFoundError, and the stranded worktree then blocked every
+    # future run at preflight. `incomplete` is what stops resume() acting on a stub.
+    review.write(log.dir / "review.json", {
+        "run_id": run_id, "asset": str(asset), "adapter": adapter_name,
+        "worktree": str(tree), "branch": branch, "base_branch": base_branch,
+        "mode": mode, "variant_of": variant_of, "decisions": [], "incomplete": True,
+    })
 
     project = tree / "project"
     try:
@@ -199,7 +368,7 @@ def run(asset: Path, adapter_name: str, repo: Path, notes: str = "",
         payload = {
             "run_id": run_id, "asset": str(asset), "adapter": adapter_name,
             "worktree": str(tree), "branch": branch, "base_branch": base_branch,
-            "mode": mode, "variant_of": variant_of,
+            "mode": mode, "variant_of": variant_of, "incomplete": False,
             "resolved_format": {"chosen": resolution.chosen, "reason": resolution.reason,
                                 "rejected": resolution.rejected},
             "decisions": [d.to_dict() for d in decisions],
@@ -225,8 +394,14 @@ def run(asset: Path, adapter_name: str, repo: Path, notes: str = "",
         return 0
 
     except Exception as exc:
-        print(f"FAILED: {exc}")
+        # The traceback, not just str(exc). This handler spans every stage, and several
+        # of them raise messages that name no location at all (a bare ValueError, a
+        # subprocess timeout); an unattributable one-liner on the first real run of a
+        # 10-stage pipeline is not a diagnosis.
+        print(f"FAILED: {type(exc).__name__}: {exc}")
+        traceback.print_exc()
         print(f"worktree left intact for inspection: {tree}")
+        print(f"clean it up with: python3 scripts/asset_pipeline.py --abandon {run_id}")
         return 1
 
 
@@ -248,9 +423,35 @@ def build(repo: Path) -> tuple[bool, str]:
     return ok, str(log_path)
 
 
+def worktree_of(run_id: str, repo: Path) -> tuple[Path, str]:
+    """Where run() would have put this run's worktree and branch.
+
+    run_id is "<yyyymmdd>-<ident>-<hex4>" and slug() never emits a hyphen, so the ident is
+    recoverable from it -- which is what lets --abandon clean up a run that died before
+    it wrote anything at all.
+    """
+    ident = "-".join(run_id.split("-")[1:-1])
+    return repo / ".worktrees" / f"asset-{ident}", f"asset/{ident}"
+
+
 def abandon_run(run_id: str, repo: Path) -> int:
-    payload = review.read(repo / "runs" / run_id / "review.json")
-    worktree.abandon(repo, Path(payload["worktree"]), payload["branch"])
+    """Destroy a run's worktree and branch. Must work on a CRASHED run.
+
+    A run that died before its checkpoint used to leave abandon_run raising
+    FileNotFoundError on the missing review.json -- and the stranded worktree then blocked
+    every future run at preflight, with no supported way out. run() now writes a stub
+    immediately, and this falls back to deriving the paths from the run id when even that
+    is absent.
+    """
+    path = repo / "runs" / run_id / "review.json"
+    if path.is_file():
+        payload = review.read(path)
+        tree, branch = Path(payload["worktree"]), payload["branch"]
+    else:
+        tree, branch = worktree_of(run_id, repo)
+        print(f"no review.json for {run_id}; derived worktree {tree} and branch {branch} "
+              f"from the run id")
+    worktree.abandon(repo, tree, branch)
     print(f"abandoned {run_id}: worktree and branch removed")
     print(f"evidence kept: {repo / 'runs' / run_id}")
     return 0
@@ -259,6 +460,15 @@ def abandon_run(run_id: str, repo: Path) -> int:
 def resume(run_id: str, repo: Path) -> int:
     log_dir = repo / "runs" / run_id
     payload = review.read(log_dir / "review.json")
+
+    if payload.get("incomplete"):
+        # The stub run() writes before stage 1, so --abandon always has something to read.
+        # It carries no decisions, which would otherwise read as "nothing left to rule".
+        print(f"cannot resume {run_id}: it never reached its checkpoint. This review.json "
+              f"is the stub --abandon needs, not a ruling sheet.")
+        print(f"  abandon: python3 scripts/asset_pipeline.py --abandon {run_id}")
+        return 1
+
     unruled = review.unruled(payload)
     if unruled:
         print(f"cannot resume: {len(unruled)} field(s) still unruled: {unruled}")
@@ -267,6 +477,7 @@ def resume(run_id: str, repo: Path) -> int:
         return 1
 
     module = ADAPTER_MODULES[payload["adapter"]]
+    adapter_name = payload["adapter"]
     tree = Path(payload["worktree"])
     mode = payload.get("mode")
     project = tree / "project"
@@ -274,17 +485,51 @@ def resume(run_id: str, repo: Path) -> int:
     display = Path(payload["asset"]).stem
     values = {d["field"]: d["value"] for d in payload["decisions"]}
 
-    problems = module.validate_values(values) if hasattr(module, "validate_values") else []
+    problems = _validate(module, adapter_name, ident, mode, values)
     if problems:
         for p in problems:
             print(f"VALIDATION: {p}")
         return 1
 
+    try:
+        return _resume_stages(run_id, repo, payload, module, adapter_name, tree, project,
+                              mode, ident, display, values)
+    except Exception as exc:
+        # resume() is the function that touches the OPERATOR'S REAL REPOSITORY, and the
+        # stages below raise messages that name no location: terrain.write()'s inert-land
+        # RuntimeError, regenerate_credits' RuntimeError, attribution.AmbiguousEntry. A
+        # raw traceback here would leave the operator holding a worktree with no statement
+        # of what it contains or how to get rid of it.
+        print(f"FAILED at resume: {type(exc).__name__}: {exc}")
+        traceback.print_exc()
+        print(f"worktree KEPT at {tree} -- nothing was merged and the main checkout is "
+              f"untouched.")
+        print(f"clean it up with: python3 scripts/asset_pipeline.py --abandon {run_id}")
+        return 1
+
+
+def _resume_stages(run_id: str, repo: Path, payload: dict, module, adapter_name: str,
+                   tree: Path, project: Path, mode: str | None, ident: str, display: str,
+                   values: dict) -> int:
     header = (f"; {display} — generated by scripts/asset_pipeline.py run {run_id}\n"
               f"; Source: {payload['asset']}\n"
               f"; Format: {payload['resolved_format']['chosen']} "
               f"({payload['resolved_format']['reason']})\n"
               f"; Every value below was ruled by the human at this run's checkpoint.\n")
+
+    # The ruled model_scale has to reach the artifact. run() wrote the wrapper BEFORE the
+    # checkpoint with a hardcoded 0.2 (it must, so Godot can probe the AnimationPlayer),
+    # and every adapter strips model_scale before rendering its .tres -- so the wrapper is
+    # the only place scale lives, and nothing was putting the ruling into it. A building
+    # ruled 1.0 shipped at 0.2; in terrain variant mode, where scale is the ONLY field the
+    # human is asked for, the checkpoint was entirely decorative.
+    scale = values.get("model_scale")
+    if scale is None:
+        print("[7/10] scale....... no model_scale in this review -- wrapper left as run() "
+              "wrote it")
+    else:
+        wrapper = importer.dest_dir(project, module.SPEC.category, ident) / f"{display}.tscn"
+        print(f"[7/10] scale....... {importer.rescale_wrapper(wrapper, scale)}")
 
     if mode == "variant":
         # A tree has no .tres of its own: it is appended to an existing terrain type's
@@ -297,38 +542,27 @@ def resume(run_id: str, repo: Path) -> int:
         path = module.write(project, ident, display, values, header)
         print(f"[7/10] data entry.. {path.relative_to(tree)}")
 
-    # BOTH copy pipelines, per the design's adapter table. fact_card takes a DISPLAY name;
-    # style_guide takes a species ID. Both run from the WORKTREE's copy (cwd=tree) because
-    # they resolve their repo root from __file__ -- invoking the main checkout's copy would
-    # patch the main checkout while this run believes it is sandboxed.
-    subprocess.run(["python3", "scripts/fact_card_pipeline.py", display, "--count", "2"],
-                   cwd=tree, check=False)
-    print("[8/10] copy........ fact_card_pipeline (worktree copy)")
-
-    # Gentle Displacement copy is ANIMALS ONLY -- displacement_copy.gd has WARN_/DEPART_/
-    # MOVE_ lines per species; buildings and terrain have none. Without this a new animal
-    # ships with fact cards but falls through to WARN_GENERIC, which is exactly the gap
-    # style_guide_pipeline.py exists to close.
-    if payload["adapter"] == "animal":
-        subprocess.run(["python3", "scripts/style_guide_pipeline.py", ident,
-                        "--line-type", "all"], cwd=tree, check=False)
-        print("[8/10] copy........ style_guide_pipeline (WARN/DEPART/MOVE)")
+    _copy_stage(adapter_name, tree, display, ident, payload)
 
     # Extending an existing pack's AttributionEntry is a generated-file operation; creating
     # a NEW entry is a licensing decision that belongs to game-design/art.md, not this
     # pipeline -- so a missing entry halts here rather than fabricating one. 11 of the 12
     # entries on disk are Quaternius; that is the creator this pipeline knows how to extend.
     pack = formats.pack_root(Path(payload["asset"]))
-    entry = attribution.find_entry(project, "Quaternius", pack.name)
-    if entry is not None:
-        print(f"[9/10] credits..... {attribution.extend_assets_used(entry, [display])}")
-    else:
+    try:
+        entry = attribution.find_entry(project, "Quaternius", pack.name)
+    except attribution.AmbiguousEntry as exc:
+        print(f"[9/10] credits..... HALT {exc}")
+        return 1
+    if entry is None:
         print(f"[9/10] credits..... NO ENTRY for pack {pack.name!r} -- a new "
               f"AttributionEntry is a licensing decision, not a generated file. Halting.")
         return 1
-    godot.regenerate_credits(tree)
+    print(f"[9/10] credits..... {attribution.extend_assets_used(entry, [display])}")
+    _preserve_license(pack, project, tree)
+    godot.regenerate_credits(tree, repo)
 
-    passed, output = godot.run_tests(tree)
+    passed, output = godot.run_tests(tree, repo=repo)
     print(f"[10/10] tests...... {'PASS' if passed else 'FAIL'}")
     if not passed:
         print(output[-2000:])
@@ -346,6 +580,84 @@ def resume(run_id: str, repo: Path) -> int:
     ok, log_path = build(repo)
     print(f"build....... {'OK' if ok else 'FAILED'} ({log_path})")
     return 0 if ok else 1
+
+
+def _copy_stage(adapter_name: str, tree: Path, display: str, ident: str,
+                payload: dict) -> None:
+    """The GER copy pipelines, per the design's adapter table.
+
+    fact_card takes a DISPLAY name; style_guide takes a species ID. Both run from the
+    WORKTREE's copy (cwd=tree) because they resolve their repo root from __file__ --
+    invoking the main checkout's copy would patch the main checkout while this run
+    believes it is sandboxed.
+
+    Both were invoked with check=False and a success line printed regardless of outcome.
+    Both carry a hardcoded ROSTER (fact_card_pipeline.py:146-160,
+    style_guide_pipeline.py:154), and a newly imported species is by definition absent from
+    it, so both exit non-zero with "unknown species" -- and the animal run then died at
+    stage 10 on AnimalDefinition.validate() rejecting an empty fact_text_pool, with nothing
+    connecting that failure back to here. The ROSTER limitation is pre-existing and out of
+    this branch's scope, so this reports honestly rather than halting.
+    """
+    if adapter_name == "terrain":
+        # The spec's terrain copy row is "none": terrain has no fact cards and no
+        # WARN_/DEPART_/MOVE_ lines. Running fact_card_pipeline here would look for
+        # project/data/animals/<id>.tres, which for a terrain type does not exist.
+        print("[8/10] copy........ skipped -- the spec's terrain copy row is 'none'")
+        return
+
+    cmd = ["python3", "scripts/fact_card_pipeline.py", display, "--count", "2"]
+    if adapter_name == "building":
+        # Task 13 added --target building_text for exactly the spec's building row.
+        # Without it the run patches project/data/animals/<id>.tres instead of
+        # project/data/buildings/<id>.tres -- the wrong file, or none at all.
+        cmd += ["--target", "building_text"]
+    rc = subprocess.run(cmd, cwd=tree, check=False).returncode
+    if rc == 0:
+        print("[8/10] copy........ fact_card_pipeline (worktree copy)")
+    else:
+        print(f"[8/10] copy........ FAILED rc={rc} -- fact_card_pipeline wrote NOTHING. "
+              f"Its ROSTER is hardcoded, so {display!r} has to be added there before it "
+              f"can generate copy. Stage 10 will fail for an animal until you do: "
+              f"AnimalDefinition.validate() rejects an empty fact_text_pool.")
+
+    # Gentle Displacement copy is ANIMALS ONLY -- displacement_copy.gd has WARN_/DEPART_/
+    # MOVE_ lines per species; buildings and terrain have none. Without this a new animal
+    # ships with fact cards but falls through to WARN_GENERIC, which is exactly the gap
+    # style_guide_pipeline.py exists to close.
+    if payload["adapter"] == "animal":
+        rc = subprocess.run(["python3", "scripts/style_guide_pipeline.py", ident,
+                             "--line-type", "all"], cwd=tree, check=False).returncode
+        if rc == 0:
+            print("[8/10] copy........ style_guide_pipeline (WARN/DEPART/MOVE)")
+        else:
+            print(f"[8/10] copy........ FAILED rc={rc} -- style_guide_pipeline wrote "
+                  f"NOTHING. Its ROSTER is hardcoded too, so {ident!r} needs adding "
+                  f"there. Until then this animal falls through to WARN_GENERIC.")
+
+
+def _preserve_license(pack: Path, project: Path, tree: Path) -> None:
+    """Keep the pack's licence text in the repo alongside the credit.
+
+    art.md's rule is that a link can rot and a compliance review must be answerable
+    offline. attribution.copy_license_text() was implemented and traversal-hardened but
+    never called by any stage. An already-present file is left alone: the three licences
+    on disk today were curated by hand, and overwriting one would be a silent edit to a
+    compliance record.
+    """
+    filename = attribution.license_filename("Quaternius", pack.name)
+    dest = project / "assets" / "licenses" / filename
+    if dest.is_file():
+        print(f"[9/10] licence..... {filename} already preserved")
+        return
+    copied = attribution.copy_license_text(pack, project, filename)
+    if copied is None:
+        print(f"[9/10] licence..... no License.txt in {pack.name!r} -- nothing to preserve "
+              f"offline; the entry's license_url stays the only record")
+    else:
+        print(f"[9/10] licence..... {copied.relative_to(tree)} -- point the entry's "
+              f"license_file field at it yourself; editing an AttributionEntry is a "
+              f"licensing decision, not a generated write")
 
 
 def main() -> int:
