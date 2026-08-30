@@ -98,6 +98,7 @@ const WARN_HUMAN_HOUSE: String = (
 )
 const WARN_HUMAN: String = "The farm family will look for a house with good soil around it."
 const WARN_GENERIC: String = "The {display_name} family will look for a new home of their own."
+const WARN_PIG: String = "The Pig family's home is open ground with crops."  # pipeline-generated (2026-08-30, scripts/style_guide_pipeline.py) -- AWAITING CONTENT-WRITER SIGN-OFF
 const WARN_HORSE: String = "The Horse family lives in grassy fields and gardens."  # pipeline-generated (2026-08-17, scripts/style_guide_pipeline.py) -- AWAITING CONTENT-WRITER SIGN-OFF
 const WARN_DEER: String = "The Deer family lives here in open sunny spaces and in the trees."  # pipeline-generated (2026-08-17, scripts/style_guide_pipeline.py) -- AWAITING CONTENT-WRITER SIGN-OFF
 const WARN_SHIBA_INU: String = "The Shiba Inu family will need to find a home with open grassy space."  # pipeline-generated (2026-08-17, scripts/style_guide_pipeline.py) -- AWAITING CONTENT-WRITER SIGN-OFF
@@ -159,6 +160,7 @@ const _WARN_STRUCTURE: Dictionary = {
 	"shiba_inu": WARN_SHIBA_INU,
 	"deer": WARN_DEER,
 	"horse": WARN_HORSE,
+	"pig": WARN_PIG,
 }
 
 ## The ordinary-home register: a den, a warren, a patch of ground.
@@ -170,6 +172,7 @@ const _WARN_HOME: Dictionary = {
 	"shiba_inu": WARN_SHIBA_INU,
 	"deer": WARN_DEER,
 	"horse": WARN_HORSE,
+	"pig": WARN_PIG,
 }
 
 ## The refinement that only becomes reachable when the payload names the binding need. Keyed
@@ -191,6 +194,7 @@ const DEPART_FOX: String = "The fox family moved away to find a new den in the w
 const DEPART_RABBIT: String = "The rabbit family moved away to find open grass of their own."
 const DEPART_HUMAN: String = "The farm family went off to farm somewhere sunnier."
 const DEPART_GENERIC: String = "The {display_name} family moved away to find a new home."
+const DEPART_PIG: String = "The Pig family found a home with plenty of space and soft ground to explore."  # pipeline-generated (2026-08-30, scripts/style_guide_pipeline.py) -- AWAITING CONTENT-WRITER SIGN-OFF
 const DEPART_HORSE: String = "The Horse family found a new home where the grasslands and farmland meet."  # pipeline-generated (2026-08-17, scripts/style_guide_pipeline.py) -- AWAITING CONTENT-WRITER SIGN-OFF
 const DEPART_DEER: String = "The Deer family found a new home with tall trees and soft ground for grazing."  # pipeline-generated (2026-08-17, scripts/style_guide_pipeline.py) -- AWAITING CONTENT-WRITER SIGN-OFF
 const DEPART_SHIBA_INU: String = "The Shiba Inu family found a new home with a cozy shelter and lots of space to run and play."  # pipeline-generated (2026-08-17, scripts/style_guide_pipeline.py) -- AWAITING CONTENT-WRITER SIGN-OFF
@@ -204,6 +208,7 @@ const _DEPART: Dictionary = {
 	"shiba_inu": DEPART_SHIBA_INU,
 	"deer": DEPART_DEER,
 	"horse": DEPART_HORSE,
+	"pig": DEPART_PIG,
 }
 
 
@@ -224,6 +229,7 @@ const MOVE_FOX: String = "The fox family moved their den to a new spot in the wo
 const MOVE_RABBIT: String = "The rabbit family moved their warren to a new patch of grass."
 const MOVE_HUMAN: String = "The farm family moved into a house with more room to grow."
 const MOVE_GENERIC: String = "The {display_name} family moved their home to a new spot."
+const MOVE_PIG: String = "The Pig family found a new home in an open field."  # pipeline-generated (2026-08-30, scripts/style_guide_pipeline.py) -- AWAITING CONTENT-WRITER SIGN-OFF
 const MOVE_HORSE: String = "The horse family found a new pasture with plenty of room to roam."  # pipeline-generated (2026-08-17, scripts/style_guide_pipeline.py) -- AWAITING CONTENT-WRITER SIGN-OFF
 const MOVE_DEER: String = "The Deer family moved to the meadow."  # pipeline-generated (2026-08-17, scripts/style_guide_pipeline.py) -- AWAITING CONTENT-WRITER SIGN-OFF
 const MOVE_SHIBA_INU: String = "The Shiba Inu family has a new home with shelter and space to play."  # pipeline-generated (2026-08-17, scripts/style_guide_pipeline.py) -- AWAITING CONTENT-WRITER SIGN-OFF
@@ -237,6 +243,7 @@ const _MOVE: Dictionary = {
 	"shiba_inu": MOVE_SHIBA_INU,
 	"deer": MOVE_DEER,
 	"horse": MOVE_HORSE,
+	"pig": MOVE_PIG,
 }
 
 

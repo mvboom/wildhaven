@@ -1,0 +1,80 @@
+{
+  "species_id": "pig",
+  "species_display_name": "Pig",
+  "generator_model": "claude-haiku-4-5-20251001",
+  "evaluator_model": "claude-opus-5",
+  "max_refine": 3,
+  "requested_count": 2,
+  "accepted_fact_texts": [
+    "Pigs have amazing snouts packed with thousands of smell receptors! Their sense of smell is one of the best in the whole animal world.",
+    "Pigs are some of the smartest animals and can even recognize individual faces and sounds. They love rolling in mud\u2014not because they're dirty, but to stay cool on hot days!"
+  ],
+  "candidates": [
+    {
+      "status": "accepted",
+      "fact_text": "Pigs have amazing snouts packed with thousands of smell receptors! Their sense of smell is one of the best in the whole animal world.",
+      "attempts": [
+        {
+          "attempt": 1,
+          "fact_text": "Pigs are super smart animals that can recognize themselves in mirrors! Their snouts have an amazing sense of smell so powerful they can find truffles buried deep underground.",
+          "source_note": "Wikipedia article on Pig \u2014 verified facts about pig intelligence (mirror self-recognition), physical features (snout structure), and olfactory abilities (truffle detection).",
+          "deterministic": {
+            "passed": true,
+            "problems": []
+          },
+          "llm_judge": {
+            "passed": false,
+            "problems": [
+              "Plausibility/sourcing: the mirror claim overstates the science. Published work (Broadbent & Held, 2009) shows pigs can use a mirror to locate food they can see reflected \u2014 mirror-guided problem solving, not mirror self-recognition. Pigs have not passed the mark test, so 'recognize themselves in mirrors' is not source-grounded and should be reworded to something like using a mirror to find a snack.",
+              "Minor accuracy stretch: truffles grow a few inches to roughly a foot below the surface, so 'buried deep underground' overstates it; 'buried under the soil' would be truer and just as fun."
+            ],
+            "skipped": false
+          },
+          "passed": false
+        },
+        {
+          "attempt": 2,
+          "fact_text": "Pigs have amazing snouts packed with thousands of smell receptors! Their sense of smell is one of the best in the whole animal world.",
+          "source_note": "kids.nationalgeographic.com (National Geographic Kids pig article) and en.wikipedia.org (Pig Wikipedia article) confirm pigs possess over 1,100 genes for smell receptors, enabling exceptional olfactory abilities.",
+          "deterministic": {
+            "passed": true,
+            "problems": []
+          },
+          "llm_judge": {
+            "passed": true,
+            "problems": [],
+            "skipped": false
+          },
+          "passed": true
+        }
+      ]
+    },
+    {
+      "status": "accepted",
+      "fact_text": "Pigs are some of the smartest animals and can even recognize individual faces and sounds. They love rolling in mud\u2014not because they're dirty, but to stay cool on hot days!",
+      "attempts": [
+        {
+          "attempt": 1,
+          "fact_text": "Pigs are some of the smartest animals and can even recognize individual faces and sounds. They love rolling in mud\u2014not because they're dirty, but to stay cool on hot days!",
+          "source_note": "kids.nationalgeographic.com (pig facts article) and en.wikipedia.org (pig intelligence and behavior)",
+          "deterministic": {
+            "passed": true,
+            "problems": []
+          },
+          "llm_judge": {
+            "passed": true,
+            "problems": [],
+            "skipped": false
+          },
+          "passed": true
+        }
+      ]
+    }
+  ],
+  "cost": {
+    "in": 114,
+    "out": 10672,
+    "usd": 0.639717,
+    "usd_known": true
+  }
+}

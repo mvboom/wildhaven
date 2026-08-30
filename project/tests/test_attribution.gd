@@ -31,7 +31,7 @@ func _init() -> void:
 	# count is a deliberate ratchet — it is supposed to fail when an entry lands, so that
 	# adding a source is a decision and not a side effect. Bumped here because the two
 	# entries are part of the same run, not to silence it.
-	check_eq(entries.size(), 12, "12 attribution sources on disk")
+	check_eq(entries.size(), 13, "13 attribution sources on disk")
 
 	var binding: Array = []
 	var by_id: Dictionary = {}
