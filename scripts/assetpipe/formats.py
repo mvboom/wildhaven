@@ -14,6 +14,7 @@ the one that costs a wasted import when it is wrong (game-design's asset-audit s
 from __future__ import annotations
 
 import json
+import os
 import re
 import struct
 from dataclasses import dataclass, field
@@ -71,7 +72,12 @@ def probe(path: Path) -> ModelProbe:
         return probe_gltf(path)
     if ext == ".fbx":
         return probe_fbx(path)
-    # obj/mtl/blend carry no skeleton this pipeline can use.
+    if ext == ".blend":
+        # Lazy: assetpipe.blender imports ModelProbe from here, so a module-level import
+        # would be circular. Reading a .blend's actions needs no Blender installed.
+        from assetpipe import blender
+        return blender.probe_blend(path)
+    # obj/mtl carry no skeleton this pipeline can use.
     return ModelProbe(fmt=ext.lstrip("."))
 
 
@@ -83,9 +89,18 @@ RANK = ("blend", "obj", "fbx", "gltf", "glb")
 ASSETS_ROOT = Path("source-content/assets")
 
 _REJECTIONS = {
-    "blend": "blender_path is not configured in project.godot",
     "obj": "no skeleton or animation",
 }
+
+# A .blend is usable only if we can convert it. Checked at resolution time so it is never
+# chosen and then found unconvertible at import.
+_NO_BLENDER = ("Blender not found -- put it on PATH or set BLENDER_PATH; a .blend is "
+               "only a candidate when it can be converted to glTF")
+
+
+def _blender_available() -> bool:
+    from assetpipe import blender  # lazy: see probe()
+    return blender.available()
 
 
 @dataclass
@@ -130,7 +145,10 @@ def resolve(asset: Path, needs_rig: bool, assets_root: Path = ASSETS_ROOT) -> Re
 
     for ext in found:
         if ext == "blend":
-            rejected[ext] = _REJECTIONS["blend"]
+            if not _blender_available():
+                rejected[ext] = _NO_BLENDER
+                continue
+            usable.append(ext)
         elif ext == "obj" and needs_rig:
             rejected[ext] = _REJECTIONS["obj"]
         else:
@@ -143,10 +161,36 @@ def resolve(asset: Path, needs_rig: bool, assets_root: Path = ASSETS_ROOT) -> Re
                 ", ".join(sorted(found)) or "nothing"),
         )
 
-    best = max(usable, key=RANK.index)
+    # For a RIGGED need the animations are the whole point, so prefer the source that
+    # actually carries more of them, tie-broken by RANK toward the format needing no
+    # conversion. Real case: Pig's fbx has 2 of the 6 actions its .blend holds, and the
+    # four it dropped include Walk -- the clip the animal gate requires. Static content
+    # ignores clip counts and keeps the plain ranking.
+    # CAVEAT on the comparison: a .blend's action names are read exactly (ID blocks), but
+    # the FBX side is the binary "Armature|<name>" heuristic, which can OVER-report -- the
+    # real Cow.fbx scans as 8 when it holds 6. Outcomes here are still right (an inflated
+    # fbx only ever wins a tie it would already win), but a large enough over-read could in
+    # principle mask a genuinely richer .blend. The post-import Godot test enumerates the
+    # real AnimationPlayer and remains the authority, as it does for the audit gate.
+    counts = {ext: len(probe(found[ext]).clips) for ext in usable} if needs_rig else {}
+    if needs_rig:
+        best = max(usable, key=lambda e: (counts[e], RANK.index(e)))
+    else:
+        best = max(usable, key=RANK.index)
     for ext in usable:
         if ext != best:
             rejected[ext] = f"{best} outranks it"
+
+    if needs_rig and len(usable) > 1:
+        runner = max((e for e in usable if e != best),
+                     key=lambda e: (counts[e], RANK.index(e)))
+        if counts[best] > counts[runner]:
+            prefix = "" if any(e in found for e in ("gltf", "glb")) else "no gltf in pack; "
+            return Resolution(
+                chosen=best, chosen_path=found[best], probe=probe(found[best]),
+                rejected=rejected,
+                reason=(f"{prefix}{best} carries {counts[best]} clips vs "
+                        f"{runner}'s {counts[runner]}"))
 
     preferred_present = any(e in found for e in ("gltf", "glb"))
     reason = (
@@ -204,8 +248,20 @@ def selftest_cases(c) -> None:
         r = resolve(pack / "FBX" / "Pig.fbx", needs_rig=True, assets_root=d / "assets")
         c.eq(r.chosen, "fbx", "animal with no gltf resolves to fbx")
         c.eq(r.rejected.get("obj"), "no skeleton or animation", "obj rejected for a rigged need")
-        c.eq(r.rejected.get("blend"), "blender_path is not configured in project.godot",
-             "blend always rejected")
+        # Force unavailability: Blender may or may not be installed on a given machine,
+        # and this assertion must mean the same thing either way.
+        _sv = os.environ.get("BLENDER_PATH")
+        os.environ["BLENDER_PATH"] = ""
+        try:
+            r_nb = resolve(pack / "FBX" / "Pig.fbx", needs_rig=True,
+                           assets_root=d / "assets")
+            c.check("Blender" in (r_nb.rejected.get("blend") or ""),
+                    "with no Blender, blend is rejected and the reason says why")
+        finally:
+            if _sv is None:
+                os.environ.pop("BLENDER_PATH", None)
+            else:
+                os.environ["BLENDER_PATH"] = _sv
         c.check("no gltf" in r.reason, "reason names the missing preferred format")
 
         (pack / "GLTF").mkdir()
@@ -218,6 +274,48 @@ def selftest_cases(c) -> None:
 
         r3 = resolve(pack / "OBJ" / "Pig.obj", needs_rig=False, assets_root=d / "assets")
         c.eq(r3.chosen, "gltf", "static need still prefers gltf when present")
+
+        # --- .blend selection, when Blender is available -----------------------
+        # Farm Animals is the real case: Pig's FBX carries 2 of the 6 actions its .blend
+        # holds, and the four it dropped include Walk -- the clip the animal gate requires.
+        fake_blender = d / "fake-blender"
+        fake_blender.write_text("#!/bin/sh\n")
+        _saved = os.environ.get("BLENDER_PATH")
+        os.environ["BLENDER_PATH"] = str(fake_blender)
+        try:
+            farm = d / "assets" / "Farm Animals"
+            (farm / "FBX").mkdir(parents=True)
+            (farm / "Blends").mkdir(parents=True)
+            (farm / "FBX" / "Pig.fbx").write_bytes(
+                b"\x00Armature|Idle\x00Armature|Jump\x00")
+            (farm / "Blends" / "Pig.blend").write_bytes(
+                b"BLENDER-v279\x00ACDeath\x00ACIdle\x00ACJump\x00ACRun\x00"
+                b"ACWalk\x00ACWalkSlow\x00")
+            rp = resolve(farm / "FBX" / "Pig.fbx", needs_rig=True, assets_root=d / "assets")
+            c.eq(rp.chosen, "blend", "a richer .blend beats a thin fbx for a rigged need")
+            c.check("6" in rp.reason and "2" in rp.reason,
+                    "the reason states the clip counts it compared")
+            c.eq(sorted(rp.probe.clips)[:2], ["Death", "Idle"],
+                 "resolution carries the .blend's own clips")
+
+            # Cow is the counter-case: its FBX is complete, so nothing should convert.
+            (farm / "FBX" / "Cow.fbx").write_bytes(
+                b"\x00Armature|Death\x00Armature|Idle\x00Armature|Jump\x00"
+                b"Armature|Run\x00Armature|Walk\x00Armature|WalkSlow\x00")
+            (farm / "Blends" / "Cow.blend").write_bytes(
+                b"BLENDER-v279\x00ACDeath\x00ACIdle\x00ACJump\x00ACRun\x00"
+                b"ACWalk\x00ACWalkSlow\x00")
+            rc_ = resolve(farm / "FBX" / "Cow.fbx", needs_rig=True, assets_root=d / "assets")
+            c.eq(rc_.chosen, "fbx", "an equally rich fbx wins the tie -- no needless convert")
+
+            # Static content ignores clip counts entirely.
+            rs = resolve(farm / "FBX" / "Pig.fbx", needs_rig=False, assets_root=d / "assets")
+            c.eq(rs.chosen, "fbx", "a static need keeps the static ranking")
+        finally:
+            if _saved is None:
+                os.environ.pop("BLENDER_PATH", None)
+            else:
+                os.environ["BLENDER_PATH"] = _saved
 
         stat = d / "assets" / "Static Pack"
         stat.mkdir(parents=True)

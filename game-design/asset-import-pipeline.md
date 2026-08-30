@@ -37,6 +37,12 @@ project/assets/<category>/<name>/<Name>.tscn          ← hand-authored wrapper 
 - **The wrapper scene is always hand-authored as text, never built via the Godot MCP
   `create_scene`/`add_node` tools.** gdd.md's Technical Strategy #3 documents why: those tools
   write non-standard properties that silently corrupt the scene. Write the `.tscn` directly.
+- **`.blend` sources are CONVERTED, not copied.** `scripts/asset_pipeline.py` runs
+  Blender headless to export a `.blend` to `<Name>.gltf` in the conventional path, so
+  what the project holds is still a plain glTF and nothing downstream needs Blender.
+  Conversion is chosen only when the `.blend` carries more animation clips than the
+  other formats in the pack: four of `Farm Animals by @Quaternius`'s FBX exports drop
+  four of the six actions their `.blend` holds, including `Walk`.
 - **Animated models:** the wrapper's `AnimationPlayer` sets `autoplay = "Idle"` — the spawn
   smoke test and the look-pass both depend on an idle clip playing without code triggering it.
 

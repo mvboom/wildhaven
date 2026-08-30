@@ -141,6 +141,19 @@ def copy_model(resolution, project: Path, category: str, name: str,
     dest = dest_dir(project, category, name)
     dest.mkdir(parents=True, exist_ok=True)
     src = resolution.chosen_path
+
+    if resolution.chosen == "blend":
+        # CONVERTED, not copied. The .blend stays in source-content; what the project
+        # commits is a plain glTF, so build-game.sh, a web export, CI and a fresh clone
+        # never need Blender. export_gltf verifies the produced glTF still carries the
+        # actions the .blend advertised -- these are BLENDER-v279 files and a modern
+        # Blender can drop things opening them.
+        from assetpipe import blender  # lazy: mirrors formats.probe's cycle break
+        before = {p for p in dest.iterdir()}
+        out = blender.export_gltf(src, dest, display)
+        written = sorted(p for p in dest.iterdir() if p.is_file() and p not in before)
+        return written or [out]
+
     target = dest / f"{display}{src.suffix}"
     shutil.copy2(src, target)
     written = [target]
@@ -295,6 +308,33 @@ def selftest_cases(c) -> None:
         imp = (proj / "assets" / "animals" / "pig" / "Pig.fbx.import").read_text()
         c.check("fbx/importer=0" in imp, ".import pins the built-in ufbx importer")
         c.check("animation/import=true" in imp, ".import keeps animation import on")
+
+        # A .blend is CONVERTED into the destination, not copied -- the artifact the
+        # project commits is a plain glTF, so nothing downstream needs Blender. Stubbed
+        # here: running a real Blender would make the suite slow and machine-dependent.
+        from assetpipe import blender as _bl
+        _real = _bl.export_gltf
+        def _fake(blend, dest_dir, name):
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            out = dest_dir / f"{name}.gltf"
+            out.write_text('{"animations": [], "meshes": [], "nodes": [], "skins": []}')
+            (dest_dir / f"{name}.bin").write_bytes(b"BIN")
+            return out
+        _bl.export_gltf = _fake
+        try:
+            blend_src = src / "Sheep.blend"
+            blend_src.write_bytes(b"BLENDER-v279\x00ACWalk\x00ACIdle\x00")
+            res_b = Resolution("blend", blend_src,
+                               ModelProbe(fmt="blend", clips=["Idle", "Walk"]), "r", {})
+            proj_b = d / "project_blend"
+            got = copy_model(res_b, proj_b, "animals", "sheep", "Sheep")
+            names = sorted(p.name for p in got)
+            c.eq(names, ["Sheep.bin", "Sheep.gltf"],
+                 "a .blend is converted into the destination, with its .bin")
+            c.check(not (dest_dir(proj_b, "animals", "sheep") / "Sheep.blend").exists(),
+                    "the .blend itself is NOT copied into the project")
+        finally:
+            _bl.export_gltf = _real
 
         plain = wrapper_text("Pig", "animals", "pig", "Pig.fbx", 0.2, "CC0-1.0", None)
         c.check("[gd_scene load_steps=2 format=3]" in plain, "wrapper header is valid")
