@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import re
 import shutil
+from dataclasses import dataclass, field
 from pathlib import Path
 
 
@@ -136,8 +137,27 @@ def dest_dir(project: Path, category: str, name: str) -> Path:
     return project / "assets" / category / name
 
 
+@dataclass
+class CopiedModel:
+    """What copy_model actually put in the destination.
+
+    `model` is the file the WRAPPER must reference, and it is NOT always named after the
+    source. A .blend is CONVERTED: the source is Pig.blend, the committed artifact is
+    Pig.gltf, and the .blend is deliberately never copied. Building the wrapper from the
+    source's suffix therefore produced a .tscn pointing at a file that does not exist --
+    Godot instanced nothing, anim_index came back -1, and the generated test asserted
+    clips against an empty scene. Exposing the written filename is what stops the next
+    converting format reintroducing that.
+
+    `files` is everything written, for the operator-facing count only.
+    """
+
+    model: Path
+    files: list[Path] = field(default_factory=list)
+
+
 def copy_model(resolution, project: Path, category: str, name: str,
-               display: str) -> list[Path]:
+               display: str) -> CopiedModel:
     dest = dest_dir(project, category, name)
     dest.mkdir(parents=True, exist_ok=True)
     src = resolution.chosen_path
@@ -149,10 +169,13 @@ def copy_model(resolution, project: Path, category: str, name: str,
         # actions the .blend advertised -- these are BLENDER-v279 files and a modern
         # Blender can drop things opening them.
         from assetpipe import blender  # lazy: mirrors formats.probe's cycle break
-        before = {p for p in dest.iterdir()}
         out = blender.export_gltf(src, dest, display)
-        written = sorted(p for p in dest.iterdir() if p.is_file() and p not in before)
-        return written or [out]
+        # What the exporter PRODUCED, read out of the glTF it wrote -- its own buffer and
+        # image uris. A directory diff under-reported on a re-run (the .bin was already
+        # there, so it vanished from the list) and counted directories as written files.
+        # material_deps also hard-fails if the export referenced something it did not
+        # write, which is a real check on the conversion rather than bookkeeping.
+        return CopiedModel(model=out, files=[out, *material_deps(out, "gltf")])
 
     target = dest / f"{display}{src.suffix}"
     shutil.copy2(src, target)
@@ -162,7 +185,7 @@ def copy_model(resolution, project: Path, category: str, name: str,
         written.append(dest / dep.name)
     if resolution.chosen == "fbx":
         write_import_file(target)
-    return written
+    return CopiedModel(model=target, files=written)
 
 
 def write_import_file(model: Path) -> Path:
@@ -302,7 +325,9 @@ def selftest_cases(c) -> None:
         copied = copy_model(res, proj, "animals", "pig", "Pig")
         c.check((proj / "assets" / "animals" / "pig" / "Pig.fbx").is_file(),
                 "model copied under its display name")
-        c.eq(len(copied), 1, "copy reports what it wrote")
+        c.eq(len(copied.files), 1, "copy reports what it wrote")
+        c.eq(copied.model.name, "Pig.fbx",
+             "copy reports the model filename the wrapper must reference")
         c.check((proj / "assets" / "animals" / "pig" / "Pig.fbx.import").is_file(),
                 "fbx gets an authored .import")
         imp = (proj / "assets" / "animals" / "pig" / "Pig.fbx.import").read_text()
@@ -315,9 +340,14 @@ def selftest_cases(c) -> None:
         from assetpipe import blender as _bl
         _real = _bl.export_gltf
         def _fake(blend, dest_dir, name):
+            # Shaped like a real GLTF_SEPARATE export: the .gltf REFERENCES its .bin, the
+            # way Blender writes it. The stub used to write an unreferenced .bin, which no
+            # assertion could have distinguished from a lost buffer.
             dest_dir.mkdir(parents=True, exist_ok=True)
             out = dest_dir / f"{name}.gltf"
-            out.write_text('{"animations": [], "meshes": [], "nodes": [], "skins": []}')
+            out.write_text(json.dumps(
+                {"animations": [], "meshes": [], "nodes": [], "skins": [],
+                 "buffers": [{"byteLength": 3, "uri": f"{name}.bin"}]}))
             (dest_dir / f"{name}.bin").write_bytes(b"BIN")
             return out
         _bl.export_gltf = _fake
@@ -328,11 +358,39 @@ def selftest_cases(c) -> None:
                                ModelProbe(fmt="blend", clips=["Idle", "Walk"]), "r", {})
             proj_b = d / "project_blend"
             got = copy_model(res_b, proj_b, "animals", "sheep", "Sheep")
-            names = sorted(p.name for p in got)
+            names = sorted(p.name for p in got.files)
             c.eq(names, ["Sheep.bin", "Sheep.gltf"],
                  "a .blend is converted into the destination, with its .bin")
             c.check(not (dest_dir(proj_b, "animals", "sheep") / "Sheep.blend").exists(),
                     "the .blend itself is NOT copied into the project")
+
+            # REGRESSION, review MINOR: the written list was a directory DIFF, so a
+            # re-run into a populated destination reported only the files that happened
+            # not to be there already -- second run dropped the .bin. What the exporter
+            # produced is read from the glTF it wrote, not inferred from the directory.
+            again = copy_model(res_b, proj_b, "animals", "sheep", "Sheep")
+            c.eq(sorted(p.name for p in again.files), ["Sheep.bin", "Sheep.gltf"],
+                 "a re-run into a populated destination still reports every file written")
+
+            # REGRESSION, review CRITICAL 1: the wrapper's model filename was built from
+            # the SOURCE suffix, so a converted .blend yielded a .tscn pointing at
+            # Sheep.blend -- a file copy_model deliberately never writes. Conversion and
+            # wrapper were each verified in isolation and never joined. This joins them:
+            # it runs the copy + wrapper sequence exactly as asset_pipeline.run() does and
+            # asserts the reference resolves to a file that is actually on disk.
+            proj_e = d / "project_e2e"
+            copied_e = copy_model(res_b, proj_e, "animals", "sheep", "Sheep")
+            write_wrapper(proj_e, "animals", "sheep", "Sheep", copied_e.model.name,
+                          0.2, "CC0-1.0", None)
+            dest_e = dest_dir(proj_e, "animals", "sheep")
+            ref = re.search(r'path="res://assets/animals/sheep/([^"]+)"',
+                            (dest_e / "Sheep.tscn").read_text())
+            c.check(ref is not None, "the converted .blend's wrapper carries an ext_resource")
+            named = ref.group(1) if ref else ""
+            c.eq(named, "Sheep.gltf",
+                 "a converted .blend's wrapper names the glTF, not the .blend")
+            c.check((dest_e / named).is_file(),
+                    f"the wrapper's ext_resource names a file that EXISTS (got {named!r})")
         finally:
             _bl.export_gltf = _real
 

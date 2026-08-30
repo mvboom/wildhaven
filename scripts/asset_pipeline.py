@@ -111,6 +111,18 @@ def _selftest_cli(c) -> None:
         c.check(not any("0.2" in line for line in code_only),
                 "resume hardcodes no scale of its own")
 
+        # REGRESSION, review CRITICAL 1: both write_wrapper call sites built the model
+        # filename from the SOURCE's suffix, so a converted .blend produced a .tscn
+        # pointing at Pig.blend -- a file copy_model deliberately never writes. The
+        # filename must come from what copy_model WROTE, so the next converting format
+        # cannot reintroduce this. The joint behaviour is asserted in
+        # importer.selftest_cases; this guards the call sites.
+        run_src = inspect.getsource(run)
+        c.check("chosen_path.suffix" not in run_src,
+                "run() no longer names the wrapper's model file after the SOURCE suffix")
+        c.eq(run_src.count("copied.model.name"), 2,
+             "both write_wrapper call sites use the filename copy_model actually wrote")
+
         # REGRESSION, whole-branch review IMPORTANT 17: copy_license_text was implemented,
         # hardened, tested and never called.
         c.check("attribution.copy_license_text" in inspect.getsource(_preserve_license),
@@ -325,11 +337,15 @@ def run(asset: Path, adapter_name: str, repo: Path, notes: str = "",
             return 1
         print("[3/10] dedupe...... no match")
 
-        written = importer.copy_model(resolution, project, spec.category, ident, display)
+        # The wrapper's model file is the one copy_model WROTE, never the source's
+        # suffix: a .blend is converted, so the source is Pig.blend and the artifact is
+        # Pig.gltf. Naming it after the source produced a .tscn referencing a file the
+        # pipeline deliberately never copies.
+        copied = importer.copy_model(resolution, project, spec.category, ident, display)
         importer.write_wrapper(project, spec.category, ident, display,
-                               f"{display}{resolution.chosen_path.suffix}",
+                               copied.model.name,
                                0.2, gate.evidence["license"], None, spec.schema)
-        print(f"[4/10] import...... {len(written)} file(s) -> "
+        print(f"[4/10] import...... {len(copied.files)} file(s) -> "
               f"{importer.dest_dir(project, spec.category, ident)}")
 
         godot.import_project(tree, repo)
@@ -337,7 +353,7 @@ def run(asset: Path, adapter_name: str, repo: Path, notes: str = "",
         idx = godot.anim_index(tree, scene_res, repo) if spec.required_clips else -1
         if idx >= 0:
             importer.write_wrapper(project, spec.category, ident, display,
-                                   f"{display}{resolution.chosen_path.suffix}", 0.2,
+                                   copied.model.name, 0.2,
                                    gate.evidence["license"], idx, spec.schema)
             godot.import_project(tree, repo)
         godot.write_import_test(tree, ident, display, spec.category,
