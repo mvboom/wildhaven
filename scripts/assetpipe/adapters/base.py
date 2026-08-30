@@ -40,11 +40,20 @@ def tres_value(v: object) -> str:
         return str(v)
     if isinstance(v, (list, tuple)):
         items = list(v)
-        if items and all(isinstance(i, int) and not isinstance(i, bool) for i in items) \
-                and len(items) == 2:
+        if len(items) == 2 and all(
+                isinstance(i, int) and not isinstance(i, bool) for i in items):
             return f"Vector2i({items[0]}, {items[1]})"
-        inner = ", ".join(f'"{i}"' for i in items)
-        return f"Array[String]([{inner}])"
+        # Only an ALL-STRING list may take the Array[String] branch. Falling through with
+        # ints, floats or bools would emit Array[String](["1", "2", "3"]) -- syntactically
+        # valid Godot that parses happily and is wrong, which is precisely the silent
+        # misparse this formatter exists to prevent. An empty list is all-string
+        # vacuously, so Array[String]([]) still renders.
+        if all(isinstance(i, str) for i in items):
+            inner = ", ".join(f'"{i}"' for i in items)
+            return f"Array[String]([{inner}])"
+        raise TypeError(
+            f"no .tres rendering for list {v!r}: only an all-string list "
+            f"(Array[String]) or a 2-int list (Vector2i) is renderable")
     raise TypeError(f"no .tres rendering for {type(v).__name__}: {v!r}")
 
 
@@ -94,3 +103,12 @@ def selftest_cases(c) -> None:
     c.check('habitat_needs = Array[String](["cultivated"])' in text, "typed array emitted")
     c.check("farm_tolerant = true" in text, "bool emitted")
     c.check('id = "pig"' in text and 'display_name = "Pig"' in text, "identity fields")
+
+    c.eq(tres_value([]), "Array[String]([])", "empty list still renders as a typed array")
+    for bad in ([1, 2, 3], [5], [True, False], [1.5, 2.5], ["a", 1]):
+        raised = False
+        try:
+            tres_value(bad)
+        except TypeError:
+            raised = True
+        c.check(raised, f"tres_value({bad!r}) raises rather than stringifying silently")
