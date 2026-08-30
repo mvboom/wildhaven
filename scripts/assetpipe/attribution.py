@@ -94,7 +94,17 @@ def new_entry_text(**fields) -> str:
 
 
 def copy_license_text(pack: Path, project: Path, filename: str) -> Path | None:
-    """A link can rot; a compliance review must be answerable offline."""
+    """A link can rot; a compliance review must be answerable offline.
+
+    `filename` must be a BARE name. This writes a compliance record, so a path separator
+    or an absolute path is refused rather than silently placing a licence file outside
+    project/assets/licenses/ -- verified escapable otherwise: "../../../x.txt" wrote
+    three levels above the destination, and an absolute path ignored it entirely.
+    """
+    if not filename or Path(filename).name != filename:
+        raise ValueError(
+            f"licence filename must be a bare name with no path separator, "
+            f"got {filename!r}")
     for name in ("License.txt", "LICENSE", "LICENSE.txt", "license.txt"):
         src = pack / name
         if src.is_file():
@@ -163,3 +173,32 @@ def selftest_cases(c) -> None:
         c.eq(dest.read_text(), "CC0 text here", "copied verbatim")
         c.eq(copy_license_text(Path(td) / "nopack", proj, "x.txt"), None,
              "a pack with no licence file yields None, not a crash")
+
+        # Filename validation: bare names are accepted
+        dest2 = copy_license_text(pack, proj, "Another_Test_License.txt")
+        c.check(dest2 is not None and dest2.is_file(),
+                "bare filename still copies successfully")
+
+        # Path traversal is rejected
+        try:
+            copy_license_text(pack, proj, "../escape.txt")
+            c.check(False, "path traversal ../escape.txt should raise ValueError")
+        except ValueError as e:
+            c.check("bare name" in str(e), "path traversal raises ValueError")
+            escape_parent = proj / "attribution"
+            c.check(not (escape_parent / "escape.txt").is_file(),
+                    "no file created outside licenses directory on path traversal")
+
+        # Absolute path is rejected
+        try:
+            copy_license_text(pack, proj, "/tmp/absolute.txt")
+            c.check(False, "absolute path /tmp/absolute.txt should raise ValueError")
+        except ValueError as e:
+            c.check("bare name" in str(e), "absolute path raises ValueError")
+
+        # Empty filename is rejected
+        try:
+            copy_license_text(pack, proj, "")
+            c.check(False, "empty filename should raise ValueError")
+        except ValueError as e:
+            c.check("bare name" in str(e), "empty filename raises ValueError")
