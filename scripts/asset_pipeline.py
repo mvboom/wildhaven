@@ -167,6 +167,15 @@ def _selftest_cli(c) -> None:
         c.eq(validate_asset_path(good, assets_root=inside_root), [],
              "a real asset under the assets root passes")
 
+    # REGRESSION, review MINOR: the suite is offline, and resolve() asks
+    # _blender_available() for every .blend candidate -- which with no override is
+    # shutil.which("blender") followed by a real launch. On this machine that started
+    # /snap/bin/blender, the exact build that dies under a confined sandbox after burning
+    # the timeout, and made the verdict machine-dependent.
+    c.check("_pinned_blender" in inspect.getsource(formats.selftest_cases),
+            "format resolution's cases pin BLENDER_PATH -- the suite never launches the "
+            "machine's own Blender")
+
     c.check("traceback.print_exc()" in inspect.getsource(run),
             "run()'s handler prints the traceback, not just str(exc)")
     c.check("traceback.print_exc()" in inspect.getsource(resume),

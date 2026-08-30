@@ -13,6 +13,7 @@ the one that costs a wasted import when it is wrong (game-design's asset-audit s
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import re
@@ -97,6 +98,10 @@ def probe(path: Path) -> ModelProbe:
 RANK = ("blend", "obj", "fbx", "gltf", "glb")
 
 ASSETS_ROOT = Path("source-content/assets")
+
+# Named here as well as in assetpipe.blender so the selftest can pin it without a
+# module-level import of blender (which would be circular -- see probe()).
+BLENDER_ENV_NAME = "BLENDER_PATH"
 
 OBJ_REJECTION = "no skeleton or animation"
 
@@ -237,9 +242,31 @@ def resolve(asset: Path, needs_rig: bool, assets_root: Path = ASSETS_ROOT,
                       reason=reason, rejected=rejected)
 
 
+@contextlib.contextmanager
+def _pinned_blender(path: str):
+    """Pin BLENDER_PATH for the duration, and put it back afterwards.
+
+    HERMETIC SUITE. resolve() asks _blender_available() for every .blend candidate, and
+    with no override that is shutil.which("blender") followed by an actual launch -- so an
+    offline selftest would start whatever Blender the machine has, wait up to 60s for a
+    snap build to die under its sandbox, and reach a different verdict per machine. Pinned
+    to "" the answer is "no Blender", deterministically and without spawning anything;
+    the blocks below that want the opposite pin a fake executable of their own.
+    """
+    saved = os.environ.get(BLENDER_ENV_NAME)
+    os.environ[BLENDER_ENV_NAME] = path
+    try:
+        yield
+    finally:
+        if saved is None:
+            os.environ.pop(BLENDER_ENV_NAME, None)
+        else:
+            os.environ[BLENDER_ENV_NAME] = saved
+
+
 def selftest_cases(c) -> None:
     import tempfile
-    with tempfile.TemporaryDirectory() as td:
+    with tempfile.TemporaryDirectory() as td, _pinned_blender(""):
         d = Path(td)
 
         gltf = d / "Deer.gltf"

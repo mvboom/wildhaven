@@ -39,7 +39,14 @@ BLENDER_ENV = "BLENDER_PATH"
 # Blender stores each Action as an ID block whose name is prefixed "AC". Reading them is a
 # pure file read -- no Blender needed -- so the audit gate can judge a .blend before any
 # conversion is attempted, and the whole selftest stays offline.
-_ACTION = re.compile(rb"AC([A-Za-z][A-Za-z0-9_.\- ]{2,30})\x00")
+#
+# NAME LENGTH: 2 to 31 characters. The old floor of 3 silently dropped a two-character
+# action with no way to notice. Widening it was measured, not assumed: across 120 real
+# .blend files in source-content/assets it adds exactly zero names, so it costs no
+# precision here. A ONE-character name is still dropped, deliberately -- this is a
+# heuristic scan over a megabyte of binary, and "AC" plus a single letter plus a NUL is
+# common enough as noise that the floor is worth keeping somewhere.
+_ACTION = re.compile(rb"AC([A-Za-z][A-Za-z0-9_.\- ]{1,30})\x00")
 
 
 def binary() -> str | None:
@@ -266,13 +273,43 @@ def selftest_cases(c) -> None:
             else:
                 os.environ[BLENDER_ENV] = _sv_op
 
-        # binary() honours the env override without requiring Blender to exist.
+        # A two-character action name is short but legal, and the pattern's old floor of
+        # three dropped it silently. Widening was measured against 120 real .blend files
+        # in source-content/assets: zero extra names, so no precision was traded away.
+        two_char = d / "Ox.blend"
+        two_char.write_bytes(b"BLENDER-v279\x00ACGo\x00ACIdle\x00")
+        c.eq(probe_blend(two_char).clips, ["Go", "Idle"],
+             "a two-character action name is read, not silently dropped")
+
+        # The parser, against a REAL file, rather than hand-built bytes that only encode
+        # the regex's own assumptions. Seven BLENDER-v279 files ship in-repo and each
+        # holds the same six actions; Pig is the headline case, since its fbx dropped four
+        # of them including Walk -- the clip the animal audit gate requires.
+        real = Path("source-content/assets/Farm Animals by @Quaternius/Blends/Pig.blend")
+        if real.is_file():
+            rp = probe_blend(real)
+            c.eq(rp.unreadable, None, "the real Pig.blend parses")
+            c.eq(rp.clips, ["Death", "Idle", "Jump", "Run", "Walk", "WalkSlow"],
+                 "the real BLENDER-v279 Pig.blend yields its six real actions")
+            c.check("Walk" in rp.clips,
+                    "including Walk, the clip its fbx dropped and the audit gate demands")
+        else:
+            c.check(True, "real .blend parse check skipped, source-content not on this path")
+
+        # binary() honours the env override without requiring Blender to exist. HERMETIC:
+        # this block must never fall through to shutil.which() and LAUNCH whatever Blender
+        # the machine happens to have -- a snap build sits on PATH and burns the 60s
+        # timeout, which is the one non-offline step an offline suite cannot afford. The
+        # predecessor here asserted isinstance(available(), bool), which cannot fail.
         saved = os.environ.get(BLENDER_ENV)
         try:
             os.environ[BLENDER_ENV] = "/nonexistent/blender"
             c.eq(binary(), "/nonexistent/blender", "BLENDER_PATH overrides discovery")
-            os.environ.pop(BLENDER_ENV)
-            c.check(isinstance(available(), bool), "available() answers without raising")
+            os.environ[BLENDER_ENV] = ""
+            c.eq(binary(), None,
+                 "an empty BLENDER_PATH means 'no Blender', not 'go looking on PATH'")
+            c.check(not available(),
+                    "and available() answers False for it without launching anything")
         finally:
             if saved is None:
                 os.environ.pop(BLENDER_ENV, None)
