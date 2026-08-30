@@ -75,6 +75,10 @@ def write(project: Path, ident: str, display: str, values: dict, header: str) ->
         header,
     )
     text += 'model_scenes = Array[PackedScene]([ExtResource("2_model")])\n'
+    # The anchor stage 8's `--target building_text` run replaces -- see animal.write.
+    # PlaceableDefinition.validate() flags a placeholder, and the empty string is what
+    # the existing building .tres files carry until copy lands.
+    text += 'fact_text = ""\n'
     path = project / "data" / SPEC.data_dir / f"{ident}.tres"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text)
@@ -123,3 +127,10 @@ def selftest_cases(c) -> None:
         c.check("footprint = Vector2i(1, 1)" in text, "footprint renders as Vector2i")
         c.check('hotbar_category = "farm_building"' in text, "category written")
         c.check("model_scenes = Array[PackedScene]" in text, "model wired")
+        # Same gap as animal's fact_text_pool: fact_card_pipeline --target building_text
+        # replaces a `fact_text = "..."` line (fact_card_pipeline.py:547) and will not
+        # invent one. PlaceableDefinition declares the field
+        # (placeable_definition.gd:67), so an empty one is valid and is what the
+        # existing barn/windmill .tres files carry before copy lands.
+        c.check('fact_text = ""' in text,
+                "an empty fact_text line is emitted for stage 8 to replace")

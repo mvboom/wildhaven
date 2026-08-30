@@ -76,7 +76,7 @@ source_name = "{source_name}"
 source_version = "{source_version}"
 creator_url = "{creator_url}"
 source_url = "{source_url}"
-support_url = ""
+support_url = "{support_url}"
 license_name = "{license_name}"
 license_url = "{license_url}"
 license_file = "{license_file}"
@@ -163,6 +163,7 @@ def new_entry_text(**fields) -> str:
         license_name=fields.get("license_name", ""),
         license_url=fields.get("license_url", ""),
         license_file=fields.get("license_file", ""),
+        support_url=fields.get("support_url", ""),
         attribution_required="true" if required else "false",
         required_notice=notice, assets=assets)
 
@@ -187,6 +188,97 @@ def copy_license_text(pack: Path, project: Path, filename: str) -> Path | None:
             shutil.copy2(src, dest)
             return dest
     return None
+
+
+class UnautomatableLicence(RuntimeError):
+    """The pack's licence was cleared, but its OBLIGATIONS cannot be read off the file.
+
+    Clearing a licence and stating what it requires are different questions. The audit
+    gate answers the first from a text match; the second decides what must appear in
+    CREDITS.md, and getting it wrong is a compliance failure rather than a bad guess.
+    Only licences in AUTOMATABLE_LICENCES answer both from the file itself.
+    """
+
+
+# A licence belongs here only if the pack's own licence text states the obligation, so
+# nothing is inferred. CC0 does: it requires no attribution, which is why every
+# quaternius_*.tres on disk carries attribution_required = false. A Synty store EULA
+# does not -- its terms live in a contract the pack does not ship, so it is refused.
+AUTOMATABLE_LICENCES = {
+    "CC0-1.0": {
+        "license_name": "CC0 1.0 Universal (CC0 1.0) Public Domain Dedication",
+        "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "attribution_required": False,
+        "required_notice": "",
+    },
+}
+
+_URL = re.compile(r"https?://[^\s\"'<>)]+")
+
+
+def support_url_of(pack: Path) -> str:
+    """The support link the pack's licence text asks for, if it names one.
+
+    quaternius_ultimate_animated_animals.tres records its Patreon "because the pack's
+    License.txt asks for it, not because anything requires it" -- so this reads the same
+    file rather than hardcoding a creator's URL.
+    """
+    for name in ("License.txt", "LICENSE", "LICENSE.txt", "license.txt"):
+        path = pack / name
+        if path.is_file():
+            for url in _URL.findall(path.read_text(errors="ignore")):
+                if "patreon.com" in url:
+                    return url.rstrip(".,")
+            return ""
+    return ""
+
+
+def new_entry_for_pack(project: Path, pack: Path, creator: str, license_id: str,
+                       license_evidence: str, assets: list[str]) -> Path:
+    """Author the pack's AttributionEntry from the licence the audit gate already cleared.
+
+    Stage 2 refuses to import anything whose licence it cannot clear from the pack's own
+    License.txt. Once that gate passes, using the asset and recording where it came from
+    are the same decision -- so leaving the entry to a later hand-edit shipped art with
+    no credit. Refuses to touch an entry that exists (extend_assets_used is that path)
+    and refuses any licence whose obligations are not stated by the file.
+    """
+    terms = AUTOMATABLE_LICENCES.get(license_id)
+    if terms is None:
+        raise UnautomatableLicence(
+            f"licence {license_id or '(none cleared)'!r} for pack {pack.name!r}: this "
+            f"pipeline generates an entry only when the pack's own licence text states "
+            f"the attribution obligation, and this one does not. Author "
+            f"project/attribution/sources/{entry_id(creator, normalize_pack_name(pack.name))}"
+            f".tres by hand -- attribution_entry.gd's doc comment gives the shape.")
+
+    ident = entry_id(creator, normalize_pack_name(pack.name))
+    path = project / "attribution" / "sources" / f"{ident}.tres"
+    if path.exists():
+        raise FileExistsError(
+            f"{path} already exists -- extend its assets_used instead of regenerating it")
+
+    text = new_entry_text(
+        entry_id=ident, creator=creator, source_name=normalize_pack_name(pack.name),
+        source_version="", creator_url="", source_url="",
+        license_name=terms["license_name"], license_url=terms["license_url"],
+        license_file=f"res://assets/licenses/{license_filename(creator, pack.name)}",
+        support_url=support_url_of(pack),
+        attribution_required=terms["attribution_required"],
+        required_notice=terms["required_notice"], assets_used=assets)
+    # The audit evidence, so a compliance review can retrace the clearance without
+    # re-running the pipeline, and the standing instruction every hand-written entry
+    # carries: extend this one, never open a second for the same pack.
+    text = text.replace(
+        'notes = "Added by scripts/asset_pipeline.py."',
+        f'notes = "Generated by scripts/asset_pipeline.py from the pack\'s own licence '
+        f'text: {license_evidence}. creator_url/source_url are blank -- the licence file '
+        f'does not state them, and inventing a URL in a compliance record is worse than '
+        f'leaving it empty. As each further model from this pack is imported, append its '
+        f'name to assets_used -- do NOT create a second entry for this pack."')
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text)
+    return path
 
 
 def selftest_cases(c) -> None:
@@ -355,3 +447,73 @@ def selftest_cases(c) -> None:
             c.check(False, "empty filename should raise ValueError")
         except ValueError as e:
             c.check("bare name" in str(e), "empty filename raises ValueError")
+
+    # --- authoring a NEW entry from the audited licence ----------------------
+    # Stage 2 already CLEARS the licence from the pack's own License.txt before a single
+    # byte is imported; refusing to record what that gate accepted left a pack in the
+    # game with no credit at all. So the entry is generated from that same evidence --
+    # but only for a licence whose obligations the file itself states.
+    with tempfile.TemporaryDirectory() as td:
+        proj = Path(td) / "project"
+        (proj / "attribution" / "sources").mkdir(parents=True)
+        pack = Path(td) / "Farm Animals by @Quaternius"
+        pack.mkdir()
+        (pack / "License.txt").write_text(
+            "Farm Animals Pack by Quaternius\n"
+            "Consider supporting me on Patreon, even $1 helps me a lot!\n"
+            "https://www.patreon.com/quaternius\n"
+            "License:\nCC0 1.0 Universal (CC0 1.0) \nPublic Domain Dedication\n"
+            "https://creativecommons.org/publicdomain/zero/1.0/\n")
+
+        written = new_entry_for_pack(proj, pack, "Quaternius", "CC0-1.0",
+                                     "License.txt: matched 'cc0'", ["Pig"])
+        c.eq(written.name, "quaternius_farm_animals_by_quaternius.tres",
+             "the entry lands at the id find_entry looks for")
+        c.eq(find_entry(proj, "Quaternius", pack.name), written,
+             "and find_entry now resolves the pack it just refused")
+
+        text = written.read_text()
+        c.check('script_class="AttributionEntry"' in text, "a real AttributionEntry")
+        c.check('license_name = "CC0 1.0 Universal' in text, "the cleared licence, named")
+        c.check("creativecommons.org/publicdomain/zero/1.0" in text, "with its url")
+        c.check("attribution_required = false" in text,
+                "CC0 carries no obligation -- generate_credits.gd fails closed otherwise")
+        c.check('required_notice = ""' in text, "and so no notice")
+        c.check('assets_used = PackedStringArray("Pig")' in text, "the asset is listed")
+        c.check("patreon.com/quaternius" in text,
+                "the support url the pack's own licence file asks for")
+        c.check("Quaternius_FarmAnimalsByQuaternius_License.txt" in text,
+                "license_file points at the preserved text, not just a url")
+        c.check("License.txt: matched 'cc0'" in text,
+                "the audit evidence travels with the entry, so a review can retrace it")
+
+        # Extending is still the common path: an entry that exists is never rewritten.
+        overwritten = False
+        try:
+            new_entry_for_pack(proj, pack, "Quaternius", "CC0-1.0", "e", ["Cow"])
+        except FileExistsError:
+            overwritten = True
+        c.check(overwritten, "an existing entry is never regenerated over")
+        c.check("Cow" not in written.read_text(), "and its assets_used is untouched")
+
+        # A licence whose obligations are not stated by the file is NOT automated.
+        synty = Path(td) / "Synty SIMPLE Pack"; synty.mkdir()
+        refused = ""
+        try:
+            new_entry_for_pack(proj, synty, "Synty", "Synty Store EULA (SIMPLE)", "e", ["X"])
+        except UnautomatableLicence as exc:
+            refused = str(exc)
+        c.check("Synty Store EULA (SIMPLE)" in refused,
+                "a store EULA is named as the reason it cannot be generated")
+        c.check("obligation" in refused.lower(),
+                "because the obligation is the thing that cannot be derived")
+
+        blank = ""
+        try:
+            new_entry_for_pack(proj, pack, "Quaternius", "", "e", ["X"])
+        except UnautomatableLicence as exc:
+            blank = str(exc)
+        c.check(blank != "", "an uncleared licence never reaches entry generation")
+
+    c.eq(sorted(AUTOMATABLE_LICENCES), ["CC0-1.0"],
+         "exactly one licence family is safe to record without a human reading it")

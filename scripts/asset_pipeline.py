@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Wildhaven Asset Pipeline -- raw asset in, built game out.
 
 Takes a path under source-content/assets/ and carries it through assess, import,
@@ -14,16 +15,18 @@ Run:
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import subprocess
 import sys
+import time
 import traceback
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from assetpipe.harness import Checks
-from assetpipe import blender, attribution, audit, dedupe, formats, importer, llm, review, runlog, worktree, godot
+from assetpipe import checkpoint, tracker, blender, attribution, audit, dedupe, formats, importer, llm, review, runlog, worktree, godot
 from assetpipe.adapters import animal, building, terrain
 
 ADAPTERS = ("animal", "building", "terrain")
@@ -76,6 +79,119 @@ def _selftest_cli(c) -> None:
     _lines_same = "\n".join(_resolution_report(Path("/p/Blends/Pig.blend"), _same))
     c.check("instead of" not in _lines_same,
             "no substitution note when the chosen format is the one pointed at")
+
+
+
+
+    # --- stage 7's tracker stub ----------------------------------------------
+    # content-pipeline-status.md's field owners all patch a section they assume exists;
+    # nothing created it, so a new species could not be recorded by the pipeline that
+    # imported it. These cover the rows stage 7 can honestly state, not tracker.py's
+    # placement logic (tracker.selftest_cases owns that).
+    _rows = dict(_tracker_rows(
+        {"asset": "source-content/assets/Farm Animals by @Quaternius/Blends/Pig.blend",
+         "deferred": [{"check": "silhouette",
+                       "evidence": {"license": "CC0-1.0",
+                                    "license_evidence": "License.txt: matched 'cc0'",
+                                    "clips": ["Idle", "Walk"]}}]},
+        "20260830-pig-45cd", "project/data/animals/pig.tres",
+        "project/assets/animals/pig/Pig.tscn"))
+    c.check("CC0-1.0" in _rows["source"], "the audited licence is recorded, not guessed")
+    c.check("Farm Animals by @Quaternius" in _rows["source"], "and the pack it came from")
+    c.check("2" in _rows["pre_import_audit"], "the clip count the audit actually found")
+    c.eq(_rows["project_location"], "`project/assets/animals/pig/Pig.tscn`",
+         "the wrapper is the project location, never the raw model")
+    c.eq(_rows["data_entry_location"], "`project/data/animals/pig.tres`", "the .tres")
+    c.check("pending" in _rows["copy_content_location"],
+            "copy is pending -- stage 8 owns this row and overwrites it")
+    for _f in ("attribution_status", "validation_status", "human_signoff", "status"):
+        c.check(_f in _rows, f"the stub carries a `{_f}` row for its owner to fill")
+    c.check("\U0001f6a7" in _rows["status"], "a new item starts in-progress, never done")
+    c.check("not" in _rows["human_signoff"].lower(),
+            "sign-off is never claimed by the pipeline")
+
+    # --- stage 8's style_guide verdict ---------------------------------------
+    # rc=1 from style_guide_pipeline means "at least one line ESCALATED" -- the
+    # circuit breaker kept the best draft, wrote it, and marked it AWAITING
+    # CONTENT-WRITER SIGN-OFF (style_guide_pipeline.py:900). The Pig run reported
+    # "wrote NOTHING ... run it by hand for the real error" over three lines that were
+    # sitting in displacement_copy.gd, sending the operator after an error that did not
+    # exist. The log is the evidence; rc alone is not.
+    import json as _json
+    import tempfile as _tf
+    with _tf.TemporaryDirectory() as _td:
+        _tree = Path(_td)
+        _out = _tree / "scripts" / "style_guide_pipeline_output"
+        _out.mkdir(parents=True)
+        _out.joinpath("pig.json").write_text(_json.dumps({"line_results": {
+            "warn": {"status": "escalated", "score": 8,
+                     "text": "The pig family needs farmland and grassland."},
+            "depart": {"status": "escalated", "score": 8, "text": "d"},
+            "move": {"status": "accepted", "score": 10, "text": "m"}}}))
+
+        _line = _style_guide_report(_tree, "pig", 1)
+        c.check("wrote 3 line(s)" in _line,
+                "an escalated run reports what it WROTE, not that it wrote nothing")
+        c.check("2 escalated" in _line, "and how many fell short of the bar")
+        c.check("warn" in _line and "depart" in _line,
+                "naming the line types the human must review")
+        c.check("NOTHING" not in _line, "the false 'wrote NOTHING' claim is gone")
+        c.check("sign-off" in _line.lower(),
+                "the operator is told the copy landed awaiting sign-off")
+
+        c.eq(_style_guide_report(_tree, "pig", 0),
+             "style_guide_pipeline (WARN/DEPART/MOVE)",
+             "rc=0 keeps the plain success line")
+
+        # No log at all IS the real failure this message used to claim: the run died
+        # before writing anything, and only then is "run it by hand" the right advice.
+        _hard = _style_guide_report(_tree, "goose", 1)
+        c.check("no log" in _hard and "goose" in _hard,
+                "a missing log is reported as a genuine failure")
+        c.check("by hand" in _hard, "and that is where the by-hand advice belongs")
+
+    # --- interactive checkpoint wiring ---------------------------------------
+    # checkpoint.py owns the prompt loop; these cover only the two things
+    # asset_pipeline.py adds: the kinds map the loop is driven with, and what the
+    # operator's answers turn into -- resume, halt, or abandon.
+    _kinds = _field_kinds(animal.SPEC)
+    for _f in animal.SPEC.fields:
+        c.eq(_kinds[_f.name], _f.kind, f"{_f.name}'s kind comes from its FieldSpec")
+
+    def _drive(answers, payload):
+        it = iter(answers)
+        return _interactive_checkpoint(payload, _kinds, lambda _p: next(it), lambda _l: None)
+
+    def _payload():
+        return {"decisions": [
+            {"field": "scout_radius", "proposal": 8, "value": None, "source": "s",
+             "confidence": "low"},
+            {"field": "farm_tolerant", "proposal": True, "value": None, "source": "s",
+             "confidence": "low"},
+        ]}
+
+    _action, _ruled = _drive(["", ""], _payload())
+    c.eq(_action, "resume", "ruling every field resumes the run without a second command")
+    c.eq([d["value"] for d in _ruled["decisions"]], [8, True],
+         "the rulings are written into the payload through apply_rulings")
+
+    _action, _ruled = _drive([checkpoint.SKIP, ""], _payload())
+    c.eq(_action, "halt", "a skipped field halts instead of resuming")
+    c.check(review.unruled(_ruled) == ["scout_radius"],
+            "and the skipped field is still unruled, so resume names it")
+
+    _action, _ruled = _drive([checkpoint.ABANDON], _payload())
+    c.eq(_action, "abandon", "a abandons the run")
+    c.eq(_ruled, None, "an abandoned checkpoint writes no rulings")
+
+    c.check("--no-interactive" in _parser().format_help(),
+            "--no-interactive is offered for non-TTY and scripted use")
+    c.check(not _should_prompt(interactive=True, isatty=False),
+            "a non-TTY run never prompts, so CI and piped runs halt as before")
+    c.check(not _should_prompt(interactive=False, isatty=True),
+            "--no-interactive forces the old file-based behaviour on a TTY")
+    c.check(_should_prompt(interactive=True, isatty=True),
+            "a plain terminal run prompts")
 
     c.eq(slug("Shiba Inu"), "shiba_inu", "display name to id")
     c.eq(slug("Common Tree 1"), "common_tree_1", "digits preserved")
@@ -134,14 +250,22 @@ def _selftest_cli(c) -> None:
         copy_src = inspect.getsource(_copy_stage)
         c.eq(copy_src.count("check=False).returncode"), 2,
              "both copy pipelines' return codes are captured, not discarded")
-        c.eq(copy_src.count("FAILED rc={rc}"), 2,
-             "a non-zero copy stage reports the code instead of printing success")
+        c.eq(copy_src.count("FAILED rc={rc}"), 1,
+             "fact_card's non-zero return reports the code instead of printing success")
         c.check("if rc == 0:" in copy_src,
-                "the success line is printed only on a zero return code")
-        c.eq(copy_src.count("ROSTER is DERIVED"), 2,
-             "both failure messages describe the DERIVED roster, not the hardcode "
-             "da039b1 removed -- they used to send the operator editing a list that no "
+                "fact_card's success line is printed only on a zero return code")
+        c.eq(copy_src.count("ROSTER is DERIVED"), 1,
+             "fact_card's failure message describes the DERIVED roster, not the hardcode "
+             "da039b1 removed -- it used to send the operator editing a list that no "
              "longer exists")
+        # style_guide's verdict moved into _style_guide_report, because its rc conflates
+        # "escalated, and written" with "failed, and wrote nothing". Its return code is
+        # still captured; what changed is that the LOG decides which message is printed.
+        c.check("_style_guide_report(tree, ident, rc)" in copy_src,
+                "style_guide's outcome is reported from its log, not from rc alone")
+        sg_src = inspect.getsource(_style_guide_report)
+        c.check("line_results" in sg_src and "escalated" in sg_src,
+                "and that report reads the run's own per-line verdicts")
 
         # REGRESSION, whole-branch review IMPORTANT 5: the ruled model_scale never reached
         # the wrapper, which is the only place scale lives.
@@ -275,6 +399,8 @@ def selftest() -> int:
     worktree.selftest_cases(c)
     importer.selftest_cases(c)
     blender.selftest_cases(c)
+    checkpoint.selftest_cases(c)
+    tracker.selftest_cases(c)
     base.selftest_cases(c)
     animal.selftest_cases(c)
     building.selftest_cases(c)
@@ -283,6 +409,32 @@ def selftest() -> int:
     godot.selftest_cases(c)
     _selftest_cli(c)
     return c.report("SELFTEST")
+
+
+def _field_kinds(spec) -> dict:
+    """Field name to FieldSpec.kind, so the prompt loop parses what the operator types
+    as the type the .tres will hold rather than as a string."""
+    return {f.name: f.kind for f in spec.fields}
+
+
+def _should_prompt(interactive: bool, isatty: bool) -> bool:
+    """Prompting requires both a terminal to prompt on and the operator not having
+    opted out. Off a TTY -- CI, a piped run, this pipeline driven from a Claude Code
+    Bash call -- `input` would raise on the first field, so the run halts at
+    review.json exactly as it always did."""
+    return interactive and isatty
+
+
+def _interactive_checkpoint(payload: dict, kinds: dict, input_fn, output_fn):
+    """Rule the checkpoint in the terminal. Returns (action, payload):
+    "resume" with every field ruled, "halt" when the operator skipped some (the
+    skipped ones stay null, so `resume` still refuses and names them), or
+    ("abandon", None). Side effects belong to the caller -- this decides only."""
+    rulings = checkpoint.prompt_rulings(payload, kinds, input_fn, output_fn)
+    if rulings is None:
+        return "abandon", None
+    ruled = review.apply_rulings(payload, rulings)
+    return ("resume" if review.ready(ruled) else "halt"), ruled
 
 
 def _format_cost_line(cost: dict) -> str:
@@ -337,7 +489,8 @@ def _validate(module, adapter_name: str, ident: str, mode: str | None,
 
 
 def run(asset: Path, adapter_name: str, repo: Path, notes: str = "",
-        dry_run: bool = False, variant_of: str | None = None) -> int:
+        dry_run: bool = False, variant_of: str | None = None,
+        interactive: bool = True) -> int:
     module = ADAPTER_MODULES[adapter_name]
     spec = module.SPEC
     display = asset.stem
@@ -464,6 +617,25 @@ def run(asset: Path, adapter_name: str, repo: Path, notes: str = "",
 
         print(f"\n=== CHECKPOINT === {len(review.unruled(payload))} field(s) await your ruling")
         print(f"  cost: {_format_cost_line(cost)}")
+
+        if _should_prompt(interactive, sys.stdin.isatty()):
+            try:
+                action, ruled = _interactive_checkpoint(
+                    payload, _field_kinds(spec), input, print)
+            except (EOFError, KeyboardInterrupt):
+                # Ctrl-D or Ctrl-C mid-prompt is not a ruling. Fall through to the
+                # file-based halt with the run intact -- nothing typed so far is kept,
+                # because a half-answered checkpoint is not a decision.
+                print("\n  interrupted; nothing ruled.")
+                action, ruled = "halt", payload
+            if action == "abandon":
+                return abandon_run(run_id, repo)
+            review.write(log.dir / "review.json", ruled)
+            if action == "resume":
+                return resume(run_id, repo)
+            payload = ruled
+            print(f"  {len(review.unruled(payload))} field(s) still unruled.")
+
         print(f"  {log.dir / 'review.json'}")
         print(f"  resume:  python3 scripts/asset_pipeline.py --resume {run_id}")
         print(f"  abandon: python3 scripts/asset_pipeline.py --abandon {run_id}")
@@ -618,24 +790,54 @@ def _resume_stages(run_id: str, repo: Path, payload: dict, module, adapter_name:
         path = module.write(project, ident, display, values, header)
         print(f"[7/10] data entry.. {path.relative_to(tree)}")
 
+    # BEFORE the copy stage, deliberately: fact_card_pipeline patches this item's
+    # `copy_content_location` row and reports "tracker not updated" when the section is
+    # absent -- which it always was, for anything the pipeline had just imported.
+    wrapper_rel = (importer.dest_dir(project, module.SPEC.category, ident)
+                   / f"{display}.tscn").relative_to(tree)
+    # A terrain variant has no .tres of its own -- it was appended to the host type's
+    # model_scenes -- so its data-entry row names the host, not a file that never exists.
+    tres_path = (project / "data" / "terrain" / f"{payload['variant_of']}.tres"
+                 if mode == "variant"
+                 else project / "data" / module.SPEC.data_dir / f"{ident}.tres")
+    tres_rel = tres_path.relative_to(tree)
+    print(f"[7/10] tracker..... " + tracker.ensure_section(
+        tree / "game-design" / "content-pipeline-status.md",
+        module.SPEC.category, ident, display,
+        _tracker_rows(payload, run_id, str(tres_rel), str(wrapper_rel))))
+
     _copy_stage(adapter_name, tree, display, ident, payload)
 
-    # Extending an existing pack's AttributionEntry is a generated-file operation; creating
-    # a NEW entry is a licensing decision that belongs to game-design/art.md, not this
-    # pipeline -- so a missing entry halts here rather than fabricating one. 11 of the 12
-    # entries on disk are Quaternius; that is the creator this pipeline knows how to extend.
+    # Extending an existing pack's entry is the common path. A pack with NO entry used to
+    # halt here: authoring one was called a licensing decision. But stage 2 has already
+    # CLEARED the licence from the pack's own License.txt -- refusing to record what that
+    # gate accepted meant the pipeline would import art and ship it uncredited. Using the
+    # asset and crediting it are one decision, so the entry is generated from the same
+    # evidence. What is still refused is a licence whose OBLIGATIONS the file does not
+    # state (a store EULA): that halts, because guessing there is a compliance failure.
     pack = formats.pack_root(Path(payload["asset"]))
     try:
         entry = attribution.find_entry(project, "Quaternius", pack.name)
     except attribution.AmbiguousEntry as exc:
         print(f"[9/10] credits..... HALT {exc}")
         return 1
-    if entry is None:
-        print(f"[9/10] credits..... NO ENTRY for pack {pack.name!r} -- a new "
-              f"AttributionEntry is a licensing decision, not a generated file. Halting.")
-        return 1
-    print(f"[9/10] credits..... {attribution.extend_assets_used(entry, [display])}")
+
+    # Before the entry, so its license_file names a file that is actually on disk.
     _preserve_license(pack, project, tree)
+
+    if entry is None:
+        evidence = (payload.get("deferred") or [{}])[0].get("evidence", {})
+        try:
+            entry = attribution.new_entry_for_pack(
+                project, pack, "Quaternius", evidence.get("license", ""),
+                evidence.get("license_evidence", "no evidence recorded"), [display])
+        except attribution.UnautomatableLicence as exc:
+            print(f"[9/10] credits..... HALT {exc}")
+            return 1
+        print(f"[9/10] credits..... new entry {entry.relative_to(tree)} "
+              f"({evidence.get('license', '')}, assets_used=[{display!r}])")
+    else:
+        print(f"[9/10] credits..... {attribution.extend_assets_used(entry, [display])}")
     godot.regenerate_credits(tree, repo)
 
     passed, output = godot.run_tests(tree, repo=repo)
@@ -656,6 +858,78 @@ def _resume_stages(run_id: str, repo: Path, payload: dict, module, adapter_name:
     ok, log_path = build(repo)
     print(f"build....... {'OK' if ok else 'FAILED'} ({log_path})")
     return 0 if ok else 1
+
+
+def _tracker_rows(payload: dict, run_id: str, tres_rel: str,
+                  wrapper_rel: str) -> list[tuple[str, str]]:
+    """The rows stage 7 can state as fact, and pending markers for the rest.
+
+    Every other field has its own write-owner (content-pipeline-status.md's rule), so the
+    stub claims none of them: stage 8's fact_card_pipeline overwrites
+    copy_content_location, and attribution, validation and sign-off stay visibly open.
+    """
+    evidence = (payload.get("deferred") or [{}])[0].get("evidence", {})
+    pack = formats.pack_root(Path(payload["asset"])).name
+    licence = evidence.get("license", "unrecorded")
+    clips = evidence.get("clips", [])
+    today = time.strftime("%Y-%m-%d")
+    return [
+        ("category_attributes",
+         f"proposed by `scripts/asset_pipeline.py` run `{run_id}` and ruled by the human "
+         f"at its checkpoint \u2014 per-field sourcing is in the `.tres` header"),
+        ("source", f"Quaternius, \"{pack}\" \u2014 {licence} "
+                   f"({evidence.get('license_evidence', 'no evidence recorded')})"),
+        ("pre_import_audit",
+         f"done ({today}) \u2014 {len(clips)} animation clip(s) confirmed"
+         + (f" including {', '.join(clips[:4])}" if clips else "")
+         + f"; licence cleared as {licence}. Silhouette/style fit DEFERRED \u2014 the "
+           f"pipeline does not eyeball art, so it is part of human sign-off"),
+        ("project_location", f"`{wrapper_rel}`"),
+        ("data_entry_location", f"`{tres_rel}`"),
+        ("copy_content_location",
+         "pending \u2014 `scripts/fact_card_pipeline.py` owns this row and writes it at "
+         "stage 8"),
+        ("attribution_status", "pending \u2014 stage 9 records the entry and regenerates "
+                               "`project/CREDITS.md`"),
+        ("validation_status", "pending \u2014 stage 10 runs the headless suite"),
+        ("human_signoff", "not started"),
+        ("status", "\U0001f6a7 \u2014 imported by the asset pipeline; copy, attribution, "
+                   "validation and sign-off still open"),
+    ]
+
+
+def _style_guide_report(tree: Path, ident: str, rc: int) -> str:
+    """What stage 8's Gentle Displacement run actually did.
+
+    style_guide_pipeline returns 1 when ANY line type escalated -- the GER circuit
+    breaker never reached the 10/10 bar, so it kept the highest-scoring draft, WROTE it
+    into displacement_copy.gd and marked it AWAITING CONTENT-WRITER SIGN-OFF. That is a
+    quality verdict on copy that exists, not a failure to produce copy, and reading it
+    as the latter cost a real run an hour of chasing an error that was never raised.
+    The per-run log carries the verdict; the return code cannot distinguish the two.
+    """
+    if rc == 0:
+        return "style_guide_pipeline (WARN/DEPART/MOVE)"
+
+    log = tree / "scripts" / "style_guide_pipeline_output" / f"{ident}.json"
+    if not log.is_file():
+        return (f"style_guide_pipeline FAILED rc={rc} and left no log at "
+                f"{log.relative_to(tree)} -- nothing was generated for {ident!r}. Run it "
+                f"by hand for the real error: python3 scripts/style_guide_pipeline.py "
+                f"{ident} --line-type all")
+
+    results = json.loads(log.read_text()).get("line_results", {})
+    escalated = [lt for lt, r in results.items() if r.get("status") == "escalated"]
+    if not escalated:
+        return (f"style_guide_pipeline rc={rc} with no escalated line in "
+                f"{log.relative_to(tree)} -- read it; the failure is elsewhere.")
+
+    scores = ", ".join(f"{lt} {results[lt].get('score', '?')}/10" for lt in escalated)
+    return (f"style_guide_pipeline wrote {len(results)} line(s) into "
+            f"displacement_copy.gd, {len(escalated)} escalated ({scores}) -- the best "
+            f"draft was kept and marked AWAITING CONTENT-WRITER SIGN-OFF, so this is a "
+            f"copy-quality verdict for the human, not a failed write. Log: "
+            f"{log.relative_to(tree)}")
 
 
 def _copy_stage(adapter_name: str, tree: Path, display: str, ident: str,
@@ -708,13 +982,7 @@ def _copy_stage(adapter_name: str, tree: Path, display: str, ident: str,
     if payload["adapter"] == "animal":
         rc = subprocess.run(["python3", "scripts/style_guide_pipeline.py", ident,
                              "--line-type", "all"], cwd=tree, check=False).returncode
-        if rc == 0:
-            print("[8/10] copy........ style_guide_pipeline (WARN/DEPART/MOVE)")
-        else:
-            print(f"[8/10] copy........ FAILED rc={rc} -- style_guide_pipeline wrote "
-                  f"NOTHING. Its ROSTER is DERIVED too, so {ident!r} is known once stage "
-                  f"7 wrote its .tres; run it by hand for the real error. Until it "
-                  f"succeeds this animal falls through to WARN_GENERIC.")
+        print(f"[8/10] copy........ {_style_guide_report(tree, ident, rc)}")
 
 
 def _preserve_license(pack: Path, project: Path, tree: Path) -> None:
@@ -736,12 +1004,10 @@ def _preserve_license(pack: Path, project: Path, tree: Path) -> None:
         print(f"[9/10] licence..... no License.txt in {pack.name!r} -- nothing to preserve "
               f"offline; the entry's license_url stays the only record")
     else:
-        print(f"[9/10] licence..... {copied.relative_to(tree)} -- point the entry's "
-              f"license_file field at it yourself; editing an AttributionEntry is a "
-              f"licensing decision, not a generated write")
+        print(f"[9/10] licence..... {copied.relative_to(tree)} preserved offline")
 
 
-def main() -> int:
+def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
@@ -762,7 +1028,13 @@ def main() -> int:
                         help="Run every deterministic stage, skip the paid ones, then abandon")
     parser.add_argument("--resume", metavar="RUN_ID", help="Continue a run past its checkpoint")
     parser.add_argument("--abandon", metavar="RUN_ID", help="Destroy a run's worktree and branch")
-    args = parser.parse_args()
+    parser.add_argument("--no-interactive", dest="interactive", action="store_false",
+                        help="Halt at review.json instead of prompting for rulings")
+    return parser
+
+
+def main() -> int:
+    args = _parser().parse_args()
 
     if args.selftest:
         return selftest()
@@ -771,13 +1043,13 @@ def main() -> int:
     if args.abandon:
         return abandon_run(args.abandon, Path.cwd())
     if not args.asset:
-        parser.error("an asset path is required (or --selftest)")
+        _parser().error("an asset path is required (or --selftest)")
     if not args.adapter:
-        parser.error("--as {animal|building|terrain} is required")
+        _parser().error("--as {animal|building|terrain} is required")
     if args.variant_of and args.adapter != "terrain":
-        parser.error("--variant-of applies only to --as terrain")
+        _parser().error("--variant-of applies only to --as terrain")
     return run(Path(args.asset), args.adapter, Path.cwd(), args.notes or "",
-               args.dry_run, args.variant_of)
+               args.dry_run, args.variant_of, args.interactive)
 
 
 if __name__ == "__main__":

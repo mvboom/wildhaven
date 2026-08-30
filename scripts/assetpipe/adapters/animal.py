@@ -99,6 +99,10 @@ def write(project: Path, ident: str, display: str, values: dict, header: str) ->
         header,
     )
     text += 'model_scenes = Array[PackedScene]([ExtResource("2_model")])\n'
+    # Empty, and deliberately so: stage 8's fact_card_pipeline REPLACES this line, and
+    # refuses to invent one that is absent. AnimalDefinition.validate() still rejects an
+    # empty pool, so this is an anchor for the copy stage, never a way to ship without copy.
+    text += 'fact_text_pool = Array[String]([])\n'
     path = project / "data" / SPEC.data_dir / f"{ident}.tres"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text)
@@ -161,3 +165,9 @@ def selftest_cases(c) -> None:
         c.check('habitat_needs = Array[String](["water", "cover"])' in text,
                 "typed arrays survive into the file")
         c.check("model_scenes = Array[PackedScene]" in text, "model wired as a PackedScene")
+        # Stage 8's fact_card_pipeline REPLACES a `fact_text_pool = Array[String]([...])`
+        # line and refuses to invent one (fact_card_pipeline.py:551, deliberately strict).
+        # Omitting it here produced a .tres stage 8 structurally could not patch: the Pig
+        # run generated two accepted cards and dropped both on the floor.
+        c.check("fact_text_pool = Array[String]([])" in text,
+                "an empty fact_text_pool line is emitted for stage 8 to replace")
