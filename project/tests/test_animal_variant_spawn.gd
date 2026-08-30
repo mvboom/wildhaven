@@ -1,9 +1,20 @@
 extends QATestCase
-## Proves two claims Task 2's mechanical migration doesn't cover on its own:
-##   1. Two residents arriving at the same site CAN receive different model_scenes entries.
-##   2. A resident's variant assignment is IDENTICAL before a WorldSnapshot capture and
-##      after a restore from that captured data — the "no save-format change" claim the
-##      spec's whole design rests on.
+## Unit coverage for the OLD-SAVE derivation path, `AnimalDefinition.pick_variant()`.
+##
+## RE-SCOPED BY THE VILLAGER-VARIETY FIX. This suite used to close on "no save-format change":
+## a resident's look was re-derived on load from its slot within its home site's `residents`
+## array, so nothing had to be written down. That derivation was the reported bug — a slot index
+## is not a global identity, so the first resident at every home site in the world derived the
+## same look — and it no longer runs at spawn time. `VariantBag` deals looks now, and the look is
+## real save state (`save_version` 5). See `test_villager_variant_variety.gd` for the regression
+## and `test_human_variant_save_stability.gd` for the round trip.
+##
+## The two claims below still hold and are still worth pinning, but ONLY as properties of the
+## legacy derivation that reads pre-v5 saves:
+##   1. It does not collapse every index to one entry — a pre-fix save with several residents
+##      at ONE site still restores them looking different from each other.
+##   2. It is deterministic — the same slot always derives the same look, which is what makes an
+##      old world reopen showing exactly what it showed before.
 
 const GREY_A: String = "res://assets/placeholder/grass/Grass.tscn"
 const GREY_B: String = "res://assets/placeholder/forest/Forest.tscn"
@@ -29,7 +40,7 @@ func _multi_variant_species() -> AnimalDefinition:
 
 
 func _init() -> void:
-	begin("Animal variant spawn + save/load stability")
+	begin("AnimalDefinition legacy (pre-v5) variant derivation")
 
 	var species: AnimalDefinition = _multi_variant_species()
 	if not check(species.model_scenes.size() == 2, "fixture species carries 2 variants"):
@@ -44,14 +55,18 @@ func _init() -> void:
 		"across 10 resident-slot indices, more than one variant is picked",
 		"got only %d distinct result(s)" % picks.size())
 
-	# --- claim 2: save/load round-trip reproduces the SAME per-slot variant ----
-	# Simulate what habitat_simulation.gd's restore_site() does: for a fixed number of
-	# slots, pick_variant(i) before "saving" and pick_variant(i) again after "loading"
-	# must agree slot-for-slot — this is the actual claim the spec's design rests on,
-	# checked directly against the resolver rather than through the full save-file
-	# machinery (WorldSnapshot round-trip coverage for POSITIONS already exists in
-	# test_world_snapshot.gd / test_save_round_trip.gd; this suite's job is the variant
-	# stability those suites don't check).
+	# The bound worth stating out loud, because it is the shape of the bug: varying with the
+	# slot index is NOT the same as varying between villagers. Every home site starts at slot 0,
+	# so slot 0's answer was every site's answer. Nothing here can see that — it takes several
+	# home sites, which is `test_villager_variant_variety.gd`'s fixture.
+	check_eq(species.pick_variant(0), species.pick_variant(0),
+		"slot 0 derives ONE fixed look — the reason this derivation could not be the spawn rule")
+
+	# --- claim 2: the legacy derivation is deterministic ----------------------
+	# What `restore_site()` falls back to for a PRE-v5 save (a `residents` entry of 3 elements,
+	# with no look in it): `legacy_variant_index(i)` must give the same answer every time, or an
+	# old world would reshuffle its villagers on every open. Checked directly against the
+	# resolver; the file-level round trip is `test_human_variant_save_stability.gd`'s.
 	var before: Array[PackedScene] = []
 	for i in range(5):
 		before.append(species.pick_variant(i))
@@ -60,6 +75,7 @@ func _init() -> void:
 		after.append(species.pick_variant(i))
 	check_eq(before, after,
 		"pick_variant(i) is identical across two independent passes for every slot i "
-		+ "(the property restore_site() depends on to reproduce looks after a load)")
+		+ "(the property restore_site()'s PRE-v5 fallback depends on to reproduce the looks "
+		+ "an old world already had)")
 
 	finish()

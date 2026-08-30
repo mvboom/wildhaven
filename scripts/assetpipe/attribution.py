@@ -1,0 +1,357 @@
+"""Attribution: extend an existing source entry, or author a new one.
+
+Schema is project/attribution/attribution_entry.gd. Field names and the
+PackedStringArray form are transcribed from the real entries in
+project/attribution/sources/ -- notably quaternius_animated_men_characters.tres.
+
+EXTENDING IS THE COMMON PATH: 11 of the 12 entries on disk are quaternius_*, so a new
+Quaternius model almost always belongs in one that already exists
+(asset-import-pipeline.md step 5). Creating a second entry for a recorded pack is a
+defect.
+
+generate_credits.gd FAILS CLOSED when attribution_required is set without a
+required_notice, so new_entry_text always writes both or neither.
+"""
+
+from __future__ import annotations
+
+import re
+import shutil
+from pathlib import Path
+
+_SNAKE = re.compile(r"[^a-z0-9]+")
+_ASSETS = re.compile(r"^assets_used = PackedStringArray\((.*)\)$", re.MULTILINE)
+
+# Pack FOLDER names on disk carry tails that entry ids never do:
+#   "Ultimate Animated Animals - July 2021"                    -> a release-date tail
+#   "Farm Buildings - Sept 2018-20260723T015504Z-1-001"        -> both, the second being
+#                                                                 a Google Drive export stamp
+# The real entries are quaternius_ultimate_animated_animals.tres and
+# quaternius_farm_buildings.tres, so the raw folder name never matched anything.
+_DRIVE_SUFFIX = re.compile(r"-\d{8}T\d{6}Z-\d+-\d+$")
+_MONTHS = ("jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|"
+           "aug|august|sep|sept|september|oct|october|nov|november|dec|december")
+_DATE_SUFFIX = re.compile(rf"\s*-\s*(?:{_MONTHS})\.?\s+\d{{4}}$", re.IGNORECASE)
+
+
+class AmbiguousEntry(RuntimeError):
+    """Several attribution entries could be the pack's. Never guessed.
+
+    Picking one would silently credit the wrong source, which is the one failure mode
+    attribution exists to prevent, so the candidates are named and the run halts.
+    """
+
+
+def normalize_pack_name(name: str) -> str:
+    """A pack folder name reduced to the form its attribution entry id is built from."""
+    previous = None
+    while previous != name:
+        previous = name
+        name = _DRIVE_SUFFIX.sub("", name).rstrip()
+        name = _DATE_SUFFIX.sub("", name).rstrip()
+    return name
+
+
+def license_filename(creator: str, source_name: str) -> str:
+    """Bare filename for the pack's preserved licence text.
+
+    Mirrors the naming already on disk -- project/assets/licenses/ holds
+    Quaternius_UltimateAnimatedAnimals_License.txt and its two siblings -- so a pipeline
+    run extends the existing convention rather than starting a second one.
+    """
+    words = re.findall(r"[A-Za-z0-9]+", normalize_pack_name(source_name))
+    pack = "".join(w[:1].upper() + w[1:] for w in words)
+    creator_part = "".join(re.findall(r"[A-Za-z0-9]+", creator))
+    return f"{creator_part}_{pack}_License.txt"
+
+ENTRY_TEMPLATE = """[gd_resource type="Resource" script_class="AttributionEntry" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://attribution/attribution_entry.gd" id="1_entry"]
+
+[resource]
+script = ExtResource("1_entry")
+id = "{entry_id}"
+creator = "{creator}"
+source_name = "{source_name}"
+source_version = "{source_version}"
+creator_url = "{creator_url}"
+source_url = "{source_url}"
+support_url = ""
+license_name = "{license_name}"
+license_url = "{license_url}"
+license_file = "{license_file}"
+attribution_required = {attribution_required}
+required_notice = "{required_notice}"
+conditions = ""
+assets_used = PackedStringArray({assets})
+per_file_licensing = false
+notes = "Added by scripts/asset_pipeline.py."
+"""
+
+
+def entry_id(creator: str, source_name: str) -> str:
+    return _SNAKE.sub("_", f"{creator} {source_name}".casefold()).strip("_")
+
+
+def find_entry(project: Path, creator: str, source_name: str) -> Path | None:
+    """Locate the pack's entry, tolerating the tails real folder names carry.
+
+    Three passes, narrowest first:
+      1. the id built from the name as given -- what a caller passing a clean pack name gets;
+      2. the id built from the normalised name -- strips the release-date and Drive-export
+         tails, which is what turns "Ultimate Animated Animals - July 2021" into the real
+         quaternius_ultimate_animated_animals.tres;
+      3. a segment-anchored PREFIX match against the ids actually on disk -- catches the
+         decorated tails normalisation cannot enumerate, e.g. the folder
+         "Stylized Nature MegaKit[Standard](1)" against quaternius_stylized_nature_megakit.
+
+    Two or more prefix matches is a halt, not a coin flip.
+    """
+    sources = project / "attribution" / "sources"
+    for candidate in (source_name, normalize_pack_name(source_name)):
+        path = sources / f"{entry_id(creator, candidate)}.tres"
+        if path.is_file():
+            return path
+
+    if not sources.is_dir():
+        return None
+    derived = entry_id(creator, normalize_pack_name(source_name))
+    # The trailing "_" makes this a SEGMENT prefix: an id must end where a word ends in
+    # the derived id, so quaternius_farm cannot claim quaternius_farm_buildings' pack.
+    matches = sorted(p for p in sources.glob("*.tres")
+                     if derived.startswith(p.stem + "_"))
+    if len(matches) == 1:
+        return matches[0]
+    if len(matches) > 1:
+        raise AmbiguousEntry(
+            f"pack folder {source_name!r} (id {derived!r}) prefix-matches "
+            f"{len(matches)} attribution entries: {[p.name for p in matches]}. "
+            f"Crediting the wrong source is worse than halting -- pick one by hand.")
+    return None
+
+
+def extend_assets_used(path: Path, new_assets: list[str]) -> str:
+    text = path.read_text()
+    match = _ASSETS.search(text)
+    if match is None:
+        raise RuntimeError(f"no assets_used array in {path} -- refusing to guess")
+
+    current = re.findall(r'"([^"]*)"', match.group(1))
+    additions = [a for a in new_assets if a not in current]
+    if not additions:
+        return f"{new_assets} already listed in {path.name} -- nothing added"
+
+    joined = ", ".join(f'"{a}"' for a in current + additions)
+    text = text[:match.start()] + f"assets_used = PackedStringArray({joined})" \
+        + text[match.end():]
+    path.write_text(text)
+    return f"added {additions} to {path.name}"
+
+
+def new_entry_text(**fields) -> str:
+    required = bool(fields.get("attribution_required"))
+    notice = fields.get("required_notice", "")
+    if required and not notice:
+        raise ValueError(
+            "attribution_required without a required_notice -- generate_credits.gd "
+            "fails closed on exactly this, so it is refused here instead")
+    assets = ", ".join(f'"{a}"' for a in fields.get("assets_used", []))
+    return ENTRY_TEMPLATE.format(
+        entry_id=fields["entry_id"], creator=fields["creator"],
+        source_name=fields["source_name"], source_version=fields.get("source_version", ""),
+        creator_url=fields.get("creator_url", ""), source_url=fields.get("source_url", ""),
+        license_name=fields.get("license_name", ""),
+        license_url=fields.get("license_url", ""),
+        license_file=fields.get("license_file", ""),
+        attribution_required="true" if required else "false",
+        required_notice=notice, assets=assets)
+
+
+def copy_license_text(pack: Path, project: Path, filename: str) -> Path | None:
+    """A link can rot; a compliance review must be answerable offline.
+
+    `filename` must be a BARE name. This writes a compliance record, so a path separator
+    or an absolute path is refused rather than silently placing a licence file outside
+    project/assets/licenses/ -- verified escapable otherwise: "../../../x.txt" wrote
+    three levels above the destination, and an absolute path ignored it entirely.
+    """
+    if not filename or Path(filename).name != filename:
+        raise ValueError(
+            f"licence filename must be a bare name with no path separator, "
+            f"got {filename!r}")
+    for name in ("License.txt", "LICENSE", "LICENSE.txt", "license.txt"):
+        src = pack / name
+        if src.is_file():
+            dest = project / "assets" / "licenses" / filename
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dest)
+            return dest
+    return None
+
+
+def selftest_cases(c) -> None:
+    import tempfile
+    c.eq(entry_id("Quaternius", "Ultimate Animated Animals"),
+         "quaternius_ultimate_animated_animals", "entry id is creator_source, snake case")
+    c.eq(entry_id("Quaternius", "Farm Buildings"), "quaternius_farm_buildings",
+         "matches the existing on-disk naming")
+
+    with tempfile.TemporaryDirectory() as td:
+        proj = Path(td) / "project"
+        sources = proj / "attribution" / "sources"
+        sources.mkdir(parents=True)
+        existing = sources / "quaternius_farm_buildings.tres"
+        existing.write_text(
+            '[gd_resource type="Resource" script_class="AttributionEntry" '
+            'load_steps=2 format=3]\n\n'
+            '[ext_resource type="Script" path="res://attribution/attribution_entry.gd" id="1_entry"]\n\n'
+            '[resource]\nscript = ExtResource("1_entry")\n'
+            'id = "quaternius_farm_buildings"\ncreator = "Quaternius"\n'
+            'source_name = "Farm Buildings"\n'
+            'assets_used = PackedStringArray("Barn", "Silo")\n'
+            'per_file_licensing = false\n')
+
+        c.eq(find_entry(proj, "Quaternius", "Farm Buildings"), existing,
+             "an existing pack entry is found")
+        c.eq(find_entry(proj, "Quaternius", "Nothing Like This"), None,
+             "an unknown pack has no entry")
+
+        # Two entries that both prefix-match must halt rather than pick one.
+        (sources / "quaternius_farm.tres").write_text("id = \"quaternius_farm\"\n")
+        ambiguous = False
+        try:
+            find_entry(proj, "Quaternius", "Farm Buildings Extra")
+        except AmbiguousEntry as exc:
+            ambiguous = ("quaternius_farm.tres" in str(exc)
+                         and "quaternius_farm_buildings.tres" in str(exc))
+        c.check(ambiguous, "two prefix matches halt with both candidates named")
+        (sources / "quaternius_farm.tres").unlink()
+
+    # Suffix normalisation, against the tails the real folders actually carry.
+    c.eq(normalize_pack_name("Ultimate Animated Animals - July 2021"),
+         "Ultimate Animated Animals", "a release-date tail is stripped")
+    c.eq(normalize_pack_name("Farm Buildings - Sept 2018-20260723T015504Z-1-001"),
+         "Farm Buildings", "a Drive-export stamp and a date tail are both stripped")
+    c.eq(normalize_pack_name("Farm Animals by @Quaternius"),
+         "Farm Animals by @Quaternius", "a name with no tail is left alone")
+    c.eq(normalize_pack_name("Ultimate Nature Pack - Jun 2019-20260723T015350Z-1-001"),
+         "Ultimate Nature Pack", "abbreviated month tail stripped")
+
+    c.eq(license_filename("Quaternius", "Ultimate Animated Animals - July 2021"),
+         "Quaternius_UltimateAnimatedAnimals_License.txt",
+         "licence filename reproduces the name already in project/assets/licenses/")
+    c.eq(license_filename("Quaternius", "Animated Men Characters - Feb 2019-20260723T015429Z-1-001"),
+         "Quaternius_AnimatedMenCharacters_License.txt",
+         "licence filename matches the second real file on disk")
+    c.check(Path(license_filename("Quaternius", "../../../etc")).name
+            == license_filename("Quaternius", "../../../etc"),
+            "licence filename is always bare -- copy_license_text refuses anything else")
+
+    # REGRESSION, whole-branch review CRITICAL 2: resume() looked the entry up from the
+    # raw pack FOLDER name, which matched nothing on disk, so every real run halted at
+    # stage 9 after the token spend. These are the actual folders and the actual entries.
+    real_project = Path("project")
+    if (real_project / "attribution" / "sources").is_dir():
+        for folder, expected in (
+            ("Ultimate Animated Animals - July 2021",
+             "quaternius_ultimate_animated_animals.tres"),
+            ("Farm Buildings - Sept 2018-20260723T015504Z-1-001",
+             "quaternius_farm_buildings.tres"),
+            ("Stylized Nature MegaKit[Standard](1)",
+             "quaternius_stylized_nature_megakit.tres"),
+            ("Nature Crops Pack - Jan 2020-20260723T015311Z-1-001",
+             "quaternius_nature_crops_pack.tres"),
+            ("Textured Stylized Trees - May 2020-20260723T015323Z-1-001",
+             "quaternius_textured_stylized_trees.tres"),
+            ("Ultimate Fantasy RTS - Aug 2022-20260723T014914Z-1-001",
+             "quaternius_ultimate_fantasy_rts.tres"),
+            ("Ultimate Nature Pack - Jun 2019-20260723T015350Z-1-001",
+             "quaternius_ultimate_nature_pack.tres"),
+            ("Animated Men Characters - Feb 2019-20260723T015429Z-1-001",
+             "quaternius_animated_men_characters.tres"),
+            ("Animated Women Characters - Feb 2019-20260723T015412Z-1-001",
+             "quaternius_animated_women_characters.tres"),
+        ):
+            found = find_entry(real_project, "Quaternius", folder)
+            c.eq(found.name if found else None, expected,
+                 f"real pack folder {folder!r} resolves to its real entry")
+        c.eq(find_entry(real_project, "Quaternius", "Medieval Village Pack - Dec 2020"), None,
+             "a real pack with no entry on disk still yields None, not a wrong guess")
+    else:
+        c.check(True, "real-entry resolution check skipped, project/ not on this path")
+
+    with tempfile.TemporaryDirectory() as td:
+        proj = Path(td) / "project"
+        sources = proj / "attribution" / "sources"
+        sources.mkdir(parents=True)
+        existing = sources / "quaternius_farm_buildings.tres"
+        existing.write_text(
+            '[gd_resource type="Resource" script_class="AttributionEntry" '
+            'load_steps=2 format=3]\n\n'
+            '[ext_resource type="Script" path="res://attribution/attribution_entry.gd" id="1_entry"]\n\n'
+            '[resource]\nscript = ExtResource("1_entry")\n'
+            'id = "quaternius_farm_buildings"\ncreator = "Quaternius"\n'
+            'source_name = "Farm Buildings"\n'
+            'assets_used = PackedStringArray("Barn", "Silo")\n'
+            'per_file_licensing = false\n')
+
+        summary = extend_assets_used(existing, ["Windmill"])
+        text = existing.read_text()
+        c.check('PackedStringArray("Barn", "Silo", "Windmill")' in text,
+                "assets_used extended in order")
+        c.check("Windmill" in summary, "summary names what was added")
+
+        again = extend_assets_used(existing, ["Windmill"])
+        c.eq(existing.read_text().count("Windmill"), 1, "extending twice is idempotent")
+        c.check("already listed" in again, "repeat extend says so")
+
+        entry = new_entry_text(
+            entry_id="sherkiz_otter", creator="Sherkiz", source_name="Otter",
+            source_version="2026", creator_url="https://example.invalid",
+            source_url="https://example.invalid", license_name="CC BY 4.0",
+            license_url="https://creativecommons.org/licenses/by/4.0/",
+            license_file="res://assets/licenses/Sherkiz_Otter_License.txt",
+            attribution_required=True, required_notice="Otter by Sherkiz (CC BY 4.0)",
+            assets_used=["Otter"])
+        c.check('script_class="AttributionEntry"' in entry, "entry names its script class")
+        c.check("attribution_required = true" in entry, "CC BY sets the obligation flag")
+        c.check('required_notice = "Otter by Sherkiz (CC BY 4.0)"' in entry,
+                "notice present -- generate_credits.gd fails closed without it")
+        c.check('assets_used = PackedStringArray("Otter")' in entry, "assets listed")
+
+        pack = Path(td) / "pack"; pack.mkdir()
+        (pack / "License.txt").write_text("CC0 text here")
+        dest = copy_license_text(pack, proj, "Quaternius_Test_License.txt")
+        c.check(dest is not None and dest.is_file(), "licence text copied into the project")
+        c.eq(dest.read_text(), "CC0 text here", "copied verbatim")
+        c.eq(copy_license_text(Path(td) / "nopack", proj, "x.txt"), None,
+             "a pack with no licence file yields None, not a crash")
+
+        # Filename validation: bare names are accepted
+        dest2 = copy_license_text(pack, proj, "Another_Test_License.txt")
+        c.check(dest2 is not None and dest2.is_file(),
+                "bare filename still copies successfully")
+
+        # Path traversal is rejected
+        try:
+            copy_license_text(pack, proj, "../escape.txt")
+            c.check(False, "path traversal ../escape.txt should raise ValueError")
+        except ValueError as e:
+            c.check("bare name" in str(e), "path traversal raises ValueError")
+            escape_parent = proj / "attribution"
+            c.check(not (escape_parent / "escape.txt").is_file(),
+                    "no file created outside licenses directory on path traversal")
+
+        # Absolute path is rejected
+        try:
+            copy_license_text(pack, proj, "/tmp/absolute.txt")
+            c.check(False, "absolute path /tmp/absolute.txt should raise ValueError")
+        except ValueError as e:
+            c.check("bare name" in str(e), "absolute path raises ValueError")
+
+        # Empty filename is rejected
+        try:
+            copy_license_text(pack, proj, "")
+            c.check(False, "empty filename should raise ValueError")
+        except ValueError as e:
+            c.check("bare name" in str(e), "empty filename raises ValueError")

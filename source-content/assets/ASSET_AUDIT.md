@@ -168,6 +168,35 @@ is in this pack"*, **not** *"we decided against it"*. `scripts/asset-manifest.py
 reports each cleared pack's imported/unused split for exactly this reason. As of this sweep:
 `Ultimate Fantasy RTS` 11/128, `Ultimate Nature Pack` 17/150, `Stylized Nature MegaKit` 4/68.
 
+### Farm Animals pack — FBX exports are incomplete (2026-08-30)
+
+Investigated because Pig's FBX carries only `Idle` and `Jump` while the pack preview shows a
+walking pig. **The clips are not mislabeled** — measured in-engine, `Armature|Jump` has both
+hind legs peaking at the same phase (108° at 11/24 — in phase, not antiphase) in a single
+anticipate-leap-land burst, which is a genuine hop, not a gait. `Idle` has zero foot rotation
+at all.
+
+**The walk exists in the `.blend` and did not survive the FBX export.** `Blends/Pig.blend`
+contains `ACIdle`, `ACJump`, `ACRun`, `ACWalk`, `ACWalkSlow`; the FBX has two of the five.
+Pack-wide, comparing each FBX's AnimationStacks against its `.blend`:
+
+| Model | FBX clips | Verdict |
+|---|---|---|
+| Cow, Horse, Zebra | Idle, Jump, Run, Walk, WalkSlow, Death | complete |
+| **Pig, Sheep, Llama, Pug** | **Idle, Jump only** | **truncated — Walk/Run recoverable from the `.blend`** |
+
+All seven `.blend` files carry Walk and Run actions. The OBJ variants carry no animation at
+all (format limitation), so **re-exporting from the `.blend` in Blender is the only recovery
+path** — Blender is not installed on this machine. `scripts/asset_pipeline.py`'s audit stage
+correctly refuses Pig ("missing required animation clip(s) Walk -- a model with no walk cycle
+cannot roam"); that gate is doing its job and should not be worked around.
+
+This settles the standing note below — "**Farm Animals** pack is presumed rigged but its title
+lacks 'Animated' — confirm animations exist before relying on those five". Confirmed, and more
+specific: rigged and animated yes, but four of seven FBX exports are lossy. Note also that
+`Ultimate Animated Animals` contains **no Pig** (Alpaca, Bull, Cow, Deer, Donkey, Fox, Horse,
+Horse_White, Husky, ShibaInu, Stag, Wolf), so there is no already-cleared substitute on disk.
+
 ## Synty pack evaluation — decision log (2026-07-25)
 
 Five Synty Store packs were evaluated as a possible base rather than just a gap-filler, on a

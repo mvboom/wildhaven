@@ -47,6 +47,17 @@ var sequence: int = 0
 ## Instantiated resident nodes. `residents.size()` is `population(h, S)` in the formula.
 var residents: Array[Node3D] = []
 
+## Node metadata key holding which `AnimalDefinition.model_scenes` entry a resident is
+## wearing, as an int.
+##
+## **ON THE NODE, NOT IN A PARALLEL ARRAY HERE**, deliberately. `residents` is mutated from
+## more than one place — `HabitatSimulation` appends at move-in and at restore,
+## `GentleDisplacement._depart()` `pop_back()`s on the way out — and a second array indexed in
+## lockstep with it would have to be maintained at every one of those sites. Metadata rides on
+## the node it describes, so a departure takes the look record with it and no desync is
+## reachable by construction.
+const VARIANT_META: StringName = &"wildhaven_variant_index"
+
 
 func _init(
 	site_position: Vector2i,
@@ -83,6 +94,24 @@ func serves(species: AnimalDefinition) -> bool:
 		if structure_tags.has(tag):
 			return true
 	return false
+
+
+## Records which look a spawned resident is wearing. Called once, at the moment the node is
+## instantiated; nothing re-tags a living resident.
+static func tag_variant(node: Node3D, variant_index: int) -> void:
+	if node == null:
+		return
+	node.set_meta(VARIANT_META, variant_index)
+
+
+## The look a resident is wearing, or `AnimalDefinition.NO_VARIANT` for a null resident (a
+## species with no model — a content defect the spawn path already warns about) or a node that
+## was never tagged. Degrades rather than erroring: an untagged node means "derive it", which
+## is exactly how a pre-fix save is read.
+static func variant_of(node: Node3D) -> int:
+	if node == null or not node.has_meta(VARIANT_META):
+		return AnimalDefinition.NO_VARIANT
+	return int(node.get_meta(VARIANT_META))
 
 
 ## Squared tile distance. Squared so the exclusivity comparison stays integer — no sqrt in

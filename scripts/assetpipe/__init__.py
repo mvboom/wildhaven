@@ -1,0 +1,1 @@
+"""Wildhaven asset pipeline package."""

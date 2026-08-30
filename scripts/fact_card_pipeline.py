@@ -84,6 +84,10 @@ def _find_repo_root(start: Path) -> Path:
 
 
 REPO_ROOT = _find_repo_root(Path(__file__).resolve().parent)
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import roster_data  # noqa: E402  (needs REPO_ROOT above)
+RosterSpecies = roster_data.RosterSpecies
 DATA_DIR = REPO_ROOT / "project" / "data" / "animals"
 OUTPUT_DIR = Path(__file__).resolve().parent / "fact_card_pipeline_output"
 CONTENT_STATUS_PATH = REPO_ROOT / "game-design" / "content-pipeline-status.md"
@@ -131,35 +135,15 @@ REGISTER_BANNED = ["town", "towns", "village", "villages", "villager", "villager
 MAX_SENTENCES = 2
 
 
-@dataclass
-class RosterSpecies:
-    id: str
-    display_name: str
-    avoids: list = field(default_factory=list)
-
-
-# The roster this pipeline knows about (roster.md -> Already-Defined Roster, D-43).
-# Used for (a) the closed-predation-graph check -- a card must name no OTHER roster
-# species -- and (b) telling the Generator about a species' own avoids partner, since
-# that is exactly the copy that's hardest to keep predation-free ("keeps its distance
-# from Husky" reads dangerously close to a predator/prey line if worded carelessly).
-ROSTER = {
-    s.id: s
-    for s in [
-        RosterSpecies("rabbit", "Rabbit", avoids=["fox"]),
-        RosterSpecies("fox", "Fox", avoids=["rabbit"]),
-        RosterSpecies("human", "Villager"),
-        RosterSpecies("deer", "Deer"),
-        RosterSpecies("stag", "Stag"),
-        RosterSpecies("horse", "Horse"),
-        RosterSpecies("donkey", "Donkey"),
-        RosterSpecies("cow", "Cow"),
-        RosterSpecies("bull", "Bull"),
-        RosterSpecies("alpaca", "Alpaca"),
-        RosterSpecies("husky", "Husky", avoids=["shiba_inu"]),
-        RosterSpecies("shiba_inu", "Shiba Inu", avoids=["husky"]),
-    ]
-}
+# The roster is DERIVED from project/data/animals/*.tres, not restated here -- see
+# scripts/roster_data.py for why. It feeds (a) the closed-predation-graph check -- a card
+# must name no OTHER roster species -- and (b) telling the Generator about a species' own
+# avoids partner, since that is exactly the copy that is hardest to keep predation-free
+# ("keeps its distance from Husky" reads dangerously close to a predator/prey line if
+# worded carelessly). Deriving it means a newly imported species is in the graph the
+# moment its .tres exists, with no hand edit -- and a missing data dir raises rather than
+# silently shrinking the graph this evaluator depends on.
+ROSTER = roster_data.load_roster(REPO_ROOT)
 
 
 # ---------------------------------------------------------------------------
@@ -498,10 +482,14 @@ def run_species(
     generator_model: str,
     evaluator_model: str,
     max_refine: int,
+    subject=None,
 ) -> dict:
-    species = ROSTER.get(species_id)
+    # `subject` lets a BUILDING flow through this same loop for --target building_text.
+    # The closed-predation-graph check below still runs against the animal ROSTER: a
+    # building's fact card must not name a species either.
+    species = subject or ROSTER.get(species_id)
     if species is None:
-        raise ValueError(f'Unknown species id "{species_id}" -- not in ROSTER.')
+        raise ValueError(f'Unknown id "{species_id}" -- not in the derived roster.')
 
     _progress(f"=== {species.display_name} ({species_id}) -- generating {count} candidate(s) ===")
     accepted: list[str] = []
@@ -539,17 +527,32 @@ def write_output_json(result: dict) -> Path:
     return path
 
 
-def write_live_tres(species_id: str, accepted_fact_texts: list) -> str:
-    """Patches project/data/animals/<species_id>.tres's fact_text_pool in place with
-    this run's accepted candidates, and drops a header note marking the copy as
-    pipeline-generated and awaiting step-8 human sign-off -- the same convention
-    human.tres already uses for agent-proposed copy elsewhere in this project. Does
-    NOT touch human_signoff or content-pipeline-status.md; that stays the human's call.
-    Returns a short description of what happened, for the run summary."""
+def write_tres(species_id: str, accepted_fact_texts: list, target: str = "animal_pool") -> str:
+    """Patches a .tres file in place with this run's accepted candidates, and drops a
+    header note marking the copy as pipeline-generated and awaiting step-8 human
+    sign-off -- the same convention human.tres already uses for agent-proposed copy
+    elsewhere in this project. Does NOT touch human_signoff or content-pipeline-status.md;
+    that stays the human's call. Returns a short description of what happened, for the
+    run summary."""
     if not accepted_fact_texts:
         return "no accepted candidates -- .tres left untouched"
 
-    tres_path = DATA_DIR / f"{species_id}.tres"
+    # Both patterns are STRICT -- they match the field only in the exact shape the real
+    # .tres files use (verified: every animal fact_text_pool is a single-line
+    # Array[String]([...]); every building fact_text is a single-line quoted string). A
+    # loose `^fact_text_pool = .*$` would let a malformed field be silently overwritten
+    # instead of refused, weakening a guard this production script already had.
+    if target == "building_text":
+        tres_path = REPO_ROOT / "project" / "data" / "buildings" / f"{species_id}.tres"
+        field_pattern = re.compile(r'^fact_text = ".*"$', re.MULTILINE)
+        replacement = f"fact_text = {json.dumps(accepted_fact_texts[0], ensure_ascii=False)}"
+    else:
+        tres_path = DATA_DIR / f"{species_id}.tres"
+        field_pattern = re.compile(r"^fact_text_pool = Array\[String\]\(\[.*\]\)$",
+                                   re.MULTILINE)
+        inner = ", ".join(json.dumps(t, ensure_ascii=False) for t in accepted_fact_texts)
+        replacement = f"fact_text_pool = Array[String]([{inner}])"
+
     if not tres_path.exists():
         return f"WARNING: {tres_path} does not exist -- .tres not written"
 
@@ -557,28 +560,21 @@ def write_live_tres(species_id: str, accepted_fact_texts: list) -> str:
     # Idempotency: strip any note this pipeline left on a PRIOR run before adding a fresh
     # one, so re-running against the same species doesn't accumulate duplicate comment lines.
     prior_note_pattern = re.compile(
-        r"^; fact_text_pool REPLACED by (?:archive/mark-vanderboom-assignment-6/ger_pipeline\.py"
+        r"^; (?:fact_text_pool|fact_text) REPLACED by (?:archive/mark-vanderboom-assignment-6/ger_pipeline\.py"
         r"|scripts/fact_card_pipeline\.py).*\n",
         re.MULTILINE,
     )
     text = prior_note_pattern.sub("", text)
 
-    # ensure_ascii=False keeps literal unicode (em dashes, etc.) instead of \uXXXX escapes --
-    # matters both for readability and because a literal "\u..." in a re.sub REPLACEMENT
-    # STRING is parsed as a backreference template and raises (hence the lambda below too).
-    array_literal = "Array[String]([" + ", ".join(json.dumps(t, ensure_ascii=False) for t in accepted_fact_texts) + "])"
-    new_line = f"fact_text_pool = {array_literal}"
-
-    pattern = re.compile(r"^fact_text_pool = Array\[String\]\(\[.*\]\)$", re.MULTILINE)
-    if not pattern.search(text):
-        return f"WARNING: no fact_text_pool line found in {tres_path} -- .tres not written"
+    if not field_pattern.search(text):
+        return f"WARNING: no {replacement.split('=')[0].strip()} line found in {tres_path} -- .tres not written"
 
     note = (
-        f"; fact_text_pool REPLACED by scripts/fact_card_pipeline.py "
+        f"; {replacement.split('=')[0].strip()} REPLACED by scripts/fact_card_pipeline.py "
         f"({time.strftime('%Y-%m-%d')}) -- AWAITING STEP-8 HUMAN SIGN-OFF, not yet reviewed.\n"
     )
-    replacement = note.rstrip("\n") + "\n" + new_line
-    new_text = pattern.sub(lambda _m: replacement, text, count=1)
+    new_replacement = note.rstrip("\n") + "\n" + replacement
+    new_text = field_pattern.sub(lambda _m: new_replacement, text, count=1)
     tres_path.write_text(new_text)
     return f"wrote {len(accepted_fact_texts)} card(s) to {tres_path.relative_to(REPO_ROOT)}"
 
@@ -642,7 +638,17 @@ def update_content_pipeline_status(species_id: str, accepted_fact_texts: list, a
 # ---------------------------------------------------------------------------
 
 def selftest() -> int:
-    shiba = ROSTER["shiba_inu"]
+    # With the ROSTER hardcode gone this fixture is a DATA dependency: renaming
+    # project/data/animals/shiba_inu.tres used to turn the whole selftest into a KeyError
+    # traceback, which reads as "the suite is broken" rather than "the suite's fixture
+    # moved". An explicit failed check says which, and names what was actually derived.
+    shiba = ROSTER.get("shiba_inu")
+    if shiba is None:
+        print("[FAIL] the selftest's fixture species 'shiba_inu' is not in the derived "
+              "ROSTER -- project/data/animals/shiba_inu.tres was renamed or removed. "
+              f"Derived instead: {sorted(ROSTER) or 'nothing'}.")
+        print("SELFTEST FAILED")
+        return 1
     cases = [
         ("Shiba Inus were originally bred in Japan to hunt small game in mountainous terrain.",
          "hunt", False),
@@ -683,7 +689,52 @@ def selftest() -> int:
     print(f"[{'PASS' if dup_ok else 'FAIL'}] duplicate-in-run check")
     ok = ok and dup_ok
 
+    import tempfile as _tf, pathlib as _pl, sys as _sys
+    _mod = _sys.modules[__name__]
+    with _tf.TemporaryDirectory() as _td:
+        _root = _pl.Path(_td)
+        (_root / "project" / "data" / "animals").mkdir(parents=True)
+        (_root / "project" / "data" / "buildings").mkdir(parents=True)
+        _animal = _root / "project" / "data" / "animals" / "pig.tres"
+        _animal.write_text('id = "pig"\nfact_text_pool = Array[String](["old"])\n')
+        _bldg = _root / "project" / "data" / "buildings" / "well.tres"
+        _bldg.write_text('id = "well"\nfact_text = "old"\n')
+        _bad = _root / "project" / "data" / "animals" / "broken.tres"
+        _bad.write_text('id = "broken"\nfact_text_pool = "not an array"\n')
+        _saved = (_mod.REPO_ROOT, _mod.DATA_DIR)
+        try:
+            _mod.REPO_ROOT = _root
+            _mod.DATA_DIR = _root / "project" / "data" / "animals"
+            write_tres("pig", ["new one", "new two"], target="animal_pool")
+            write_tres("well", ["a well fact"], target="building_text")
+            _missing = write_tres("nosuch", ["x"], target="animal_pool")
+            _refused = write_tres("broken", ["x"], target="animal_pool")
+        finally:
+            _mod.REPO_ROOT, _mod.DATA_DIR = _saved
+
+        _animal_ok = 'fact_text_pool = Array[String](["new one", "new two"])' in _animal.read_text()
+        print(f"[{'PASS' if _animal_ok else 'FAIL'}] animal pool written correctly")
+        ok = ok and _animal_ok
+
+        _bldg_ok = 'fact_text = "a well fact"' in _bldg.read_text() and "fact_text_pool" not in _bldg.read_text()
+        print(f"[{'PASS' if _bldg_ok else 'FAIL'}] building text written correctly")
+        ok = ok and _bldg_ok
+
+        _missing_ok = "WARNING" in _missing
+        print(f"[{'PASS' if _missing_ok else 'FAIL'}] missing file reported as warning")
+        ok = ok and _missing_ok
+
+        _refused_ok = "WARNING" in _refused and '"not an array"' in _bad.read_text()
+        print(f"[{'PASS' if _refused_ok else 'FAIL'}] malformed field refused (regression test for strict guard)")
+        ok = ok and _refused_ok
+
     print()
+    _tres_count = len(list((REPO_ROOT / roster_data.ANIMALS_DIR).glob("*.tres")))
+    _derived_ok = len(ROSTER) == _tres_count and _tres_count > 0
+    print(f"[{'PASS' if _derived_ok else 'FAIL'}] ROSTER is derived from the data dir "
+          f"({len(ROSTER)} species from {_tres_count} .tres files), not hardcoded")
+    ok = ok and _derived_ok
+
     print("SELFTEST " + ("PASSED" if ok else "FAILED"))
     return 0 if ok else 1
 
@@ -701,6 +752,12 @@ def main() -> int:
                          help="Must differ from --generator-model. Default: the other of haiku/opus.")
     parser.add_argument("--max-refine", type=int, default=3, help="Circuit breaker threshold (default 3)")
     parser.add_argument("--dry-run", action="store_true", help="Write the archive JSON only; do not touch project/data/animals/*.tres")
+    parser.add_argument(
+        "--target", choices=("animal_pool", "building_text"), default="animal_pool",
+        help="Where accepted copy is written. animal_pool: fact_text_pool in "
+             "project/data/animals/<id>.tres (default, unchanged behaviour). "
+             "building_text: the single fact_text field in project/data/buildings/<id>.tres.",
+    )
     parser.add_argument("--selftest", action="store_true", help="Run the Evaluator against known-bad drafts, no LLM calls, exit nonzero on failure")
     args = parser.parse_args()
 
@@ -717,24 +774,35 @@ def main() -> int:
     generator_model_id = MODEL_IDS[args.generator_model]
     evaluator_model_id = MODEL_IDS[evaluator_model]
 
-    by_display_name = {s.display_name.lower(): s.id for s in ROSTER.values()}
+    # --target building_text resolves against project/data/buildings/, not the animals
+    # roster -- without this the flag Task 13 added is unreachable, because a building
+    # display name can never appear in ROSTER.
+    if args.target == "building_text":
+        lookup, what = roster_data.load_buildings(REPO_ROOT), "building"
+    else:
+        lookup, what = ROSTER, "species"
+    by_display_name = {s.display_name.lower(): s.id for s in lookup.values()}
 
     exit_code = 0
     for name in args.species:
-        species_id = by_display_name.get(name.lower()) or (name.lower() if name.lower() in ROSTER else None)
+        species_id = by_display_name.get(name.lower()) or (
+            name.lower() if name.lower() in lookup else None)
         if species_id is None:
-            print(f"ERROR: unknown species {name!r} -- not in ROSTER", file=sys.stderr)
+            print(f"ERROR: unknown {what} {name!r} -- not in the derived roster",
+                  file=sys.stderr)
             exit_code = 1
             continue
 
-        result = run_species(species_id, args.count, generator_model_id, evaluator_model_id, args.max_refine)
+        result = run_species(species_id, args.count, generator_model_id,
+                             evaluator_model_id, args.max_refine,
+                             subject=lookup.get(species_id))
         json_path = write_output_json(result)
         _progress(f"  archive log: {json_path.relative_to(REPO_ROOT)}")
 
         if args.dry_run:
             _progress("  --dry-run: not writing to project/data/animals/*.tres or the tracker")
         else:
-            summary = write_live_tres(species_id, result["accepted_fact_texts"])
+            summary = write_tres(species_id, result["accepted_fact_texts"], target=args.target)
             _progress(f"  live content: {summary}")
             any_escalated = any(c["status"] == "escalated" for c in result["candidates"])
             tracker_summary = update_content_pipeline_status(species_id, result["accepted_fact_texts"], any_escalated)

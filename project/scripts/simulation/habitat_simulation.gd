@@ -65,6 +65,10 @@ var _presentation: ResidentPresentation = null
 var _dirty: Array[Vector2i] = []
 var _dirty_set: Dictionary = {}
 
+## Which look each newly arrived resident wears. Owned per simulation instance (see
+## `VariantBag`'s header for why it is not global and why it is not saved).
+var _variants: VariantBag = VariantBag.new()
+
 
 ## `presentation` is optional and view-only: pass it and residents wander and get a home prop,
 ## omit it and the simulation runs identically with nobody moving. Nothing in the qualification
@@ -91,6 +95,13 @@ func registry() -> HomeSiteRegistry:
 
 func arrivals() -> ArrivalQueue:
 	return _arrivals
+
+
+## The look-assignment bag. Public for the same reason `arrivals()` is: a test needs to pin
+## the permutation property, and a seeded bag is the only way to do that without disturbing
+## the engine's global RNG. No simulation code outside this file should call it.
+func variants() -> VariantBag:
+	return _variants
 
 
 ## True when there is nothing at all to do. An idle world must satisfy this.
@@ -315,13 +326,25 @@ func _move_in(position: Vector2i, species: AnimalDefinition) -> void:
 		_registry.claim(site, species.id, species.scout_radius)
 	var world_position: Vector3 = _grid.tile_to_world(position.x, position.y)
 
+	# WHICH LOOK THIS VILLAGER WEARS. Dealt from the per-species shuffle bag, so every look in
+	# `model_scenes` appears before any look repeats (the human's stated requirement).
+	#
+	# THIS USED TO BE `species.pick_variant(site.residents.size())` AND THAT WAS THE BUG: the
+	# argument is a resident's slot within its OWN site, not a global identity, so the first
+	# resident at every home site in the world hashed to the same look and a world of one- and
+	# two-resident homes was almost entirely one variant. See
+	# `AnimalDefinition.legacy_variant_index()`.
 	var node: Node3D = null
-	var variant: PackedScene = species.pick_variant(site.residents.size())
+	var variant_index: int = _variants.next(species.id, species.model_scenes.size())
+	var variant: PackedScene = species.variant_scene(variant_index)
 	if variant != null:
 		node = variant.instantiate() as Node3D
 	if node != null:
 		node.name = "%s_%d_%d_%d" % [species.id, position.x, position.y, site.population()]
 		node.position = world_position
+		# Tagged BEFORE the tree add so the node is never briefly in the world untagged —
+		# `WorldSnapshot.capture()` can run on any frame, including this one.
+		HomeSite.tag_variant(node, variant_index)
 		if _residents_root != null:
 			_residents_root.add_child(node)
 		site.residents.append(node)
@@ -354,12 +377,31 @@ func _move_in(position: Vector2i, species: AnimalDefinition) -> void:
 ## `resident_positions` holds saved world positions, one per resident. They are used verbatim:
 ## residents roam, so a resident is almost never at its home tile's centre, and snapping them
 ## home on load would visibly teleport the whole neighbourhood.
+##
+## `resident_variants` holds the saved LOOK per resident, parallel to `resident_positions`
+## (`AnimalDefinition.NO_VARIANT` where the save does not say). It is optional and defaults to
+## empty, which means every entry reads as "not recorded" — that is the pre-save_version-5
+## file, and the whole shape of the backward-compatibility story:
+##
+##   * a look the file names is used VERBATIM. No re-roll, and the bag is not dealt from —
+##     re-rolling on load is precisely what index-keyed derivation was protecting against, and
+##     that protection has to survive the fix that removed the derivation.
+##   * a look the file does NOT name (an old save, or an index the species no longer has after
+##     a `.tres` lost a variant) falls back to `legacy_variant_index(i)` — the pre-fix
+##     derivation. That reproduces exactly what that old world already showed on screen, so an
+##     existing village looks no worse than it did and does not visibly reshuffle. It also does
+##     not look BETTER: an old save keeps its sameness until its residents turn over. That is
+##     the honest outcome — the file simply does not contain the information.
+##
+## The restored look is then `consume()`d from the bag so the next NEW arrival in this session
+## does not immediately repeat a look already standing in the loaded world.
 func restore_site(
 	position: Vector2i,
 	species_id: String,
 	radius: int,
 	structure_tags: Array[String],
-	resident_positions: Array
+	resident_positions: Array,
+	resident_variants: Array = []
 ) -> HomeSite:
 	var site: HomeSite = _registry.restore_site(position, species_id, radius, structure_tags)
 	if site.is_vacant():
@@ -375,7 +417,14 @@ func restore_site(
 		var entry: Variant = resident_positions[i]
 		var world_position: Vector3 = entry as Vector3
 		var node: Node3D = null
-		var variant: PackedScene = species.pick_variant(i)
+
+		var variant_index: int = AnimalDefinition.NO_VARIANT
+		if i < resident_variants.size():
+			variant_index = int(resident_variants[i])
+		if variant_index < 0 or variant_index >= species.model_scenes.size():
+			variant_index = species.legacy_variant_index(i)
+
+		var variant: PackedScene = species.variant_scene(variant_index)
 		if variant != null:
 			node = variant.instantiate() as Node3D
 		if node == null:
@@ -384,6 +433,8 @@ func restore_site(
 			continue
 		node.name = "%s_%d_%d_%d" % [species.id, position.x, position.y, site.population()]
 		node.position = world_position
+		HomeSite.tag_variant(node, variant_index)
+		_variants.consume(species.id, species.model_scenes.size(), variant_index)
 		if _residents_root != null:
 			_residents_root.add_child(node)
 		site.residents.append(node)
