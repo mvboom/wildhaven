@@ -36,22 +36,31 @@ source_file="res://{res_path}"
 
 nodes/root_type=""
 nodes/root_name=""
+nodes/root_script=null
+mesh_library/use_node_names_as_mesh_names=false
+array_mesh/deduplicate_surfaces=true
 nodes/apply_root_scale=true
 nodes/root_scale=1.0
 nodes/import_as_skeleton_bones=false
 nodes/use_name_suffixes=true
+nodes/use_node_type_suffixes=true
 meshes/ensure_tangents=true
 meshes/generate_lods=true
 meshes/create_shadow_meshes=true
 meshes/light_baking=1
 meshes/lightmap_texel_size=0.2
+meshes/force_disable_compression=false
 skins/use_named_skins=true
 animation/import=true
 animation/fps=30
 animation/trimming=true
 animation/remove_immutable_tracks=true
 animation/import_rest_as_RESET=false
+import_script/path=""
 materials/extract=0
+materials/extract_format=0
+materials/extract_path=""
+_subresources={{}}
 fbx/importer=0
 fbx/allow_geometry_helper_nodes=false
 fbx/embedded_image_handling=1
@@ -215,3 +224,38 @@ def selftest_cases(c) -> None:
         c.check('autoplay = "Idle"' in withanim, "autoplay set")
         c.check('[editable path="Model"]' in withanim,
                 "editable marker present -- without it the override is ignored")
+
+        # Verify FBX_IMPORT_PARAMS fidelity against the real Bush_1.fbx.import file.
+        # Skip gracefully if the reference file is missing.
+        ref_path = Path("project/assets/props/den/Bush_1.fbx.import")
+        if ref_path.is_file():
+            ref_text = ref_path.read_text()
+            ref_params = set()
+            in_params = False
+            for line in ref_text.splitlines():
+                if line == "[params]":
+                    in_params = True
+                    continue
+                if in_params and line.startswith("["):
+                    break
+                if in_params and "=" in line:
+                    key = line.split("=")[0].strip()
+                    if key:
+                        ref_params.add(key)
+
+            const_params = set()
+            in_params = False
+            for line in FBX_IMPORT_PARAMS.splitlines():
+                if line == "[params]":
+                    in_params = True
+                    continue
+                if in_params and line.startswith("["):
+                    break
+                if in_params and "=" in line:
+                    key = line.split("=")[0].strip()
+                    if key:
+                        const_params.add(key)
+
+            c.eq(const_params, ref_params, "FBX_IMPORT_PARAMS [params] keys match Bush_1.fbx.import")
+        else:
+            c.check(True, "FBX_IMPORT_PARAMS fidelity check skipped, reference file absent")
