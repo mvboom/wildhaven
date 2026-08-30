@@ -12,15 +12,29 @@ import re
 import subprocess
 from pathlib import Path
 
+# The index this returns is the one write_wrapper writes into
+# `[node name="AnimationPlayer" parent="Model" index="N"]`, so it must be counted
+# among MODEL's children -- the wrapper root has exactly one child, the instanced model,
+# and never an AnimationPlayer of its own.
+#
+# It used to scan the wrapper ROOT's children, which returns -1 for every animated asset
+# there has ever been. Measured 2026-08-30 against both wrappers in the tree: root scan
+# -1 / Model scan 1 for Fox, and identically for Pig -- and 1 is exactly what
+# hand-authored Fox.tscn carries. So the phase-two rewrite never once fired, every
+# pipeline-imported model shipped with no autoplay, and the generated import test caught
+# it: test_pig_import failed on `AnimationPlayer autoplay is "Idle"` and nothing else.
 ANIM_PROBE = '''extends SceneTree
 func _init() -> void:
 \tvar packed: PackedScene = load("res://{scene}") as PackedScene
 \tif packed == null:
 \t\tprint("ANIM_INDEX=-1"); quit(); return
 \tvar root: Node = packed.instantiate()
+\tvar host: Node = root.get_node_or_null("Model")
+\tif host == null:
+\t\thost = root
 \tvar idx: int = -1
-\tfor i in root.get_child_count():
-\t\tif root.get_child(i) is AnimationPlayer:
+\tfor i in host.get_child_count():
+\t\tif host.get_child(i) is AnimationPlayer:
 \t\t\tidx = i
 \t\t\tbreak
 \tprint("ANIM_INDEX=%d" % idx)
@@ -145,6 +159,66 @@ def anim_index(tree: Path, scene_res: str, repo: Path | None = None) -> int:
         probe.unlink(missing_ok=True)
 
 
+# The EXPECTED_CLIPS row test_resident_wander.gd pins for every roster species, MEASURED
+# through the same resolver the game uses rather than read off the glTF's animation list:
+# the table's whole point is that three naming conventions coexist (`Idle` vs
+# `Bunny|Bunny_idle` vs `CharacterArmature|Idle`), so only AnimalClips can say which name
+# a given model actually resolves to. Pig measured `run: Run`, not the `Gallop` every
+# other Quaternius quadruped uses -- a fourth convention, and exactly the kind of thing a
+# proposal derived from a sibling species would have got wrong.
+CLIP_ROW_PROBE = '''extends SceneTree
+func _init() -> void:
+\tvar packed: PackedScene = load("res://{scene}") as PackedScene
+\tif packed == null:
+\t\tprint("CLIP_ROW=NONE"); quit(); return
+\tvar node: Node = packed.instantiate()
+\tvar p: AnimationPlayer = AnimalClips.find_player(node)
+\tif p == null:
+\t\tprint("CLIP_ROW=NONE"); node.free(); quit(); return
+\tvar idle: String = AnimalClips.idle_clip(p)
+\tprint("CLIP_ROW=%s\\t%s\\t%s\\t%s" % [idle, AnimalClips.walk_clip(p), AnimalClips.resolve(p, "run"), ",".join(AnimalClips.idle_variant_clips(p, idle))])
+\tnode.free()
+\tquit()
+'''
+
+
+def clip_row_probe_text(scene: str) -> str:
+    return CLIP_ROW_PROBE.format(scene=scene)
+
+
+def parse_clip_row(output: str) -> dict | None:
+    """None when the probe could not measure -- a static model, a scene that failed to
+    load, an engine run that died. A ratchet with nothing measured is not offered at the
+    checkpoint at all, rather than offered with a guess in it."""
+    match = re.search(r"CLIP_ROW=(.*)", output)
+    if match is None or match.group(1).strip() == "NONE":
+        return None
+    # rstrip("\r") only: a trailing tab is a MEANINGFUL empty field -- rabbit has no run
+    # clip and no idle flavours, so its row legitimately ends in two empty columns, and
+    # stripping them turned a real measurement into "could not measure".
+    parts = match.group(1).rstrip("\r").split("\t")
+    if len(parts) != 4:
+        return None
+    idle, walk, run, flavors = parts
+    if not idle or not walk:
+        return None
+    return {"idle": idle, "walk": walk, "run": run,
+            "idle_flavors": [f for f in flavors.split(",") if f]}
+
+
+def clip_row(tree: Path, scene_res: str, repo: Path | None = None) -> dict | None:
+    probe = tree / "project" / "_clip_row_probe.gd"
+    probe.write_text(clip_row_probe_text(scene_res))
+    try:
+        proc = subprocess.run(
+            [str(binary(repo)), "--headless", "--path", str(tree / "project"),
+             "--script", "res://_clip_row_probe.gd"],
+            capture_output=True, text=True, timeout=300)
+        return parse_clip_row(proc.stdout + proc.stderr)
+    finally:
+        probe.unlink(missing_ok=True)
+
+
 def import_test_text(name: str, display: str, category: str, clips: list[str],
                      required_clips: list[str] | None = None) -> str:
     """Which template to emit is the ADAPTER's decision, not the file's.
@@ -244,6 +318,34 @@ def selftest_cases(c) -> None:
 
     c.eq(parse_anim_index("noise\nANIM_INDEX=1\nmore\n"), 1, "index parsed from output")
     c.eq(parse_anim_index("no marker here"), -1, "missing marker yields -1, not a crash")
+
+    # REGRESSION: the probe must count the AnimationPlayer among MODEL's children, which
+    # is the coordinate system write_wrapper's `parent="Model" index="N"` override uses.
+    # Scanning the wrapper root instead returned -1 for every animal in the project.
+    _probe = anim_probe_text("assets/animals/pig/Pig.tscn")
+    c.check('get_node_or_null("Model")' in _probe,
+            "the probe descends into the instanced model before counting children")
+    c.check("host.get_child(i) is AnimationPlayer" in _probe,
+            "and counts among that node's children, not the wrapper root's")
+    c.check("host = root" in _probe,
+            "falling back to the root for a wrapper with no Model node")
+
+    # The clip-row probe feeds test_resident_wander.gd's EXPECTED_CLIPS through the
+    # checkpoint. A measurement that did not happen must never become a proposal.
+    c.eq(parse_clip_row("noise\nCLIP_ROW=Idle\tWalk\tRun\t\nmore"),
+         {"idle": "Idle", "walk": "Walk", "run": "Run", "idle_flavors": []},
+         "a measured row parses, with an empty flavour list")
+    c.eq(parse_clip_row("CLIP_ROW=Idle\tWalk\tGallop\tEating,Idle_2")["idle_flavors"],
+         ["Eating", "Idle_2"], "flavours split on commas")
+    c.eq(parse_clip_row("CLIP_ROW=Bunny|Bunny_idle\tBunny|Bunny_walk\t\t")["run"], "",
+         "a species with no run clip measures an empty run, which is a real answer")
+    c.eq(parse_clip_row("CLIP_ROW=NONE"), None, "a static model measures nothing")
+    c.eq(parse_clip_row("no marker at all"), None, "a dead engine run measures nothing")
+    c.eq(parse_clip_row("CLIP_ROW=Idle\tWalk"), None, "a truncated line is not a row")
+    c.eq(parse_clip_row("CLIP_ROW=\tWalk\tRun\t"), None,
+         "a blank idle is a failed resolve, not a row worth proposing")
+    c.check("AnimalClips.find_player" in clip_row_probe_text("x.tscn"),
+            "the probe resolves through the game's own resolver, not the raw clip list")
 
     # `godot/**` is gitignored, so a worktree has no engine binary. Handing binary() a
     # worktree path must NOT produce a path inside it.

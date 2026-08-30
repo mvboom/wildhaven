@@ -26,7 +26,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from assetpipe.harness import Checks
-from assetpipe import checkpoint, tracker, blender, attribution, audit, dedupe, formats, importer, llm, review, runlog, worktree, godot
+from assetpipe import checkpoint, ratchets, tracker, blender, attribution, audit, dedupe, formats, importer, llm, review, runlog, worktree, godot
 from assetpipe.adapters import animal, building, terrain
 
 ADAPTERS = ("animal", "building", "terrain")
@@ -86,6 +86,74 @@ def _selftest_cli(c) -> None:
 
     import json as _json
     import tempfile as _tf
+
+
+    # --- the roster ratchets, asked at the checkpoint -------------------------
+    # test_attribution.gd's source count and test_resident_wander.gd's EXPECTED_CLIPS both
+    # fail BECAUSE content was added -- by design, so that shipping a new source or a new
+    # species is a decision. They used to be discovered as a red suite at stage 10, after
+    # the token spend, with no hint which of 94 suites cared. Now they are checkpoint
+    # fields with measured proposals.
+    _row = {"idle": "Idle", "walk": "Walk", "run": "Run", "idle_flavors": []}
+    _ds = _ratchet_decisions("animal", "pig", _row, entry_is_new=True, already_pinned=False)
+    _by = {d.field: d for d in _ds}
+    c.eq(sorted(_by), [ratchets.CLIP_ROW_FIELD, ratchets.NEW_SOURCE_FIELD],
+         "both ratchets are offered when both apply")
+    c.eq(_by[ratchets.NEW_SOURCE_FIELD].proposal, True,
+         "recording a source this run creates is proposed, not assumed")
+    c.eq(_by[ratchets.CLIP_ROW_FIELD].proposal,
+         '{"idle": "Idle", "walk": "Walk", "run": "Run", "idle_flavors": []}',
+         "the clip row is proposed as editable text, prefilled with what was MEASURED")
+    for _d in _ds:
+        c.eq(_d.confidence, "measured",
+             f"{_d.field} is measured, never an LLM proposal")
+        c.eq(_d.value, None, "and unruled, so it reaches the checkpoint like any other")
+        c.check(_d.source, f"{_d.field} states where its proposal came from")
+
+    c.eq(_ratchet_decisions("animal", "pig", _row, False, False)[0].field,
+         ratchets.CLIP_ROW_FIELD,
+         "an existing pack's entry needs no source ruling -- only the clip row is asked")
+    c.eq(_ratchet_decisions("animal", "pig", _row, False, True), [],
+         "a species already pinned with an existing pack asks nothing")
+    c.eq(_ratchet_decisions("animal", "pig", None, False, False), [],
+         "a model whose clips could not be measured offers no row to rule")
+    c.eq([d.field for d in _ratchet_decisions("building", "silo", None, True, False)],
+         [ratchets.NEW_SOURCE_FIELD],
+         "buildings and terrain are not in EXPECTED_CLIPS, so only the source ratchet applies")
+
+    # The ratchet fields must never reach the .tres: render_tres writes every key it is
+    # given, so an unfiltered `values` would emit `ratchet_clip_row = "..."` into a
+    # resource the schema has no such field on.
+    _values = {"scout_radius": 8, ratchets.NEW_SOURCE_FIELD: True,
+               ratchets.CLIP_ROW_FIELD: "{}"}
+    c.eq(_adapter_values(_values), {"scout_radius": 8},
+         "adapter values exclude the ratchet fields")
+    c.eq(_ratchet_values(_values),
+         {ratchets.NEW_SOURCE_FIELD: True, ratchets.CLIP_ROW_FIELD: "{}"},
+         "and the ratchet rulings are separated out for the test files")
+    c.check(all(f.startswith(_RATCHET_PREFIX) for f in ratchets.FIELD_KINDS),
+            "every ratchet field carries the prefix the split relies on")
+    for _mod in ADAPTER_MODULES.values():
+        for _f in _mod.SPEC.fields:
+            c.check(not _f.name.startswith(_RATCHET_PREFIX),
+                    f"no real adapter field collides with the prefix ({_f.name})")
+
+    # The checkpoint has to know how to parse each one, or the prompt takes them as strings.
+    _kinds = _field_kinds(animal.SPEC)
+    c.eq(_kinds[ratchets.NEW_SOURCE_FIELD], "bool", "the source ratchet prompts as a bool")
+    c.eq(_kinds[ratchets.CLIP_ROW_FIELD], "str", "the clip row prompts as editable text")
+
+    # ORDERING: the rulings must reach the test files BEFORE the suite reads them, or the
+    # run reports a failure it had already been told how to fix.
+    import inspect as _inspect
+    _stages = _inspect.getsource(_resume_stages)
+    c.check(_stages.index("ratchets.apply(") < _stages.index("godot.run_tests("),
+            "ratchets are applied before the suite runs, not after")
+    _resume_src = _inspect.getsource(resume)
+    c.check("_adapter_values(ruled)" in _resume_src,
+            "the .tres is written from the adapter's fields alone")
+    c.check("_ratchet_values(ruled)" in _resume_src,
+            "and the ratchet rulings are handed to the stage that owns the test files")
 
     # --- stage 8's cost line -------------------------------------------------
     # Stage 6 prints what it spent; stage 8 runs a full GER loop per candidate through
@@ -330,8 +398,19 @@ def _selftest_cli(c) -> None:
         run_src = inspect.getsource(run)
         c.check("chosen_path.suffix" not in run_src,
                 "run() no longer names the wrapper's model file after the SOURCE suffix")
-        c.eq(run_src.count("copied.model.name"), 2,
-             "both write_wrapper call sites use the filename copy_model actually wrote")
+        # Structural rather than a token count: the .import path is now built from the
+        # same name too, so counting occurrences would drift every time another consumer
+        # of the written filename is added. What must hold is that EVERY write_wrapper
+        # call site takes it.
+        _sites = [i for i in range(len(run_src))
+                  if run_src.startswith("importer.write_wrapper(", i)]
+        c.eq(len(_sites), 2, "run() writes the wrapper exactly twice -- before and after "
+                             "the AnimationPlayer probe")
+        for _at in _sites:
+            c.check("copied.model.name" in run_src[_at:_at + 300],
+                    "this write_wrapper call uses the filename copy_model actually wrote")
+        c.check("copied.model.name" in run_src[run_src.index(".import"):][:400],
+                "and so does the .import path whose loop modes are rewritten")
 
         # REGRESSION, whole-branch review IMPORTANT 17: copy_license_text was implemented,
         # hardened, tested and never called.
@@ -443,6 +522,7 @@ def selftest() -> int:
     blender.selftest_cases(c)
     checkpoint.selftest_cases(c)
     tracker.selftest_cases(c)
+    ratchets.selftest_cases(c)
     base.selftest_cases(c)
     animal.selftest_cases(c)
     building.selftest_cases(c)
@@ -455,8 +535,10 @@ def selftest() -> int:
 
 def _field_kinds(spec) -> dict:
     """Field name to FieldSpec.kind, so the prompt loop parses what the operator types
-    as the type the .tres will hold rather than as a string."""
-    return {f.name: f.kind for f in spec.fields}
+    as the type the .tres will hold rather than as a string. The ratchet fields are not
+    on any AdapterSpec -- they belong to the test files, not the schema -- so their kinds
+    are merged in here, or the prompt would take a bool answer as the string "y"."""
+    return {f.name: f.kind for f in spec.fields} | dict(ratchets.FIELD_KINDS)
 
 
 def _should_prompt(interactive: bool, isatty: bool) -> bool:
@@ -613,8 +695,31 @@ def run(asset: Path, adapter_name: str, repo: Path, notes: str = "",
         godot.write_import_test(tree, ident, display, spec.category,
                                 resolution.probe.clips, spec.required_clips)
         heuristic = set(resolution.probe.clips)
+        # Measured through AnimalClips, the resolver the GAME uses -- the pre-gate's clip
+        # list cannot say which of the three naming conventions this model follows, and
+        # that is precisely what test_resident_wander.gd's table pins.
+        clip_row = godot.clip_row(tree, scene_res, repo) if adapter_name == "animal" else None
+
+        # A locomotion clip that does not loop plays once and freezes while the model keeps
+        # moving -- test_resident_wander.gd calls that "the glide bug". Godot leaves
+        # `_subresources={}` on a fresh import, so the loop flags have to be written, and
+        # the set to write is exactly what was just measured: idle, walk, run, flavours.
+        looped: list[str] = []
+        if clip_row:
+            import_file = (importer.dest_dir(project, spec.category, ident)
+                           / f"{copied.model.name}.import")
+            if import_file.is_file():
+                looped = [clip_row["idle"], clip_row["walk"], clip_row["run"],
+                          *clip_row["idle_flavors"]]
+                import_file.write_text(
+                    importer.set_loop_modes(import_file.read_text(), looped))
+                godot.import_project(tree, repo)
+
         print(f"[5/10] verify...... AnimationPlayer index {idx}; "
-              f"{len(heuristic)} clips from the pre-gate")
+              f"{len(heuristic)} clips from the pre-gate"
+              + (f"; resolves idle={clip_row['idle']} walk={clip_row['walk']}"
+                 f"; {len([c for c in looped if c])} clip(s) set to loop"
+                 if clip_row else ""))
 
         # cost's usd_known starts True: a dry run or a run whose only stage was free
         # made no unpriced spend, so there is nothing to warn about.
@@ -632,6 +737,14 @@ def run(asset: Path, adapter_name: str, repo: Path, notes: str = "",
             log.record(6, "values", runlog.stage_key(ident, resolution.chosen),
                        {"fields": [d.field for d in decisions]}, usage)
             print(f"[6/10] values...... {len(decisions)} proposed")
+
+        # The roster ratchets: guards that fire because content was ADDED. Asked here, with
+        # measured proposals, rather than met as an unexplained red suite at stage 10.
+        decisions += _ratchet_decisions(
+            adapter_name, ident, clip_row,
+            entry_is_new=_entry_is_new(project, asset, gate.evidence.get("license", "")),
+            already_pinned=ratchets.clips_pinned(
+                _read_or_empty(tree / "project" / "tests" / ratchets.WANDER_TEST), ident))
 
         cost = log.total_cost()
         cost["usd_known"] = usd_known
@@ -773,7 +886,10 @@ def resume(run_id: str, repo: Path) -> int:
     project = tree / "project"
     ident = slug(Path(payload["asset"]).stem)
     display = Path(payload["asset"]).stem
-    values = {d["field"]: d["value"] for d in payload["decisions"]}
+    ruled = {d["field"]: d["value"] for d in payload["decisions"]}
+    # The ratchet rulings belong to the TEST FILES, not the resource: render_tres writes
+    # every key it is handed, and no schema declares a `ratchet_*` field.
+    values = _adapter_values(ruled)
 
     problems = _validate(module, adapter_name, ident, mode, values)
     if problems:
@@ -783,7 +899,7 @@ def resume(run_id: str, repo: Path) -> int:
 
     try:
         return _resume_stages(run_id, repo, payload, module, adapter_name, tree, project,
-                              mode, ident, display, values)
+                              mode, ident, display, values, _ratchet_values(ruled))
     except Exception as exc:
         # resume() is the function that touches the OPERATOR'S REAL REPOSITORY, and the
         # stages below raise messages that name no location: terrain.write()'s inert-land
@@ -800,7 +916,7 @@ def resume(run_id: str, repo: Path) -> int:
 
 def _resume_stages(run_id: str, repo: Path, payload: dict, module, adapter_name: str,
                    tree: Path, project: Path, mode: str | None, ident: str, display: str,
-                   values: dict) -> int:
+                   values: dict, ratchet_rulings: dict | None = None) -> int:
     header = (f"; {display} — generated by scripts/asset_pipeline.py run {run_id}\n"
               f"; Source: {payload['asset']}\n"
               f"; Format: {payload['resolved_format']['chosen']} "
@@ -882,6 +998,12 @@ def _resume_stages(run_id: str, repo: Path, payload: dict, module, adapter_name:
         print(f"[9/10] credits..... {attribution.extend_assets_used(entry, [display])}")
     godot.regenerate_credits(tree, repo)
 
+    # BEFORE the suite runs, so what runs is the tree the human ruled. Both guards are
+    # deliberate -- ruling no leaves one failing, and that is a choice, not a surprise.
+    for line in ratchets.apply(project / "tests", project / "attribution" / "sources",
+                               ident, ratchet_rulings or {}):
+        print(f"[10/10] ratchets... {line}")
+
     passed, output = godot.run_tests(tree, repo=repo)
     print(f"[10/10] tests...... {'PASS' if passed else 'FAIL'}")
     if not passed:
@@ -900,6 +1022,73 @@ def _resume_stages(run_id: str, repo: Path, payload: dict, module, adapter_name:
     ok, log_path = build(repo)
     print(f"build....... {'OK' if ok else 'FAILED'} ({log_path})")
     return 0 if ok else 1
+
+
+def _read_or_empty(path: Path) -> str:
+    return path.read_text() if path.is_file() else ""
+
+
+def _entry_is_new(project: Path, asset: Path, license_id: str) -> bool:
+    """Whether stage 9 will AUTHOR an attribution entry rather than extend one.
+
+    False for a licence stage 9 refuses to automate: that run halts at stage 9 with no
+    entry written, so asking the operator to bump a count nothing will change would be
+    a question with no consequence.
+    """
+    if license_id not in attribution.AUTOMATABLE_LICENCES:
+        return False
+    try:
+        return attribution.find_entry(
+            project, "Quaternius", formats.pack_root(asset).name) is None
+    except attribution.AmbiguousEntry:
+        # Stage 9 halts on this rather than crediting a guess; nothing gets added.
+        return False
+
+
+_RATCHET_PREFIX = "ratchet_"
+
+
+def _adapter_values(values: dict) -> dict:
+    """The ruled fields the adapter's .tres actually has.
+
+    render_tres writes EVERY key it is handed, so a ratchet ruling left in here would emit
+    `ratchet_clip_row = "..."` into a resource whose schema declares no such field.
+    """
+    return {k: v for k, v in values.items() if not k.startswith(_RATCHET_PREFIX)}
+
+
+def _ratchet_values(values: dict) -> dict:
+    return {k: v for k, v in values.items() if k.startswith(_RATCHET_PREFIX)}
+
+
+def _ratchet_decisions(adapter_name: str, ident: str, clip_row: dict | None,
+                       entry_is_new: bool, already_pinned: bool) -> list[review.Decision]:
+    """The roster ratchets that apply to THIS run, as checkpoint fields.
+
+    Offered only when they would actually fire -- a pack that already has an entry needs
+    no source ruling, a species already in EXPECTED_CLIPS needs no row -- so the
+    checkpoint never asks a question whose answer changes nothing. Confidence is
+    "measured", not an LLM's: the clip names come from AnimalClips running against the
+    model this run just imported.
+    """
+    out: list[review.Decision] = []
+    if entry_is_new:
+        out.append(review.Decision(
+            field=ratchets.NEW_SOURCE_FIELD, proposal=True,
+            source=(f"{ratchets.ATTRIBUTION_TEST} pins the number of attribution sources "
+                    f"on disk so that adding one is a decision, not a side effect. This "
+                    f"run creates an entry; yes updates that count, no leaves the guard "
+                    f"to fail at stage 10"),
+            confidence="measured", value=None))
+    if adapter_name == "animal" and clip_row is not None and not already_pinned:
+        out.append(review.Decision(
+            field=ratchets.CLIP_ROW_FIELD, proposal=ratchets.row_literal(clip_row),
+            source=(f"{ratchets.WANDER_TEST} pins every roster species' exact clip names; "
+                    f"`{ident}` is new, so the table must gain a row or the suite refuses "
+                    f"to run. Prefilled with what AnimalClips resolved on the imported "
+                    f"model -- edit it to override, or answer empty to leave it unpinned"),
+            confidence="measured", value=None))
+    return out
 
 
 def _tracker_rows(payload: dict, run_id: str, tres_rel: str,

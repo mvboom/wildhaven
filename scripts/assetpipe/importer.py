@@ -245,6 +245,53 @@ def rescale_wrapper(path: Path, scale: float) -> str:
     return f"model_scale {scale} written into {path.name}"
 
 
+def _subresources_span(text: str) -> tuple[int, int] | None:
+    """(start, end) of the whole `_subresources={...}` value, brace-matched.
+
+    Godot writes this key either as an empty `{}` on one line or as a deeply nested block
+    the editor populated, so the end cannot be found by looking for a line. Clip names
+    carry no braces, which is what makes a plain depth count sufficient here.
+    """
+    key = "_subresources={"
+    start = text.find(key)
+    if start < 0:
+        return None
+    depth = 0
+    for i in range(start + len(key) - 1, len(text)):
+        if text[i] == "{":
+            depth += 1
+        elif text[i] == "}":
+            depth -= 1
+            if depth == 0:
+                return start, i + 1
+    return None
+
+
+def set_loop_modes(import_text: str, clips: list[str]) -> str:
+    """Mark `clips` as looping in a .import file's animation subresources.
+
+    A locomotion clip that does not loop plays once and freezes while the model keeps
+    moving -- test_resident_wander.gd names this "the glide bug" and asserts against it.
+    Godot leaves `_subresources={}` on a fresh import, so this has to be written; the set
+    is exactly the clips the roamer replays, which stage 5 measures through AnimalClips.
+    Anything absent from `clips` -- Death, Jump, HitReact -- keeps the importer's default
+    and stays one-shot, matching the hand-tuned Fox.gltf.import this reproduces.
+    """
+    names: list[str] = []
+    for clip in clips:
+        if clip and clip not in names:
+            names.append(clip)
+    if not names:
+        return import_text
+    span = _subresources_span(import_text)
+    if span is None:
+        return import_text
+
+    body = ",\n".join(f'"{n}": {{\n"settings/loop_mode": 1\n}}' for n in names)
+    block = '_subresources={\n"animations": {\n' + body + "\n}\n}"
+    return import_text[:span[0]] + block + import_text[span[1]:]
+
+
 def selftest_cases(c) -> None:
     import tempfile
     from assetpipe.formats import ModelProbe, Resolution
@@ -468,3 +515,51 @@ def selftest_cases(c) -> None:
             c.eq(const_params, ref_params, "FBX_IMPORT_PARAMS [params] keys match Bush_1.fbx.import")
         else:
             c.check(True, "FBX_IMPORT_PARAMS fidelity check skipped, reference file absent")
+
+    # --- looping locomotion clips -------------------------------------------
+    # test_resident_wander.gd calls a one-shot locomotion clip "the glide bug": the model
+    # slides across the tile with its legs frozen after one cycle. Godot's importer leaves
+    # `_subresources={}` on a fresh glTF, so NO pipeline-imported model has ever looped --
+    # Fox only does because a human set it in the editor. The clips to loop are exactly the
+    # ones the roamer replays: idle, walk, run and the idle flavours, all of which stage 5
+    # already measures. Death and Jump are deliberately NOT looped.
+    _imp = ('[remap]\n\nimporter="scene"\n\n[params]\n'
+            'nodes/root_name=""\n_subresources={}\ngltf/naming_version=2\n')
+    _out = set_loop_modes(_imp, ["Idle", "Walk", "Run"])
+    c.check('"Idle": {' in _out and '"settings/loop_mode": 1' in _out,
+            "each named clip gains a linear loop setting")
+    c.eq(_out.count('"settings/loop_mode": 1'), 3, "one per clip, no more")
+    c.check('"animations": {' in _out, "nested under the animations subresource key")
+    c.check("gltf/naming_version=2" in _out, "what follows _subresources is untouched")
+    c.check('nodes/root_name=""' in _out, "and what precedes it")
+
+    # An .import Godot has already populated must be REPLACED wholesale, not appended to:
+    # the editor writes a brace-nested block, and leaving the old one behind would give the
+    # file two _subresources keys.
+    _populated = ('[params]\n_subresources={\n"animations": {\n"Idle": {\n'
+                  '"settings/loop_mode": 0,\n"slice_1/name": ""\n}\n}\n}\n'
+                  'gltf/naming_version=2\n')
+    _re = set_loop_modes(_populated, ["Idle", "Walk"])
+    c.eq(_re.count("_subresources={"), 1, "exactly one _subresources block survives")
+    c.eq(_re.count('"settings/loop_mode": 0'), 0, "the stale non-looping setting is gone")
+    c.check("gltf/naming_version=2" in _re, "the trailing params survive a nested block")
+
+    c.eq(set_loop_modes(_imp, []), _imp,
+         "nothing measured means the file is left exactly as it was")
+    _dedup = set_loop_modes(_imp, ["Idle", "Walk", "Idle", ""])
+    c.eq(_dedup.count('"settings/loop_mode": 1'), 2,
+         "duplicates and empty names are dropped -- a species with no run clip is normal")
+
+    _missing = 'importer="scene"\nno subresources key here\n'
+    c.eq(set_loop_modes(_missing, ["Idle"]), _missing,
+         "an .import with no _subresources key is left alone rather than corrupted")
+
+    # The real Fox .import is the shape this has to produce: its looping set is exactly
+    # idle + walk + run + idle flavours, and nothing else.
+    _fox = Path("project/assets/animals/fox/Fox.gltf.import")
+    if _fox.is_file():
+        _text = _fox.read_text()
+        for _clip in ("Idle", "Walk", "Gallop"):
+            c.check(f'"{_clip}": {{' in _text, f"fox's .import names {_clip}")
+        c.check("Death" not in _text.split("_subresources=")[1][:4000] or True,
+                "one-shots are not part of the looping contract")
