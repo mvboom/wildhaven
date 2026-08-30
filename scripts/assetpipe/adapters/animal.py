@@ -11,6 +11,7 @@ every remaining choice goes to the human as a Decision.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from assetpipe.adapters.base import AdapterSpec, FieldSpec, render_tres
@@ -23,6 +24,8 @@ HABITAT_TAGS = ["water", "forest", "open_grass", "quiet", "cover", "flowers",
 BARE_TAGS = ["open_grass", "quiet"]
 PERSONALITIES = ["Shy", "Bold"]
 RADIUS_BAND = (8, 12)
+# Transcribed from animal_definition.gd:64.
+ID_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 
 SPEC = AdapterSpec(
     name="animal", category="animals", data_dir="animals",
@@ -50,9 +53,17 @@ def validate_values(values: dict) -> list[str]:
     for tag in needs:
         if tag not in HABITAT_TAGS:
             problems.append(f"unknown habitat tag {tag!r}")
-    for tag in values.get("avoids", []):
-        if tag not in HABITAT_TAGS and tag not in ("human",):
-            problems.append(f"unknown avoids entry {tag!r}")
+
+    # `avoids` names other SPECIES ids, never habitat tags -- animal_definition.gd:125,
+    # "Species ids to keep mutual distance from, in ID_PATTERN form". Real roster data:
+    # fox avoids ["rabbit"], rabbit avoids ["fox"], husky avoids ["shiba_inu"]. We check the
+    # id CONVENTION only, not existence: the roster is not available here, and a species may
+    # legitimately avoid one being added later in the same batch.
+    for other in values.get("avoids", []):
+        if not isinstance(other, str) or ID_PATTERN.match(other) is None:
+            problems.append(
+                f"avoids entry {other!r} is not a valid species id "
+                f"(lowercase snake, matching {ID_PATTERN.pattern})")
 
     if needs and all(tag in BARE_TAGS for tag in needs):
         problems.append(
@@ -104,7 +115,7 @@ def selftest_cases(c) -> None:
     c.eq(SPEC.required_clips, ["Idle", "Walk"], "idle and walk are required")
 
     good = {"habitat_needs": ["water", "cover"], "personality": "Shy",
-            "avoids": ["human"], "farm_tolerant": False, "scout_radius": 10,
+            "avoids": ["rabbit"], "farm_tolerant": False, "scout_radius": 10,
             "capacity_radius": 0, "tiles_per_individual": 5, "max_individuals": 6}
     c.eq(validate_values(good), [], "a well-formed value set validates")
 
@@ -121,6 +132,17 @@ def selftest_cases(c) -> None:
     c.check(any("scout_radius" in p for p in
                 validate_values(dict(good, scout_radius=40))),
             "scout_radius outside the 8-12 band rejected")
+
+    c.eq(validate_values(dict(good, avoids=["fox", "shiba_inu"])), [],
+         "multiple valid species ids in avoids validates clean")
+    c.check(any("species id" in p for p in
+                validate_values(dict(good, avoids=["Fox"]))),
+            "capitals in avoids violate id convention")
+    c.check(any("species id" in p for p in
+                validate_values(dict(good, avoids=[123]))),
+            "non-string entry in avoids is rejected")
+    c.eq(validate_values(dict(good, avoids=["water"])), [],
+         "avoids with tag-shaped names passes shape check; existence is not verified here")
 
     ds = decisions(ModelProbe(fmt="fbx", clips=["Idle", "Walk"]))
     names = [d.field for d in ds]
