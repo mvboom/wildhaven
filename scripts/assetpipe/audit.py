@@ -80,9 +80,9 @@ def gate(resolution, required_clips: list[str], pack: Path,
     if not license_id:
         problems.append(f"no cleared licence: {license_evidence}")
 
-    if license_id.startswith("Synty") and adapter_name and adapter_name != "animal":
+    if license_id.startswith("Synty") and adapter_name != "animal":
         problems.append(
-            f"Synty SIMPLE is sanctioned for ANIMALS ONLY (art.md:70 — 'Animals only; "
+            f"Synty SIMPLE is sanctioned for ANIMALS ONLY (art.md:69 — 'Animals only; "
             f"humans stay Quaternius'); this is a {adapter_name!r} import")
 
     if not resolution.chosen or resolution.probe is None:
@@ -167,6 +167,12 @@ def selftest_cases(c) -> None:
         c.check(not r_building.passed, "Synty SIMPLE pack fails for buildings")
         c.check(any("Animals only" in p for p in r_building.problems),
                 "problem names the animals-only rule")
+
+        # Synty SIMPLE with adapter_name omitted (default "") must fail CLOSED
+        r_omitted = gate(animal_synty, ["Idle", "Walk"], synty_simple)
+        c.check(not r_omitted.passed, "Synty SIMPLE pack fails when adapter_name is omitted")
+        c.check(any("Animals only" in p for p in r_omitted.problems),
+                "problem names animals-only rule when adapter_name omitted (fail-CLOSED)")
 
         # Both return paths have same evidence key set
         resolved_evidence_keys = set(gate(ok, ["Idle", "Walk"], cc0).evidence.keys())
