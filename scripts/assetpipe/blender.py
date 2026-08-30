@@ -188,13 +188,45 @@ def _unreadable(why: str) -> ModelProbe:
     return ModelProbe(fmt="blend", unreadable=f"unreadable .blend: {why}")
 
 
+# WHY THE REWIRE. A BLENDER-v279 material converts into THREE Material Output nodes, one
+# per render target, and only the EEVEE one is wired to the Principled BSDF that holds the
+# colour. The `ALL`-target output -- the one the glTF exporter follows -- is wired to a
+# Diffuse BSDF, which the exporter cannot map to a PBR material. It then emits a material
+# with NO `pbrMetallicRoughness` block at all, and glTF's defaults take over: base colour
+# white AND metallicFactor 1.0. Pig shipped as a white metallic pig while its Principled
+# node had held (0.687, 0.356, 0.371) -- dusty pink -- the whole time.
+#
+# So point the output the exporter reads at the node that carries the colour, before
+# exporting. Measured on Pig.blend: without this, both materials export bare; with it,
+# baseColorFactor [0.687, 0.356, 0.371] and [0.202, 0.087, 0.049], metallicFactor 0, and
+# all six clips still present.
+#
+# Nothing is deleted -- the other outputs are only marked inactive -- and on a modern
+# single-output .blend this relinks the Principled BSDF to the output it is already wired
+# to, which is a no-op. A material with no Principled BSDF is left untouched: this
+# repoints the exporter at the colour, it does not invent a conversion for node graphs
+# the exporter was never going to read.
+#
 # GLTF_SEPARATE writes <Name>.gltf plus its .bin beside it, matching the shape the rest of
-# the project already uses (Wolf.gltf, Plant_7.gltf + .bin). Exporting straight into the
-# destination means there is nothing to copy afterwards.
-_EXPORT_EXPR = (
-    "import bpy; "
-    "bpy.ops.export_scene.gltf(filepath=r'{out}', export_format='GLTF_SEPARATE')"
-)
+# the project already uses (Wolf.gltf, Plant_7.gltf + .bin).
+_EXPORT_EXPR = """import bpy
+for _mat in bpy.data.materials:
+    if not _mat.use_nodes:
+        continue
+    _nt = _mat.node_tree
+    _bsdf = next((n for n in _nt.nodes if n.type == 'BSDF_PRINCIPLED'), None)
+    _outs = [n for n in _nt.nodes if n.type == 'OUTPUT_MATERIAL']
+    if _bsdf is None or not _outs:
+        continue
+    _keep = next((n for n in _outs if n.target == 'ALL'), _outs[0])
+    for _o in _outs:
+        _o.is_active_output = (_o is _keep)
+    _keep.target = 'ALL'
+    for _link in list(_keep.inputs['Surface'].links):
+        _nt.links.remove(_link)
+    _nt.links.new(_bsdf.outputs['BSDF'], _keep.inputs['Surface'])
+bpy.ops.export_scene.gltf(filepath=r'{out}', export_format='GLTF_SEPARATE')
+"""
 
 
 def export_gltf(blend: Path, dest_dir: Path, name: str) -> Path:
@@ -461,3 +493,28 @@ def selftest_cases(c) -> None:
                 os.environ.pop(BLENDER_ENV, None)
             else:
                 os.environ[BLENDER_ENV] = saved
+
+    # --- the material rewire -------------------------------------------------
+    # These are BLENDER-v279 files, and their legacy three-output material graph made the
+    # glTF exporter emit materials with no pbrMetallicRoughness at all -- so glTF's
+    # defaults applied and Pig imported as a WHITE METALLIC pig. Measured against the real
+    # Pig.blend: bare materials before, [0.687, 0.356, 0.371] / [0.202, 0.087, 0.049] with
+    # metallicFactor 0 after, six clips either way.
+    _script = _EXPORT_EXPR.format(out="/tmp/Pig.gltf")
+    c.check("BSDF_PRINCIPLED" in _script,
+            "the export points the output node at the Principled BSDF")
+    c.check("n.target == 'ALL'" in _script,
+            "and at the ALL-target output specifically -- the one the exporter follows, "
+            "not the EEVEE one the colour happened to be wired to")
+    c.check("_nt.links.new(_bsdf.outputs['BSDF'], _keep.inputs['Surface'])" in _script,
+            "the Principled is linked to that output's Surface input")
+    c.check("nodes.remove" not in _script,
+            "nothing is DELETED -- the other outputs are only marked inactive, because a "
+            "conversion has no business destroying node graphs it does not understand")
+    c.check("_bsdf is None" in _script,
+            "a material with no Principled BSDF is left untouched rather than invented for")
+    c.check(_script.index("for _mat in bpy.data.materials")
+            < _script.index("export_scene.gltf"),
+            "the rewire runs BEFORE the export, or it changes nothing")
+    c.check("export_format='GLTF_SEPARATE'" in _script,
+            "still exporting .gltf + .bin, the shape the project already uses")

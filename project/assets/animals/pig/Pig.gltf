@@ -5665,11 +5665,31 @@
 	"materials":[
 		{
 			"doubleSided":true,
-			"name":"Material.003"
+			"name":"Material.003",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0.6866853833198547,
+					0.3564002215862274,
+					0.37123775482177734,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
 		},
 		{
 			"doubleSided":true,
-			"name":"Material"
+			"name":"Material",
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					0.20189817249774933,
+					0.08714307844638824,
+					0.04865839704871178,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":0.5
+			}
 		}
 	],
 	"meshes":[
