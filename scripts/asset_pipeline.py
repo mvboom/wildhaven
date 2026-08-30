@@ -21,7 +21,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from assetpipe.harness import Checks
-from assetpipe import audit, dedupe, formats, importer, llm, review, runlog, worktree, godot
+from assetpipe import attribution, audit, dedupe, formats, importer, llm, review, runlog, worktree, godot
 from assetpipe.adapters import animal, building, terrain
 
 ADAPTERS = ("animal", "building", "terrain")
@@ -46,6 +46,7 @@ def _selftest_cli(c) -> None:
 def selftest() -> int:
     from assetpipe.adapters import base
     c = Checks()
+    attribution.selftest_cases(c)
     formats.selftest_cases(c)
     audit.selftest_cases(c)
     dedupe.selftest_cases(c)
