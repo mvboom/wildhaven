@@ -27,6 +27,11 @@ import shutil
 import subprocess
 from pathlib import Path
 
+try:  # stdlib zstd landed in 3.14; older interpreters report the file as unreadable
+    from compression import zstd as _zstd
+except ImportError:  # pragma: no cover -- depends on the interpreter, not on input
+    _zstd = None
+
 from assetpipe.formats import UNKNOWN, ModelProbe, probe_gltf
 
 BLENDER_ENV = "BLENDER_PATH"
@@ -92,14 +97,40 @@ def probe_blend(path: Path) -> ModelProbe:
 
     Geometry counts stay UNKNOWN: only Blender can answer those, and guessing them from
     the container would be inventing evidence -- the same rule probe_fbx follows.
+
+    A container we cannot get inside is reported UNREADABLE, never as zero clips. Only
+    gzip was handled here, but Blender 3.0+ writes zstd, so a modern .blend was scanned
+    raw: it yielded clips == [], silently lost every comparison against its own fbx, and
+    made export_gltf's verification vacuous -- `expected` was empty, so `missing` was
+    always empty and the "nothing was lost" guard passed on a file we never read.
     """
     raw = path.read_bytes()
     if raw[:2] == b"\x1f\x8b":
-        raw = gzip.decompress(raw)
+        try:
+            raw = gzip.decompress(raw)
+        except (OSError, EOFError) as exc:
+            return _unreadable(f"gzip container that would not decompress ({exc})")
+    elif raw[:4] == b"\x28\xb5\x2f\xfd":
+        if _zstd is None:
+            return _unreadable(
+                "zstd-compressed (Blender 3.0+ writes these) and this Python has no "
+                "compression.zstd -- 3.14+ or a manual decompression is needed")
+        try:
+            raw = _zstd.decompress(raw)
+        except Exception as exc:  # the codec's own error types vary by build
+            return _unreadable(f"zstd container that would not decompress ({exc})")
+    if not raw.startswith(b"BLENDER"):
+        return _unreadable(
+            "no BLENDER magic after every decompression this pipeline supports, so its "
+            "actions cannot be read -- it is not zero-action, it is unread")
     return ModelProbe(
         fmt="blend",
         clips=sorted({m.decode("ascii", "ignore") for m in _ACTION.findall(raw)}),
     )
+
+
+def _unreadable(why: str) -> ModelProbe:
+    return ModelProbe(fmt="blend", unreadable=f"unreadable .blend: {why}")
 
 
 # GLTF_SEPARATE writes <Name>.gltf plus its .bin beside it, matching the shape the rest of
@@ -119,6 +150,19 @@ def export_gltf(blend: Path, dest_dir: Path, name: str) -> Path:
     action would otherwise surface as a missing animation at look-pass time instead of
     here, where it names the file and the clips.
     """
+    # Read the source FIRST. The verification below compares the actions the .blend
+    # advertises against the ones the glTF carries -- and a container we cannot parse
+    # advertises nothing, so `missing` is empty and the guard passes unconditionally on
+    # exactly the files it exists to protect. Refusing here also saves a pointless
+    # ten-minute Blender run.
+    source = probe_blend(blend)
+    if source.unreadable:
+        raise RuntimeError(
+            f"cannot convert {blend.name}: {source.unreadable}. Refusing to export it, "
+            f"because with no actions read there is nothing to verify the export against "
+            f"-- the 'nothing was lost' check would pass no matter what came out."
+        )
+
     exe = binary()
     if not exe:
         raise RuntimeError(
@@ -138,7 +182,7 @@ def export_gltf(blend: Path, dest_dir: Path, name: str) -> Path:
             f"Blender failed to export {blend.name} (exit {proc.returncode}). "
             f"Output tail: {tail}"
         )
-    expected = set(probe_blend(blend).clips)
+    expected = set(source.clips)
     got = set(probe_gltf(out).clips)
     missing = sorted(expected - got)
     if missing:
@@ -175,6 +219,52 @@ def selftest_cases(c) -> None:
         empty = d / "Rock.blend"
         empty.write_bytes(b"BLENDER-v279\x00no actions here\x00")
         c.eq(probe_blend(empty).clips, [], "a .blend with no actions yields no clips")
+        c.eq(probe_blend(empty).unreadable, None,
+             "a readable .blend with genuinely no actions is not 'unreadable'")
+
+        # REGRESSION, review IMPORTANT 2: only gzip was decompressed, but Blender 3.0+
+        # writes zstd. A zstd .blend was scanned raw, yielded clips == [], silently lost
+        # every comparison -- and made export_gltf's verification VACUOUS, because
+        # `expected` was empty so `missing` was always empty and the "verify nothing was
+        # lost" guard passed unconditionally on a file it could not read.
+        try:
+            from compression import zstd as _zstd
+        except ImportError:
+            _zstd = None
+        if _zstd is not None:
+            zst = d / "Goat.blend"
+            zst.write_bytes(_zstd.compress(b"BLENDER-v303\x00ACIdle\x00ACWalk\x00"))
+            c.eq(probe_blend(zst).clips, ["Idle", "Walk"],
+                 "a zstd-compressed .blend is decompressed and read")
+            c.eq(probe_blend(zst).unreadable, None, "and is not reported unreadable")
+        else:
+            c.check(True, "zstd check skipped, this Python has no compression.zstd")
+
+        opaque = d / "Opaque.blend"
+        opaque.write_bytes(b"\x00\x01\x02not a blender file at all\x00")
+        op = probe_blend(opaque)
+        c.check(op.unreadable is not None,
+                "a container with no BLENDER magic is reported UNREADABLE, not 0 clips")
+        c.eq(op.clips, [], "and offers no clips to compare against")
+
+        # An unreadable source must not reach the verification step, where `expected`
+        # would be empty and "nothing was lost" would pass unconditionally.
+        _sv_op = os.environ.get(BLENDER_ENV)
+        try:
+            os.environ[BLENDER_ENV] = "/nonexistent/blender"
+            refused = False
+            try:
+                export_gltf(opaque, d / "out", "Opaque")
+            except RuntimeError as exc:
+                refused = "unreadable" in str(exc).lower()
+            c.check(refused,
+                    "export_gltf refuses an unparseable source rather than verifying "
+                    "vacuously against zero expected clips")
+        finally:
+            if _sv_op is None:
+                os.environ.pop(BLENDER_ENV, None)
+            else:
+                os.environ[BLENDER_ENV] = _sv_op
 
         # binary() honours the env override without requiring Blender to exist.
         saved = os.environ.get(BLENDER_ENV)

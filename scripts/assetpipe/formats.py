@@ -36,6 +36,12 @@ class ModelProbe:
     meshes: int = UNKNOWN
     nodes: int = UNKNOWN
     skins: int = UNKNOWN
+    # Set when the file is PRESENT but this pipeline could not parse it -- a container
+    # compressed with a codec we do not have, say. Distinct from "parsed fine, zero clips",
+    # which is a real answer. Conflating the two lost every clip comparison silently and,
+    # worse, made blender.export_gltf's "verify nothing was lost" check vacuous: with no
+    # expected clips, nothing can go missing.
+    unreadable: str | None = None
 
 
 def probe_gltf(path: Path) -> ModelProbe:
@@ -143,12 +149,21 @@ def resolve(asset: Path, needs_rig: bool, assets_root: Path = ASSETS_ROOT,
     found = siblings(asset, assets_root)
     rejected: dict[str, str] = {}
     usable: list[str] = []
+    probed: dict[str, ModelProbe] = {}
 
     for ext in found:
         if ext == "blend":
             if not _blender_available():
                 from assetpipe import blender  # lazy: see probe()
                 rejected[ext] = blender.unavailable_reason()
+                continue
+            # A container we cannot parse is excluded WITH ITS REASON rather than
+            # compared as zero clips -- scanned raw it silently lost every comparison,
+            # and if it had won one, the conversion's own verification would have been
+            # vacuous. Unreadable-but-present is a distinct, stated outcome.
+            probed[ext] = probe(found[ext])
+            if probed[ext].unreadable:
+                rejected[ext] = probed[ext].unreadable
                 continue
             usable.append(ext)
         elif ext == "obj" and needs_rig:
@@ -178,7 +193,8 @@ def resolve(asset: Path, needs_rig: bool, assets_root: Path = ASSETS_ROOT,
     # that, since a phantom name is not one of the two clips being looked for, but an
     # over-read can still swing the raw-count tiebreak. The post-import Godot test
     # enumerates the real AnimationPlayer and remains the authority, as for the audit gate.
-    probes = {ext: probe(found[ext]) for ext in usable} if needs_rig else {}
+    probes = ({ext: probed[ext] if ext in probed else probe(found[ext])
+               for ext in usable} if needs_rig else {})
     counts = {ext: len(p.clips) for ext, p in probes.items()}
     covered = {ext: sum(1 for clip in required_clips if clip in p.clips)
                for ext, p in probes.items()}
@@ -361,6 +377,16 @@ def selftest_cases(c) -> None:
                           assets_root=d / "assets", required_clips=["Idle", "Walk"])
             c.eq(rc2.chosen, "fbx",
                  "an fbx that already covers the required clips still wins the tie")
+
+            # REGRESSION, review IMPORTANT 2: a container we cannot parse used to scan as
+            # zero clips, which silently lost every comparison instead of saying why.
+            (farm / "FBX" / "Yak.fbx").write_bytes(b"\x00Armature|Idle\x00")
+            (farm / "Blends" / "Yak.blend").write_bytes(b"\x00\x01not a blender file\x00")
+            ry = resolve(farm / "FBX" / "Yak.fbx", needs_rig=True,
+                         assets_root=d / "assets", required_clips=["Idle", "Walk"])
+            c.eq(ry.chosen, "fbx", "an unreadable .blend is excluded from the comparison")
+            c.check("unreadable" in (ry.rejected.get("blend") or "").lower(),
+                    "and is REPORTED as unreadable-but-present, with a stated reason")
 
             # Static content ignores clip counts entirely.
             rs = resolve(farm / "FBX" / "Pig.fbx", needs_rig=False, assets_root=d / "assets")
