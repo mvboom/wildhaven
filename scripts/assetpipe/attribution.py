@@ -22,6 +22,48 @@ from pathlib import Path
 _SNAKE = re.compile(r"[^a-z0-9]+")
 _ASSETS = re.compile(r"^assets_used = PackedStringArray\((.*)\)$", re.MULTILINE)
 
+# Pack FOLDER names on disk carry tails that entry ids never do:
+#   "Ultimate Animated Animals - July 2021"                    -> a release-date tail
+#   "Farm Buildings - Sept 2018-20260723T015504Z-1-001"        -> both, the second being
+#                                                                 a Google Drive export stamp
+# The real entries are quaternius_ultimate_animated_animals.tres and
+# quaternius_farm_buildings.tres, so the raw folder name never matched anything.
+_DRIVE_SUFFIX = re.compile(r"-\d{8}T\d{6}Z-\d+-\d+$")
+_MONTHS = ("jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|"
+           "aug|august|sep|sept|september|oct|october|nov|november|dec|december")
+_DATE_SUFFIX = re.compile(rf"\s*-\s*(?:{_MONTHS})\.?\s+\d{{4}}$", re.IGNORECASE)
+
+
+class AmbiguousEntry(RuntimeError):
+    """Several attribution entries could be the pack's. Never guessed.
+
+    Picking one would silently credit the wrong source, which is the one failure mode
+    attribution exists to prevent, so the candidates are named and the run halts.
+    """
+
+
+def normalize_pack_name(name: str) -> str:
+    """A pack folder name reduced to the form its attribution entry id is built from."""
+    previous = None
+    while previous != name:
+        previous = name
+        name = _DRIVE_SUFFIX.sub("", name).rstrip()
+        name = _DATE_SUFFIX.sub("", name).rstrip()
+    return name
+
+
+def license_filename(creator: str, source_name: str) -> str:
+    """Bare filename for the pack's preserved licence text.
+
+    Mirrors the naming already on disk -- project/assets/licenses/ holds
+    Quaternius_UltimateAnimatedAnimals_License.txt and its two siblings -- so a pipeline
+    run extends the existing convention rather than starting a second one.
+    """
+    words = re.findall(r"[A-Za-z0-9]+", normalize_pack_name(source_name))
+    pack = "".join(w[:1].upper() + w[1:] for w in words)
+    creator_part = "".join(re.findall(r"[A-Za-z0-9]+", creator))
+    return f"{creator_part}_{pack}_License.txt"
+
 ENTRY_TEMPLATE = """[gd_resource type="Resource" script_class="AttributionEntry" load_steps=2 format=3]
 
 [ext_resource type="Script" path="res://attribution/attribution_entry.gd" id="1_entry"]
@@ -52,8 +94,40 @@ def entry_id(creator: str, source_name: str) -> str:
 
 
 def find_entry(project: Path, creator: str, source_name: str) -> Path | None:
-    path = project / "attribution" / "sources" / f"{entry_id(creator, source_name)}.tres"
-    return path if path.is_file() else None
+    """Locate the pack's entry, tolerating the tails real folder names carry.
+
+    Three passes, narrowest first:
+      1. the id built from the name as given -- what a caller passing a clean pack name gets;
+      2. the id built from the normalised name -- strips the release-date and Drive-export
+         tails, which is what turns "Ultimate Animated Animals - July 2021" into the real
+         quaternius_ultimate_animated_animals.tres;
+      3. a segment-anchored PREFIX match against the ids actually on disk -- catches the
+         decorated tails normalisation cannot enumerate, e.g. the folder
+         "Stylized Nature MegaKit[Standard](1)" against quaternius_stylized_nature_megakit.
+
+    Two or more prefix matches is a halt, not a coin flip.
+    """
+    sources = project / "attribution" / "sources"
+    for candidate in (source_name, normalize_pack_name(source_name)):
+        path = sources / f"{entry_id(creator, candidate)}.tres"
+        if path.is_file():
+            return path
+
+    if not sources.is_dir():
+        return None
+    derived = entry_id(creator, normalize_pack_name(source_name))
+    # The trailing "_" makes this a SEGMENT prefix: an id must end where a word ends in
+    # the derived id, so quaternius_farm cannot claim quaternius_farm_buildings' pack.
+    matches = sorted(p for p in sources.glob("*.tres")
+                     if derived.startswith(p.stem + "_"))
+    if len(matches) == 1:
+        return matches[0]
+    if len(matches) > 1:
+        raise AmbiguousEntry(
+            f"pack folder {source_name!r} (id {derived!r}) prefix-matches "
+            f"{len(matches)} attribution entries: {[p.name for p in matches]}. "
+            f"Crediting the wrong source is worse than halting -- pick one by hand.")
+    return None
 
 
 def extend_assets_used(path: Path, new_assets: list[str]) -> str:
@@ -141,6 +215,85 @@ def selftest_cases(c) -> None:
              "an existing pack entry is found")
         c.eq(find_entry(proj, "Quaternius", "Nothing Like This"), None,
              "an unknown pack has no entry")
+
+        # Two entries that both prefix-match must halt rather than pick one.
+        (sources / "quaternius_farm.tres").write_text("id = \"quaternius_farm\"\n")
+        ambiguous = False
+        try:
+            find_entry(proj, "Quaternius", "Farm Buildings Extra")
+        except AmbiguousEntry as exc:
+            ambiguous = ("quaternius_farm.tres" in str(exc)
+                         and "quaternius_farm_buildings.tres" in str(exc))
+        c.check(ambiguous, "two prefix matches halt with both candidates named")
+        (sources / "quaternius_farm.tres").unlink()
+
+    # Suffix normalisation, against the tails the real folders actually carry.
+    c.eq(normalize_pack_name("Ultimate Animated Animals - July 2021"),
+         "Ultimate Animated Animals", "a release-date tail is stripped")
+    c.eq(normalize_pack_name("Farm Buildings - Sept 2018-20260723T015504Z-1-001"),
+         "Farm Buildings", "a Drive-export stamp and a date tail are both stripped")
+    c.eq(normalize_pack_name("Farm Animals by @Quaternius"),
+         "Farm Animals by @Quaternius", "a name with no tail is left alone")
+    c.eq(normalize_pack_name("Ultimate Nature Pack - Jun 2019-20260723T015350Z-1-001"),
+         "Ultimate Nature Pack", "abbreviated month tail stripped")
+
+    c.eq(license_filename("Quaternius", "Ultimate Animated Animals - July 2021"),
+         "Quaternius_UltimateAnimatedAnimals_License.txt",
+         "licence filename reproduces the name already in project/assets/licenses/")
+    c.eq(license_filename("Quaternius", "Animated Men Characters - Feb 2019-20260723T015429Z-1-001"),
+         "Quaternius_AnimatedMenCharacters_License.txt",
+         "licence filename matches the second real file on disk")
+    c.check(Path(license_filename("Quaternius", "../../../etc")).name
+            == license_filename("Quaternius", "../../../etc"),
+            "licence filename is always bare -- copy_license_text refuses anything else")
+
+    # REGRESSION, whole-branch review CRITICAL 2: resume() looked the entry up from the
+    # raw pack FOLDER name, which matched nothing on disk, so every real run halted at
+    # stage 9 after the token spend. These are the actual folders and the actual entries.
+    real_project = Path("project")
+    if (real_project / "attribution" / "sources").is_dir():
+        for folder, expected in (
+            ("Ultimate Animated Animals - July 2021",
+             "quaternius_ultimate_animated_animals.tres"),
+            ("Farm Buildings - Sept 2018-20260723T015504Z-1-001",
+             "quaternius_farm_buildings.tres"),
+            ("Stylized Nature MegaKit[Standard](1)",
+             "quaternius_stylized_nature_megakit.tres"),
+            ("Nature Crops Pack - Jan 2020-20260723T015311Z-1-001",
+             "quaternius_nature_crops_pack.tres"),
+            ("Textured Stylized Trees - May 2020-20260723T015323Z-1-001",
+             "quaternius_textured_stylized_trees.tres"),
+            ("Ultimate Fantasy RTS - Aug 2022-20260723T014914Z-1-001",
+             "quaternius_ultimate_fantasy_rts.tres"),
+            ("Ultimate Nature Pack - Jun 2019-20260723T015350Z-1-001",
+             "quaternius_ultimate_nature_pack.tres"),
+            ("Animated Men Characters - Feb 2019-20260723T015429Z-1-001",
+             "quaternius_animated_men_characters.tres"),
+            ("Animated Women Characters - Feb 2019-20260723T015412Z-1-001",
+             "quaternius_animated_women_characters.tres"),
+        ):
+            found = find_entry(real_project, "Quaternius", folder)
+            c.eq(found.name if found else None, expected,
+                 f"real pack folder {folder!r} resolves to its real entry")
+        c.eq(find_entry(real_project, "Quaternius", "Medieval Village Pack - Dec 2020"), None,
+             "a real pack with no entry on disk still yields None, not a wrong guess")
+    else:
+        c.check(True, "real-entry resolution check skipped, project/ not on this path")
+
+    with tempfile.TemporaryDirectory() as td:
+        proj = Path(td) / "project"
+        sources = proj / "attribution" / "sources"
+        sources.mkdir(parents=True)
+        existing = sources / "quaternius_farm_buildings.tres"
+        existing.write_text(
+            '[gd_resource type="Resource" script_class="AttributionEntry" '
+            'load_steps=2 format=3]\n\n'
+            '[ext_resource type="Script" path="res://attribution/attribution_entry.gd" id="1_entry"]\n\n'
+            '[resource]\nscript = ExtResource("1_entry")\n'
+            'id = "quaternius_farm_buildings"\ncreator = "Quaternius"\n'
+            'source_name = "Farm Buildings"\n'
+            'assets_used = PackedStringArray("Barn", "Silo")\n'
+            'per_file_licensing = false\n')
 
         summary = extend_assets_used(existing, ["Windmill"])
         text = existing.read_text()

@@ -82,7 +82,7 @@ def gate(resolution, required_clips: list[str], pack: Path,
 
     if license_id.startswith("Synty") and adapter_name != "animal":
         problems.append(
-            f"Synty SIMPLE is sanctioned for ANIMALS ONLY (art.md:69 — 'Animals only; "
+            f"Synty SIMPLE is sanctioned for ANIMALS ONLY (art.md:70 — 'Animals only; "
             f"humans stay Quaternius'); this is a {adapter_name!r} import")
 
     if not resolution.chosen or resolution.probe is None:
