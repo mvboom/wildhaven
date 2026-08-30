@@ -94,8 +94,6 @@ _REJECTIONS = {
 
 # A .blend is usable only if we can convert it. Checked at resolution time so it is never
 # chosen and then found unconvertible at import.
-_NO_BLENDER = ("Blender not found -- put it on PATH or set BLENDER_PATH; a .blend is "
-               "only a candidate when it can be converted to glTF")
 
 
 def _blender_available() -> bool:
@@ -146,7 +144,8 @@ def resolve(asset: Path, needs_rig: bool, assets_root: Path = ASSETS_ROOT) -> Re
     for ext in found:
         if ext == "blend":
             if not _blender_available():
-                rejected[ext] = _NO_BLENDER
+                from assetpipe import blender  # lazy: see probe()
+                rejected[ext] = blender.unavailable_reason()
                 continue
             usable.append(ext)
         elif ext == "obj" and needs_rig:
@@ -278,8 +277,10 @@ def selftest_cases(c) -> None:
         # --- .blend selection, when Blender is available -----------------------
         # Farm Animals is the real case: Pig's FBX carries 2 of the 6 actions its .blend
         # holds, and the four it dropped include Walk -- the clip the animal gate requires.
+        import stat as _stat
         fake_blender = d / "fake-blender"
-        fake_blender.write_text("#!/bin/sh\n")
+        fake_blender.write_text("#!/bin/sh\nexit 0\n")
+        fake_blender.chmod(fake_blender.stat().st_mode | _stat.S_IXUSR)
         _saved = os.environ.get("BLENDER_PATH")
         os.environ["BLENDER_PATH"] = str(fake_blender)
         try:

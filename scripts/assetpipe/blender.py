@@ -45,16 +45,46 @@ def binary() -> str | None:
     return shutil.which("blender")
 
 
-def available() -> bool:
-    """True when a Blender we could actually run is present.
+# Answered once per binary per process: resolve() asks for every .blend candidate, and
+# launching Blender repeatedly to learn the same fact would be wasteful.
+_RUNNABLE: dict = {}
 
-    Checked at format-resolution time so a .blend only becomes a candidate when it can be
-    converted -- rather than being chosen and then failing at import.
+
+def available() -> bool:
+    """True when a Blender we can actually RUN is present.
+
+    Deliberately LAUNCHES it rather than checking the file exists. A snap Blender is on
+    PATH and passes an exists-check, then dies under a confined sandbox with a DBus
+    "cannot create transient scope" error. Catching that here means format resolution
+    simply does not offer .blend as a candidate -- and records why -- instead of choosing
+    it and failing mid-import, after the worktree is built. Every other gate in this
+    pipeline fails at the cheapest point; this one now does too.
     """
     path = binary()
     if not path:
         return False
-    return Path(path).is_file() or shutil.which(path) is not None
+    if path not in _RUNNABLE:
+        try:
+            proc = subprocess.run([path, "--version"], capture_output=True, timeout=60)
+            _RUNNABLE[path] = proc.returncode == 0
+        except (OSError, subprocess.SubprocessError):
+            _RUNNABLE[path] = False
+    return _RUNNABLE[path]
+
+
+def unavailable_reason() -> str:
+    """Why .blend is not a candidate, accurately.
+
+    "Not found" and "found but will not run" are different problems with different fixes,
+    and the operator sees this text at the checkpoint. The snap case is the second one.
+    """
+    path = binary()
+    if not path:
+        return ("Blender not found -- put it on PATH or set BLENDER_PATH; a .blend is "
+                "only a candidate when it can be converted to glTF")
+    return (f"Blender at {path} could not be launched -- it exists but did not run "
+            f"(a snap build fails this way under a confined sandbox). Set BLENDER_PATH "
+            f"to a working build.")
 
 
 def probe_blend(path: Path) -> ModelProbe:
@@ -158,6 +188,53 @@ def selftest_cases(c) -> None:
                 os.environ.pop(BLENDER_ENV, None)
             else:
                 os.environ[BLENDER_ENV] = saved
+
+        # available() must answer "can we RUN it", not "does the file exist". A snap
+        # Blender exists on PATH and dies under a confined sandbox with a DBus error;
+        # catching that here means resolution never offers .blend and then fails at import.
+        import stat as _stat
+        runnable = d / "runs-fine"
+        runnable.write_text("#!/bin/sh\nexit 0\n")
+        runnable.chmod(runnable.stat().st_mode | _stat.S_IXUSR)
+        broken = d / "exits-nonzero"
+        broken.write_text("#!/bin/sh\nexit 3\n")
+        broken.chmod(broken.stat().st_mode | _stat.S_IXUSR)
+        not_exec = d / "not-executable"
+        not_exec.write_text("#!/bin/sh\nexit 0\n")
+
+        _s2 = os.environ.get(BLENDER_ENV)
+        try:
+            os.environ[BLENDER_ENV] = str(runnable)
+            c.check(available(), "a Blender that launches is available")
+            os.environ[BLENDER_ENV] = str(broken)
+            c.check(not available(), "a Blender that exits non-zero is NOT available")
+            os.environ[BLENDER_ENV] = str(not_exec)
+            c.check(not available(),
+                    "a file that exists but cannot be executed is NOT available")
+            os.environ[BLENDER_ENV] = "/nonexistent/blender"
+            c.check(not available(), "a missing Blender is NOT available")
+        finally:
+            if _s2 is None:
+                os.environ.pop(BLENDER_ENV, None)
+            else:
+                os.environ[BLENDER_ENV] = _s2
+
+        _s3 = os.environ.get(BLENDER_ENV)
+        try:
+            os.environ[BLENDER_ENV] = ""
+            c.check("not found" in unavailable_reason(),
+                    "with no Blender at all, the reason says not found")
+            os.environ[BLENDER_ENV] = str(broken)
+            reason = unavailable_reason()
+            c.check("could not be launched" in reason,
+                    "a Blender that exists but will not run says so, not 'not found'")
+            c.check(str(broken) in reason,
+                    "and names the path it actually tried")
+        finally:
+            if _s3 is None:
+                os.environ.pop(BLENDER_ENV, None)
+            else:
+                os.environ[BLENDER_ENV] = _s3
 
         # export_gltf must refuse clearly rather than shelling out to nothing.
         saved = os.environ.get(BLENDER_ENV)
