@@ -1,0 +1,79 @@
+{
+  "species_id": "sheep",
+  "species_display_name": "Sheep",
+  "generator_model": "claude-haiku-4-5-20251001",
+  "evaluator_model": "claude-opus-5",
+  "max_refine": 3,
+  "requested_count": 2,
+  "accepted_fact_texts": [
+    "Sheep are amazing at remembering faces\u2014they can recognize and remember up to 50 different sheep and humans for over two years!",
+    "Sheep have super-wide vision that stretches almost all the way around their heads, so they can see behind themselves without turning around!"
+  ],
+  "candidates": [
+    {
+      "status": "accepted",
+      "fact_text": "Sheep are amazing at remembering faces\u2014they can recognize and remember up to 50 different sheep and humans for over two years!",
+      "attempts": [
+        {
+          "attempt": 1,
+          "fact_text": "Sheep are amazing at remembering faces\u2014they can recognize and remember up to 50 different sheep and humans for over two years!",
+          "source_note": "en.wikipedia.org (Sheep article) - face recognition and memory abilities",
+          "deterministic": {
+            "passed": true,
+            "problems": []
+          },
+          "llm_judge": {
+            "passed": true,
+            "problems": [],
+            "skipped": false
+          },
+          "passed": true
+        }
+      ]
+    },
+    {
+      "status": "accepted",
+      "fact_text": "Sheep have super-wide vision that stretches almost all the way around their heads, so they can see behind themselves without turning around!",
+      "attempts": [
+        {
+          "attempt": 1,
+          "fact_text": "Sheep have wonderful memories and can recognize up to 50 other sheep by their faces! Each sheep has a unique bleating voice that helps family members find each other.",
+          "source_note": "en.wikipedia.org/wiki/Sheep (face recognition and bleating communication); animaldiversity.org/accounts/Ovis_aries/ (social behavior and communication)",
+          "deterministic": {
+            "passed": true,
+            "problems": []
+          },
+          "llm_judge": {
+            "passed": false,
+            "problems": [
+              "Duplicate fact: the first sentence restates the already-accepted card's underlying fact (sheep remember ~50 individual faces) with only minor rewording; the added bleat-voice detail is a secondary clause and does not make the card a genuinely different fact. If the voice-recognition idea is worth keeping, rewrite the card to be solely about individual bleat recognition and drop the face-memory/50 claim entirely."
+            ],
+            "skipped": false
+          },
+          "passed": false
+        },
+        {
+          "attempt": 2,
+          "fact_text": "Sheep have super-wide vision that stretches almost all the way around their heads, so they can see behind themselves without turning around!",
+          "source_note": "Wikipedia (Sheep article) \u2014 states sheep have 270-320 degree wide-angle eyesight allowing them to see behind without turning",
+          "deterministic": {
+            "passed": true,
+            "problems": []
+          },
+          "llm_judge": {
+            "passed": true,
+            "problems": [],
+            "skipped": false
+          },
+          "passed": true
+        }
+      ]
+    }
+  ],
+  "cost": {
+    "in": 114,
+    "out": 6584,
+    "usd": 0.531847,
+    "usd_known": true
+  }
+}

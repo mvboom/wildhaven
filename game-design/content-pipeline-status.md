@@ -377,6 +377,21 @@ copy edit invalidates the assertions that pinned the placeholder) and 8 (sign-of
 | `human_signoff` | not started |
 | `status` | 🚧 — imported by the asset pipeline; copy, attribution, validation and sign-off still open |
 
+### `sheep` — Sheep
+
+| Field | Value |
+|---|---|
+| `category_attributes` | proposed by `scripts/asset_pipeline.py` run `20260830-sheep-5652` and ruled by the human at its checkpoint — per-field sourcing is in the `.tres` header |
+| `source` | Quaternius, "Farm Animals by @Quaternius" — CC0-1.0 (License.txt: matched 'cc0') |
+| `pre_import_audit` | done (2026-08-30) — 6 animation clip(s) confirmed including Death, Idle, Jump, Run; licence cleared as CC0-1.0. Silhouette/style fit DEFERRED — the pipeline does not eyeball art, so it is part of human sign-off |
+| `project_location` | `project/assets/animals/sheep/Sheep.tscn` |
+| `data_entry_location` | `project/data/animals/sheep.tres` |
+| `copy_content_location` | **2 card(s) generated** (2026-08-30) by `scripts/fact_card_pipeline.py` (Generator/Evaluator/Refiner/Circuit-Breaker loop, cross-model validated) -- landed directly in `project/data/animals/sheep.tres`'s `fact_text_pool`, **awaiting step-8 human sign-off**. Full attempt log: `scripts/fact_card_pipeline_output/sheep.json` |
+| `attribution_status` | pending — stage 9 records the entry and regenerates `project/CREDITS.md` |
+| `validation_status` | pending — stage 10 runs the headless suite |
+| `human_signoff` | not started |
+| `status` | 🚧 — imported by the asset pipeline; copy, attribution, validation and sign-off still open |
+
 ---
 
 ## Terrain
