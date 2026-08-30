@@ -113,13 +113,30 @@ def commit_all(tree: Path, message: str) -> str:
 
 
 def merge(repo: Path, branch: str, target: str) -> str:
+    """Merge locally, or restore the repo exactly as it was.
+
+    This runs against the OPERATOR'S REAL REPOSITORY, so a merge that fails after the
+    checkout succeeded must not strand them on an unexpected branch with a conflicted
+    merge in progress. On any failure we abort the merge and return to the branch they
+    were on, then re-raise.
+    """
     if target == "main":
         raise MainBranchRefused(
             f"branch {branch} is ready, but this pipeline will not merge into main. "
             f"Merge it yourself, or re-run from a feature branch.")
-    if current_branch(repo) != target:
+    original = current_branch(repo)
+    if original != target:
         git(repo, "checkout", target)
-    git(repo, "merge", "--no-ff", branch, "-m", f"merge {branch}")
+    try:
+        git(repo, "merge", "--no-ff", branch, "-m", f"merge {branch}")
+    except RuntimeError:
+        try:
+            git(repo, "merge", "--abort")
+        except RuntimeError:
+            pass  # nothing to abort: the merge failed before it started one
+        if original != target:
+            git(repo, "checkout", original)
+        raise
     return git(repo, "rev-parse", "HEAD").strip()
 
 
@@ -228,3 +245,43 @@ def selftest_cases(c) -> None:
         except RuntimeError as exc:
             blocked = "not authorised" in str(exc)
         c.check(blocked, "push is refused by the verb guard")
+
+    with tempfile.TemporaryDirectory() as td:
+        repo = Path(td) / "repo"
+        repo.mkdir(parents=True)
+        (repo / "conflict.tres").write_text("base\n")
+        for args in (["init", "-b", "main"], ["add", "."],
+                     ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-m", "init"]):
+            subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True)
+
+        subprocess.run(["git", "checkout", "-b", "asset/conflict"], cwd=repo, check=True,
+                       capture_output=True)
+        (repo / "conflict.tres").write_text("asset-version\n")
+        subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True)
+        subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t",
+                        "commit", "-m", "asset change"], cwd=repo, check=True,
+                       capture_output=True)
+
+        subprocess.run(["git", "checkout", "main"], cwd=repo, check=True,
+                       capture_output=True)
+        subprocess.run(["git", "checkout", "-b", "feature/target"], cwd=repo, check=True,
+                       capture_output=True)
+        (repo / "conflict.tres").write_text("target-version\n")
+        subprocess.run(["git", "add", "."], cwd=repo, check=True, capture_output=True)
+        subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t",
+                        "commit", "-m", "target change"], cwd=repo, check=True,
+                       capture_output=True)
+
+        subprocess.run(["git", "checkout", "asset/conflict"], cwd=repo, check=True,
+                       capture_output=True)
+
+        conflicted = False
+        try:
+            merge(repo, "asset/conflict", "feature/target")
+        except RuntimeError:
+            conflicted = True
+        c.check(conflicted, "a genuine conflict raises")
+        c.eq(current_branch(repo), "asset/conflict",
+             "failed merge restores the branch we started on")
+        c.check(not (repo / ".git" / "MERGE_HEAD").exists(),
+                "failed merge leaves no merge in progress")
