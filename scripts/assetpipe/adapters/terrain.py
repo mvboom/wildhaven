@@ -37,8 +37,14 @@ SPEC = AdapterSpec(
     ],
 )
 
-_EXT = re.compile(r'^\[ext_resource type="PackedScene" path="([^"]+)" id="(\d+)_model"\]$',
-                  re.MULTILINE)
+# Godot writes `uid="uid://..."` between `type` and `path` when it re-saves a resource
+# (see project/assets/props/den/Den.tscn). No terrain .tres carries one today, but if a
+# human ever opens one in the editor and saves, an entry without the optional group here
+# would silently drop out of the match set -- under-counting ids and letting a later
+# append duplicate an existing one. The optional group costs nothing and removes that.
+_EXT = re.compile(
+    r'^\[ext_resource type="PackedScene"(?: uid="[^"]*")? path="([^"]+)" id="(\d+)_model"\]$',
+    re.MULTILINE)
 _STEPS = re.compile(r"load_steps=(\d+)")
 _SCENES = re.compile(r"^model_scenes = Array\[PackedScene\]\(\[(.*)\]\)$", re.MULTILINE)
 
@@ -100,13 +106,82 @@ def selftest_cases(c) -> None:
             refused = "inert-land" in str(exc)
         c.check(refused, "write refuses to break the inert-land invariant")
 
+    # FINDING 3(a): Mixed model + non-model .tres, shaped like the real forest.tres
+    # with 1_schema Script, 3_harvest Resource, and 2_model/4_model PackedScene entries
+    with tempfile.TemporaryDirectory() as td:
+        mixed = Path(td) / "mixed.tres"
+        mixed.write_text(
+            '[gd_resource type="Resource" script_class="TerrainDefinition" '
+            'load_steps=5 format=3]\n\n'
+            '[ext_resource type="Script" path="res://scripts/definitions/terrain_definition.gd" id="1_schema"]\n'
+            '[ext_resource type="PackedScene" path="res://assets/terrain/common_tree_1/CommonTree1.tscn" id="2_model"]\n'
+            '[ext_resource type="Resource" path="res://data/terrain/forest_harvest.tres" id="3_harvest"]\n'
+            '[ext_resource type="PackedScene" path="res://assets/terrain/common_tree_2/CommonTree2.tscn" id="4_model"]\n\n'
+            '[resource]\nscript = ExtResource("1_schema")\nid = "forest"\n'
+            'model_scenes = Array[PackedScene]([ExtResource("2_model"), ExtResource("4_model")])\n')
+
+        summary = append_variant(mixed, "res://assets/terrain/birch_tree/BirchTree.tscn")
+        text = mixed.read_text()
+        # The non-model id="3_harvest" is excluded by the filter; max of ids is 4, so next is 5
+        c.check('path="res://assets/terrain/birch_tree/BirchTree.tscn" id="5_model"' in text,
+                "mixed model+non-model .tres: next id is 5_model (3_harvest excluded)")
+        c.check("load_steps=6" in text, "mixed: load_steps incremented to 6")
+        c.check('ExtResource("2_model"), ExtResource("4_model"), ExtResource("5_model")' in text,
+                "mixed: model_scenes now has three entries in order")
+
+    # FINDING 3(b): A uid-bearing entry is still matched and counted correctly
+    with tempfile.TemporaryDirectory() as td:
+        uid_file = Path(td) / "uid.tres"
+        uid_file.write_text(
+            '[gd_resource type="Resource" script_class="TerrainDefinition" '
+            'load_steps=4 format=3]\n\n'
+            '[ext_resource type="Script" path="res://scripts/definitions/terrain_definition.gd" id="1_schema"]\n'
+            '[ext_resource type="PackedScene" uid="uid://abc123def456" path="res://assets/terrain/common_tree_1/CommonTree1.tscn" id="2_model"]\n'
+            '[ext_resource type="PackedScene" path="res://assets/terrain/bush/Bush.tscn" id="3_model"]\n\n'
+            '[resource]\nscript = ExtResource("1_schema")\nid = "forest"\n'
+            'model_scenes = Array[PackedScene]([ExtResource("2_model"), ExtResource("3_model")])\n')
+
+        summary = append_variant(uid_file, "res://assets/terrain/maple_tree/MapleTree.tscn")
+        text = uid_file.read_text()
+        # The regex must match the uid-bearing entry; max id is 3, so next is 4
+        c.check('id="4_model"' in text,
+                "uid-bearing entry is still matched; next id is 4_model (not 3_model)")
+        c.check('ExtResource("2_model"), ExtResource("3_model"), ExtResource("4_model")' in text,
+                "uid test: model_scenes extended with 4_model")
+
+    # FINDING 3(c): The refuse path -- .tres with ext_resources but NO model_scenes array
+    with tempfile.TemporaryDirectory() as td:
+        no_array = Path(td) / "no_array.tres"
+        original = (
+            '[gd_resource type="Resource" script_class="TerrainDefinition" '
+            'load_steps=3 format=3]\n\n'
+            '[ext_resource type="Script" path="res://scripts/definitions/terrain_definition.gd" id="1_schema"]\n'
+            '[ext_resource type="PackedScene" path="res://assets/terrain/common_tree_1/CommonTree1.tscn" id="2_model"]\n\n'
+            '[resource]\nscript = ExtResource("1_schema")\nid = "broken"\n')
+        no_array.write_text(original)
+
+        refused = False
+        error_msg = ""
+        try:
+            append_variant(no_array, "res://assets/terrain/maple_tree/MapleTree.tscn")
+        except RuntimeError as e:
+            refused = True
+            error_msg = str(e)
+        c.check(refused, "no model_scenes array: append_variant raises RuntimeError")
+        c.check("no model_scenes array" in error_msg, "error message names the problem")
+        c.eq(no_array.read_text(), original, "refusal is atomic; file unchanged")
+
 
 def append_variant(tres: Path, scene_res_path: str) -> str:
     text = tres.read_text()
-    if scene_res_path in text:
+
+    # Structural idempotency: compare against the paths actually bound by ext_resource
+    # lines, not a raw substring of the whole file. A header comment quoting a res:// path
+    # in prose would otherwise make a legitimate append silently no-op.
+    existing = _EXT.findall(text)
+    if scene_res_path in [path for path, _id in existing]:
         return f"{Path(scene_res_path).name} already present -- nothing appended"
 
-    existing = _EXT.findall(text)
     next_id = max((int(n) for _p, n in existing), default=1) + 1
     new_line = (f'[ext_resource type="PackedScene" path="{scene_res_path}" '
                 f'id="{next_id}_model"]')
