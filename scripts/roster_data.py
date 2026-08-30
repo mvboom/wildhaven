@@ -82,13 +82,31 @@ def floor_species_ids(repo_root: Path) -> list:
     """
     path = repo_root / DISPLACEMENT_COPY
     if not path.is_file():
-        return []
+        raise RuntimeError(
+            f"{path} does not exist -- refusing to treat 'no floor list' as 'nothing to "
+            f"check'. The floor species are what prove the derived roster is complete; "
+            f"without them load_roster cannot tell a full roster from an empty one.")
+    # DOTALL as well as MULTILINE: displacement_copy.gd's own header calls itself an
+    # interim home for these lines, so the declaration can plausibly be reformatted across
+    # lines -- and with a line-bounded `.` that yielded no match and, before the raises
+    # below, no floor list and therefore no check at all.
     match = re.search(
         r"^const FLOOR_SPECIES_IDS: Array\[String\] = \[(.*?)\]",
         path.read_text(),
-        re.MULTILINE,
+        re.MULTILINE | re.DOTALL,
     )
-    return re.findall(r'"([^"]+)"', match.group(1)) if match else []
+    if match is None:
+        raise RuntimeError(
+            f"no FLOOR_SPECIES_IDS declaration found in {path} -- refusing to run with "
+            f"no floor list, because an unparsed one is indistinguishable from an empty "
+            f"one and silently disables the completeness check.")
+    ids = re.findall(r'"([^"]+)"', match.group(1))
+    if not ids:
+        raise RuntimeError(
+            f"FLOOR_SPECIES_IDS in {path} parsed EMPTY -- refusing to run, because an "
+            f"empty floor list means load_roster would accept ANY roster, including one "
+            f"with no species in it at all.")
+    return ids
 
 
 def _load_dir(repo_root: Path, rel_dir: Path) -> dict:
@@ -106,12 +124,22 @@ def _load_dir(repo_root: Path, rel_dir: Path) -> dict:
 def load_roster(repo_root: Path) -> dict:
     """Every animal in `project/data/animals/`, keyed by id.
 
-    Raises when a floor species is missing. That is the loud failure the old hardcode
-    could not give us: a wrong path or an unreadable directory would otherwise shrink the
-    closed-predation-graph check to whatever happened to parse, and the fact-card
-    evaluator would go on reporting PASS with a smaller graph than it thinks it has.
+    Raises when the roster comes back empty, and when a floor species is missing. That is
+    the loud failure the old hardcode could not give us: a wrong path or an unreadable
+    directory would otherwise shrink the closed-predation-graph check to whatever happened
+    to parse, and the fact-card evaluator would go on reporting PASS with a smaller graph
+    than it thinks it has. An EMPTY roster is the worst case of that, not the harmless
+    one -- the graph loop iterates nothing, so every card passes -- and the floor-species
+    check cannot catch it on its own, because floor_species_ids failing is exactly the
+    condition under which the roster is likely to be empty too.
     """
     roster = _load_dir(repo_root, ANIMALS_DIR)
+    if not roster:
+        raise RuntimeError(
+            f"derived roster is EMPTY -- refusing to run with no predation graph at all. "
+            f"Looked in {repo_root / ANIMALS_DIR}"
+            f"{'' if (repo_root / ANIMALS_DIR).is_dir() else ' (which does not exist)'}. "
+            f"Every closed-graph check would pass vacuously against an empty roster.")
     missing = [s for s in floor_species_ids(repo_root) if s not in roster]
     if missing:
         raise RuntimeError(
@@ -222,6 +250,50 @@ def selftest() -> int:
         except RuntimeError as exc:
             raised = "floor species" in str(exc)
         check(raised, "a roster missing floor species raises rather than running short")
+
+    # REGRESSION, review CRITICAL 3: the loud-failure guard silently disabled itself.
+    # floor_species_ids returned [] when the file was absent AND when the regex missed,
+    # which made load_roster's `missing` list empty -- so it returned whatever it had
+    # loaded, INCLUDING {}. An empty ROSTER makes the fact-card evaluator's
+    # closed-predation-graph loop iterate nothing, so every card passes the check: the
+    # same "silently weakened a content-safety gate" failure the hardcode was removed to
+    # fix, reintroduced one level down. All three modes must raise, each naming itself.
+    def _raises(fn, needle: str) -> bool:
+        try:
+            fn()
+        except RuntimeError as exc:
+            return needle in str(exc)
+        return False
+
+    with tempfile.TemporaryDirectory() as td:
+        fake = Path(td)
+        (fake / DISPLACEMENT_COPY.parent).mkdir(parents=True)
+        gd = fake / DISPLACEMENT_COPY
+
+        check(_raises(lambda: floor_species_ids(fake), "does not exist"),
+              "an absent displacement_copy.gd raises, naming the missing file")
+
+        gd.write_text("extends Node\n# no floor list here\n")
+        check(_raises(lambda: floor_species_ids(fake), "no FLOOR_SPECIES_IDS"),
+              "a FLOOR_SPECIES_IDS the regex cannot find raises, naming the declaration")
+
+        gd.write_text("const FLOOR_SPECIES_IDS: Array[String] = []\n")
+        check(_raises(lambda: floor_species_ids(fake), "parsed EMPTY"),
+              "a floor list that parses empty raises rather than checking nothing")
+
+        # The pattern was MULTILINE but not DOTALL, so reformatting the declaration
+        # across lines -- which displacement_copy.gd's own header invites, calling itself
+        # an interim home for these lines -- silently yielded no match.
+        gd.write_text(
+            'const FLOOR_SPECIES_IDS: Array[String] = [\n'
+            '\t"human",\n\t"fox",\n\t"rabbit",\n]\n'
+        )
+        check(sorted(floor_species_ids(fake)) == ["fox", "human", "rabbit"],
+              "a multi-line FLOOR_SPECIES_IDS declaration is read, not missed")
+
+        (fake / ANIMALS_DIR).mkdir(parents=True)
+        check(_raises(lambda: load_roster(fake), "EMPTY"),
+              "an empty animals dir raises rather than returning an empty predation graph")
 
     copy_path = repo / DISPLACEMENT_COPY
     all_types = list(LINE_TYPE_PREFIX)
