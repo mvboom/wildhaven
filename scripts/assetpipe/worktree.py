@@ -18,7 +18,7 @@ from pathlib import Path
 
 # Guarded rather than documented: a typo that reaches for a network verb fails loudly.
 ALLOWED_VERBS = {"worktree", "branch", "commit", "merge", "status", "rev-parse",
-                 "add", "checkout", "symbolic-ref"}
+                 "add", "checkout", "symbolic-ref", "ls-files"}
 
 WATCHED_DIRS = ("project", "scripts")
 
@@ -52,10 +52,13 @@ def preflight(repo: Path) -> list[str]:
         if any(path.startswith(d + "/") for d in WATCHED_DIRS):
             problems.append(f"uncommitted change to tracked file: {path}")
 
-    if not git(repo, "status", "--porcelain", "--", "project").strip():
-        tracked = git(repo, "status", "--porcelain", "--untracked-files=all", "--", "project")
-        if tracked.strip().startswith("??"):
-            problems.append("project/ is untracked -- worktree isolation needs it committed")
+    # Ask git what it TRACKS under project/, rather than inferring from status output.
+    # An earlier version gated an --untracked-files=all check on the normal-mode call being
+    # empty, which is unreachable: if project/ were untracked, the normal-mode call would
+    # itself print "?? project/" and never be empty. `ls-files` answers the real question
+    # directly -- no tracked files under project/ means worktree isolation cannot work.
+    if not git(repo, "ls-files", "project").strip():
+        problems.append("project/ is untracked -- worktree isolation needs it committed")
 
     existing = git(repo, "worktree", "list")
     for line in existing.splitlines()[1:]:
@@ -136,3 +139,30 @@ def selftest_cases(c) -> None:
         c.eq(git(repo, "branch", "--list", "asset/pig").strip(), "", "abandon deletes the branch")
         c.eq((repo / "project" / "data" / "x.tres").read_text(), "a\n",
              "main checkout untouched by the whole cycle")
+
+    # Regression coverage for the dead-code bug: an earlier version's untracked-project/
+    # check was gated on a git-status call that could never be empty when project/ was truly
+    # untracked, so it never fired. This exercises the real condition in a fresh repo where
+    # project/ exists on disk but nothing under it is tracked.
+    with tempfile.TemporaryDirectory() as td2:
+        repo2 = Path(td2) / "repo2"
+        repo2.mkdir(parents=True)
+        (repo2 / "README.md").write_text("hi\n")
+        for args in (["init", "-b", "main"],
+                     ["add", "README.md"],
+                     ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-m", "init"]):
+            subprocess.run(["git", *args], cwd=repo2, check=True, capture_output=True)
+
+        (repo2 / "project" / "data").mkdir(parents=True)
+        (repo2 / "project" / "data" / "y.tres").write_text("z\n")
+
+        problems = preflight(repo2)
+        c.check(any("project/" in p for p in problems),
+                "untracked project/ is caught by preflight")
+
+        subprocess.run(["git", "add", "project"], cwd=repo2, check=True, capture_output=True)
+        subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t",
+                        "commit", "-m", "track project"], cwd=repo2, check=True,
+                       capture_output=True)
+        c.check(not any("project/" in p for p in preflight(repo2)),
+                "tracked project/ is no longer flagged")
