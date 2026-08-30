@@ -24,9 +24,10 @@ WATCHED_DIRS = ("project", "scripts")
 
 
 def git(repo: Path, *args: str) -> str:
-    if args and args[0] not in ALLOWED_VERBS:
+    verb = next((a for a in args if not a.startswith("-") and "=" not in a), "")
+    if verb not in ALLOWED_VERBS:
         raise RuntimeError(
-            f"git verb {args[0]!r} is not authorised for this pipeline "
+            f"git verb {verb!r} is not authorised for this pipeline "
             f"(local-only: {sorted(ALLOWED_VERBS)})")
     proc = subprocess.run(["git", *args], cwd=repo, capture_output=True, text=True)
     if proc.returncode != 0:
@@ -93,6 +94,33 @@ def seed_import_cache(repo: Path, tree: Path) -> str:
 def abandon(repo: Path, path: Path, branch: str) -> None:
     git(repo, "worktree", "remove", "--force", str(path))
     git(repo, "branch", "-D", branch)
+
+
+class MainBranchRefused(RuntimeError):
+    """Raised instead of merging into main.
+
+    .claude/CLAUDE.md gates "merging to main / committing directly on main" as a human
+    decision. The operator's local-git authorisation for this pipeline does not lift that
+    gate, so approve halts here and hands back the ready branch.
+    """
+
+
+def commit_all(tree: Path, message: str) -> str:
+    git(tree, "add", "-A")
+    git(tree, "-c", "user.email=asset-pipeline@local",
+        "-c", "user.name=asset-pipeline", "commit", "-m", message)
+    return git(tree, "rev-parse", "HEAD").strip()
+
+
+def merge(repo: Path, branch: str, target: str) -> str:
+    if target == "main":
+        raise MainBranchRefused(
+            f"branch {branch} is ready, but this pipeline will not merge into main. "
+            f"Merge it yourself, or re-run from a feature branch.")
+    if current_branch(repo) != target:
+        git(repo, "checkout", target)
+    git(repo, "merge", "--no-ff", branch, "-m", f"merge {branch}")
+    return git(repo, "rev-parse", "HEAD").strip()
 
 
 def selftest_cases(c) -> None:
@@ -166,3 +194,37 @@ def selftest_cases(c) -> None:
                        capture_output=True)
         c.check(not any("project/" in p for p in preflight(repo2)),
                 "tracked project/ is no longer flagged")
+
+    with tempfile.TemporaryDirectory() as td:
+        repo = Path(td) / "repo"
+        (repo / "project").mkdir(parents=True)
+        (repo / "project" / "a.tres").write_text("one\n")
+        for args in (["init", "-b", "main"], ["add", "."],
+                     ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-m", "init"]):
+            subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True)
+
+        tree = create(repo, "asset/well", repo / ".worktrees" / "asset-well")
+        (tree / "project" / "b.tres").write_text("two\n")
+        commit_all(tree, "feat: add well")
+
+        raised = False
+        try:
+            merge(repo, "asset/well", "main")
+        except MainBranchRefused as exc:
+            raised = True
+            c.check("asset/well" in str(exc), "refusal names the ready branch")
+        c.check(raised, "merging into main is refused")
+        c.check(not (repo / "project" / "b.tres").is_file(),
+                "refused merge left main untouched")
+
+        subprocess.run(["git", "checkout", "-b", "feature/x"], cwd=repo, check=True,
+                       capture_output=True)
+        merge(repo, "asset/well", "feature/x")
+        c.check((repo / "project" / "b.tres").is_file(), "merge into a feature branch lands")
+
+        blocked = False
+        try:
+            git(repo, "push", "origin", "main")
+        except RuntimeError as exc:
+            blocked = "not authorised" in str(exc)
+        c.check(blocked, "push is refused by the verb guard")
