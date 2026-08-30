@@ -162,14 +162,14 @@ def run(asset: Path, adapter_name: str, repo: Path, notes: str = "",
         print(f"[4/10] import...... {len(written)} file(s) -> "
               f"{importer.dest_dir(project, spec.category, ident)}")
 
-        godot.import_project(tree)
+        godot.import_project(tree, repo)
         scene_res = f"assets/{spec.category}/{ident}/{display}.tscn"
-        idx = godot.anim_index(tree, scene_res) if spec.required_clips else -1
+        idx = godot.anim_index(tree, scene_res, repo) if spec.required_clips else -1
         if idx >= 0:
             importer.write_wrapper(project, spec.category, ident, display,
                                    f"{display}{resolution.chosen_path.suffix}", 0.2,
                                    gate.evidence["license"], idx, spec.schema)
-            godot.import_project(tree)
+            godot.import_project(tree, repo)
         godot.write_import_test(tree, ident, display, spec.category,
                                 resolution.probe.clips, spec.required_clips)
         heuristic = set(resolution.probe.clips)

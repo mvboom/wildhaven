@@ -83,14 +83,42 @@ func _init() -> void:
 '''
 
 
-def binary(repo: Path) -> Path:
-    return Path(os.environ.get(
-        "GODOT_PATH", repo / "godot" / "Godot_v4.7-stable_mono_linux.x86_64"))
+BINARY_NAME = "Godot_v4.7-stable_mono_linux.x86_64"
 
 
-def import_project(tree: Path) -> str:
+def main_checkout() -> Path:
+    """The repo root of THIS file, which is always the MAIN checkout.
+
+    scripts/asset_pipeline.py is only ever invoked from the main checkout -- the worktree
+    runs the GER copy pipelines as subprocesses and nothing else. So __file__'s
+    grandparent is the main checkout even when every other path in scope points into a
+    worktree.
+    """
+    return Path(__file__).resolve().parents[2]
+
+
+def binary(repo: Path | None = None) -> Path:
+    """Resolve the engine binary against the MAIN checkout, never a worktree.
+
+    .gitignore:25 ignores `godot/**` and `git ls-files godot` returns 0 files, so
+    `git worktree add` produces a tree with NO godot/ directory at all. Every caller here
+    used to be handed the worktree, which made stage 5 of run() and stages 9-10 of
+    resume() fail on every real run. Callers now pass the repo root; the existence check
+    is the belt to that braces, so a stray worktree path cannot resolve to a binary that
+    is not there.
+    """
+    override = os.environ.get("GODOT_PATH")
+    if override:
+        return Path(override)
+    root = Path(repo) if repo is not None else main_checkout()
+    if not (root / "godot").is_dir():
+        root = main_checkout()
+    return root / "godot" / BINARY_NAME
+
+
+def import_project(tree: Path, repo: Path | None = None) -> str:
     proc = subprocess.run(
-        [str(binary(tree)), "--headless", "--path", str(tree / "project"), "--import"],
+        [str(binary(repo)), "--headless", "--path", str(tree / "project"), "--import"],
         capture_output=True, text=True, timeout=900)
     return proc.stdout + proc.stderr
 
@@ -104,12 +132,12 @@ def parse_anim_index(output: str) -> int:
     return int(match.group(1)) if match else -1
 
 
-def anim_index(tree: Path, scene_res: str) -> int:
+def anim_index(tree: Path, scene_res: str, repo: Path | None = None) -> int:
     probe = tree / "project" / "_anim_probe.gd"
     probe.write_text(anim_probe_text(scene_res))
     try:
         proc = subprocess.run(
-            [str(binary(tree)), "--headless", "--path", str(tree / "project"),
+            [str(binary(repo)), "--headless", "--path", str(tree / "project"),
              "--script", "res://_anim_probe.gd"],
             capture_output=True, text=True, timeout=300)
         return parse_anim_index(proc.stdout + proc.stderr)
@@ -143,15 +171,31 @@ def write_import_test(tree: Path, name: str, display: str, category: str,
     return path
 
 
-def run_tests(tree: Path, filt: str = "") -> tuple[bool, str]:
+def run_tests(tree: Path, filt: str = "", repo: Path | None = None) -> tuple[bool, str]:
+    """Run the worktree's own suite, against the MAIN checkout's engine.
+
+    run-tests.sh derives `$REPO_ROOT/godot/...` from its own location, which inside a
+    worktree is a directory that does not exist -- it would exit 2 with "Godot binary not
+    found". Its own GODOT_PATH override (run-tests.sh:31) is the sanctioned way to point
+    it elsewhere, so we export the resolved binary into the subprocess env and keep
+    cwd=tree, which is what makes it the WORKTREE's suite that runs.
+    """
     cmd = ["bash", "scripts/run-tests.sh"] + ([filt] if filt else [])
-    proc = subprocess.run(cmd, cwd=tree, capture_output=True, text=True, timeout=1800)
+    env = dict(os.environ)
+    env["GODOT_PATH"] = str(binary(repo))
+    proc = subprocess.run(cmd, cwd=tree, env=env, capture_output=True, text=True,
+                          timeout=1800)
     return proc.returncode == 0, proc.stdout + proc.stderr
 
 
-def regenerate_credits(tree: Path) -> str:
+def regenerate_credits(tree: Path, repo: Path | None = None) -> str:
+    # --import FIRST. This runs immediately after new .tres/.tscn files were written, and
+    # a bare --script is a parse check that cannot resolve a newly added class_name
+    # (run-tests.sh:21-24, and this module's own header). Without the import pass
+    # generate_credits.gd would report on content the engine never loaded.
+    import_project(tree, repo)
     proc = subprocess.run(
-        [str(binary(tree)), "--headless", "--path", str(tree / "project"),
+        [str(binary(repo)), "--headless", "--path", str(tree / "project"),
          "--script", "res://attribution/generate_credits.gd"],
         capture_output=True, text=True, timeout=300)
     if proc.returncode != 0:
@@ -200,3 +244,40 @@ def selftest_cases(c) -> None:
 
     c.eq(parse_anim_index("noise\nANIM_INDEX=1\nmore\n"), 1, "index parsed from output")
     c.eq(parse_anim_index("no marker here"), -1, "missing marker yields -1, not a crash")
+
+    # `godot/**` is gitignored, so a worktree has no engine binary. Handing binary() a
+    # worktree path must NOT produce a path inside it.
+    import inspect
+    import tempfile
+    saved = os.environ.pop("GODOT_PATH", None)
+    try:
+        with tempfile.TemporaryDirectory() as td:
+            fake_tree = Path(td) / ".worktrees" / "asset-pig"
+            (fake_tree / "project").mkdir(parents=True)
+            resolved = binary(fake_tree)
+            c.eq(resolved, main_checkout() / "godot" / BINARY_NAME,
+                 "binary() handed a worktree resolves against the main checkout")
+            c.check(str(resolved).startswith(str(main_checkout())),
+                    "resolved engine path lives under the main checkout")
+            c.check(fake_tree not in resolved.parents,
+                    "resolved engine path is not inside the worktree")
+            c.eq(binary(), main_checkout() / "godot" / BINARY_NAME,
+                 "binary() with no argument defaults to the main checkout")
+        os.environ["GODOT_PATH"] = "/opt/godot/custom"
+        c.eq(binary(Path("/anything")), Path("/opt/godot/custom"),
+             "an explicit GODOT_PATH still wins over both")
+    finally:
+        os.environ.pop("GODOT_PATH", None)
+        if saved is not None:
+            os.environ["GODOT_PATH"] = saved
+
+    c.check((main_checkout() / "scripts" / "asset_pipeline.py").is_file(),
+            "main_checkout() points at a tree that holds the pipeline")
+
+    run_tests_src = inspect.getsource(run_tests)
+    c.check('env["GODOT_PATH"] = str(binary(repo))' in run_tests_src,
+            "run_tests exports GODOT_PATH so run-tests.sh finds the main checkout's engine")
+    c.check("cwd=tree" in run_tests_src,
+            "run_tests still runs the WORKTREE's suite, not the main checkout's")
+    c.check("import_project(tree, repo)" in inspect.getsource(regenerate_credits),
+            "regenerate_credits runs --import before --script")
