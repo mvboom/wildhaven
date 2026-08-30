@@ -19,8 +19,9 @@ _CLEARED = (
     ("cc0", "CC0-1.0"),
     ("creative commons zero", "CC0-1.0"),
     ("public domain", "CC0-1.0"),
-    ("synty", "Synty Store EULA"),
 )
+
+_SYNTY_SANCTIONED_LINE = "simple"
 
 
 @dataclass
@@ -43,20 +44,52 @@ def license_of(pack: Path) -> tuple[str, str]:
         for needle, license_id in _CLEARED:
             if needle in low:
                 return license_id, f"{name}: matched {needle!r}"
+        if "synty" in low:
+            if _SYNTY_SANCTIONED_LINE in low:
+                return "Synty Store EULA (SIMPLE)", f"{name}: matched Synty SIMPLE"
+            return "", (f"{name}: Synty pack that is not SIMPLE — art.md sanctions the "
+                        f"SIMPLE line only, and the absence of POLYGON does not make a "
+                        f"pack SIMPLE")
         return "", f"{name}: no cleared licence recognised"
     return "", "no licence file in pack"
 
 
-def gate(resolution, required_clips: list[str], pack: Path) -> AuditResult:
+def _make_evidence(resolution, probe, license_id, license_evidence):
+    """Always return the full key set, using empty/sentinel values when probe is absent."""
+    if probe is None:
+        return {
+            "license": license_id, "license_evidence": license_evidence,
+            "format": "", "format_reason": resolution.reason,
+            "clips": [], "meshes": -1, "nodes": -1, "skins": -1,
+            "silhouette": "DEFERRED -- human rules at the checkpoint",
+        }
+    return {
+        "license": license_id, "license_evidence": license_evidence,
+        "format": resolution.chosen, "format_reason": resolution.reason,
+        "clips": probe.clips, "meshes": probe.meshes,
+        "nodes": probe.nodes, "skins": probe.skins,
+        "silhouette": "DEFERRED -- human rules at the checkpoint",
+    }
+
+
+def gate(resolution, required_clips: list[str], pack: Path,
+         adapter_name: str = "") -> AuditResult:
     problems: list[str] = []
     license_id, license_evidence = license_of(pack)
 
     if not license_id:
         problems.append(f"no cleared licence: {license_evidence}")
 
+    if license_id.startswith("Synty") and adapter_name and adapter_name != "animal":
+        problems.append(
+            f"Synty SIMPLE is sanctioned for ANIMALS ONLY (art.md:70 — 'Animals only; "
+            f"humans stay Quaternius'); this is a {adapter_name!r} import")
+
     if not resolution.chosen or resolution.probe is None:
         problems.append(f"no importable format: {resolution.reason}")
-        return AuditResult(False, problems, {"license": license_id, "clips": []})
+        return AuditResult(
+            False, problems,
+            _make_evidence(resolution, resolution.probe, license_id, license_evidence))
 
     probe = resolution.probe
     missing = [clip for clip in required_clips if clip not in probe.clips]
@@ -70,13 +103,7 @@ def gate(resolution, required_clips: list[str], pack: Path) -> AuditResult:
     return AuditResult(
         passed=not problems,
         problems=problems,
-        evidence={
-            "license": license_id, "license_evidence": license_evidence,
-            "format": resolution.chosen, "format_reason": resolution.reason,
-            "clips": probe.clips, "meshes": probe.meshes,
-            "nodes": probe.nodes, "skins": probe.skins,
-            "silhouette": "DEFERRED -- human rules at the checkpoint",
-        },
+        evidence=_make_evidence(resolution, probe, license_id, license_evidence),
     )
 
 
@@ -98,6 +125,18 @@ def selftest_cases(c) -> None:
         bare = d / "nolicence"; bare.mkdir()
         c.eq(license_of(bare)[0], "", "missing licence file yields no licence")
 
+        synty_no_simple = d / "synty_nosimple"; synty_no_simple.mkdir()
+        (synty_no_simple / "License.txt").write_text("Synty Studios proprietary asset licence")
+        c.eq(license_of(synty_no_simple)[0], "", "Synty without SIMPLE is not cleared")
+
+        synty_simple = d / "synty_simple"; synty_simple.mkdir()
+        (synty_simple / "License.txt").write_text("Synty Studios SIMPLE asset licence")
+        c.eq(license_of(synty_simple)[0], "Synty Store EULA (SIMPLE)", "Synty SIMPLE is cleared")
+
+        unrecognized = d / "unrecognized"; unrecognized.mkdir()
+        (unrecognized / "License.txt").write_text("All Rights Reserved")
+        c.eq(license_of(unrecognized)[0], "", "licence file matching no pattern yields no licence")
+
         rigged = Resolution("fbx", d / "Pig.fbx",
                             ModelProbe(fmt="fbx", clips=["Idle", "Jump"]), "r", {})
         r = gate(rigged, required_clips=["Idle", "Walk"], pack=cc0)
@@ -115,3 +154,22 @@ def selftest_cases(c) -> None:
 
         unresolved = Resolution("", None, None, "no importable format", {})
         c.check(not gate(unresolved, [], cc0).passed, "unresolved format fails the gate")
+
+        # Synty SIMPLE with animal adapter passes
+        animal_synty = Resolution("fbx", d / "Antelope.fbx",
+                                   ModelProbe(fmt="fbx", clips=["Idle", "Walk"], meshes=1, nodes=10, skins=1),
+                                   "r", {})
+        c.check(gate(animal_synty, ["Idle", "Walk"], synty_simple, adapter_name="animal").passed,
+                "Synty SIMPLE pack passes for animals")
+
+        # Synty SIMPLE with building adapter fails
+        r_building = gate(animal_synty, ["Idle", "Walk"], synty_simple, adapter_name="building")
+        c.check(not r_building.passed, "Synty SIMPLE pack fails for buildings")
+        c.check(any("Animals only" in p for p in r_building.problems),
+                "problem names the animals-only rule")
+
+        # Both return paths have same evidence key set
+        resolved_evidence_keys = set(gate(ok, ["Idle", "Walk"], cc0).evidence.keys())
+        unresolved_evidence_keys = set(gate(unresolved, [], cc0).evidence.keys())
+        c.eq(sorted(resolved_evidence_keys), sorted(unresolved_evidence_keys),
+             "resolved and unresolved gates have same evidence key set")
