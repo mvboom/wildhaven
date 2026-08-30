@@ -88,6 +88,49 @@ def _selftest_cli(c) -> None:
     import tempfile as _tf
 
 
+
+    # --- --accept-all ---------------------------------------------------------
+    # A run nobody is watching still has to be HONEST about what happened: the .tres
+    # header asserted "Every value below was ruled by the human at this run's checkpoint",
+    # which under this flag is a false statement written into a file people read later to
+    # find out where a tuning value came from.
+    c.check("--accept-all" in _parser().format_help(), "the flag is offered")
+    c.check(_parser().parse_args(["--selftest"]).accept_all is False,
+            "and is off unless asked for -- the checkpoint is the default")
+
+    _hdr_auto = _tres_header("Pig", "run-1", {"asset": "a", "resolved_format":
+                             {"chosen": "blend", "reason": "r"}}, auto_accepted=True)
+    c.check("not ruled by a human" in _hdr_auto.lower(),
+            "an auto-accepted run says so in the header of the file it writes")
+    c.check("--accept-all" in _hdr_auto, "and names the flag that did it")
+    c.check("ruled by the human" not in _hdr_auto,
+            "and does NOT also claim the human ruled them")
+
+    _hdr_human = _tres_header("Pig", "run-1", {"asset": "a", "resolved_format":
+                              {"chosen": "blend", "reason": "r"}}, auto_accepted=False)
+    c.check("ruled by the human" in _hdr_human,
+            "a checkpointed run still records that a human ruled the values")
+    c.check("--accept-all" not in _hdr_human, "and does not mention a flag it never used")
+
+    # The halt path is the safety-critical one: a field with no proposal must stop the run
+    # rather than resume it, and it must stop WITHOUT calling resume() at all.
+    with _tf.TemporaryDirectory() as _td:
+        _log = Path(_td) / "runs" / "r1"; _log.mkdir(parents=True)
+        _pl = {"decisions": [{"field": "a", "proposal": 3, "value": None},
+                             {"field": "b", "proposal": None, "value": None}]}
+        _rc = _accept_all_checkpoint("r1", Path(_td), _log, _pl)
+        c.eq(_rc, 0, "the run ends cleanly rather than proceeding on a null")
+        _written = _json.loads((_log / "review.json").read_text())
+        c.eq({d["field"]: d["value"] for d in _written["decisions"]},
+             {"a": 3, "b": None},
+             "the proposals that existed are recorded; the one that did not stays null")
+        c.check(review.unruled(_written) == ["b"],
+                "so resume still refuses and names the field nobody ruled")
+
+    import inspect as _insp
+    c.check('"auto_accepted": bool(accept_all)' in _insp.getsource(run),
+            "the payload records how it was ruled, which is what the .tres header reads")
+
     # --- the roster ratchets, asked at the checkpoint -------------------------
     # test_attribution.gd's source count and test_resident_wander.gd's EXPECTED_CLIPS both
     # fail BECAUSE content was added -- by design, so that shipping a new source or a new
@@ -614,7 +657,7 @@ def _validate(module, adapter_name: str, ident: str, mode: str | None,
 
 def run(asset: Path, adapter_name: str, repo: Path, notes: str = "",
         dry_run: bool = False, variant_of: str | None = None,
-        interactive: bool = True) -> int:
+        interactive: bool = True, accept_all: bool = False) -> int:
     module = ADAPTER_MODULES[adapter_name]
     spec = module.SPEC
     display = asset.stem
@@ -753,6 +796,9 @@ def run(asset: Path, adapter_name: str, repo: Path, notes: str = "",
             "run_id": run_id, "asset": str(asset), "adapter": adapter_name,
             "worktree": str(tree), "branch": branch, "base_branch": base_branch,
             "mode": mode, "variant_of": variant_of, "incomplete": False,
+            # Read back by _tres_header: the generated resource states its own provenance,
+            # and "a human ruled this" must not be written about a run where none did.
+            "auto_accepted": bool(accept_all),
             "resolved_format": {"chosen": resolution.chosen, "reason": resolution.reason,
                                 "rejected": resolution.rejected},
             "decisions": [d.to_dict() for d in decisions],
@@ -772,6 +818,9 @@ def run(asset: Path, adapter_name: str, repo: Path, notes: str = "",
 
         print(f"\n=== CHECKPOINT === {len(review.unruled(payload))} field(s) await your ruling")
         print(f"  cost: {_format_cost_line(cost)}")
+
+        if accept_all:
+            return _accept_all_checkpoint(run_id, repo, log.dir, payload)
 
         if _should_prompt(interactive, sys.stdin.isatty()):
             try:
@@ -917,11 +966,8 @@ def resume(run_id: str, repo: Path) -> int:
 def _resume_stages(run_id: str, repo: Path, payload: dict, module, adapter_name: str,
                    tree: Path, project: Path, mode: str | None, ident: str, display: str,
                    values: dict, ratchet_rulings: dict | None = None) -> int:
-    header = (f"; {display} — generated by scripts/asset_pipeline.py run {run_id}\n"
-              f"; Source: {payload['asset']}\n"
-              f"; Format: {payload['resolved_format']['chosen']} "
-              f"({payload['resolved_format']['reason']})\n"
-              f"; Every value below was ruled by the human at this run's checkpoint.\n")
+    header = _tres_header(display, run_id, payload,
+                          bool(payload.get("auto_accepted")))
 
     # The ruled model_scale has to reach the artifact. run() wrote the wrapper BEFORE the
     # checkpoint with a hardcoded 0.2 (it must, so Godot can probe the AnimationPlayer),
@@ -1022,6 +1068,54 @@ def _resume_stages(run_id: str, repo: Path, payload: dict, module, adapter_name:
     ok, log_path = build(repo)
     print(f"build....... {'OK' if ok else 'FAILED'} ({log_path})")
     return 0 if ok else 1
+
+
+def _accept_all_checkpoint(run_id: str, repo: Path, log_dir: Path,
+                           payload: dict) -> int:
+    """--accept-all: take every proposal and carry straight on to the remaining stages.
+
+    A field with NO proposal is NOT accepted -- there is nothing to accept -- so the run
+    halts on those exactly as an unruled review always has, naming them. Everything else
+    is written through the same apply_rulings the prompt and the hand-edited review.json
+    both use, so there is one path into a ruling and one shape of record.
+    """
+    rulings, unproposed = checkpoint.accept_all(payload)
+    ruled = review.apply_rulings(payload, rulings)
+    review.write(log_dir / "review.json", ruled)
+
+    print(f"  --accept-all: took {len(rulings)} proposal(s) as ruled. NO HUMAN RULED "
+          f"THESE -- the .tres header and {log_dir / 'review.json'} both say so.")
+    for field, value in rulings.items():
+        print(f"    {field} = {value!r}")
+    if unproposed:
+        print(f"  {len(unproposed)} field(s) had no proposal to accept: "
+              f"{', '.join(unproposed)}")
+        print(f"  Rule them in {log_dir / 'review.json'}, then: "
+              f"python3 scripts/asset_pipeline.py --resume {run_id}")
+        return 0
+    return resume(run_id, repo)
+
+
+def _tres_header(display: str, run_id: str, payload: dict,
+                 auto_accepted: bool) -> str:
+    """The comment block at the top of the generated .tres.
+
+    Its last line is a PROVENANCE CLAIM, and someone reading this file later to find out
+    where a number came from will believe it. "Ruled by the human" is true of a
+    checkpointed run and false of an --accept-all one, so the two runs say different
+    things.
+    """
+    provenance = (
+        "; The values below were NOT ruled by a human: this run used --accept-all, so "
+        "every one is\n; the pipeline's own proposal. See the run's review.json for each "
+        "field's sourcing and\n; confidence before trusting any of them.\n"
+        if auto_accepted else
+        "; Every value below was ruled by the human at this run's checkpoint.\n")
+    return (f"; {display} — generated by scripts/asset_pipeline.py run {run_id}\n"
+            f"; Source: {payload['asset']}\n"
+            f"; Format: {payload['resolved_format']['chosen']} "
+            f"({payload['resolved_format']['reason']})\n"
+            + provenance)
 
 
 def _read_or_empty(path: Path) -> str:
@@ -1294,6 +1388,9 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--abandon", metavar="RUN_ID", help="Destroy a run's worktree and branch")
     parser.add_argument("--no-interactive", dest="interactive", action="store_false",
                         help="Halt at review.json instead of prompting for rulings")
+    parser.add_argument("--accept-all", action="store_true",
+                        help="Take every proposal as the ruling without prompting, then "
+                             "continue. The .tres header records that no human ruled them")
     return parser
 
 
@@ -1303,6 +1400,12 @@ def main() -> int:
     if args.selftest:
         return selftest()
     if args.resume:
+        if args.accept_all:
+            # Same flag, same meaning, for a run already halted at its checkpoint.
+            log_dir = Path.cwd() / "runs" / args.resume
+            payload = review.read(log_dir / "review.json")
+            payload["auto_accepted"] = True
+            return _accept_all_checkpoint(args.resume, Path.cwd(), log_dir, payload)
         return resume(args.resume, Path.cwd())
     if args.abandon:
         return abandon_run(args.abandon, Path.cwd())
@@ -1313,7 +1416,7 @@ def main() -> int:
     if args.variant_of and args.adapter != "terrain":
         _parser().error("--variant-of applies only to --as terrain")
     return run(Path(args.asset), args.adapter, Path.cwd(), args.notes or "",
-               args.dry_run, args.variant_of, args.interactive)
+               args.dry_run, args.variant_of, args.interactive, args.accept_all)
 
 
 if __name__ == "__main__":

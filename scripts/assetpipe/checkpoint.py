@@ -125,6 +125,29 @@ def prompt_rulings(payload: dict, kinds: dict, input_fn, output_fn):
     return rulings
 
 
+def accept_all(payload: dict) -> tuple[dict, list[str]]:
+    """Take every proposal as the ruling, without asking. Returns (rulings, unproposed).
+
+    The interactive `A` does this with a human watching each line scroll past. The flag
+    form runs unattended, so the one thing it must not do is treat a field with NO
+    proposal as accepted -- that would write a null and read downstream as ruled. Those
+    fields come back in `unproposed` for the caller to report, and the run halts on them
+    exactly as an unruled review always has.
+
+    A `False` or `[]` proposal IS a proposal. Only `None` means nothing was proposed.
+    """
+    rulings: dict = {}
+    unproposed: list[str] = []
+    for decision in payload.get("decisions", []):
+        if decision.get("value") is not None:
+            continue
+        if decision.get("proposal") is None:
+            unproposed.append(decision["field"])
+            continue
+        rulings[decision["field"]] = decision["proposal"]
+    return rulings, unproposed
+
+
 def selftest_cases(c) -> None:
     # --- parse_value, per FieldSpec.kind ------------------------------------
     c.eq(parse_value("10", "int"), 10, "int parsed")
@@ -203,3 +226,26 @@ def selftest_cases(c) -> None:
     line = render_decision(payload()["decisions"][0], "int")
     for token in ("scout_radius", "8", "roster.md band 8-12", "low"):
         c.check(token in line, f"the prompt line shows {token}")
+
+    # --- accept-all, the non-interactive form --------------------------------
+    # `A` at the prompt already does this for a human watching it happen. The flag is for
+    # a run nobody is watching, which is exactly why it must not quietly "accept" a field
+    # that has no proposal to accept: that would write value=None and read as ruled.
+    _payload = {"decisions": [
+        {"field": "scout_radius", "proposal": 8, "value": None},
+        {"field": "farm_tolerant", "proposal": False, "value": None},
+        {"field": "avoids", "proposal": [], "value": None},
+        {"field": "personality", "proposal": None, "value": None},
+        {"field": "already", "proposal": 1, "value": 99},
+    ]}
+    _rulings, _unproposed = accept_all(_payload)
+    c.eq(_rulings, {"scout_radius": 8, "farm_tolerant": False, "avoids": []},
+         "every proposal becomes the ruling")
+    c.check("farm_tolerant" in _rulings and _rulings["farm_tolerant"] is False,
+            "a False proposal is a real proposal, not a missing one")
+    c.check("avoids" in _rulings, "and so is an empty list")
+    c.eq(_unproposed, ["personality"],
+         "a field with NO proposal is reported, never accepted into a null ruling")
+    c.check("already" not in _rulings, "a field the human already ruled is left alone")
+
+    c.eq(accept_all({"decisions": []}), ({}, []), "nothing to rule accepts nothing")
