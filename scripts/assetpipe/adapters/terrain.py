@@ -106,8 +106,11 @@ def selftest_cases(c) -> None:
             refused = "inert-land" in str(exc)
         c.check(refused, "write refuses to break the inert-land invariant")
 
-    # FINDING 3(a): Mixed model + non-model .tres, shaped like the real forest.tres
-    # with 1_schema Script, 3_harvest Resource, and 2_model/4_model PackedScene entries
+    # FINDING 3(a): Mixed model + non-model .tres with non-discriminating id placement.
+    # Fixture has 2_model, 4_model (both PackedScene with _model suffix), and 12_harvest
+    # (Resource with different suffix). A correct filter sees max model id 4 → next_id=5.
+    # A broken filter that wrongly counts all entries sees max id 12 → next_id=13.
+    # This assertion diverges the two behaviors and proves the filter works.
     with tempfile.TemporaryDirectory() as td:
         mixed = Path(td) / "mixed.tres"
         mixed.write_text(
@@ -115,16 +118,18 @@ def selftest_cases(c) -> None:
             'load_steps=5 format=3]\n\n'
             '[ext_resource type="Script" path="res://scripts/definitions/terrain_definition.gd" id="1_schema"]\n'
             '[ext_resource type="PackedScene" path="res://assets/terrain/common_tree_1/CommonTree1.tscn" id="2_model"]\n'
-            '[ext_resource type="Resource" path="res://data/terrain/forest_harvest.tres" id="3_harvest"]\n'
-            '[ext_resource type="PackedScene" path="res://assets/terrain/common_tree_2/CommonTree2.tscn" id="4_model"]\n\n'
+            '[ext_resource type="PackedScene" path="res://assets/terrain/common_tree_2/CommonTree2.tscn" id="4_model"]\n'
+            '[ext_resource type="Resource" path="res://data/terrain/forest_harvest.tres" id="12_harvest"]\n\n'
             '[resource]\nscript = ExtResource("1_schema")\nid = "forest"\n'
             'model_scenes = Array[PackedScene]([ExtResource("2_model"), ExtResource("4_model")])\n')
 
         summary = append_variant(mixed, "res://assets/terrain/birch_tree/BirchTree.tscn")
         text = mixed.read_text()
-        # The non-model id="3_harvest" is excluded by the filter; max of ids is 4, so next is 5
+        # Correct filter sees max model id=4, so next=5. Broken filter sees max id=12, so next=13.
         c.check('path="res://assets/terrain/birch_tree/BirchTree.tscn" id="5_model"' in text,
-                "mixed model+non-model .tres: next id is 5_model (3_harvest excluded)")
+                "discriminating fixture: next id is 5_model (only models counted)")
+        c.check('id="13_model"' not in text,
+                "discriminating fixture: does NOT use 13_model (would prove filter is broken)")
         c.check("load_steps=6" in text, "mixed: load_steps incremented to 6")
         c.check('ExtResource("2_model"), ExtResource("4_model"), ExtResource("5_model")' in text,
                 "mixed: model_scenes now has three entries in order")
@@ -170,6 +175,30 @@ def selftest_cases(c) -> None:
         c.check(refused, "no model_scenes array: append_variant raises RuntimeError")
         c.check("no model_scenes array" in error_msg, "error message names the problem")
         c.eq(no_array.read_text(), original, "refusal is atomic; file unchanged")
+
+    # Header-prose idempotency regression test: a res:// path quoted in a comment but
+    # NOT bound by any ext_resource line. The old raw-substring check would report
+    # "already present" for this scenario and silently no-op. The structural check
+    # should recognize it's not actually bound and append successfully.
+    with tempfile.TemporaryDirectory() as td:
+        header_prose = Path(td) / "header_prose.tres"
+        header_prose.write_text(
+            '; superseded — see res://assets/terrain/maple_tree/MapleTree.tscn for details\n'
+            '[gd_resource type="Resource" script_class="TerrainDefinition" '
+            'load_steps=3 format=3]\n\n'
+            '[ext_resource type="Script" path="res://scripts/definitions/terrain_definition.gd" id="1_schema"]\n'
+            '[ext_resource type="PackedScene" path="res://assets/terrain/common_tree_1/CommonTree1.tscn" id="2_model"]\n\n'
+            '[resource]\nscript = ExtResource("1_schema")\nid = "forest"\n'
+            'model_scenes = Array[PackedScene]([ExtResource("2_model")])\n')
+
+        summary = append_variant(header_prose, "res://assets/terrain/maple_tree/MapleTree.tscn")
+        text = header_prose.read_text()
+        # The path IS in the file (in the header), but NOT bound by ext_resource.
+        # Structural idempotency should append, not silently no-op.
+        c.check("appended" in summary and "already present" not in summary,
+                "header prose: path in comment does not block append")
+        c.check('id="3_model"' in text,
+                "header prose: new model added despite path appearing in header comment")
 
 
 def append_variant(tres: Path, scene_res_path: str) -> str:
