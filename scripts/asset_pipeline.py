@@ -96,8 +96,10 @@ def _selftest_cli(c) -> None:
              "a non-zero copy stage reports the code instead of printing success")
         c.check("if rc == 0:" in copy_src,
                 "the success line is printed only on a zero return code")
-        c.check("ROSTER" in copy_src,
-                "the failure message names the hardcoded ROSTER the operator must edit")
+        c.eq(copy_src.count("ROSTER is DERIVED"), 2,
+             "both failure messages describe the DERIVED roster, not the hardcode "
+             "da039b1 removed -- they used to send the operator editing a list that no "
+             "longer exists")
 
         # REGRESSION, whole-branch review IMPORTANT 5: the ruled model_scale never reached
         # the wrapper, which is the only place scale lives.
@@ -623,12 +625,15 @@ def _copy_stage(adapter_name: str, tree: Path, display: str, ident: str,
     believes it is sandboxed.
 
     Both were invoked with check=False and a success line printed regardless of outcome.
-    Both carry a hardcoded ROSTER (fact_card_pipeline.py:146-160,
-    style_guide_pipeline.py:154), and a newly imported species is by definition absent from
-    it, so both exit non-zero with "unknown species" -- and the animal run then died at
-    stage 10 on AnimalDefinition.validate() rejecting an empty fact_text_pool, with nothing
-    connecting that failure back to here. The ROSTER limitation is pre-existing and out of
-    this branch's scope, so this reports honestly rather than halting.
+    Both USED TO carry a hardcoded ROSTER that a newly imported species was by definition
+    absent from, so both exited non-zero with "unknown species" -- and the animal run then
+    died at stage 10 on AnimalDefinition.validate() rejecting an empty fact_text_pool, with
+    nothing connecting that failure back to here. That limitation is gone: the ROSTER is
+    now DERIVED from project/data/animals/*.tres (scripts/roster_data.py), which stage 7
+    writes before this stage runs, so a new species is in it the moment its .tres exists.
+    A non-zero return therefore no longer means "add it to the list" -- it means the copy
+    run itself failed -- but it still means NO copy was written and stage 10 will still
+    fail, so this reports honestly rather than halting.
     """
     if adapter_name == "terrain":
         # The spec's terrain copy row is "none": terrain has no fact cards and no
@@ -648,8 +653,9 @@ def _copy_stage(adapter_name: str, tree: Path, display: str, ident: str,
         print("[8/10] copy........ fact_card_pipeline (worktree copy)")
     else:
         print(f"[8/10] copy........ FAILED rc={rc} -- fact_card_pipeline wrote NOTHING. "
-              f"Its ROSTER is hardcoded, so {display!r} has to be added there before it "
-              f"can generate copy. Stage 10 will fail for an animal until you do: "
+              f"Its ROSTER is DERIVED from project/data/animals/*.tres, so check stage 7 "
+              f"really wrote {ident}.tres, then run it by hand for the real error. Stage "
+              f"10 will fail for an animal until {display!r} has copy: "
               f"AnimalDefinition.validate() rejects an empty fact_text_pool.")
 
     # Gentle Displacement copy is ANIMALS ONLY -- displacement_copy.gd has WARN_/DEPART_/
@@ -663,8 +669,9 @@ def _copy_stage(adapter_name: str, tree: Path, display: str, ident: str,
             print("[8/10] copy........ style_guide_pipeline (WARN/DEPART/MOVE)")
         else:
             print(f"[8/10] copy........ FAILED rc={rc} -- style_guide_pipeline wrote "
-                  f"NOTHING. Its ROSTER is hardcoded too, so {ident!r} needs adding "
-                  f"there. Until then this animal falls through to WARN_GENERIC.")
+                  f"NOTHING. Its ROSTER is DERIVED too, so {ident!r} is known once stage "
+                  f"7 wrote its .tres; run it by hand for the real error. Until it "
+                  f"succeeds this animal falls through to WARN_GENERIC.")
 
 
 def _preserve_license(pack: Path, project: Path, tree: Path) -> None:
