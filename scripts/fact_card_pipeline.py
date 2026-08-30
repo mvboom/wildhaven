@@ -539,17 +539,26 @@ def write_output_json(result: dict) -> Path:
     return path
 
 
-def write_live_tres(species_id: str, accepted_fact_texts: list) -> str:
-    """Patches project/data/animals/<species_id>.tres's fact_text_pool in place with
-    this run's accepted candidates, and drops a header note marking the copy as
-    pipeline-generated and awaiting step-8 human sign-off -- the same convention
-    human.tres already uses for agent-proposed copy elsewhere in this project. Does
-    NOT touch human_signoff or content-pipeline-status.md; that stays the human's call.
-    Returns a short description of what happened, for the run summary."""
+def write_tres(species_id: str, accepted_fact_texts: list, target: str = "animal_pool") -> str:
+    """Patches a .tres file in place with this run's accepted candidates, and drops a
+    header note marking the copy as pipeline-generated and awaiting step-8 human
+    sign-off -- the same convention human.tres already uses for agent-proposed copy
+    elsewhere in this project. Does NOT touch human_signoff or content-pipeline-status.md;
+    that stays the human's call. Returns a short description of what happened, for the
+    run summary."""
     if not accepted_fact_texts:
         return "no accepted candidates -- .tres left untouched"
 
-    tres_path = DATA_DIR / f"{species_id}.tres"
+    if target == "building_text":
+        tres_path = REPO_ROOT / "project" / "data" / "buildings" / f"{species_id}.tres"
+        field_pattern = re.compile(r"^fact_text = .*$", re.MULTILINE)
+        replacement = f"fact_text = {json.dumps(accepted_fact_texts[0])}"
+    else:
+        tres_path = DATA_DIR / f"{species_id}.tres"
+        field_pattern = re.compile(r"^fact_text_pool = .*$", re.MULTILINE)
+        inner = ", ".join(json.dumps(t, ensure_ascii=False) for t in accepted_fact_texts)
+        replacement = f"fact_text_pool = Array[String]([{inner}])"
+
     if not tres_path.exists():
         return f"WARNING: {tres_path} does not exist -- .tres not written"
 
@@ -557,28 +566,21 @@ def write_live_tres(species_id: str, accepted_fact_texts: list) -> str:
     # Idempotency: strip any note this pipeline left on a PRIOR run before adding a fresh
     # one, so re-running against the same species doesn't accumulate duplicate comment lines.
     prior_note_pattern = re.compile(
-        r"^; fact_text_pool REPLACED by (?:archive/mark-vanderboom-assignment-6/ger_pipeline\.py"
+        r"^; (?:fact_text_pool|fact_text) REPLACED by (?:archive/mark-vanderboom-assignment-6/ger_pipeline\.py"
         r"|scripts/fact_card_pipeline\.py).*\n",
         re.MULTILINE,
     )
     text = prior_note_pattern.sub("", text)
 
-    # ensure_ascii=False keeps literal unicode (em dashes, etc.) instead of \uXXXX escapes --
-    # matters both for readability and because a literal "\u..." in a re.sub REPLACEMENT
-    # STRING is parsed as a backreference template and raises (hence the lambda below too).
-    array_literal = "Array[String]([" + ", ".join(json.dumps(t, ensure_ascii=False) for t in accepted_fact_texts) + "])"
-    new_line = f"fact_text_pool = {array_literal}"
-
-    pattern = re.compile(r"^fact_text_pool = Array\[String\]\(\[.*\]\)$", re.MULTILINE)
-    if not pattern.search(text):
-        return f"WARNING: no fact_text_pool line found in {tres_path} -- .tres not written"
+    if not field_pattern.search(text):
+        return f"WARNING: no {replacement.split('=')[0].strip()} line found in {tres_path} -- .tres not written"
 
     note = (
-        f"; fact_text_pool REPLACED by scripts/fact_card_pipeline.py "
+        f"; {replacement.split('=')[0].strip()} REPLACED by scripts/fact_card_pipeline.py "
         f"({time.strftime('%Y-%m-%d')}) -- AWAITING STEP-8 HUMAN SIGN-OFF, not yet reviewed.\n"
     )
-    replacement = note.rstrip("\n") + "\n" + new_line
-    new_text = pattern.sub(lambda _m: replacement, text, count=1)
+    new_replacement = note.rstrip("\n") + "\n" + replacement
+    new_text = field_pattern.sub(lambda _m: new_replacement, text, count=1)
     tres_path.write_text(new_text)
     return f"wrote {len(accepted_fact_texts)} card(s) to {tres_path.relative_to(REPO_ROOT)}"
 
@@ -683,6 +685,17 @@ def selftest() -> int:
     print(f"[{'PASS' if dup_ok else 'FAIL'}] duplicate-in-run check")
     ok = ok and dup_ok
 
+    import tempfile as _tf
+    with _tf.TemporaryDirectory() as _td:
+        _p = Path(_td) / "well.tres"
+        _p.write_text('id = "well"\nfact_text = "old"\n')
+        _pat = re.compile(r"^fact_text = .*$", re.MULTILINE)
+        _new = _pat.sub('fact_text = "new"', _p.read_text())
+        _target_ok = 'fact_text = "new"' in _new and "fact_text_pool" not in _new
+    print(f"[{'PASS' if _target_ok else 'FAIL'}] --target building_text patches the "
+          f"single fact_text field, not the pool")
+    ok = ok and _target_ok
+
     print()
     print("SELFTEST " + ("PASSED" if ok else "FAILED"))
     return 0 if ok else 1
@@ -701,6 +714,12 @@ def main() -> int:
                          help="Must differ from --generator-model. Default: the other of haiku/opus.")
     parser.add_argument("--max-refine", type=int, default=3, help="Circuit breaker threshold (default 3)")
     parser.add_argument("--dry-run", action="store_true", help="Write the archive JSON only; do not touch project/data/animals/*.tres")
+    parser.add_argument(
+        "--target", choices=("animal_pool", "building_text"), default="animal_pool",
+        help="Where accepted copy is written. animal_pool: fact_text_pool in "
+             "project/data/animals/<id>.tres (default, unchanged behaviour). "
+             "building_text: the single fact_text field in project/data/buildings/<id>.tres.",
+    )
     parser.add_argument("--selftest", action="store_true", help="Run the Evaluator against known-bad drafts, no LLM calls, exit nonzero on failure")
     args = parser.parse_args()
 
@@ -734,7 +753,7 @@ def main() -> int:
         if args.dry_run:
             _progress("  --dry-run: not writing to project/data/animals/*.tres or the tracker")
         else:
-            summary = write_live_tres(species_id, result["accepted_fact_texts"])
+            summary = write_tres(species_id, result["accepted_fact_texts"], target=args.target)
             _progress(f"  live content: {summary}")
             any_escalated = any(c["status"] == "escalated" for c in result["candidates"])
             tracker_summary = update_content_pipeline_status(species_id, result["accepted_fact_texts"], any_escalated)
