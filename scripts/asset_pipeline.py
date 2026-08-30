@@ -26,6 +26,7 @@ ADAPTERS = ("animal", "building", "terrain")
 
 def selftest() -> int:
     from assetpipe import audit, formats, dedupe, review, runlog, worktree, importer
+    from assetpipe.adapters import base
     c = Checks()
     formats.selftest_cases(c)
     audit.selftest_cases(c)
@@ -34,6 +35,7 @@ def selftest() -> int:
     runlog.selftest_cases(c)
     worktree.selftest_cases(c)
     importer.selftest_cases(c)
+    base.selftest_cases(c)
     return c.report("SELFTEST")
 
 
