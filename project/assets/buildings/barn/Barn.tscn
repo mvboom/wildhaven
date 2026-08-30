@@ -1,0 +1,50 @@
+; Barn — NEW farm-building placeable (content-variety pass Task 3, 2026-08-26), one of 8
+; brand-new PlaceableDefinition entries (Barn, SmallBarn, OpenBarn, ChickenCoop, Silo,
+; Windmill, WaterTower, Well) — each its own real buildable, not a variant of House or of
+; each other. See project/data/buildings/barn.tres for the full data-entry header
+; (proposed cost/footprint, human sign-off flag).
+;
+; Source: Quaternius, "Farm Buildings" pack (FBX), Barn.fbx — CC0 1.0 Universal.
+; License.txt at `source-content/assets/Farm Buildings - Sept 2018.../License.txt` confirmed CC0
+; 1.0 Universal / Public Domain Dedication before import, per asset-import-pipeline.md's
+; audit gate. NEW pack for this project — recorded in the newly-authored
+; project/attribution/sources/quaternius_farm_buildings.tres.
+;
+; TEXTURE AUDIT (mandatory per asset-import-pipeline.md and this task's brief — the
+; DeadTree/PineTree2 precedent): probed every surface's albedo_texture/albedo_color/
+; vertex_color_use_as_albedo on the raw, unmodified FBX import (same throwaway-script
+; method used to diagnose those two bugs). Result: albedo_texture is null on every
+; surface (this pack, like its own OBJ/MTL sibling export, never shipped map_Kd texture
+; references at all — confirmed by inspecting Barn.mtl directly), BUT
+; vertex_color_use_as_albedo reads true with MEANINGFUL, DISTINCT per-surface colors
+; (e.g. surface 0 ~ dark red (0.4872, 0.228, 0.1966), surface 1 ~ light grey trim
+; (0.821, 0.821, 0.821), surface 2 ~ mid red-brown (0.5601, 0.2625, 0.2265), surface 3 ~
+; dark grey/roof (0.311, 0.311, 0.311)) — NOT the uniform near-(0.9063, 0.9063, 0.9063,
+; 1.0) tell that flagged DeadTree/PineTree2 as broken. This pack bakes each of its named
+; flat-color Blender materials (DarkRed/LightRed/RoofBlack/White etc., see Barn.mtl) into
+; real per-vertex color at FBX export time, the same genuinely-vertex-colored shape
+; BirchTree/Bush already established elsewhere in this project. No texture fix needed; no
+; material_override applied. Plain instance, matching House.tscn's convention exactly.
+;
+; SCALE: raw AABB measured via manual local-transform composition on the unmodified FBX
+; (NOT global_transform — see cultivated_field.tres's header for why that silently
+; returns identity on a freshly-instantiated, not-yet-tree-attached node; same method
+; Task 2 used for the House variants): footprint 7.7269 x 8.2224 (x, z) tile-units,
+; height 6.0086. Barn is this task's proposed 2x2-footprint outlier (FLAG FOR HUMAN
+; SIGN-OFF, see barn.tres's header) — target max-axis is therefore 2x House's own
+; established 1x1 margin (0.869309), i.e. 1.738618, not the 1x1 target every other farm
+; building in this batch uses. Long axis (z) scaled by 0.211448 to hit that target.
+; Scaled result: 1.6338 x 1.2705 x 1.7386 (x, y, z) — fits inside a 2x2 tile footprint
+; with the same "small margin, not edge-to-edge" fit House's own variants used.
+;
+; FACING: left as authored (identity transform, no rotation) — unconfirmed by a human eye
+; pass, same posture as every other placement judgment call in this project. FLAG FOR
+; HUMAN SIGN-OFF.
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" uid="uid://c1qjsp88pjm5u" path="res://assets/buildings/barn/Barn.fbx" id="1_model"]
+
+[node name="Barn" type="Node3D"]
+
+[node name="Model" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.211448, 0, 0, 0, 0.211448, 0, 0, 0, 0.211448, 0, 0, 0)

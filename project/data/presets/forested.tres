@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="WorldPreset" load_steps=2 format=3]
+
+; base_terrain_id is deliberately "wild_grass", same as meadow_start — see barren.tres's own
+; header for why (Open Question #10's real terrain differentiation is deferred, human
+; decision 2026-08-24).
+
+[ext_resource type="Script" path="res://scripts/definitions/world_preset.gd" id="1_schema"]
+
+[resource]
+script = ExtResource("1_schema")
+id = "forested_start"
+display_name = "Forested"
+width = 36
+depth = 36
+base_terrain_id = "wild_grass"

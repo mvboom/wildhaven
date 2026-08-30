@@ -1,0 +1,46 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/style_picker_popup.gd" id="1"]
+
+; The long-press style picker (style-picker sub-project B2, Task 7). No scrim ColorRect —
+; see style_picker_popup.gd's own header for why: this reads as a lightweight dropdown, not
+; a modal, so the only visible chrome is Panel/Scroll/List. OutsideCatcher still covers the
+; full rect (transparent — no `color` set, unlike FactCard's/MenuWindow's tinted Scrim) so an
+; outside tap is consumed rather than falling through to a palette button or a world tile.
+[node name="StylePickerPopup" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1")
+
+[node name="OutsideCatcher" type="Control" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+
+[node name="Panel" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(240, 0)
+layout_mode = 1
+anchors_preset = 0
+
+[node name="Scroll" type="ScrollContainer" parent="Panel"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(240, 44)
+layout_mode = 2
+horizontal_scroll_mode = 0
+
+[node name="List" type="VBoxContainer" parent="Panel/Scroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 6

@@ -1,0 +1,39 @@
+[gd_resource type="Resource" script_class="AttributionEntry" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://attribution/attribution_entry.gd" id="1_entry"]
+
+[resource]
+script = ExtResource("1_entry")
+id = "quaternius_stylized_nature_megakit"
+creator = "Quaternius"
+source_name = "Stylized Nature MegaKit (Standard/free)"
+source_version = "Standard edition — 68 of 116 total pack models"
+creator_url = "https://quaternius.com"
+source_url = "https://quaternius.com"
+support_url = "https://www.patreon.com/quaternius"
+license_name = "CC0 1.0 Universal (CC0 1.0) Public Domain Dedication"
+license_url = "https://creativecommons.org/publicdomain/zero/1.0/"
+license_file = "res://assets/licenses/Quaternius_UltimateAnimatedAnimals_License.txt"
+attribution_required = false
+required_notice = ""
+conditions = ""
+assets_used = PackedStringArray("CommonTree_1", "CommonTree_2", "Grass_Common_Short", "Grass_Common_Tall")
+per_file_licensing = false
+notes = "CC0 — crediting is courtesy, not compliance. Reuses the generic Quaternius CC0
+license text already in-repo (`License_Standard.txt` in this pack is the same generic
+CC0 1.0 dedication, just with an extra paragraph noting this is the free Standard tier
+vs. the paid PRO/SOURCE tiers — that paragraph is a marketing note, not a license term).
+
+First use of this pack: 2 common trees + 2 common grass variants for the terrain
+common-set pass (project/assets/terrain/). Unlike the animal/building imports, these
+scale corrections are NOT measured against a GDD number — there is no stated tile-height
+target for trees or grass the way there is for a villager (\"~1 tile tall\") or a house
+footprint. Flagged for human eyeball sign-off in each wrapper scene's own header comment.
+
+Each imported glTF references external PNG textures (Bark_NormalTree*, Leaves_NormalTree_C,
+Grass) copied alongside it into its own asset folder — self-contained per the pipeline's
+one-folder-per-asset convention, at the cost of duplicating shared textures across folders.
+
+Pack ships many more trees/rocks/grass/flowers not evaluated here; append to assets_used
+as more are imported, do NOT create a second entry for this pack (same convention as the
+other Quaternius entries)."

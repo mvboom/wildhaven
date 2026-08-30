@@ -1,0 +1,47 @@
+; CultivatedCropsPlot — one of 2 Cultivated field terrain variants. Composes a
+; root-vegetable/mixed-plot look (tomato, pumpkin, and cabbage-style rows) as the second
+; crop-type variant alongside CultivatedWheatRow, per the task's "2-3 crop-type variants"
+; guidance — reasonable variety without implying growth-stage simulation (v1 has no such
+; mechanic; this is a single fixed visual stage, not an animated progression).
+;
+; Source: CropsPlot.glb, "Crops" by Quaternius, CC0 1.0 Universal, poly.pizza — see
+; project/attribution/sources/quaternius_poly_pizza_nature.tres. This single mesh is
+; ALREADY composed as 5 furrow rows (tomato, pumpkin, and 2 cabbage-style rows) with soil
+; strips baked in — chosen over hand-placing individual crop props because it already
+; reads as "a small farm plot," which is exactly the brief ("a few crop rows/furrows, not
+; a single plant in the middle of a box").
+;
+; Raw measured AABB: footprint 1.789x1.556, height 0.323 tile-units — bigger than one
+; 0.94-unit tile at native scale. Scaled to 0.48 (footprint ~0.86x0.75, height ~0.155),
+; leaving a visible soil-slab margin on every edge so the tile-to-tile boundary stays
+; readable. FLAG FOR HUMAN SIGN-OFF: this scale trades off row-count legibility (rows
+; compress at this size) against tile-fit; a human may prefer either a further scale-down
+; for more headroom or a slight crop/mask to the AABB instead.
+;
+; Slab matches CultivatedWheatRow's dirt-brown (Color(0.4, 0.28, 0.16, 1)) for tonal
+; consistency across both Cultivated field variants — the crop mesh's own baked-in soil
+; color is a similar tone, so the slab mostly shows as a narrow worked-soil margin.
+;
+; SLAB WIDENED 0.94 -> 1.0 (2026-08-16, human-reported cross-tile seam gap) — same fix,
+; same reasoning as CommonTree1.tscn's header. X/Z only, Y (0.2) untouched. This slightly
+; narrows the visible soil margin the header above describes, but the crop mesh itself is
+; untouched (still scaled to 0.48, well inside the now-1.0 footprint).
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="PackedScene" uid="uid://v8xkg2m2j0ly" path="res://assets/terrain/crops_plot/CropsPlot.glb" id="1_model"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_slab"]
+size = Vector3(1.0, 0.2, 1.0)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_slab"]
+albedo_color = Color(0.4, 0.28, 0.16, 1)
+
+[node name="CultivatedCropsPlot" type="Node3D"]
+
+[node name="Slab" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+mesh = SubResource("BoxMesh_slab")
+material_override = SubResource("StandardMaterial3D_slab")
+
+[node name="Plot" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.48, 0, 0, 0, 0.48, 0, 0, 0, 0.48, 0, 0, 0)

@@ -1,0 +1,17 @@
+; Fox — model scene for AnimalDefinition.model_scenes
+; Source: Quaternius "Ultimate Animated Animal Pack" (July 2021), CC0 1.0.
+; Wrapper exists so the world-scale factor and any future look-pass overrides live in
+; readable text and survive a re-import of Fox.gltf.
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" uid="uid://d0v2jqn06fcm7" path="res://assets/animals/fox/Fox.gltf" id="1_model"]
+
+[node name="Fox" type="Node3D"]
+
+[node name="Model" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.2, 0, 0, 0, 0.2, 0, 0, 0, 0.2, 0, 0, 0)
+
+[node name="AnimationPlayer" parent="Model" index="1"]
+autoplay = "Idle"
+
+[editable path="Model"]

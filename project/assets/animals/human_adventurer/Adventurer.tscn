@@ -1,0 +1,27 @@
+; Adventurer — one of 5 Human look variants (see art.md; Adventurer is the recommended
+; default, and entry [0] of human.tres's now-5-entry AnimalDefinition.model_scenes array —
+; all 5 variants are wired and equal-weight as of the 2026-08-26 content-variety pass).
+; Source: Quaternius character (standalone glb, poly.pizza-style filename); CC0 1.0
+; Universal per art.md's locked policy — see
+; project/attribution/sources/quaternius_poly_pizza_characters.tres.
+;
+; Scale is a MEASURED first-pass fit to person-scale (tile height = 1.0 unit, gdd.md ->
+; Level & world design "a villager stands ~1 tile tall"): scale = 1 / combined mesh AABB
+; height at rest pose (2.592191 units -> 0.386). FLAG FOR HUMAN REVIEW: this bbox is
+; taller and sits lower (min y -0.736) than the other 3 CharacterArmature siblings
+; (Punk/Hoodie/Woman, bbox min y ~0), likely from the Backpack mesh or a raised-arm rest
+; pose rather than true standing height — eyeball-check that Adventurer reads the same
+; height as its siblings once placed, not a scale artifact of an unrelated prop.
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" uid="uid://cuj2112fmk771" path="res://assets/animals/human_adventurer/Adventurer.glb" id="1_model"]
+
+[node name="Adventurer" type="Node3D"]
+
+[node name="Model" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.386, 0, 0, 0, 0.386, 0, 0, 0, 0.386, 0, 0, 0)
+
+[node name="AnimationPlayer" parent="Model" index="1"]
+autoplay = "CharacterArmature|Idle"
+
+[editable path="Model"]

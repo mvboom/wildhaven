@@ -1,0 +1,52 @@
+; RockCluster1 — one of 4 Rock terrain cluster variants (D-42 model_scenes variety pass).
+; Composes already-imported pieces (no new download): 2x Rock_1 (Ultimate Nature Pack,
+; project/assets/terrain/rock_1/Rock_1.fbx) + 1x Rock_Moss_3 (same pack, already imported
+; for the Den prop at project/assets/props/den/Rock_Moss_3.fbx) — reused here as a THIRD,
+; distinct rock piece, not duplicated content.
+;
+; WHY A CLUSTER, NOT ONE BIG ROCK: the prior single-variant Rock1.tscn used Rock_1 at
+; NATURAL SCALE (height 0.87775 — nearly tile-height), which read in-engine as "one giant
+; rock," not "a bunch of rocks" (explicit human complaint). This variant instead scatters
+; SEVERAL SMALL rocks, each scaled well below natural size:
+;   - Rock_1 raw measured AABB: footprint 0.485x0.467, height 0.877 (matches Rock1.tscn's
+;     own header). Scaled here to 0.22-0.28 (target height ~0.19-0.25 tile-units).
+;   - Rock_Moss_3 raw measured AABB: footprint 0.738x0.803, height 0.557 (measured fresh
+;     for this pass — Den.tscn uses its own separate scale, not reused here). Scaled to
+;     0.40 (target height ~0.22).
+; All 3 pieces land well under the OLD single-rock height (0.877) — FLAG FOR HUMAN
+; SIGN-OFF: the exact per-piece scale/spacing is a first-pass judgment call, not measured
+; against any GDD number (none exists for rock height).
+;
+; Slab matches the existing Rock terrain grey (Color(0.55, 0.55, 0.58, 1)), same geometry
+; as Rock1.tscn's slab, for tonal consistency across all rock-cluster variants.
+;
+; SLAB WIDENED 0.94 -> 1.0 (2026-08-16, human-reported cross-tile seam gap): matches
+; `WorldGrid.TILE_SIZE` exactly so adjacent tile slabs' edges touch with no sky-blue gap —
+; same fix, same exact-1.0-match approach as CommonTree1.tscn; see that scene's header for
+; the full explanation. X/Z only, Y (0.2) untouched.
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="PackedScene" uid="uid://blkwv726k6y3a" path="res://assets/terrain/rock_1/Rock_1.fbx" id="1_rock1"]
+[ext_resource type="PackedScene" uid="uid://b5pqr3l1dqg36" path="res://assets/props/den/Rock_Moss_3.fbx" id="2_mossrock"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_slab"]
+size = Vector3(1.0, 0.2, 1.0)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_slab"]
+albedo_color = Color(0.55, 0.55, 0.58, 1)
+
+[node name="RockCluster1" type="Node3D"]
+
+[node name="Slab" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+mesh = SubResource("BoxMesh_slab")
+material_override = SubResource("StandardMaterial3D_slab")
+
+[node name="Rock_A" parent="." instance=ExtResource("1_rock1")]
+transform = Transform3D(0.263114, 0, -0.095766, 0, 0.28, 0, 0.095766, 0, 0.263114, -0.22, 0, -0.15)
+
+[node name="Rock_B" parent="." instance=ExtResource("1_rock1")]
+transform = Transform3D(-0.038203, 0, -0.216658, 0, 0.22, 0, 0.216658, 0, -0.038203, 0.18, 0, -0.05)
+
+[node name="Rock_C_Moss" parent="." instance=ExtResource("2_mossrock")]
+transform = Transform3D(-0.375877, 0, 0.136808, 0, 0.4, 0, -0.136808, 0, -0.375877, 0.02, 0, 0.22)

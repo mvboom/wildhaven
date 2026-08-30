@@ -1,0 +1,59 @@
+; Fox — AnimalDefinition data entry (gdd.md -> Data Schemas / Content Architecture).
+; Roster row: gdd.md:329 | Asset: Quaternius "Ultimate Animated Animal Pack", CC0 1.0.
+;
+; fact_text is content-writer option B2 — a post-verification rewrite of the original
+; option B, which shipped briefly and then FAILED source verification: ADW states the
+; male does not enter the maternity den, contradicting B's "shares one cozy den", and
+; all sources place fox activity at night/twilight, contradicting "most of the day".
+;
+; All four checklist steps now SATISFIED. Per-clause sourcing:
+;   "both help raise"                -> ADW Vulpes vulpes; Nat Geo Kids Red Fox
+;   "stay with their family for months" -> ADW (young remain at least until autumn)
+;   "about four weeks old ... out of the den" -> ADW (young leave den at 4-5 weeks)
+; https://animaldiversity.org/accounts/Vulpes_vulpes/
+; https://kids.nationalgeographic.com/animals/mammals/facts/red-fox
+;
+; Register: US English roster-wide — "kits", never "cubs" (UK usage). Human decision.
+;
+; CAPACITY FIELDS, set 2026-07-28 by human ruling D-27 (#1, #2):
+;   capacity_radius = 0    -> the SENTINEL `CAPACITY_RADIUS_FOLLOWS_SCOUT`, NOT a radius of
+;                             zero. It means "equal to scout_radius" (12 here), which is
+;                             spec.md's stated v1 default expressed as the relation rather
+;                             than as a copied number, so a scout_radius retune (#20 is
+;                             open) cannot silently break the equality. Any value 8-12
+;                             would be a deliberate divergence.
+;   tiles_per_individual = 5  -> roster.md's DECIDED value, replacing the uniform 12 that
+;                             was only `DEFAULT_TILES_PER_INDIVIDUAL` showing through.
+;   max_individuals = 6    -> roster.md's stated "~6" baseline, uniform across the roster
+;                             (still #23, still the human's).
+;
+; NEWS_REPORTS, added 2026-08-09 (Tier 1 row 12, closing the schema gap tier1-status.md named).
+; Nine lines from docs/content/fox-news-report-pool.md's Discovery/hint and Ambient/flavor
+; sub-pools, checklist-passed 2026-07-20 (pilot 3). ONE LINE FROM THAT FILE IS DELIBERATELY
+; NOT HERE: "The fox kits were out tumbling in the leaves all morning" is flagged there as
+; SUSPECT — verification found fox activity nocturnal/crepuscular across every source, and
+; "all morning" repeats the exact daytime-activity error the shipped fact_text above was
+; rewritten to correct. Move-in, Avoidance-relocation and Symmetric-avoids lines from the same
+; file are not included either — Move-in already has its own channel (the fact card), and the
+; other two describe a different trigger (row 9/10's Avoids flow) this row's cadence never
+; fires.
+[gd_resource type="Resource" script_class="AnimalDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/animal_definition.gd" id="1_schema"]
+[ext_resource type="PackedScene" path="res://assets/animals/fox/Fox.tscn" id="2_model"]
+
+[resource]
+script = ExtResource("1_schema")
+id = "fox"
+display_name = "Fox"
+habitat_needs = Array[String](["forest", "cover"])
+personality = "Shy"
+avoids = Array[String](["rabbit"])
+farm_tolerant = false
+scout_radius = 12
+capacity_radius = 0
+tiles_per_individual = 5
+max_individuals = 6
+model_scenes = Array[PackedScene]([ExtResource("2_model")])
+fact_text_pool = Array[String](["Fox parents both help raise their kits, and the young foxes stay with their family for months. At about four weeks old, the kits start peeking out of the den for the first time."])
+news_reports = Array[String](["Word has it a fox is looking for a new home — somewhere with plenty of trees and quiet places to tuck into…", "A fox has been seen at the edge of the woods, looking around like someone reading a map. It seems to want thick cover and tall trees.", "Rumor from the treetops: a fox family would like a shady stretch of forest with lots of leafy corners to curl up in…", "Someone heard a funny chattering sound coming from the trees last night.", "A fox was spotted curled up in a sunbeam with its tail draped over its nose like a blanket.", "Both fox parents have been busy around the den today.", "A fox stood very still at dawn with its ears turned forward, listening to the whole forest at once.", "The fox has been napping in the ferns where the light comes through green.", "Whoever saw the fox today says its coat has a color all its own."])

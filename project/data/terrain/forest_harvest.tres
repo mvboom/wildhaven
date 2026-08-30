@@ -1,0 +1,35 @@
+; Forest harvest — HarvestableTileDefinition data entry (spec.md -> Data Schemas;
+; terrain.md -> Harvestable terrain). Referenced by data/terrain/forest.tres.
+;
+; Forest is v1's SOLE harvestable and the whole of v1's economy supply side. Three of the
+; four values below are DECIDED design, not tuning:
+;   resource_type = "wood"  -> v1 has one resource (spec.md; the field stays multi-valued
+;                              for the deferred multi-resource system, future.md)
+;   land_use = "wild"       -> Forest is wild land; the cultivated field is the other kind
+;                              and produces nothing in v1
+;   removes_habitat_when_harvested = false
+;                           -> terrain.md: "zero-downside by design". This one is a PILLAR
+;                              OBLIGATION, not a preference: gdd.md's free-Forest recovery
+;                              guarantee (Tier 1 row 5) is what stops a player ever being
+;                              stranded at zero Wood, and it only holds if tending Forest
+;                              costs the player nothing. Flipping this to true breaks the
+;                              no-dead-ends floor.
+;
+; The passive RATE (~1 Wood / forest tile / 60 s, Open Question #8) is deliberately NOT
+; here — it belongs to the row-5 economy evaluator, not to a per-tile definition.
+;
+; NO model_scene — removed 2026-07-27 by human decision (-> D-26). This resource is a
+; YIELD RULE, not a thing on the ground; the model lives on forest.tres. Growing the set
+; of harvestables is the reason the split exists AND the reason the model cannot live
+; here: a rule shared by two terrains would need two models.
+[gd_resource type="Resource" script_class="HarvestableTileDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/harvestable_tile_definition.gd" id="1_schema"]
+
+[resource]
+script = ExtResource("1_schema")
+id = "forest_harvest"
+display_name = "Forest"
+resource_type = "wood"
+land_use = "wild"
+removes_habitat_when_harvested = false

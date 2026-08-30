@@ -1,0 +1,84 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/menu/leave_overlay.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/ui/tile_icon.gd" id="2"]
+
+[sub_resource type="StyleBoxFlat" id="ButtonCream"]
+content_margin_left = 14.0
+content_margin_top = 14.0
+content_margin_right = 14.0
+content_margin_bottom = 14.0
+bg_color = Color(1, 0.973, 0.906, 1)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 8
+border_color = Color(0.42, 0.29, 0.169, 1)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+
+[node name="LeaveOverlay" type="CanvasLayer"]
+script = ExtResource("1")
+
+; THE ROOT CONTROL. Full-rect, MOUSE_FILTER_IGNORE — it exists only to anchor `LeaveArea`, and
+; must never itself block a world tap (the negative control in test_mode_tap_model.gd sets this
+; to MOUSE_FILTER_STOP and asserts the widened scan reports it).
+[node name="Root" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+; Bottom-right corner (terraform-bar rework vacated this spot when the HUD's Home button was
+; retired and Rotate moved into the merged palette row) — a plain square icon button now,
+; matching the rest of the bottom chrome instead of the old wide text pill.
+[node name="LeaveArea" type="Control" parent="Root"]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -96.0
+offset_top = -96.0
+offset_right = -24.0
+offset_bottom = -24.0
+grow_horizontal = 0
+grow_vertical = 0
+mouse_filter = 2
+
+[node name="LeaveButton" type="Button" parent="Root/LeaveArea"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(72, 72)
+tooltip_text = "Exit"
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+focus_mode = 0
+theme_override_styles/normal = SubResource("ButtonCream")
+
+[node name="Icon" type="Control" parent="Root/LeaveArea/LeaveButton"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("2")
+kind = 8
+
+[node name="ConfirmDialog" type="ConfirmationDialog" parent="."]
+unique_name_in_owner = true
+title = "Leave?"
+dialog_text = "Go back to the main menu?"
+ok_button_text = "Yes"
+cancel_button_text = "Stay"

@@ -1,0 +1,45 @@
+; Rock — GREY-BOX PLACEHOLDER. Authored in-repo from Godot primitives; no third-party
+; source, nothing to attribute (see assets/placeholder/README.md).
+;
+; Rock is the v1 `cover` source (terrain.md — "rock, not forest, is the `cover` source"),
+; so this tile is load-bearing for both Fox and Rabbit habitat and needs to be readable at
+; a glance next to Forest, not just distinct in a colour picker. It gets a boulder box on
+; top for the same reason Forest gets a tree.
+;
+; Boulder proportions are sized against the Forest tree for consistency: wider and much
+; lower than the trunk+canopy stack, so the two decorated terrains never read as the same
+; silhouette from the fixed ~45 degree camera. The numbers themselves are PLACEHOLDERS —
+; the imported Rock_1 asset already fits a 1x1 tile with no rescale
+; (content-pipeline-status.md), and replacing this grey-box is a one-field edit.
+;
+; Slab dimensions track grid_manager.gd (0.94 across, TILE_HEIGHT 0.2 thick). Origin is
+; the tile's TOP surface.
+;
+; COLOURS ARE PLACEHOLDERS and a taste call reserved for the human: slab
+; Color(0.55, 0.55, 0.58), boulder Color(0.45, 0.45, 0.48) — a slightly darker value of
+; the same grey so the boulder separates from its ground without a hue change.
+[gd_scene load_steps=5 format=3]
+
+[sub_resource type="BoxMesh" id="BoxMesh_slab"]
+size = Vector3(0.94, 0.2, 0.94)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_slab"]
+albedo_color = Color(0.55, 0.55, 0.58, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_boulder"]
+size = Vector3(0.5, 0.3, 0.44)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_boulder"]
+albedo_color = Color(0.45, 0.45, 0.48, 1)
+
+[node name="Rock" type="Node3D"]
+
+[node name="Slab" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+mesh = SubResource("BoxMesh_slab")
+material_override = SubResource("StandardMaterial3D_slab")
+
+[node name="Boulder" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.15, 0)
+mesh = SubResource("BoxMesh_boulder")
+material_override = SubResource("StandardMaterial3D_boulder")

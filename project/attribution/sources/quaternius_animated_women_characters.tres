@@ -1,0 +1,42 @@
+[gd_resource type="Resource" script_class="AttributionEntry" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://attribution/attribution_entry.gd" id="1_entry"]
+
+[resource]
+script = ExtResource("1_entry")
+id = "quaternius_animated_women_characters"
+creator = "Quaternius"
+source_name = "Animated Women Characters"
+source_version = "February 2019"
+creator_url = "https://quaternius.com"
+source_url = "https://quaternius.com"
+support_url = "https://www.patreon.com/quaternius"
+license_name = "CC0 1.0 Universal (CC0 1.0) Public Domain Dedication"
+license_url = "https://creativecommons.org/publicdomain/zero/1.0/"
+license_file = "res://assets/licenses/Quaternius_AnimatedWomenCharacters_License.txt"
+attribution_required = false
+required_notice = ""
+conditions = ""
+assets_used = PackedStringArray("Female_Alternative", "Female_Casual", "Female_Dress", "Female_TankTop", "Smooth_Female_Alternative", "Smooth_Female_Casual", "Smooth_Female_Dress", "Smooth_Female_TankTop")
+per_file_licensing = false
+notes = "CC0 — crediting is courtesy, not compliance. Separate entry from
+quaternius_animated_men_characters.tres because it is a separate pack download with its
+own License.txt on disk, even though the two texts are identical and the two packs share
+one rig; merging them would make the entry stop matching what a reviewer finds in
+source-content/assets/.
+
+license_file is this pack's OWN License.txt, copied verbatim from
+source-content/assets/Animated Women Characters - Feb 2019.../License.txt, not the shared
+generic Quaternius CC0 boilerplate.
+
+All 8 models ship the same HumanArmature rig (42 bones) and the same 11 clips
+(HumanArmature|Female_Clapping/Death/Idle/Jump/Punch/Run/RunningJump/Sitting/Standing/
+SwordSlash/Walk) — measured on import, not assumed. The four Smooth_* models are
+subdivided twins of the four base models: identical silhouette and identical material
+set, roughly 3.5-4x the triangles. Both sets were imported on purpose so the base-vs-
+smooth comparison can be made in-engine; whichever set loses gets pulled later.
+
+DISTINCT FROM the AnimatedWoman model recorded in
+quaternius_poly_pizza_characters.tres — that one is a different, later Quaternius release
+on the CharacterArmature rig (24 clips) and is NOT from this pack. Nothing was moved
+between those entries; only Man was (see the men's entry for that correction)."

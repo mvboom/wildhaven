@@ -1,0 +1,92 @@
+; PineTree — 3rd Forest tree pick, added 2026-08-16 (Terrain look-pass follow-up). Human
+; complaint: "It does not seem like forest cycles between multiple assets." The code was
+; already alternating correctly (pick_variant()'s hash is even, forest.tres already wired
+; both CommonTree1 and CommonTree2) — the real problem was that both existing "common
+; tree" picks came from the same MegaKit set at the same ~2.5-tile canopy height and read
+; as visually indistinguishable at the fixed ~45 camera pitch. This is a GENUINELY
+; DIFFERENT silhouette (a narrow, tapered conifer, not another round-canopy "common tree"),
+; not a third common-tree variant.
+;
+; Source: "Pine Tree" by Quaternius, CC0 1.0 Universal — poly.pizza (fresh individual
+; download, 2026-08-16; no local MegaKit Pine/Twisted or Nature Pack Birch/Willow/Palm
+; file was present on disk to hand-carry, matching the same "no local vendor/pack
+; directory" situation the rest of this pass's poly.pizza sourcing already documents). CC0
+; + Quaternius creator confirmed on the model page (poly.pizza/m/gX8WmgkeEm) before
+; download, per asset-import-pipeline.md's audit gate. Recorded in
+; project/attribution/sources/quaternius_poly_pizza_nature.tres.
+;
+; SCALE: the source file bakes a 90-degree axis correction + scale=100 into its own child
+; node (Blender Z-up -> glTF Y-up), measured post-correction global AABB height = 3.565
+; units (footprint ~1.26 x 1.37 at that height) — scaled here by 0.701 to hit the SAME
+; ~2.5-tile canopy-height target CommonTree1/CommonTree2 use, so height stays a control
+; variable and the silhouette/shape is the only thing that changes between variants. FIRST-
+; PASS PROPOSAL, not a measured GDD number (none exists for tree height) — FLAG FOR HUMAN
+; SIGN-OFF, including whether a pine reading TALLER/NARROWER than the common trees (rather
+; than matched-height) would sell the "different tree" read even harder — that's a real
+; alternative, left to the human's eyeball call rather than assumed here.
+;
+; SLAB IS 1.0x0.2x1.0 FROM THE START (not 0.94): this scene is new as of the SAME pass that
+; widened every other terrain slab to close the cross-tile seam gap (see CommonTree1.tscn's
+; header, "SLAB WIDENED 0.94 -> 1.0") — built at the corrected size directly rather than
+; needing a follow-up fix.
+;
+; FLOOR TREATMENT MATCHES COMMONTREE1/COMMONTREE2 EXACTLY (same slab tint, same 3-patch
+; moss/litter blotch treatment, same relative transforms) so a Forest tile's floor reads
+; identically regardless of which of the 3 trees it lands on — same reasoning as
+; CommonTree2's parity pass.
+;
+; EVERYTHING NESTED UNDER ONE NODE NAMED "Slab" (required, not cosmetic): identical
+; OcclusionFader exemption requirement as CommonTree1.tscn/CommonTree2.tscn — see either
+; scene's header for the full mechanism. The ground plane (renamed "Ground") and all 3
+; floor patches are children of a wrapper Node3D literally named "Slab".
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="PackedScene" uid="uid://dew3idgu0k53f" path="res://assets/terrain/pine_tree/PineTree.glb" id="1_model"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_slab"]
+size = Vector3(1.0, 0.2, 1.0)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_slab"]
+albedo_color = Color(0.16, 0.4, 0.22, 1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_patch1"]
+size = Vector2(0.42, 0.36)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_patch_moss"]
+albedo_color = Color(0.11, 0.32, 0.16, 1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_patch2"]
+size = Vector2(0.3, 0.34)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_patch_litter"]
+albedo_color = Color(0.3, 0.22, 0.13, 1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_patch3"]
+size = Vector2(0.26, 0.3)
+
+[node name="PineTree" type="Node3D"]
+
+[node name="Slab" type="Node3D" parent="."]
+
+[node name="Ground" type="MeshInstance3D" parent="Slab"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+mesh = SubResource("BoxMesh_slab")
+material_override = SubResource("StandardMaterial3D_slab")
+
+[node name="FloorPatch_1_Moss" type="MeshInstance3D" parent="Slab"]
+transform = Transform3D(0.965926, 0, -0.258819, 0, 1, 0, 0.258819, 0, 0.965926, -0.18, 0.001, -0.12)
+mesh = SubResource("PlaneMesh_patch1")
+material_override = SubResource("StandardMaterial3D_patch_moss")
+
+[node name="FloorPatch_2_Litter" type="MeshInstance3D" parent="Slab"]
+transform = Transform3D(0.642788, 0, -0.766044, 0, 1, 0, 0.766044, 0, 0.642788, 0.2, 0.001, 0.15)
+mesh = SubResource("PlaneMesh_patch2")
+material_override = SubResource("StandardMaterial3D_patch_litter")
+
+[node name="FloorPatch_3_Moss" type="MeshInstance3D" parent="Slab"]
+transform = Transform3D(-0.173648, 0, -0.984808, 0, 1, 0, 0.984808, 0, -0.173648, 0.05, 0.001, -0.28)
+mesh = SubResource("PlaneMesh_patch3")
+material_override = SubResource("StandardMaterial3D_patch_moss")
+
+[node name="Model" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.701, 0, 0, 0, 0.701, 0, 0, 0, 0.701, 0, 0, 0)

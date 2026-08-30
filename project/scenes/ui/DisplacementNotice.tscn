@@ -1,0 +1,156 @@
+[gd_scene load_steps=4 format=3]
+
+; Gentle Displacement's two surfaces, Tier 1 row 10. See scripts/ui/displacement_notice.gd.
+;
+; THE WARNING is a centred panel: a lead sentence, one line per affected family, 🔊 and a
+; dismiss. NO SCRIM — gdd.md's design guarantee for the opening minutes is "no modal blocks the
+; world", so the world stays live, tappable and undoable behind it.
+;
+; %Lines lives inside %LinesScroll (not directly in %Stack) so a settlement affecting many
+; families scrolls internally instead of growing the whole panel past the viewport — the
+; panel is centred and grows symmetrically, so an unclamped Lines list pushed the dismiss
+; button in %ButtonRow off both the top AND bottom of the screen. displacement_notice.gd's
+; `_clamp_lines_height()` sizes %LinesScroll at `show_warning()` time.
+;
+; THE BANNER is top-centre, cream, one line, auto-dismissing: the toast register spec.md gives
+; News Reports, used for the after-the-fact consequence lines and NOT for the warning, which is
+; how "consent copy must never sound like flavor" is made visible rather than merely intended.
+;
+; The stylebox colours below mirror `UiPalette` so this scene reads correctly in the editor; the
+; script re-applies them from `UiPalette` at runtime, which is the single authority.
+
+[ext_resource type="Script" path="res://scripts/ui/displacement_notice.gd" id="1"]
+
+[sub_resource type="StyleBoxFlat" id="NoticePanel"]
+content_margin_left = 32.0
+content_margin_top = 32.0
+content_margin_right = 32.0
+content_margin_bottom = 32.0
+bg_color = Color(0.851, 0.784, 0.541, 1)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 8
+border_color = Color(0.42, 0.29, 0.169, 1)
+corner_radius_top_left = 28
+corner_radius_top_right = 28
+corner_radius_bottom_right = 28
+corner_radius_bottom_left = 28
+
+[sub_resource type="StyleBoxFlat" id="BannerPanel"]
+content_margin_left = 18.0
+content_margin_top = 18.0
+content_margin_right = 18.0
+content_margin_bottom = 18.0
+bg_color = Color(1, 0.973, 0.906, 1)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 8
+border_color = Color(0.42, 0.29, 0.169, 1)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+
+[node name="DisplacementNotice" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1")
+
+[node name="Warning" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(760, 0)
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 4
+theme_override_styles/panel = SubResource("NoticePanel")
+
+[node name="Stack" type="VBoxContainer" parent="Warning"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 18
+
+[node name="Lead" type="Label" parent="Warning/Stack"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 32
+text = "This will be a different kind of place."
+autowrap_mode = 3
+
+[node name="Rule" type="HSeparator" parent="Warning/Stack"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="LinesScroll" type="ScrollContainer" parent="Warning/Stack"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+horizontal_scroll_mode = 0
+
+[node name="Lines" type="VBoxContainer" parent="Warning/Stack/LinesScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_constants/separation = 12
+
+[node name="ButtonRow" type="HBoxContainer" parent="Warning/Stack"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+alignment = 2
+theme_override_constants/separation = 16
+
+[node name="ReadAloudButton" type="Button" parent="Warning/Stack/ButtonRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(88, 72)
+layout_mode = 2
+focus_mode = 0
+theme_override_font_sizes/font_size = 32
+text = "🔊"
+
+[node name="CloseButton" type="Button" parent="Warning/Stack/ButtonRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(88, 72)
+layout_mode = 2
+focus_mode = 0
+theme_override_font_sizes/font_size = 32
+text = "×"
+
+[node name="Banner" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(520, 0)
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_top = 28.0
+offset_bottom = 28.0
+grow_horizontal = 2
+size_flags_horizontal = 4
+theme_override_styles/panel = SubResource("BannerPanel")
+
+[node name="BannerLabel" type="Label" parent="Banner"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 26
+text = "The fox family moved their den to a new spot in the woods."
+autowrap_mode = 3
+horizontal_alignment = 1

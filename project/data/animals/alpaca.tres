@@ -1,0 +1,51 @@
+; Alpaca — AnimalDefinition data entry (gdd.md -> Data Schemas / Content Architecture).
+; Roster row: roster.md -> Already-Defined Roster | Ruled: decisions.md -> D-43.
+; Asset: Quaternius "Ultimate Animated Animal Pack", CC0 1.0 Universal — see
+;   project/attribution/sources/quaternius_ultimate_animated_animals.tres.
+;
+; SPECIES: alpaca (Lama pacos).
+;
+; CAPACITY FIELDS (D-43, tiles_per_individual REVISED by D-45): capacity_radius = 0 ->
+; SENTINEL `CAPACITY_RADIUS_FOLLOWS_SCOUT`, meaning "equal to scout_radius" (8), not a
+; radius of zero. tiles_per_individual = 5 (D-45; D-43 originally shipped 3 — see D-45 in
+; decisions.md for why: at 3, on the two most generic/shared tags in the game
+; (open_grass + cultivated), Alpaca out-competed every other farm-tag species for the same
+; land under the exclusivity rule's whole-radius-disc ownership, crowding out Horse/Donkey/
+; Cow/Bull and triggering their Gentle Displacement. 5 matches Horse/Cow — no longer an
+; outlier bargain against its own cluster. max_individuals = 6. Farm-tolerant.
+; art.md's single-tag axis (open_grass) would have violated roster.md's own "≥ 2 tags" mix
+; rule, so `cultivated` was added — alpacas are commonly kept alongside crops/pasture.
+;
+; fact_text is docs/content/cleared-pool-fact-cards.md § Alpaca's proposed line, transcribed
+; verbatim — all four checklist steps PASS there.
+;   "Baby alpacas are called crias" -> ADW Lama pacos, "Reproduction": "Crias is the term
+;   used to designate alpaca offspring up to 6 months of age."
+;   "grown alpacas hum to each other — especially when something around them changes" ->
+;   ADW, "Communication and Perception": "The most common is the humming vocalization,
+;   which is produced under a variety of circumstances, such as distress or a change in
+;   the environment." ("distress" deliberately trimmed from the card — see the source
+;   file's retrieval trace.)
+; https://animaldiversity.org/accounts/Lama_pacos/
+;
+; news_reports intentionally empty — News Report pools for this pool are a separate, later
+; purchase (not part of Content Pipeline step 4/5 for this dispatch).
+[gd_resource type="Resource" script_class="AnimalDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/animal_definition.gd" id="1_schema"]
+[ext_resource type="PackedScene" path="res://assets/animals/alpaca/Alpaca.tscn" id="2_model"]
+
+[resource]
+script = ExtResource("1_schema")
+id = "alpaca"
+display_name = "Alpaca"
+habitat_needs = Array[String](["open_grass", "cultivated"])
+personality = "Bold"
+avoids = Array[String]([])
+farm_tolerant = true
+scout_radius = 8
+capacity_radius = 0
+tiles_per_individual = 5
+max_individuals = 6
+model_scenes = Array[PackedScene]([ExtResource("2_model")])
+fact_text_pool = Array[String](["Baby alpacas are called crias, and grown alpacas hum to each other — especially when something around them changes."])
+news_reports = Array[String]([])

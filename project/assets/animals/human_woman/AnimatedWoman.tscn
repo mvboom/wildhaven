@@ -1,0 +1,22 @@
+; AnimatedWoman — one of 5 Human look variants (see art.md; Adventurer is the
+; recommended default).
+; Source: Quaternius character (standalone glb, poly.pizza-style filename); CC0 1.0
+; Universal per art.md's locked policy — see
+; project/attribution/sources/quaternius_poly_pizza_characters.tres.
+;
+; Scale is a MEASURED first-pass fit to person-scale (tile height = 1.0 unit, gdd.md ->
+; Level & world design): scale = 1 / combined mesh AABB height at rest pose
+; (1.852041 units -> 0.540). Bbox min y ~0 — no grounding anomaly.
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" uid="uid://c2rashmlaosqi" path="res://assets/animals/human_woman/AnimatedWoman.glb" id="1_model"]
+
+[node name="AnimatedWoman" type="Node3D"]
+
+[node name="Model" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.540, 0, 0, 0, 0.540, 0, 0, 0, 0.540, 0, 0, 0)
+
+[node name="AnimationPlayer" parent="Model" index="1"]
+autoplay = "CharacterArmature|Idle"
+
+[editable path="Model"]

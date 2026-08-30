@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wildhaven — build a home for everyone</title>
+<meta name="description" content="Wildhaven — a gentle world-building game. Build a home for everyone.">
+
+<!--
+  Landing page for Wildhaven.
+
+  Palette, button shapes and type treatment are lifted from the in-game title screen
+  (project/scenes/TitleScreen.tscn) so the page reads as the same front door:
+    sky gradient  #8FD3EF -> #CEEFE3 (70%) -> #F6EFC9
+    ink (brown)   #6B4A2B      muted ink   #8A6A48
+    primary CTA   #FF9F4A on #E07E2A border, hover #FFB266
+    secondary     #FFFDF4 on #E6D3A6 border
+  Chunky 32px pill radius with a heavier bottom border, soft drop shadow.
+
+  Layout mirrors the title screen: text column on the left, and the video fills the
+  right-hand slot the title-screen mockup reserved for the world diorama.
+
+  DEPLOY NOTES
+  - "Play Now" points at ./game/index.html. Copy the exported web build there:
+        cp -r builds/web-singlethread/. web/game/
+    (builds/ is gitignored on purpose, so it is not committed alongside this page.)
+  - The gameplay video is expected at ./gameplay.mp4, next to this file. Until that
+    file exists the player below renders empty.
+-->
+
+<style>
+  :root {
+    --sky-top:    #8FD3EF;
+    --sky-mid:    #CEEFE3;
+    --sky-bottom: #F6EFC9;
+
+    --ink:        #6B4A2B;
+    --ink-muted:  #8A6A48;
+
+    --cta:        #FF9F4A;
+    --cta-hover:  #FFB266;
+    --cta-border: #E07E2A;
+
+    --panel:        #FFFDF4;
+    --panel-border: #E6D3A6;
+
+    --radius: 32px;
+    --shadow: 0 3px 4px rgba(0, 0, 0, 0.133);
+  }
+
+  * { box-sizing: border-box; }
+
+  html { height: 100%; }
+
+  body {
+    min-height: 100%;
+    margin: 0;
+    font-family: "Nunito", "Quicksand", "Trebuchet MS", "Segoe UI", system-ui, -apple-system, sans-serif;
+    color: var(--ink);
+    background: linear-gradient(to bottom, var(--sky-top) 0%, var(--sky-mid) 70%, var(--sky-bottom) 100%);
+    background-attachment: fixed;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* The game's own focus affordance: a fat white ring, not the browser default. */
+  a:focus-visible,
+  video:focus-visible {
+    outline: 6px solid rgba(255, 255, 255, 0.9);
+    outline-offset: 4px;
+    border-radius: var(--radius);
+  }
+
+  .hero {
+    min-height: 100vh;
+    min-height: 100svh;
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    align-items: center;
+    gap: clamp(2rem, 5vw, 4.5rem);
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: clamp(2rem, 5vw, 3.5rem);
+  }
+
+  /* ---- Left column: title, tagline, call to action ---- */
+
+  .stack {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1.125rem;
+  }
+
+  .title {
+    margin: 0;
+    font-size: clamp(3rem, 9vw, 6rem);
+    line-height: 1.02;
+    letter-spacing: -0.01em;
+    color: #fff;
+    /* Matches the title screen's 14px brown outline. paint-order keeps the stroke
+       behind the fill so the letterforms do not thin out; the text-shadow ring is
+       the fallback for engines without it. */
+    -webkit-text-stroke: 0.11em var(--ink);
+    paint-order: stroke fill;
+    text-shadow:
+       0.03em  0.03em 0 var(--ink),
+      -0.03em  0.03em 0 var(--ink),
+       0.03em -0.03em 0 var(--ink),
+      -0.03em -0.03em 0 var(--ink),
+       0      0.06em 0.06em rgba(107, 74, 43, 0.35);
+  }
+
+  .tagline {
+    margin: 0;
+    font-size: clamp(1.125rem, 2.2vw, 1.5rem);
+    line-height: 1.45;
+    max-width: 22ch;
+  }
+
+  .cta-gap { height: 0.75rem; }
+
+  .cta {
+    display: inline-block;
+    padding: 1rem 2.5rem;
+    min-width: 20rem;
+    text-align: center;
+    font-size: clamp(1.25rem, 2vw, 1.625rem);
+    font-weight: 700;
+    text-decoration: none;
+    color: #fff;
+    background: var(--cta);
+    border: 4px solid var(--cta-border);
+    border-bottom-width: 6px;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    transition: background-color 120ms ease, transform 120ms ease;
+  }
+
+  .cta:hover { background: var(--cta-hover); }
+
+  .cta:active {
+    transform: translateY(2px);
+    border-bottom-width: 4px;
+    margin-bottom: 2px;
+  }
+
+  /* ---- Right column: gameplay video ---- */
+
+  .video-frame {
+    background: var(--panel);
+    border: 4px solid var(--panel-border);
+    border-bottom-width: 6px;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 0.75rem;
+    overflow: hidden;
+  }
+
+  .video-frame video {
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    border-radius: calc(var(--radius) - 0.75rem);
+    background: var(--ink);
+    object-fit: cover;
+  }
+
+  .video-caption {
+    margin: 0.75rem 0.25rem 0.125rem;
+    font-size: 0.9375rem;
+    color: var(--ink-muted);
+    text-align: center;
+  }
+
+  /* ---- Footer ---- */
+
+  .footer {
+    padding: 0 clamp(2rem, 5vw, 3.5rem) 1.5rem;
+    font-size: 1rem;
+    color: var(--ink-muted);
+    text-align: center;
+  }
+
+  @media (max-width: 900px) {
+    .hero {
+      grid-template-columns: minmax(0, 1fr);
+      justify-items: center;
+      text-align: center;
+      padding-top: clamp(2.5rem, 8vw, 4rem);
+    }
+    .stack { align-items: center; }
+    .tagline { max-width: 30ch; }
+    .cta { min-width: min(20rem, 100%); }
+    .video-frame { width: 100%; }
+  }
+
+  @media (max-width: 420px) {
+    .cta { padding-left: 1.5rem; padding-right: 1.5rem; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cta { transition: none; }
+    .cta:active { transform: none; }
+  }
+</style>
+</head>
+<body>
+
+<main class="hero">
+  <div class="stack">
+    <h1 class="title">Wildhaven</h1>
+    <p class="tagline">build a home for everyone</p>
+    <div class="cta-gap"></div>
+    <!-- Copy the exported web build to web/game/ before this link resolves. -->
+    <a class="cta" href="./game/index.html">Play Now</a>
+  </div>
+
+  <div class="video-frame">
+    <!-- Drop the trailer at web/gameplay.mp4, next to this file. Add a poster
+         image with poster="gameplay-poster.png" once one exists. -->
+    <video controls preload="metadata" playsinline src="gameplay.mp4">
+      Your browser can&rsquo;t play this video.
+      <a href="gameplay.mp4">Download the gameplay video</a> instead.
+    </video>
+    <p class="video-caption">Gameplay video &mdash; coming soon</p>
+  </div>
+</main>
+
+<footer class="footer">
+  <p>Wildhaven &mdash; a gentle world-building game.</p>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,31 @@
+; House look variant — TowerHouse (FirstAge) (content-variety pass Task 2, 2026-08-26).
+; One of 9 new House look variants added alongside the original HousesFirstAge1Level1
+; (house.tres index 0, unchanged) — see house.tres's header for the consolidated batch
+; note and the human sign-off flag.
+;
+; Source: Quaternius, "Ultimate Fantasy RTS" pack (glTF), TowerHouse_FirstAge.gltf — CC0
+; 1.0 Universal, same pack as the existing House entry. See
+; project/attribution/sources/quaternius_ultimate_fantasy_rts.tres.
+;
+; SCALE: raw AABB measured via manual local-transform composition (NOT global_transform —
+; see project/data/terrain/cultivated_field.tres's header for why that silently returns
+; identity on a freshly-instantiated, not-yet-tree-attached node): footprint 1.3857 x
+; 1.1700 tile-units (x, z), height 1.4722 — a taller, narrower tower form than the
+; cottage variants; height is free (only footprint is scale-constrained per the import
+; procedure). Long axis (x) exceeds the 1x1 tile, so uniformly scaled by 0.627354 to
+; bring it down to 0.8693, matching HousesFirstAge1Level1's own natural (unscaled)
+; max-axis footprint, the same "small margin, not edge-to-edge" fit. Scaled result:
+; 0.8693 x 0.9236 x 0.7340 (x, y, z) — the scaled height (0.9236) is taller than the
+; cottage variants, which is expected and intentional for a tower.
+;
+; FACING: left as authored (identity transform, no rotation) — unconfirmed by a human eye
+; pass, same posture as every other placement judgment call in this project. FLAG FOR
+; HUMAN SIGN-OFF.
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" uid="uid://c53misvxc0is2" path="res://assets/buildings/house_tower_firstage/TowerHouseFirstage.gltf" id="1_model"]
+
+[node name="HouseTowerFirstage" type="Node3D"]
+
+[node name="Model" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.627354, 0, 0, 0, 0.627354, 0, 0, 0, 0.627354, 0, 0, 0)

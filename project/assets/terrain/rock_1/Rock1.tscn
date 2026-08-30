@@ -1,0 +1,37 @@
+; Rock1 — the Rock terrain tile (emits `cover` + `rocks`; load-bearing for Fox/Rabbit
+; habitat, terrain.md). Source: Ultimate Nature Pack, Quaternius, CC0 1.0 Universal — see
+; project/attribution/sources/quaternius_ultimate_nature_pack.tres (same pack already used
+; for the Den prop's Rock_Moss_3/WoodLog_Moss/Bush_1, extended here with the plain Rock_1).
+;
+; No rescale: raw mesh height 0.87775 units / footprint 0.485x0.467 already sits well
+; within a 1x1 tile at natural size, similar to the House. Still a first-pass — not yet
+; eyeball-confirmed in-engine.
+;
+; SLAB REINSTATED (2026-08-03): TerrainView._refresh_tile_visual() instantiates
+; model_scene as a tile's ENTIRE visual — nothing else is drawn per tile — and this prop
+; alone doesn't cover the tile's footprint. Without a slab, the rest of the tile showed
+; scenes/Main.tscn's configured WorldEnvironment sky-blue background_color
+; (0.53, 0.72, 0.86) showing straight through the gap, which an in-engine human look
+; reported as "a lot of transparency, lots of blue showing." This was confirmed by that
+; look, not assumed. Slab geometry/position/color are copied verbatim
+; from the grey-box placeholder this scene replaced (assets/placeholder/rock/Rock.tscn) —
+; same taste call, not a new one. The look of the prop-on-slab combo still awaits full
+; human sign-off.
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="PackedScene" uid="uid://blkwv726k6y3a" path="res://assets/terrain/rock_1/Rock_1.fbx" id="1_model"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_slab"]
+size = Vector3(0.94, 0.2, 0.94)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_slab"]
+albedo_color = Color(0.55, 0.55, 0.58, 1)
+
+[node name="Rock1" type="Node3D"]
+
+[node name="Slab" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+mesh = SubResource("BoxMesh_slab")
+material_override = SubResource("StandardMaterial3D_slab")
+
+[node name="Model" parent="." instance=ExtResource("1_model")]

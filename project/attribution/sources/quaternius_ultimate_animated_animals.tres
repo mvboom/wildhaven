@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="AttributionEntry" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://attribution/attribution_entry.gd" id="1_entry"]
+
+[resource]
+script = ExtResource("1_entry")
+id = "quaternius_ultimate_animated_animals"
+creator = "Quaternius"
+source_name = "Ultimate Animated Animal Pack"
+source_version = "July 2021"
+creator_url = "https://quaternius.com"
+source_url = "https://quaternius.com/packs/ultimateanimatedanimals.html"
+support_url = "https://www.patreon.com/quaternius"
+license_name = "CC0 1.0 Universal (CC0 1.0) Public Domain Dedication"
+license_url = "https://creativecommons.org/publicdomain/zero/1.0/"
+license_file = "res://assets/licenses/Quaternius_UltimateAnimatedAnimals_License.txt"
+attribution_required = false
+required_notice = ""
+conditions = ""
+assets_used = PackedStringArray("Fox", "Deer", "Stag", "Horse", "Donkey", "Cow", "Bull", "Alpaca", "Husky", "ShibaInu")
+per_file_licensing = false
+notes = "CC0 — crediting is courtesy, not compliance. Verified twice: the pack ships a
+License.txt (preserved at license_file) reading \"License: CC0 1.0 Universal (CC0 1.0)
+Public Domain Dedication\", and the Quaternius FAQ states verbatim: \"No, attribution is
+not necessary. However, credit is always appreciated. These assets are licensed under
+CC0, allowing you to use them without giving credit, even for commercial purposes.\"
+The support_url is included because the pack's License.txt asks for it, not because
+anything requires it.
+
+2026-07-26: Deer, Stag, Horse, Donkey, Cow, Bull, Alpaca, Husky, and ShibaInu imported
+(9 species — see project/assets/animals/<name>/ for each, and
+game-design/content-pipeline-status.md for per-item pipeline state). Horse_White (a
+colour variant of Horse), Llama, and Wolf remain in the archive, not yet imported — as
+each is imported, append its name to assets_used — do NOT create a second entry for this
+pack."

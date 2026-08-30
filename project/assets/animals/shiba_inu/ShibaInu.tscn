@@ -1,0 +1,30 @@
+; ShibaInu — model scene for AnimalDefinition.model_scenes. Display name "Shiba Inu";
+; directory/id use the lowercase `shiba_inu` form per this task's naming instruction.
+; Source: Quaternius "Ultimate Animated Animal Pack" (July 2021), CC0 1.0 — same pack as
+; Fox; see project/attribution/sources/quaternius_ultimate_animated_animals.tres.
+;
+; Design role: art.md → Newly Available Animals proposes house, open_grass · Bold,
+; farm-tolerant · "village dog," pairs with Cat and Husky. Not locked design.
+;
+; Audit (2026-07-26): 12 animation clips confirmed — Idle, Idle_2, Idle_2_HeadLow,
+; Idle_HitReact1/2, Walk, Gallop, Gallop_Jump, Jump_ToIdle, Eating, Attack, Death.
+; Idle/Walk both present and non-degenerate (51 tracks each). Node structure matches Fox
+; (AnimalArmature -> Skeleton3D -> mesh; AnimationPlayer sibling index 1).
+;
+; Scale: 0.2, matching Fox's established factor for this pack (same rationale as
+; Deer.tscn). Raw AABB height 3.096 -> scaled height 0.619, slightly smaller than Husky
+; (0.638) as expected for the breed. FLAG FOR HUMAN REVIEW: not yet eyeball-confirmed in
+; engine.
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" uid="uid://dpt5gky5in8q2" path="res://assets/animals/shiba_inu/ShibaInu.gltf" id="1_model"]
+
+[node name="ShibaInu" type="Node3D"]
+
+[node name="Model" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.2, 0, 0, 0, 0.2, 0, 0, 0, 0.2, 0, 0, 0)
+
+[node name="AnimationPlayer" parent="Model" index="1"]
+autoplay = "Idle"
+
+[editable path="Model"]

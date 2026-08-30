@@ -1,0 +1,35 @@
+{
+  "species": "Stag",
+  "habitat_design": {
+    "habitat_needs": [
+      "forest",
+      "cover"
+    ],
+    "personality": "Shy",
+    "avoids": [],
+    "farm_tolerant": false,
+    "scout_radius": 11,
+    "tiles_per_individual": 6,
+    "max_individuals": 4,
+    "rationale": "Red deer stags rely on woodland cover for shelter and browsing, retreating into dense forest to avoid disturbance while ranging widely across territory."
+  },
+  "schema": {
+    "id": "stag",
+    "display_name": "Stag",
+    "tres_body": "[resource]\nscript = ExtResource(\"1_animal_def\")\nid = \"stag\"\ndisplay_name = \"Stag\"\nhabitat_needs = Array[String]([\"forest\", \"cover\"])\npersonality = \"Shy\"\navoids = Array[String]([])\nfarm_tolerant = false\nscout_radius = 11\ncapacity_radius = 0\ntiles_per_individual = 6\nmax_individuals = 4\nmodel_scene = \"res://assets/animals/stag/Stag.tscn\"\nfact_text = \"PLACEHOLDER\"\n"
+  },
+  "content": {
+    "fact_text": "A stag is a grown-up male red deer, and he grows a magnificent set of branching antlers that can stretch almost a metre wide! Each spring he grows a brand new pair, covered in soft, fuzzy 'velvet' skin while they grow.",
+    "checklist_log": {
+      "source": "wildlifetrusts.org (Red Deer wildlife explorer page) \u2014 confirms male red deer are called stags, describes their branched antlers up to one metre in breadth, and the soft velvet-covered regrowth process.",
+      "length": "pass - 2 sentences",
+      "tone": "pass - warm and admiring, no snark",
+      "predation": "pass - omitted rutting battles and territorial fighting details from the source; focused only on antler growth, no predation, death, or threat framing"
+    }
+  },
+  "tres_body": "[resource]\nscript = ExtResource(\"1_animal_def\")\nid = \"stag\"\ndisplay_name = \"Stag\"\nhabitat_needs = Array[String]([\"forest\", \"cover\"])\npersonality = \"Shy\"\navoids = Array[String]([])\nfarm_tolerant = false\nscout_radius = 11\ncapacity_radius = 0\ntiles_per_individual = 6\nmax_individuals = 4\nmodel_scene = \"res://assets/animals/stag/Stag.tscn\"\nfact_text = \"A stag is a grown-up male red deer, and he grows a magnificent set of branching antlers that can stretch almost a metre wide! Each spring he grows a brand new pair, covered in soft, fuzzy 'velvet' skin while they grow.\"\n",
+  "qa": {
+    "passed": true,
+    "problems": []
+  }
+}

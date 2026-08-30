@@ -1,0 +1,45 @@
+; Windmill — NEW farm-building placeable (content-variety pass Task 3, 2026-08-26), one of
+; 8 brand-new PlaceableDefinition entries. See project/data/buildings/windmill.tres for
+; the full data-entry header (proposed cost/footprint, human sign-off flag).
+;
+; Source: Quaternius, "Farm Buildings" pack (FBX), Windmill.fbx — CC0 1.0 Universal (this
+; pack also ships a taller "TowerWindmill.fbx"; the brief's table specifies Windmill.fbx,
+; used here — TowerWindmill is a separate, unevaluated candidate). License.txt confirmed
+; CC0 1.0 Universal / Public Domain Dedication before import, per
+; asset-import-pipeline.md's audit gate. Same NEW pack as Barn.tscn — see
+; project/attribution/sources/quaternius_farm_buildings.tres.
+;
+; TEXTURE AUDIT (mandatory — DeadTree/PineTree2 precedent; see Barn.tscn's header for the
+; full method): probed every surface on the raw, unmodified FBX (both the "Windmill" base
+; node and the "Windmill_Blades" rotor node). albedo_texture null on every surface, but
+; vertex_color_use_as_albedo reads true with MEANINGFUL, DISTINCT per-surface colors
+; (brown wood ~(0.5115, 0.3069, 0.2132), mid grey ~(0.6269, 0.6269, 0.6269)) — same
+; pack's named flat-color materials baked into real per-vertex color, NOT the uniform
+; near-(0.9063, 0.9063, 0.9063, 1.0) missing-texture tell. No texture fix needed; no
+; material_override applied. Plain instance.
+;
+; SCALE: raw AABB measured via manual local-transform composition on the unmodified FBX
+; (NOT global_transform) — this measurement is the COMBINED base+blades AABB, so the
+; blades (which project sideways, well past the base tower) set the x axis: footprint
+; 6.5077 x 1.8979 (x, z) tile-units, height 11.1962. Target max-axis 0.869309 (House's own
+; established 1x1 margin). Long axis (x, the blade span) scaled by 0.133582. Scaled
+; result: 0.8693 x 1.4956 x 0.2535 (x, y, z) — a tall, narrow tower with wide-spanning
+; blades, all capped to the blade-tip extent. FIRST-PASS PROPOSAL, not a measured GDD
+; number: capping scale to the BLADE SPAN (rather than the narrower tower-only footprint,
+; which would let the tower itself sit larger on the tile with blades overhanging the
+; neighbor the way tree canopies overhang their slab elsewhere in this project) is a
+; judgment call — FLAG FOR HUMAN SIGN-OFF, specifically on whether the resulting tower
+; (visually slim inside a 1x1 tile once the blade extent is priced in) reads correctly, or
+; whether an overhang treatment (blade-span uncapped, tower-only footprint driving the
+; scale instead) would look better.
+;
+; FACING: left as authored (identity transform, no rotation) — unconfirmed by a human eye
+; pass. FLAG FOR HUMAN SIGN-OFF.
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" uid="uid://ctv8uignhlsrq" path="res://assets/buildings/windmill/Windmill.fbx" id="1_model"]
+
+[node name="Windmill" type="Node3D"]
+
+[node name="Model" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.133582, 0, 0, 0, 0.133582, 0, 0, 0, 0.133582, 0, 0, 0)

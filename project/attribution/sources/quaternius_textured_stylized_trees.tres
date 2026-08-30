@@ -1,0 +1,51 @@
+[gd_resource type="Resource" script_class="AttributionEntry" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://attribution/attribution_entry.gd" id="1_entry"]
+
+[resource]
+script = ExtResource("1_entry")
+id = "quaternius_textured_stylized_trees"
+creator = "Quaternius"
+source_name = "Textured Stylized Trees"
+source_version = "May 2020"
+creator_url = "https://quaternius.com"
+source_url = "https://quaternius.com"
+support_url = "https://www.patreon.com/quaternius"
+license_name = "CC0 1.0 Universal (CC0 1.0) Public Domain Dedication"
+license_url = "https://creativecommons.org/publicdomain/zero/1.0/"
+license_file = "res://assets/licenses/Quaternius_UltimateAnimatedAnimals_License.txt"
+attribution_required = false
+required_notice = ""
+conditions = ""
+assets_used = PackedStringArray("DeadTree_3", "Pine_2")
+per_file_licensing = false
+notes = "CC0 — crediting is courtesy, not compliance. FIRST use of this pack in the project
+(2026-08-26, content-variety pass Task 5) — no prior entry existed, so this is a new
+AttributionEntry rather than an extension, per asset-import-pipeline.md's \"same source
+pack as an existing entry\" vs. \"new source\" distinction.
+
+Pack ships its own License.txt at `source-content/assets/Textured Stylized Trees - May 2020.../
+License.txt`, re-checked before import per asset-import-pipeline.md's audit gate — confirmed
+byte-identical (content, differs only in CRLF vs. LF line endings) to the generic Quaternius
+CC0 1.0 boilerplate already preserved as license_file for the Ultimate Animated Animal Pack
+(not pack-specific text) — reused rather than duplicated, same convention as every other
+Quaternius entry in this project (quaternius_ultimate_nature_pack.tres,
+quaternius_poly_pizza_nature.tres, etc.).
+
+Per-asset destination and use:
+  - DeadTree_3.fbx -> project/assets/terrain/dead_tree/DeadTree.fbx ->
+    project/assets/terrain/dead_tree/DeadTree.tscn, wired as forest.tres's 5th
+    model_scenes entry — a bare-branch silhouette, the first non-living-canopy tree pick.
+  - Pine_2.fbx -> project/assets/terrain/pine_tree_2/PineTree2.fbx ->
+    project/assets/terrain/pine_tree_2/PineTree2.tscn, wired as forest.tres's 6th
+    model_scenes entry — a second conifer, deliberately narrower-footprint than the
+    existing PineTree.tscn (see that scene's own header for the non-uniform-scale
+    reasoning).
+
+Note: this pack's own on-disk directory name (\"Textured Stylized Trees - May 2020\") is
+duplicated verbatim under two sibling `source-content/assets/` extraction folders (both suffixed
+`-20260723T015323Z-1-001`, one with a trailing \" (2)\") — confirmed byte-identical via
+`diff -rq` before sourcing from either; not two different packs.
+
+The pack ships more trees (Pine_1, Birch_*, DeadBirch_*, DeadTree_1/2, etc.) beyond these
+two; append to assets_used as each is imported, do NOT create a second entry for this pack."

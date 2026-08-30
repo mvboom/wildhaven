@@ -1,0 +1,72 @@
+[gd_resource type="Resource" script_class="AttributionEntry" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://attribution/attribution_entry.gd" id="1_entry"]
+
+[resource]
+script = ExtResource("1_entry")
+id = "quaternius_farm_buildings"
+creator = "Quaternius"
+source_name = "Farm Buildings"
+source_version = "September 2018"
+creator_url = "https://quaternius.com"
+source_url = "https://quaternius.com"
+support_url = "https://www.patreon.com/quaternius"
+license_name = "CC0 1.0 Universal (CC0 1.0) Public Domain Dedication"
+license_url = "https://creativecommons.org/publicdomain/zero/1.0/"
+license_file = "res://assets/licenses/Quaternius_UltimateAnimatedAnimals_License.txt"
+attribution_required = false
+required_notice = ""
+conditions = ""
+assets_used = PackedStringArray("Barn", "SmallBarn", "OpenBarn", "ChickenCoop", "Silo", "Windmill", "WaterTower", "Well")
+per_file_licensing = false
+notes = "CC0 — crediting is courtesy, not compliance. FIRST use of this pack in the project
+(2026-08-26, content-variety pass Task 3) — no prior entry existed, so this is a new
+AttributionEntry rather than an extension, per asset-import-pipeline.md's \"same source
+pack as an existing entry\" vs. \"new source\" distinction.
+
+Pack ships its own License.txt at `source-content/assets/Farm Buildings - Sept 2018.../
+License.txt`, re-checked before import per asset-import-pipeline.md's audit gate —
+confirmed CC0 1.0 Universal / Public Domain Dedication, same generic Quaternius CC0
+boilerplate already preserved as license_file for the Ultimate Animated Animal Pack (not
+pack-specific text) — reused rather than duplicated, same convention as every other
+Quaternius entry in this project.
+
+TEXTURE AUDIT FINDING, recorded here as well as per-scene (see each Barn.tscn-sibling
+header): at plan time no texture files were found anywhere in this pack's extracted
+folder (only a Preview.png) — this was correctly treated as a LEAD, not a conclusion, and
+empirically verified via a throwaway probe script (same method used to diagnose the
+DeadTree/PineTree2 missing-texture bug earlier this session). Result: this pack never
+shipped textures at all, in ANY of its export formats (confirmed by inspecting the
+sibling OBJ/MTL export's .mtl files directly — no `map_Kd` line anywhere) — it instead
+bakes each of its named flat-color Blender materials (DarkRed, LightRed, RoofBlack,
+White, Brown, Grey, Black, DarkGrey, etc.) into real per-vertex color at FBX export time.
+Every one of the 8 imported buildings was probed individually and shows MEANINGFUL,
+DISTINCT per-surface vertex colors, not the uniform near-(0.9063, 0.9063, 0.9063, 1.0)
+missing-texture tell that flagged DeadTree/PineTree2 as broken. No texture fix was
+needed for any of the 8; no material_override was applied anywhere in this pack's
+wrapper scenes.
+
+Per-asset destination and use (all 8, first use of each):
+  - Barn.fbx -> project/assets/buildings/barn/Barn.fbx -> Barn.tscn ->
+    project/data/buildings/barn.tres (proposed 2x2 footprint, the one outlier in this
+    batch's cost/footprint table — see barn.tres's own header).
+  - SmallBarn.fbx -> project/assets/buildings/small_barn/SmallBarn.fbx ->
+    SmallBarn.tscn -> project/data/buildings/small_barn.tres.
+  - OpenBarn.fbx -> project/assets/buildings/open_barn/OpenBarn.fbx -> OpenBarn.tscn ->
+    project/data/buildings/open_barn.tres.
+  - ChickenCoop.fbx -> project/assets/buildings/chicken_coop/ChickenCoop.fbx ->
+    ChickenCoop.tscn -> project/data/buildings/chicken_coop.tres.
+  - Silo.fbx -> project/assets/buildings/silo/Silo.fbx -> Silo.tscn ->
+    project/data/buildings/silo.tres.
+  - Windmill.fbx -> project/assets/buildings/windmill/Windmill.fbx -> Windmill.tscn ->
+    project/data/buildings/windmill.tres (this pack also ships a taller
+    TowerWindmill.fbx, not used here — Windmill.fbx is what this task's proposal table
+    specifies).
+  - WaterTower.fbx -> project/assets/buildings/water_tower/WaterTower.fbx ->
+    WaterTower.tscn -> project/data/buildings/water_tower.tres.
+  - Well.fbx -> project/assets/buildings/well/Well.fbx -> Well.tscn ->
+    project/data/buildings/well.tres.
+
+The pack ships more buildings beyond these 8 (BigBarn, Silo_House, Fence, Fence2,
+TowerWindmill) plus Blend/OBJ source formats not used here; append to assets_used as any
+more are imported, do NOT create a second entry for this pack."

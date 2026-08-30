@@ -1,0 +1,65 @@
+; WildGrassPalm — 2nd of 3 sand/desert-flavor Wild grass variants (content-variety pass
+; Task 9, 2026-08-26). See wild_grass.tres's own header for the model_scenes array change.
+;
+; STRUCTURE: instances the existing res://assets/terrain/wild_grass/WildGrass.tscn verbatim
+; as a child (identity transform), same base-scene-reuse pattern WildGrassCactus.tscn (this
+; pass) and WaterLilypad1/2.tscn (Task 8) already use for their own base scenes, plus ONE
+; centered desert prop (scale-only transform, no rotation/XZ offset — same convention
+; CommonTree1.tscn/Bush.tscn's own "Model" node already uses).
+;
+; Source: "PalmTree_1.fbx", Ultimate Nature Pack by Quaternius, CC0 1.0 Universal — the task
+; brief flagged this filename as NOT individually confirmed on disk at plan time (only that
+; ASSET_AUDIT.md named "PalmTree" as an available category); on-disk `find` in this task
+; confirmed PalmTree_1.fbx exists exactly in the pack the brief guessed (Ultimate Nature
+; Pack's FBX/ folder), so no poly.pizza fallback search was needed. (A same-named
+; PalmTree_1.fbx ALSO exists in the Nature Crops Pack, part of that pack's separate
+; growth-stage series (PalmTree_1..4/_Crop/_Harvested) — the Ultimate Nature Pack's
+; standalone tree, not the crop-series one, was used here, matching the "Ultimate Nature
+; Pack .../PalmTree_1.fbx" path the brief itself named.) License.txt re-checked at
+; `source-content/assets/Ultimate Nature Pack - Jun 2019.../License.txt` before import, per
+; asset-import-pipeline.md's audit gate (CC0 1.0 Universal / Public Domain Dedication, same
+; boilerplate as every other Quaternius pack in this repo). Recorded in
+; project/attribution/sources/quaternius_ultimate_nature_pack.tres (extends that pack's
+; existing assets_used list). Flat vertex-color materials ("DarkGreen"/"Green"/"Wood" per
+; the source .mtl) — no texture files to carry over, same as Bush.fbx/Rock_Moss_N.fbx
+; precedent.
+;
+; RAW SOURCE LOCATION: copied to res://assets/terrain/wild_grass_palm/PalmTree_1.fbx (a
+; single-use prop, not shared across multiple composed scenes, so it lives directly
+; alongside this scene rather than in a shared per-model folder — same convention
+; CropCactus2.tscn/Cactus_2.fbx already established for single-use crop props).
+;
+; SCALE: raw PalmTree_1.fbx measured local-space AABB (one-off SceneTree script,
+; res://tests/_measure_wild_grass_props.gd, deleted after use, same corner-transform
+; procedure Task 8's clearance fix used) = size (2.876911, 4.471397, 2.608991), position
+; (-1.267573, -0.02376, -1.074887) — a full-size tree, not a shrub. Scaled to a ~2.2-tile
+; target height (scale 0.492013), matching the SAME ~2.2-2.5-tile canopy-height convention
+; every Forest tree variant (CommonTree1/2, PineTree, BirchTree) already uses, since this is
+; a genuine tree and not a ground-level accent like the Cactus/Coconut siblings in this same
+; task. Resulting footprint ~1.416 x 1.284 tile-units — a canopy that overflows the 1x1 tile
+; footprint, same as every Forest tree pick already does at this height target (PineTree's
+; own header records an analogous ~1.26 x 1.37 footprint at the same height convention; canopy
+; overflow onto neighboring tile space is this project's existing accepted convention for
+; tree-scale props, not a new decision made here). Y-offset (0.011691 = scale * |raw AABB
+; base y|) nudges the model up so its measured base sits exactly on the slab's y=0 top
+; surface. FIRST-PASS PROPOSAL, not a measured GDD number — FLAG FOR HUMAN SIGN-OFF:
+; whether a full-height palm tree reads correctly standing on a Wild grass tile specifically
+; (as opposed to, say, a much shorter "young palm" reading that might fit better against
+; wild grass's shorter/scruffier register — WildGrass.tscn's own ~0.065 blade-height
+; baseline and its "claim-able but scruffy" framing per Open Question #29), the same open
+; question every prior scale/placement judgment call in this pass carries.
+;
+; NO SLAB WRAPPER NEEDED HERE: same reasoning as WildGrassCactus.tscn's header — the
+; instanced WildGrass.tscn already carries its own internal "Slab" wrapper for the
+; OcclusionFader exemption mechanism; the palm prop sits as a plain sibling.
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://assets/terrain/wild_grass/WildGrass.tscn" id="1_grass"]
+[ext_resource type="PackedScene" uid="uid://bsi8yuwdihe5i" path="res://assets/terrain/wild_grass_palm/PalmTree_1.fbx" id="2_palm"]
+
+[node name="WildGrassPalm" type="Node3D"]
+
+[node name="WildGrass" parent="." instance=ExtResource("1_grass")]
+
+[node name="PalmTree" parent="." instance=ExtResource("2_palm")]
+transform = Transform3D(0.492013, 0, 0, 0, 0.492013, 0, 0, 0, 0.492013, 0, 0.011691, 0)

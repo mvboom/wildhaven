@@ -1,0 +1,58 @@
+; Rabbit — AnimalDefinition data entry (gdd.md -> Data Schemas / Content Architecture).
+; Roster row: gdd.md:324 | Asset: "Rabbit" by Sherkiz via Poly Pizza, CC BY 3.0.
+;   ATTRIBUTION IS REQUIRED — see project/attribution/sources/sherkiz_rabbit.tres.
+;
+; SPECIES: European rabbit (Oryctolagus cuniculus). Human decision, deliberate, over the
+; eastern cottontail: cottontails are solitary and shelter in a surface scrape, which
+; leaves almost nothing writable for a fact card outside predation tropes. The European
+; rabbit is social and warren-digging, so its true natural history is also its most
+; child-friendly angle — the fact card below is a direct consequence of this choice.
+;
+; TERMINOLOGY RULE (roster-wide): say "baby rabbits". Never "kits" — that collides with
+; the shipped Fox card, which uses "kits" for fox young. Never "kittens" — that collides
+; with Cat on the roster (gdd.md:326). Applies to all future Rabbit copy, not just this
+; card.
+;
+; fact_text is content-writer option A, picked by the human at step-8 sign-off. Unlike
+; the Fox card, this one cleared ALL FOUR checklist steps including source verification:
+;   https://animaldiversity.org/accounts/Oryctolagus_cuniculus/
+;   https://www.wildlifetrusts.org/wildlife-explorer/mammals/rabbit
+;
+; CAPACITY FIELDS, set 2026-07-28 by human ruling D-27 (#1, #2):
+;   capacity_radius = 0    -> the SENTINEL `CAPACITY_RADIUS_FOLLOWS_SCOUT`, NOT a radius of
+;                             zero. It means "equal to scout_radius" (8 here) — spec.md's
+;                             stated v1 default written as the relation, so a scout_radius
+;                             retune (#20) cannot silently break the equality.
+;   tiles_per_individual = 4  -> roster.md's DECIDED value, replacing the uniform 12 that
+;                             was only `DEFAULT_TILES_PER_INDIVIDUAL` showing through. This
+;                             is live, not cosmetic: FOUR cover tiles now reach capacity 1
+;                             where twelve were needed, which is roughly a 3x easier world
+;                             and is what the <=2 min time-to-first-move-in target assumes.
+;   max_individuals = 6    -> roster.md's stated "~6" baseline (still #23, still human's).
+;
+; NEWS_REPORTS, added 2026-08-09 (Tier 1 row 12, closing the schema gap tier1-status.md named).
+; Nine lines from docs/content/rabbit-news-report-pool.md's Discovery/hint and Ambient/flavor
+; sub-pools, source-verified in a single pass 2026-07-20 (pilot 3b). Move-in, Avoidance-
+; relocation and Symmetric-avoids lines from the same file are not included — Move-in already
+; has its own channel (the fact card), and the other two describe a different trigger (row
+; 9/10's Avoids flow) this row's cadence never fires.
+[gd_resource type="Resource" script_class="AnimalDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/animal_definition.gd" id="1_schema"]
+[ext_resource type="PackedScene" path="res://assets/animals/rabbit/Rabbit.tscn" id="2_model"]
+
+[resource]
+script = ExtResource("1_schema")
+id = "rabbit"
+display_name = "Rabbit"
+habitat_needs = Array[String](["open_grass", "cover"])
+personality = "Bold"
+avoids = Array[String](["fox"])
+farm_tolerant = true
+scout_radius = 8
+capacity_radius = 0
+tiles_per_individual = 4
+max_individuals = 6
+model_scenes = Array[PackedScene]([ExtResource("2_model")])
+fact_text_pool = Array[String](["Rabbits live together in a warren — a cozy maze of tunnels under the grass. One warren can be home to a whole group of rabbits."])
+news_reports = Array[String](["Word has it a group of rabbits is looking for a new home — somewhere with wide open grass to graze…", "A rabbit was seen out in the meadow, sizing it up as if measuring it for tunnels.", "Rumor from the hedgerow: rabbits want a big grassy spot with room for a whole warren…", "The rabbits came out to graze as the sun went down.", "Someone counted eight rabbits out on the grass this evening — a whole warren's worth.", "There's a new tunnel entrance out in the meadow that wasn't there last week.", "The rabbits have been at the garden greens again.", "The young rabbits stayed close to the warren all evening.", "Whoever saw the rabbits today says no two are quite the same shade of brown."])

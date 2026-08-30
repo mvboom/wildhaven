@@ -1,0 +1,51 @@
+; WaterLilypad2 — 2nd of 2 lilypad-dressed Water variants (content-variety pass Task 8,
+; 2026-08-26). Denser of the two: 4 lilypads (vs. WaterLilypad1.tscn's 2), a different
+; count AND placement so a tile doesn't look identical to its neighbor even when both land
+; on a lilypad variant, per the task's explicit differentiation instruction. See
+; WaterLilypad1.tscn's header for the full sourcing/attribution/scale/placement rationale
+; (identical source, identical conventions) — not repeated here in full.
+;
+; STRUCTURE: same pattern as WaterLilypad1.tscn — res://assets/terrain/water/Water.tscn
+; instanced verbatim as a child (identity transform, shader/ripple/fresnel untouched) plus
+; 4 Lilypad.fbx prop instances here instead of 2.
+;
+; Source: same res://assets/terrain/lilypad/Lilypad.fbx (Quaternius Ultimate Nature Pack,
+; CC0 1.0 Universal), referenced here by uid — one raw file, reused across both scenes,
+; per WaterLilypad1.tscn's header.
+;
+; SCALE/PLACEMENT: 4 smaller instances (scale 0.19-0.24, vs. WaterLilypad1's 0.24/0.28) so
+; 4 pads fit near the tile's edges without crowding or overlapping. Positioned toward all 4
+; corners this time (vs. WaterLilypad1's 2 opposite corners) for the denser read. Same
+; y = -0.11 resting height on Water.tscn's y = -0.14 surface plane. FIRST-PASS PROPOSAL —
+; same FLAG FOR HUMAN SIGN-OFF as WaterLilypad1.tscn: relative lilypad size/count read at
+; the fixed ~45 degree camera pitch.
+;
+; TILE-BOUNDARY CLEARANCE (verified 2026-08-26, same post-review fix pass as
+; WaterLilypad1.tscn — see that scene's header for why the original "|position| +
+; scale*0.6 < ~0.44" formula was wrong): measured by transforming the raw model's actual
+; local AABB corners through each instance's real Transform3D (one-off SceneTree script,
+; res://tests/_measure_lilypad_clearance.gd, deleted after use), reading clearance from all
+; 4 tile edges. All 4 instances here already had genuine margin, no position change needed:
+; Lilypad_A worst-case clearance 0.0415, Lilypad_B 0.0483, Lilypad_C 0.0445, Lilypad_D
+; 0.0484 (tile half-footprint 0.5) — all comfortably inside, unlike WaterLilypad1's
+; original placement.
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://assets/terrain/water/Water.tscn" id="1_water"]
+[ext_resource type="PackedScene" uid="uid://bkowrxvsd8s80" path="res://assets/terrain/lilypad/Lilypad.fbx" id="2_lilypad"]
+
+[node name="WaterLilypad2" type="Node3D"]
+
+[node name="Water" parent="." instance=ExtResource("1_water")]
+
+[node name="Lilypad_A" parent="." instance=ExtResource("2_lilypad")]
+transform = Transform3D(0.19696, 0, -0.03473, 0, 0.20, 0, 0.03473, 0, 0.19696, -0.32, -0.11, -0.30)
+
+[node name="Lilypad_B" parent="." instance=ExtResource("2_lilypad")]
+transform = Transform3D(0.03820, 0, -0.21666, 0, 0.22, 0, 0.21666, 0, 0.03820, 0.30, -0.11, -0.27)
+
+[node name="Lilypad_C" parent="." instance=ExtResource("2_lilypad")]
+transform = Transform3D(-0.23636, 0, 0.04168, 0, 0.24, 0, -0.04168, 0, -0.23636, 0.26, -0.11, 0.29)
+
+[node name="Lilypad_D" parent="." instance=ExtResource("2_lilypad")]
+transform = Transform3D(-0.03299, 0, 0.18711, 0, 0.19, 0, -0.18711, 0, -0.03299, -0.27, -0.11, 0.32)

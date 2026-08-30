@@ -1,0 +1,36 @@
+{
+  "species": "Horse",
+  "habitat_design": {
+    "habitat_needs": [
+      "open_grass",
+      "water",
+      "cultivated"
+    ],
+    "personality": "Bold",
+    "avoids": [],
+    "farm_tolerant": true,
+    "scout_radius": 10,
+    "tiles_per_individual": 5,
+    "max_individuals": 6,
+    "rationale": "Horses are grazing animals that thrive on open pasture with reliable water access, and are well-suited to farmed/cultivated land alongside people."
+  },
+  "schema": {
+    "id": "horse",
+    "display_name": "Horse",
+    "tres_body": "[resource]\nscript = ExtResource(\"1\")\nid = \"horse\"\ndisplay_name = \"Horse\"\nhabitat_needs = Array[String]([\"open_grass\", \"water\", \"cultivated\"])\npersonality = \"Bold\"\navoids = Array[String]([])\nfarm_tolerant = true\nscout_radius = 10\ncapacity_radius = 0\ntiles_per_individual = 5\nmax_individuals = 6\nmodel_scene = \"res://assets/animals/horse/Horse.tscn\"\nfact_text = \"PLACEHOLDER\"\n"
+  },
+  "content": {
+    "fact_text": "Horses can talk to each other without making a sound \u2014 pointing their ears forward and raising their lips like a smile shows they're happy, while flattened ears mean they're feeling grumpy! Horses also like to nap standing up, snoozing in short little breaks throughout the day.",
+    "checklist_log": {
+      "source": "animaldiversity.org (Equus caballus species account) \u2014 facts on ear/lip communication and standing sleep patterns confirmed there.",
+      "length": "pass - two sentences, kid-readable",
+      "tone": "pass - warm, playful phrasing ('like a smile', 'snoozing'), no snark",
+      "predation": "pass - omitted the source's 'stay alert for predators' framing; no mention of danger, death, or threats"
+    }
+  },
+  "tres_body": "[resource]\nscript = ExtResource(\"1\")\nid = \"horse\"\ndisplay_name = \"Horse\"\nhabitat_needs = Array[String]([\"open_grass\", \"water\", \"cultivated\"])\npersonality = \"Bold\"\navoids = Array[String]([])\nfarm_tolerant = true\nscout_radius = 10\ncapacity_radius = 0\ntiles_per_individual = 5\nmax_individuals = 6\nmodel_scene = \"res://assets/animals/horse/Horse.tscn\"\nfact_text = \"Horses can talk to each other without making a sound \u2014 pointing their ears forward and raising their lips like a smile shows they're happy, while flattened ears mean they're feeling grumpy! Horses also like to nap standing up, snoozing in short little breaks throughout the day.\"\n",
+  "qa": {
+    "passed": true,
+    "problems": []
+  }
+}

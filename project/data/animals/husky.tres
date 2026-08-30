@@ -1,0 +1,49 @@
+; Husky — AnimalDefinition data entry (gdd.md -> Data Schemas / Content Architecture).
+; Roster row: roster.md -> Already-Defined Roster | Ruled: decisions.md -> D-43.
+; Asset: Quaternius "Ultimate Animated Animal Pack", CC0 1.0 Universal — see
+;   project/attribution/sources/quaternius_ultimate_animated_animals.tres.
+;
+; SPECIES: domestic dog, Siberian husky breed (Canis lupus familiaris).
+;
+; AVOIDS: ruled in as row 9's second Avoids pair (D-43), the candidate art.md and roster.md
+; already named — mutual and symmetric with Shiba Inu below. Both are domestic dogs, so the
+; structural predation-graph check stays clean the same way it does for Rabbit <-> Fox.
+; Personality split (Husky Bold, Shiba Inu Shy) matches each breed's documented real
+; temperament (huskies outgoing/pack-social, Shiba Inu independent/reserved) and gives this
+; second pair its own visibility hook, the job Fox's Shy does for the first pair.
+;
+; CAPACITY FIELDS (D-43): capacity_radius = 0 -> SENTINEL `CAPACITY_RADIUS_FOLLOWS_SCOUT`,
+; meaning "equal to scout_radius" (8), not a radius of zero. tiles_per_individual = 2,
+; max_individuals = 6. Farm-tolerant, "village dog" — house + open_grass habitat.
+;
+; fact_text is docs/content/cleared-pool-fact-cards.md § Husky's proposed line, transcribed
+; verbatim — all four checklist steps PASS there.
+;   "bred to be strong pullers ... help pull heavy loads and sleds" -> ADW Canis lupus
+;   familiaris, "Behavior": "...pulling loads (huskies, St. Bernard's)..." (one clause
+;   drawn from a longer breed-role list; other items in that list name banned words
+;   directly — "hunting", "catching rats", "guarding" — and are not used here; see the
+;   source file's banned-vocabulary note.)
+; https://animaldiversity.org/accounts/Canis_lupus_familiaris/
+;
+; news_reports intentionally empty — News Report pools for this pool are a separate, later
+; purchase (not part of Content Pipeline step 4/5 for this dispatch).
+[gd_resource type="Resource" script_class="AnimalDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/animal_definition.gd" id="1_schema"]
+[ext_resource type="PackedScene" path="res://assets/animals/husky/Husky.tscn" id="2_model"]
+
+[resource]
+script = ExtResource("1_schema")
+id = "husky"
+display_name = "Husky"
+habitat_needs = Array[String](["house", "open_grass"])
+personality = "Bold"
+avoids = Array[String](["shiba_inu"])
+farm_tolerant = true
+scout_radius = 8
+capacity_radius = 0
+tiles_per_individual = 2
+max_individuals = 6
+model_scenes = Array[PackedScene]([ExtResource("2_model")])
+fact_text_pool = Array[String](["Huskies were bred to be strong pullers — people used them to help pull heavy loads and sleds."])
+news_reports = Array[String]([])

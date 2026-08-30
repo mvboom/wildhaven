@@ -1,0 +1,91 @@
+[gd_resource type="Resource" script_class="AttributionEntry" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://attribution/attribution_entry.gd" id="1_entry"]
+
+[resource]
+script = ExtResource("1_entry")
+id = "quaternius_ultimate_nature_pack"
+creator = "Quaternius"
+source_name = "Ultimate Nature Pack"
+source_version = "June 2019"
+creator_url = "https://quaternius.com"
+source_url = "https://quaternius.com"
+support_url = "https://www.patreon.com/quaternius"
+license_name = "CC0 1.0 Universal (CC0 1.0) Public Domain Dedication"
+license_url = "https://creativecommons.org/publicdomain/zero/1.0/"
+license_file = "res://assets/licenses/Quaternius_UltimateAnimatedAnimals_License.txt"
+attribution_required = false
+required_notice = ""
+conditions = ""
+assets_used = PackedStringArray("WoodLog_Moss", "Rock_Moss_3", "Bush_1", "Rock_1", "BirchTree_1", "BushBerries_1", "Rock_Moss_2", "Rock_Moss_5", "Lilypad", "Cactus_1", "PalmTree_1")
+per_file_licensing = false
+notes = "CC0 — crediting is courtesy, not compliance. Pack ships its own License.txt at
+`source-content/assets/Ultimate Nature Pack - Jun 2019.../License.txt`, byte-identical boilerplate
+to the one already preserved as license_file for the Ultimate Animated Animal Pack (same
+generic Quaternius CC0 1.0 dedication text, not pack-specific) — reused rather than
+duplicated, same reasoning as quaternius_poly_pizza_characters.tres.
+
+First use of this pack: three pieces (WoodLog_Moss, Rock_Moss_3, Bush_1) composed into the
+Den move-in prop (project/assets/props/den/Den.tscn) — see gdd.md's Level & world design
+for what a move-in prop is.
+
+Second use: Rock_1 (plain, non-moss) as the Rock terrain tile's model
+(project/assets/terrain/rock_1/Rock1.tscn) — the load-bearing `cover`/`rocks` source for
+Fox/Rabbit habitat (terrain.md). Deliberately a different piece from the Den's Rock_Moss_3:
+the Den is decoration, this is a paintable terrain tile, and the plain Rock reads more
+generic/repeatable than a mossy one for something the player places many of.
+
+Third use (2026-08-26, content-variety pass Task 5): BirchTree_1.fbx and BushBerries_1.fbx
+newly imported as project/assets/terrain/birch_tree/BirchTree.tscn and
+project/assets/terrain/bush_berries/BushBerries.tscn, both wired as new Forest
+model_scenes entries (see project/data/terrain/forest.tres's header). Bush_1.fbx (already
+listed above from the Den prop use) is ALSO now reused a second time as
+project/assets/terrain/bush/Bush.tscn, another new Forest model_scenes entry — same source
+file, no new assets_used entry needed since the filename is already recorded.
+
+Fourth use (2026-08-26, content-variety pass Task 6): Rock_Moss_2.fbx and Rock_Moss_5.fbx
+newly imported as project/assets/terrain/rock_moss_2/Rock_Moss_2.fbx and
+project/assets/terrain/rock_moss_5/Rock_Moss_5.fbx, both composed (never referenced
+directly) into 2 new Rock model_scenes entries — RockCluster5.tscn and RockCluster6.tscn
+(see project/data/terrain/rock.tres's header). Deliberately different Rock_Moss_N files
+from Rock_Moss_3 (already used by RockCluster1.tscn and the Den prop, both listed above)
+so this pass adds genuinely new pieces rather than a third use of the same file; the pack
+ships 7 Rock_Moss_N.fbx variants total (Rock_Moss_1..7, confirmed on disk), of which only
+3, 2, and 5 are used anywhere in the project as of this pass.
+
+Fifth use (2026-08-26, content-variety pass Task 8): Lilypad.fbx newly imported as
+res://assets/terrain/lilypad/Lilypad.fbx (one raw copy, shared by uid reference — same
+Rock_Moss_5/Rock_Moss_2 convention above), composed into 2 new Water model_scenes entries:
+project/assets/terrain/water_lilypad_1/WaterLilypad1.tscn (2 lilypad instances) and
+project/assets/terrain/water_lilypad_2/WaterLilypad2.tscn (4 lilypad instances), both
+siblings that instance the existing project/assets/terrain/water/Water.tscn as a base (see
+project/data/terrain/water.tres's own header). The task brief that spawned this work
+originally named project/attribution/sources/quaternius_poly_pizza_nature.tres as the file
+to modify, written before the on-disk `find` confirmed Lilypad.fbx actually lives in THIS
+pack (Ultimate Nature Pack), not among the standalone poly.pizza downloads that other file
+tracks — recorded here instead, the correct source file for where the asset was actually
+found.
+
+Sixth use (2026-08-26, content-variety pass Task 9): Cactus_1.fbx and PalmTree_1.fbx newly
+imported as res://assets/terrain/wild_grass_cactus/WildGrassCactus.tscn and
+res://assets/terrain/wild_grass_palm/WildGrassPalm.tscn, initially wired as 2 of 3 new Wild
+grass model_scenes entries (see project/data/terrain/wild_grass.tres's own header) that
+instance the existing res://assets/terrain/wild_grass/WildGrass.tscn as a base plus one
+desert-flavor prop each — same "instance the existing scene, add a prop" pattern the
+Fifth use (WaterLilypad1/2.tscn) already established. Cactus_1.fbx was directly confirmed
+in this pack at plan time; PalmTree_1.fbx was flagged unconfirmed at plan time and
+confirmed by this task's own on-disk `find` (a same-named PalmTree_1.fbx also exists in
+the separate Nature Crops Pack's growth-stage series — this is the Ultimate Nature Pack's
+standalone tree, a different file).
+
+REVERTED FROM THE RANDOM POOL THE SAME DAY (human eyeball pass): wild_grass.tres's human
+ruling was that plain Wild grass must stay the default, not one-of-N-equal-weight — Cactus
+and Palm were pulled from `model_scenes` back down to the single original entry, and are
+kept imported here on disk (not deleted) for sub-project B's player-facing style picker to
+wire in later. The 3rd variant this pass tried, a Coconut prop sourced from the Nature
+Crops Pack, was rejected outright ("does not look good at all") and fully deleted rather
+than deferred — see quaternius_nature_crops_pack.tres for that one's removal note.
+
+The pack ships many more trees/rocks/grass pieces beyond these eleven; append to
+assets_used as each is imported, do NOT create a second entry for this pack (same
+convention as quaternius_ultimate_animated_animals.tres)."

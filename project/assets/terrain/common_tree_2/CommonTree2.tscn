@@ -1,0 +1,79 @@
+; CommonTree2 — one of 2 "common" tree picks for the Forest terrain tile. Source: Stylized
+; Nature MegaKit (Standard/free), Quaternius, CC0 1.0 Universal — see
+; project/attribution/sources/quaternius_stylized_nature_megakit.tres.
+;
+; Scale is a FIRST-PASS PROPOSAL (same reasoning as CommonTree1): raw mesh height
+; 7.642996 units -> scaled to the same ~2.5-tile canopy-height target (scale 0.327), so
+; both common trees read a consistent height next to each other. FLAG FOR HUMAN SIGN-OFF.
+;
+; LOOK-PASS REWORK (2026-08-16): this scene was imported but never wired as a live
+; model_scene (CommonTree1 was the sole entry) and so never got the slab/floor treatment
+; CommonTree1 received on 2026-08-03 — an oversight surfaced now that D-42's model_scenes
+; array lets Forest actually alternate between both trees per tile. Brought to parity with
+; CommonTree1: same Slab BoxMesh (0.94x0.2x0.94, Color(0.16, 0.4, 0.22, 1)) and the same 3
+; blotchy floor patches (moss-dark-green / leaf-litter-brown PlaneMesh, unlit color
+; treatment — no tileable ground texture exists in the audited packs, see CommonTree1.tscn's
+; header for the fuller reasoning) at the same relative transforms, for a consistent forest
+; floor regardless of which tree a tile lands on. FLAG FOR HUMAN SIGN-OFF, same as
+; CommonTree1.
+;
+; ALL GROUND MESHES NESTED UNDER ONE NODE NAMED "Slab" (2026-08-16, required, not
+; cosmetic) — same OcclusionFader exemption fix as CommonTree1.tscn; see that scene's
+; header for the full reasoning. The BoxMesh ground plane (renamed "Ground") and all 3
+; floor patches are children of a wrapper Node3D literally named "Slab" at identity
+; transform.
+;
+; SLAB WIDENED 0.94 -> 1.0 (2026-08-16, human-reported cross-tile seam gap) — same fix,
+; same reasoning, same exact-1.0-match approach as CommonTree1.tscn; see that scene's
+; header for the full explanation. X/Z only, Y (0.2) untouched.
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="PackedScene" uid="uid://0j14s5eg2fo4" path="res://assets/terrain/common_tree_2/CommonTree_2.gltf" id="1_model"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_slab"]
+size = Vector3(1.0, 0.2, 1.0)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_slab"]
+albedo_color = Color(0.16, 0.4, 0.22, 1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_patch1"]
+size = Vector2(0.42, 0.36)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_patch_moss"]
+albedo_color = Color(0.11, 0.32, 0.16, 1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_patch2"]
+size = Vector2(0.3, 0.34)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_patch_litter"]
+albedo_color = Color(0.3, 0.22, 0.13, 1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_patch3"]
+size = Vector2(0.26, 0.3)
+
+[node name="CommonTree2" type="Node3D"]
+
+[node name="Slab" type="Node3D" parent="."]
+
+[node name="Ground" type="MeshInstance3D" parent="Slab"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+mesh = SubResource("BoxMesh_slab")
+material_override = SubResource("StandardMaterial3D_slab")
+
+[node name="FloorPatch_1_Moss" type="MeshInstance3D" parent="Slab"]
+transform = Transform3D(0.965926, 0, -0.258819, 0, 1, 0, 0.258819, 0, 0.965926, -0.18, 0.001, -0.12)
+mesh = SubResource("PlaneMesh_patch1")
+material_override = SubResource("StandardMaterial3D_patch_moss")
+
+[node name="FloorPatch_2_Litter" type="MeshInstance3D" parent="Slab"]
+transform = Transform3D(0.642788, 0, -0.766044, 0, 1, 0, 0.766044, 0, 0.642788, 0.2, 0.001, 0.15)
+mesh = SubResource("PlaneMesh_patch2")
+material_override = SubResource("StandardMaterial3D_patch_litter")
+
+[node name="FloorPatch_3_Moss" type="MeshInstance3D" parent="Slab"]
+transform = Transform3D(-0.173648, 0, -0.984808, 0, 1, 0, 0.984808, 0, -0.173648, 0.05, 0.001, -0.28)
+mesh = SubResource("PlaneMesh_patch3")
+material_override = SubResource("StandardMaterial3D_patch_moss")
+
+[node name="Model" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.327, 0, 0, 0, 0.327, 0, 0, 0, 0.327, 0, 0, 0)

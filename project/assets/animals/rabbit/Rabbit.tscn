@@ -1,0 +1,56 @@
+; Rabbit — model scene for AnimalDefinition.model_scenes
+; Source: "Rabbit" by Sherkiz, via Poly Pizza. CC BY 3.0 — ATTRIBUTION IS REQUIRED.
+;   https://poly.pizza/m/Km89u3twcR
+; See project/attribution/sources/sherkiz_rabbit.tres for the required credit line.
+;
+; Wrapper carries the world-scale factor and the material overrides so the imported
+; .glb stays byte-identical to the upstream download (which keeps the CC BY
+; "indicate if you modified" question simple: the asset itself is unmodified).
+;
+; Material overrides exist for ONE reason: the source ships metallicFactor 0.4 on all
+; three materials, which puts a metallic sheen on fur. Albedo and roughness are copied
+; from the import unchanged; only `metallic` differs (0.4 -> 0.0).
+;
+; Y offset (2026-08-25): unlike the Quaternius/Mixamo animals, this asset's rig origin
+; sits mid-body, not at the feet — measured combined mesh AABB at scale 0.72 puts the
+; feet at y = -0.738 against a total height of 2.233 (~33% of the model buried).
+; simulation/habitat_simulation.gd places residents at world y = 0.0 with no per-species
+; ground offset, so residents were rendering sunk into the terrain. Model's transform
+; origin.y = 0.73787242174149 lifts the feet back to y = 0 exactly (verified via a
+; one-off headless AABB probe against Rabbit.tscn).
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="PackedScene" uid="uid://dtx0fjdmsowq" path="res://assets/animals/rabbit/Rabbit.glb" id="1_model"]
+
+[sub_resource type="StandardMaterial3D" id="Fur"]
+resource_name = "Fur"
+albedo_color = Color(0.4661, 0.3458, 0.2332, 1)
+metallic = 0.0
+roughness = 1.0
+
+[sub_resource type="StandardMaterial3D" id="Fur_white"]
+resource_name = "Fur_white"
+albedo_color = Color(0.778, 0.6548, 0.5412, 1)
+metallic = 0.0
+roughness = 0.27216553688049
+
+[sub_resource type="StandardMaterial3D" id="Black"]
+resource_name = "Black"
+albedo_color = Color(0.108, 0.108, 0.108, 1)
+metallic = 0.0
+roughness = 0.27216553688049
+
+[node name="Rabbit" type="Node3D"]
+
+[node name="Model" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.72, 0, 0, 0, 0.72, 0, 0, 0, 0.72, 0, 0.73787242174149, 0)
+
+[node name="Bunny_mesh" parent="Model/RootNode/Bunny/Skeleton3D" index="0"]
+surface_material_override/0 = SubResource("Fur")
+surface_material_override/1 = SubResource("Fur_white")
+surface_material_override/2 = SubResource("Black")
+
+[node name="AnimationPlayer" parent="Model" index="1"]
+autoplay = "Bunny|Bunny_idle"
+
+[editable path="Model"]

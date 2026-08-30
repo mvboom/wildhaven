@@ -1,0 +1,43 @@
+; Donkey — AnimalDefinition data entry (gdd.md -> Data Schemas / Content Architecture).
+; Roster row: roster.md -> Already-Defined Roster | Ruled: decisions.md -> D-43.
+; Asset: Quaternius "Ultimate Animated Animal Pack", CC0 1.0 Universal — see
+;   project/attribution/sources/quaternius_ultimate_animated_animals.tres.
+;
+; SPECIES: domestic donkey (Equus asinus).
+;
+; CAPACITY FIELDS (D-43): capacity_radius = 0 -> SENTINEL `CAPACITY_RADIUS_FOLLOWS_SCOUT`,
+; meaning "equal to scout_radius" (8), not a radius of zero. tiles_per_individual = 4
+; (lower than Horse's 5) — the lower-upkeep animal of the pair, matching donkeys' desert/
+; mountain, sure-footed real ecology (ADW). max_individuals = 6. Farm-tolerant. Habitat
+; needs trade Horse's open_grass for rocks, ruled apart from Horse on real ecology despite
+; art.md proposing identical axes for both.
+;
+; fact_text is docs/content/cleared-pool-fact-cards.md § Donkey's proposed line, transcribed
+; verbatim — all four checklist steps PASS there.
+;   "hee-haw call ... heard from almost two miles away" -> ADW Equus asinus, "Donkeys use
+;   a 'hee-haw' sound that can travel up to 3 km away." (3 km converted to "almost two
+;   miles" for a US-register card; the underlying fact is unchanged, only the unit.)
+; https://animaldiversity.org/accounts/Equus_asinus/
+;
+; news_reports intentionally empty — News Report pools for this pool are a separate, later
+; purchase (not part of Content Pipeline step 4/5 for this dispatch).
+[gd_resource type="Resource" script_class="AnimalDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/animal_definition.gd" id="1_schema"]
+[ext_resource type="PackedScene" path="res://assets/animals/donkey/Donkey.tscn" id="2_model"]
+
+[resource]
+script = ExtResource("1_schema")
+id = "donkey"
+display_name = "Donkey"
+habitat_needs = Array[String](["cultivated", "rocks"])
+personality = "Bold"
+avoids = Array[String]([])
+farm_tolerant = true
+scout_radius = 8
+capacity_radius = 0
+tiles_per_individual = 4
+max_individuals = 6
+model_scenes = Array[PackedScene]([ExtResource("2_model")])
+fact_text_pool = Array[String](["A donkey's 'hee-haw' call is so loud, it can be heard from almost two miles away."])
+news_reports = Array[String]([])

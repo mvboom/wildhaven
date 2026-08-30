@@ -1,0 +1,37 @@
+{
+  "species": "Shiba Inu",
+  "habitat_design": {
+    "habitat_needs": [
+      "house",
+      "open_grass"
+    ],
+    "personality": "Bold",
+    "avoids": [],
+    "farm_tolerant": true,
+    "scout_radius": 8,
+    "tiles_per_individual": 3,
+    "max_individuals": 4,
+    "rationale": "Shiba Inus are companion dogs that bond to a human dwelling and do best with open yard space to patrol and play, reflecting their alert, independent hunting-breed temperament."
+  },
+  "schema": {
+    "id": "shiba_inu",
+    "display_name": "Shiba Inu",
+    "tres_body": "[resource]\nscript = ExtResource(\"1\")\nid = \"shiba_inu\"\ndisplay_name = \"Shiba Inu\"\nhabitat_needs = [\"house\", \"open_grass\"]\npersonality = \"Bold\"\navoids = []\nfarm_tolerant = true\nscout_radius = 8\ncapacity_radius = 0\ntiles_per_individual = 3\nmax_individuals = 4\nmodel_scene = \"res://assets/animals/shiba_inu/Shiba Inu.tscn\"\nfact_text = \"PLACEHOLDER\"\n"
+  },
+  "content": {
+    "fact_text": "PLACEHOLDER - no usable source found on approved sites after searching kids.nationalgeographic.com, education.nationalgeographic.org, and animaldiversity.org for 'Shiba Inu' and related terms (Japanese dog breed, brushwood dog); animaldiversity.org's domestic dog page (Canis lupus) covers general dog domestication but names no specific breeds like Shiba Inu, and no Nat Geo Kids/Education page on the breed could be located",
+    "checklist_log": {
+      "source": "fail - searched kids.nationalgeographic.com and education.nationalgeographic.org directly for Shiba Inu with no results; searched animaldiversity.org and fetched its Canis lupus (domestic dog) account, which discusses dog domestication generally but does not mention Shiba Inu or any specific breed; wildlifetrusts.org and nationalzoo.si.edu were not tried as they cover UK wildlife/zoo conservation species, not domestic dog breeds, so are very unlikely to have breed-specific content",
+      "length": "n/a - no fact could be constructed from approved sources",
+      "tone": "n/a - no fact could be constructed from approved sources",
+      "predation": "n/a - no fact could be constructed from approved sources"
+    }
+  },
+  "tres_body": "[resource]\nscript = ExtResource(\"1\")\nid = \"shiba_inu\"\ndisplay_name = \"Shiba Inu\"\nhabitat_needs = [\"house\", \"open_grass\"]\npersonality = \"Bold\"\navoids = []\nfarm_tolerant = true\nscout_radius = 8\ncapacity_radius = 0\ntiles_per_individual = 3\nmax_individuals = 4\nmodel_scene = \"res://assets/animals/shiba_inu/Shiba Inu.tscn\"\nfact_text = \"PLACEHOLDER - no usable source found on approved sites after searching kids.nationalgeographic.com, education.nationalgeographic.org, and animaldiversity.org for 'Shiba Inu' and related terms (Japanese dog breed, brushwood dog); animaldiversity.org's domestic dog page (Canis lupus) covers general dog domestication but names no specific breeds like Shiba Inu, and no Nat Geo Kids/Education page on the breed could be located\"\n",
+  "qa": {
+    "passed": false,
+    "problems": [
+      "`fact_text` is still a placeholder."
+    ]
+  }
+}

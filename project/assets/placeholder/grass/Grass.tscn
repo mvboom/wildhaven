@@ -1,0 +1,24 @@
+; Grass — GREY-BOX PLACEHOLDER. Authored in-repo from Godot primitives; no third-party
+; source, nothing to attribute (see assets/placeholder/README.md).
+;
+; Slab dimensions track grid_manager.gd: TILE_SIZE 1.0 - TILE_GAP 0.06 = 0.94 across,
+; TILE_HEIGHT 0.2 thick. Origin is the tile's TOP surface, so the slab hangs to y = -0.2
+; and anything standing on this tile is placed at y >= 0.
+;
+; COLOUR IS A PLACEHOLDER and a taste call reserved for the human: Color(0.42, 0.68, 0.30)
+; is grid_manager.gd's existing COLOR_GRASS, reused so the grey-box set reads continuous
+; with the pilot-1 spike. Listed under Proposals in the build report.
+[gd_scene load_steps=3 format=3]
+
+[sub_resource type="BoxMesh" id="BoxMesh_slab"]
+size = Vector3(0.94, 0.2, 0.94)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_slab"]
+albedo_color = Color(0.42, 0.68, 0.3, 1)
+
+[node name="Grass" type="Node3D"]
+
+[node name="Slab" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+mesh = SubResource("BoxMesh_slab")
+material_override = SubResource("StandardMaterial3D_slab")

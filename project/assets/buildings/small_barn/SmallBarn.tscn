@@ -1,0 +1,37 @@
+; SmallBarn — NEW farm-building placeable (content-variety pass Task 3, 2026-08-26), one
+; of 8 brand-new PlaceableDefinition entries. See project/data/buildings/small_barn.tres
+; for the full data-entry header (proposed cost/footprint, human sign-off flag).
+;
+; Source: Quaternius, "Farm Buildings" pack (FBX), SmallBarn.fbx — CC0 1.0 Universal.
+; License.txt at `source-content/assets/Farm Buildings - Sept 2018.../License.txt` confirmed CC0
+; 1.0 Universal / Public Domain Dedication before import, per asset-import-pipeline.md's
+; audit gate. Same NEW pack as Barn.tscn — see
+; project/attribution/sources/quaternius_farm_buildings.tres.
+;
+; TEXTURE AUDIT (mandatory — DeadTree/PineTree2 precedent; see Barn.tscn's header for the
+; full method): probed every surface on the raw, unmodified FBX. albedo_texture null on
+; every surface, but vertex_color_use_as_albedo reads true with MEANINGFUL, DISTINCT
+; per-surface colors (dark red roof ~(0.4872, 0.228, 0.1966), light grey trim ~(0.821,
+; 0.821, 0.821), mid red-brown ~(0.5601, 0.2625, 0.2265), dark grey ~(0.311, 0.311,
+; 0.311)) — matches Barn.fbx's shared material set exactly (same pack, same named
+; flat-color Blender materials baked into real per-vertex color), NOT the uniform
+; near-(0.9063, 0.9063, 0.9063, 1.0) missing-texture tell. No texture fix needed; no
+; material_override applied. Plain instance.
+;
+; SCALE: raw AABB measured via manual local-transform composition on the unmodified FBX
+; (NOT global_transform — see cultivated_field.tres's header): footprint 6.0787 x 6.2739
+; (x, z) tile-units, height 4.9611. Target max-axis 0.869309 (House's own established 1x1
+; margin, the shared "small margin, not edge-to-edge" fit every non-Barn building in this
+; batch uses). Long axis (z) scaled by 0.138560. Scaled result: 0.8423 x 0.6874 x 0.8693
+; (x, y, z).
+;
+; FACING: left as authored (identity transform, no rotation) — unconfirmed by a human eye
+; pass. FLAG FOR HUMAN SIGN-OFF.
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" uid="uid://b6j2jkt7fk8ww" path="res://assets/buildings/small_barn/SmallBarn.fbx" id="1_model"]
+
+[node name="SmallBarn" type="Node3D"]
+
+[node name="Model" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.13856, 0, 0, 0, 0.13856, 0, 0, 0, 0.13856, 0, 0, 0)

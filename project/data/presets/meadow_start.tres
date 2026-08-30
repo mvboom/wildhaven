@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="WorldPreset" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/world_preset.gd" id="1_schema"]
+
+[resource]
+script = ExtResource("1_schema")
+id = "meadow_start"
+display_name = "Meadow Start"
+width = 36
+depth = 36
+base_terrain_id = "wild_grass"

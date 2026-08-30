@@ -1,0 +1,61 @@
+; WildGrassCactus — 1st of 3 sand/desert-flavor Wild grass variants (content-variety pass
+; Task 9, 2026-08-26). See wild_grass.tres's own header for the model_scenes array change.
+;
+; STRUCTURE: instances the existing res://assets/terrain/wild_grass/WildGrass.tscn verbatim
+; as a child (identity transform — same grass-base reuse pattern Task 8's
+; WaterLilypad1.tscn/WaterLilypad2.tscn use for Water.tscn: "don't duplicate the base scene,
+; instance it"). This scene does NOT touch WildGrass.tscn itself. Plus ONE centered desert
+; prop, same "single centered specimen" convention CommonTree1.tscn/Bush.tscn already use
+; for their own Model node (scale-only transform, no rotation, no XZ offset).
+;
+; Source: "Cactus_1.fbx", Ultimate Nature Pack by Quaternius, CC0 1.0 Universal — the task
+; brief's own research directly confirmed this filename in this pack before the task started
+; (unlike Palm/Coconut below, which needed an on-disk audit). License.txt re-checked at
+; `source-content/assets/Ultimate Nature Pack - Jun 2019.../License.txt` before import, per
+; asset-import-pipeline.md's audit gate (CC0 1.0 Universal / Public Domain Dedication, same
+; boilerplate as every other Quaternius pack in this repo). Recorded in
+; project/attribution/sources/quaternius_ultimate_nature_pack.tres (extends that pack's
+; existing assets_used list). Flat vertex-color materials ("Green"/"LightOrange" per the
+; source .mtl) — no texture files to carry over, same as Bush.fbx/Rock_Moss_N.fbx precedent.
+;
+; RAW SOURCE LOCATION: copied to res://assets/terrain/wild_grass_cactus/Cactus_1.fbx (a
+; single-use prop, not shared across multiple composed scenes, so it lives directly
+; alongside this scene rather than in a shared per-model folder — same convention
+; CropCactus2.tscn/Cactus_2.fbx already established for single-use crop props).
+;
+; SCALE: raw Cactus_1.fbx measured local-space AABB (one-off SceneTree script,
+; res://tests/_measure_wild_grass_props.gd, deleted after use, same corner-transform
+; procedure Task 8's clearance fix used) = size (0.549685, 1.00763, 0.562914), position
+; (-0.267189, -0.010727, -0.281552) — a single specimen ~1.0 raw units tall. Scaled to a
+; ~0.5-tile target height (scale 0.496213): shorter than every Forest tree's ~2.2-2.5-tile
+; canopy convention (this is a squat desert succulent, not a canopy tree) but taller than
+; the wild-grass clusters it stands among (WildGrass.tscn's own ~0.065 blade-height
+; baseline), matching Bush.tscn's "distinct scale-class from ground cover" reasoning at a
+; shorter absolute height since a cactus reads smaller than a bush. Resulting footprint
+; ~0.273 x 0.279 tile-units — a compact single-specimen silhouette, not tile-covering.
+; Y-offset (0.005324 = scale * |raw AABB base y|) nudges the model up so its measured base
+; sits exactly on the slab's y=0 top surface rather than sinking fractionally into it (raw
+; pivot is very close to, but not exactly at, the mesh base). FIRST-PASS PROPOSAL, not a
+; measured GDD number — FLAG FOR HUMAN SIGN-OFF: whether a single cactus reads as "something
+; to claim, without reading as broken" on wild grass specifically, per Open Question #29's
+; exact wording (WildGrass.tscn's own header) — the same open question every prior
+; scale/placement judgment call in this pass carries, sharper here since this is the first
+; time a desert-flavor prop sits on a grass-family (not sand) terrain base.
+;
+; NO SLAB WRAPPER NEEDED HERE: unlike a land terrain built from scratch, WildGrass.tscn's
+; own ground/patch geometry already lives under a node named "Slab" inside the instanced
+; scene itself (see that scene's own header — the OcclusionFader exemption mechanism is
+; internal to WildGrass.tscn, not something this wrapper scene needs to reproduce). The
+; cactus prop sits as a plain sibling of the WildGrass instance, same "no Slab wrapper
+; needed" reasoning WaterLilypad1.tscn's header already established for its lilypad props.
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://assets/terrain/wild_grass/WildGrass.tscn" id="1_grass"]
+[ext_resource type="PackedScene" uid="uid://cgj8nd7nifr8v" path="res://assets/terrain/wild_grass_cactus/Cactus_1.fbx" id="2_cactus"]
+
+[node name="WildGrassCactus" type="Node3D"]
+
+[node name="WildGrass" parent="." instance=ExtResource("1_grass")]
+
+[node name="Cactus" parent="." instance=ExtResource("2_cactus")]
+transform = Transform3D(0.496213, 0, 0, 0, 0.496213, 0, 0, 0, 0.496213, 0, 0.005324, 0)

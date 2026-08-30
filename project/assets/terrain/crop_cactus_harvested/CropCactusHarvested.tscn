@@ -1,0 +1,44 @@
+; CropCactusHarvested — Cultivated field crop variant (content-variety pass Task 7,
+; 2026-08-26). See cultivated_field.tres's header for the full batch rationale,
+; the measurement-tooling note, and the human sign-off flag.
+;
+; Source: Cactus_Harvested.fbx, "Nature Crops Pack" (Jan 2020) by Quaternius, CC0 1.0
+; Universal, Public Domain Dedication — see
+; project/attribution/sources/quaternius_nature_crops_pack.tres. Represents the
+; post-harvest ("_Harvested") growth stage.
+;
+; Raw measured AABB (manually-composed local transform, not global_transform —
+; see cultivated_field.tres's header for why): footprint 1.0943x0.5629, height 1.2565
+; tile-units. Scaled to ~0.07 tile-units tall (footprint capped at ~0.20 on
+; whichever axis is larger — height-limited for this item). 3 small clustered
+; instances per tile, not a single plant in the middle of a box, same convention
+; as CultivatedWheatRow's clumps. FLAG FOR HUMAN SIGN-OFF — same posture as every
+; other scale/count decision in this pass.
+;
+; Slab matches CultivatedWheatRow/CultivatedCropsPlot's dirt-brown (Color(0.4, 0.28, 0.16, 1)) for
+; tonal consistency across all Cultivated field variants.
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="PackedScene" uid="uid://dh6emfatp3vcj" path="res://assets/terrain/crop_cactus_harvested/Cactus_Harvested.fbx" id="1_model"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_slab"]
+size = Vector3(1.0, 0.2, 1.0)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_slab"]
+albedo_color = Color(0.4, 0.28, 0.16, 1)
+
+[node name="CropCactusHarvested" type="Node3D"]
+
+[node name="Slab" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+mesh = SubResource("BoxMesh_slab")
+material_override = SubResource("StandardMaterial3D_slab")
+
+[node name="Cactus_A" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.052120, 0, -0.009190, 0, 0.052924, 0, 0.009190, 0, 0.052120, -0.22, 0, -0.15)
+
+[node name="Cactus_B" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.056758, 0, 0.014151, 0, 0.058495, 0, -0.014151, 0, 0.056758, 0.2, 0, 0.06)
+
+[node name="Cactus_C" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.052350, 0, -0.019054, 0, 0.055710, 0, 0.019054, 0, 0.052350, -0.03, 0, 0.22)

@@ -1,0 +1,28 @@
+; House look variant — FirstAge 2 Level 1 (content-variety pass Task 2, 2026-08-26).
+; One of 9 new House look variants added alongside the original HousesFirstAge1Level1
+; (house.tres index 0, unchanged) — see house.tres's header for the consolidated batch
+; note and the human sign-off flag.
+;
+; Source: Quaternius, "Ultimate Fantasy RTS" pack (glTF), Houses_FirstAge_2_Level1.gltf —
+; CC0 1.0 Universal, same pack as the existing House entry. See
+; project/attribution/sources/quaternius_ultimate_fantasy_rts.tres.
+;
+; SCALE: raw AABB measured via manual local-transform composition (NOT global_transform —
+; see project/data/terrain/cultivated_field.tres's header for why that silently returns
+; identity on a freshly-instantiated, not-yet-tree-attached node): footprint 0.9108 x
+; 1.1748 tile-units (x, z), height 0.7685. Long axis (z) exceeds the 1x1 tile, so
+; uniformly scaled by 0.739958 to bring it down to 0.8693, matching HousesFirstAge1Level1's
+; own natural (unscaled) max-axis footprint, the same "small margin, not edge-to-edge" fit.
+; Scaled result: 0.6739 x 0.5687 x 0.8693 (x, y, z).
+;
+; FACING: left as authored (identity transform, no rotation) — unconfirmed by a human eye
+; pass, same posture as every other placement judgment call in this project. FLAG FOR
+; HUMAN SIGN-OFF.
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" uid="uid://dn5y2jtsb8isf" path="res://assets/buildings/house_firstage_2_level1/HousesFirstAge2Level1.gltf" id="1_model"]
+
+[node name="HouseFirstage2Level1" type="Node3D"]
+
+[node name="Model" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.739958, 0, 0, 0, 0.739958, 0, 0, 0, 0.739958, 0, 0, 0)

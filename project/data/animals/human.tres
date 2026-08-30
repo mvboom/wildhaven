@@ -1,0 +1,241 @@
+; Human (Villager) — AnimalDefinition data entry (spec.md -> Data Schemas).
+; Roster row: roster.md -> Already-Defined Roster, the "Human (Villager)" row.
+; Asset: Quaternius standalone character glb (Adventurer), CC0 1.0 Universal — see
+;   project/attribution/sources/quaternius_poly_pizza_characters.tres.
+;
+; VILLAGERS ARE JUST ANOTHER SPECIES (gdd.md -> Design Pillars). There is no people schema,
+; no separate economy, and no special case anywhere in the simulation: this file is loaded
+; by the same SpeciesRoster loader as fox.tres and rabbit.tres, and a villager moving in is
+; the same event as any other move-in. That is the whole point — row 4's USP proof is that
+; the House-plus-farm habitat produces a resident through the ordinary qualification path.
+;
+; DECIDED VALUES, transcribed from roster.md's Already-Defined row — not proposed here:
+;   habitat_needs = ["house", "cultivated"]   personality = Bold   avoids = (none)
+;   farm_tolerant = true                      tiles_per_individual = 1
+; roster.md's rationale for the divisor: "Human's divisor is 1 because the House is the
+; scarce need and the floor House is a single tile; the 2x2 form supports up to four
+; families, given fields to match."
+;
+; NO `avoids` ENTRY, and that closes a gate rather than leaving one open: roster.md's
+; structural predation check runs only when a species gains an avoids entry, so Human's
+; predation risk is closed by data, not by copy.
+;
+; PLACEHOLDER — the human owns this: `scout_radius = 8`. spec.md gives the band ~8-12
+; (Open Question #20) and states no Human value. 8 is proposed at the band's tight end
+; because a villager's two needs are a House and the field beside it, and gdd.md notes the
+; radius "is the mechanism that makes the land-allocation tradeoff bite" (#23) — a compact
+; village is the shape a tight radius produces. Listed under Proposals in the build report.
+;
+; ------------------------------------------------------------------------------------
+; OPEN QUESTION #31 — COPY WRITTEN AND SOURCE-VERIFIED 2026-07-28. AWAITING STEP-8 SIGN-OFF.
+; SECOND-SOURCE PASS 2026-07-28: card was single-sourced (ADW only) because Nat Geo Kids'
+; domain was unreachable. Domain is back and education.nationalgeographic.org was added to
+; spec.md's approved set. Result: PARTIALLY CORROBORATED — clause 2's date was OVER-PRECISE
+; and clause 3's causal framing was HARDER THAN THE SOURCES. Both were corrected; the
+; shipped string CHANGED. See "SOURCES REACHED" and "PER-CLAUSE SOURCING" below, which are
+; rewritten to the double-sourced form; every clause now carries a non-ADW source.
+;
+; `fact_text` below is content-writer's option A, written at Content Pipeline step 5
+; against spec.md -> Fact-Card Content Checklist. The register was never in question
+; (roster.md -> Villagers): the villager's move-in card is a REAL fact card asserting a
+; real-world fact, not flavor, because the two-register rule does not bend for the one
+; species the player happens to be.
+;
+; SOURCES REACHED (all fetched and quoted, none recalled):
+;   [ADW]  https://animaldiversity.org/accounts/Homo_sapiens/
+;   [NGE-A] Nat Geo Society Education, "The Development of Agriculture"
+;          https://education.nationalgeographic.org/resource/development-agriculture/
+;   [NGE-B] "Hunter-Gatherer Culture"
+;          https://education.nationalgeographic.org/resource/hunter-gatherer-culture/
+;   [NGE-C] "Agricultural Communities"
+;          https://education.nationalgeographic.org/resource/resource-library-agricultural-communities/
+;   [NGE-D] "Early Agricultural Communities"
+;          https://education.nationalgeographic.org/resource/early-agricultural-communities/
+; NAT GEO KIDS is reachable again (verified: an article loads) but carries NO human-origins
+; or agriculture-emergence page. Its nearest article, Ancient Egypt, is one region at
+; "as early as 6000 B.C." — far too local and too late to source a worldwide claim. Recorded
+; so nobody re-runs this search: NGK is not a source for this card. (Same lesson as spec.md's
+; Smithsonian-has-no-red-fox-page note — do not assume a site covers a topic.)
+;
+; PER-CLAUSE SOURCING — every clause now carries a NON-ADW source.
+;   "people moved from place to place instead of staying in one home"        CORROBORATED
+;     <- [ADW] "Ancient humans were nomadic hunter gatherers..." (the NOMADIC half only)
+;     <- [NGE-A] "They switched from nomadic hunter-gatherer lifestyles to permanent
+;         settlements and farming." + "Traditional hunter-gatherer lifestyles, followed by
+;         humans since their evolution, were swept aside"
+;     <- [NGE-B] "most hunter-gatherers were nomadic"
+;      NOTE the "most" hedge in NGE-B. NGE-A states it unhedged and universally, and the
+;      card's "Long ago" is a time anchor, not an all-people quantifier, so the clause
+;      stands as written. Flagged for the human anyway — see the build report.
+;
+;   "About 10,000 to 12,000 years ago they learned to grow their own food"   REWRITTEN
+;     WAS: "About 10,000 years ago". The sources DISAGREE, and the disagreement runs
+;     straight through the publication the human added to carry exactly this material:
+;       [ADW]   "the development of agriculture approximately 10,000 years ago"
+;       [NGE-C] "Agricultural communities developed approximately 10,000 years ago"
+;       [NGE-A] "The development of agricultural about 12,000 years ago changed the way
+;                humans lived." + "Taking root around 12,000 years ago"
+;       [NGE-B] "the Neolithic Revolution about 12,000 years ago, when agricultural
+;                practices were first developed"
+;       [NGE-D] "10,000 to 15,000 years ago, during the Neolithic Age"
+;     A flat "about 10,000" sat at the extreme low edge of the range and was contradicted
+;     by the two MOST ON-POINT pages. The range form is true under every source fetched.
+;     This is the over-precision trap: the number read as settled and was not.
+;
+;   "and little by little they settled down in one place"                    REWRITTEN
+;     WAS: "and that is when people began to settle down in one place". The direction of
+;     causation holds, but "that is when" pins a gradual process to a moment, which the
+;     sources explicitly refuse:
+;       [NGE-C] "By domesticating species, many groups of people were able to build settled
+;                communities and transition from a nomadic hunter-gatherer lifestyle"
+;                — the strongest causal support, and note "many groups", not all people
+;       [NGE-A] "Though the transition from wild harvesting was gradual" — an explicit
+;                gradualness hedge, in the source's own voice
+;       [NGE-A] "the switch from a nomadic to a settled way of life is MARKED BY the
+;                appearance of early Neolithic villages" — a marker, not a cause
+;       [NGE-B] "some groups abandoned hunter-gatherer practices to establish permanent
+;                settlements"
+;       [ADW]   "Agriculture ultimately led to increases in regional human populations and
+;                concentration in urban centers..." — note ADW's own "ultimately"
+;     "little by little" carries the gradualness in words a six-year-old already owns, and
+;     softens the all-people reading at the same time. The card no longer claims a date on
+;     which people settled; it claims a slow change that growing food made possible.
+;
+; HABITAT-KEYED, exactly as the fox card keys off cover: growing food IS the `cultivated`
+; need and settling in one place IS the `house` need, so the card explains in real-world
+; terms why this species' habitat is a house with a field beside it.
+;
+; BANNED VOCABULARY, recorded so it is never re-shown: ADW's sentence reads "nomadic hunter
+; gatherers". The copy rests on the CONCLUSION — people moved from place to place — and can
+; never show that work. Same rule the Rabbit warren fact runs under (rabbit.tres).
+;
+; ROSTER-WIDE TERMINOLOGY CHECK (the D-19 "kits"/"kittens" lesson: read other species'
+; SHIPPED COPY, not just the sources). "town" and "village" were drafted and CUT: this
+; entry's `display_name` is "Villager" and the HUD counter is "Village Population", so a
+; real-world claim carrying those words reads as a claim about the game world — precisely
+; what the two-register rule forbids. "family", "home", "den", "warren" as used in
+; fox.tres, rabbit.tres and the news-report pools are untouched by this card.
+;
+; RE-RUN 2026-07-28 for the rewritten clauses. One NEAR-MISS found and cleared, recorded so
+; it is not re-litigated: "SETTLED" is already shipped player-facing copy in the GAME
+; register — docs/content/fox-news-report-pool.md ("a fox family has settled in"),
+; rabbit-news-report-pool.md ("a group of rabbits has settled in"), and displacement-copy.md
+; — where it means "moved into your world". This card uses it in the FACT register. It
+; clears because, unlike "town"/"village", "settled" is not a HUD label but ordinary
+; narrative verb, and the clause is anchored by "Long ago" and a date, which fixes the
+; register before the verb arrives. Had the card said "the first people settled in", it
+; would NOT have cleared. New words "little by little" and "12,000" collide with nothing.
+; CONSISTENCY GAINED: displacement-copy.md's Human lines say the farm family needs "better
+; soil to grow in" and "room to grow"; this card says people "learned to grow their own
+; food". Same verb, same `cultivated` need, across both registers — reinforcing, not
+; colliding, and worth keeping if either string is ever revised.
+;
+; PREDATION / GRAPH CHECK: `avoids` is empty, so the structural predation check stays closed
+; by data (see above). The copy names no other species, no diet, and no danger.
+;
+; NOTE FOR QA — ROUND 2, 2026-07-28. THE SHIPPED STRING CHANGED AGAIN. `test_human_schema.gd`
+; and `test_fact_card.gd` now pin the previous wording with EXACT EQUALITY, so both go red
+; on this edit. That is intended and it is qa-engineer's to re-point, not content-writer's.
+; The one and only correct value is the `fact_text` literal at the bottom of this file —
+; copy it from there, do not retype it. Two characters are easy to lose: the comma-free
+; "10,000 to 12,000" range and "little by little".
+; (Round 1, for the record: this file's copy first replaced a placeholder, invalidating
+; `begins_with PLACEHOLDER_MARKER`, `contains "#31"`, validate()-returns-exactly-one-problem,
+; and `_check_human_placeholder_renders_as_authored()`. Pin it the way `test_fox_schema.gd`
+; pins the fox card: exact-string equality, a not-a-placeholder check, a banned-word sweep,
+; and validate() clean.)
+; ------------------------------------------------------------------------------------
+;
+; NEWS_REPORTS, added 2026-08-09 (Tier 1 row 12, closing the schema gap tier1-status.md named
+; a THIRD time over — fox, then rabbit, then human). Nine lines from
+; docs/content/human-news-report-pool.md's Discovery/hint and Ambient/flavor sub-pools,
+; checklist-passed 2026-08-06 reusing this very fact card's already-verified habitat-need
+; clauses (spec.md:78 — News Report content reuses the fact-card pipeline, not a second
+; sourcing pass). Move-in is not included here — it already has its own channel (this fact
+; card) — and Avoidance-relocation / Symmetric-avoids are explicitly N/A for this species
+; (`avoids` is empty; see the pool file's own "Avoids: does not apply" section).
+;
+; MODEL_SCENES GROWN TO 5 VARIANTS (content-variety pass, human-confirmed): a new villager
+; randomly gets one of Adventurer/Man/Woman/Hoodie/Punk (equal weight, no ordering
+; preference — same D-42 precedent forest.tres's 3-tree pool uses), stably picked per
+; resident by AnimalDefinition.pick_variant(), keyed on the resident's index within its
+; home site's `residents` array. All 5 source scenes were already imported and wrapped
+; before this pass (assets/animals/human_{man,woman,hoodie,punk}/*.tscn) — no new asset
+; import, only wiring.
+;
+; MODEL_SCENES GROWN 5 -> 18 (2026-08-29, Content Pipeline step 4 — model_scenes wiring ONLY;
+; no other AnimalDefinition field is touched by this pass, and none needs to be: Human is a
+; signed-off floor species (D-28) whose habitat_needs, personality, avoids, farm_tolerant and
+; the three capacity constants are settled). 13 character wrappers appended, all imported,
+; wrapped, tested and attributed by tech-art before this pass. Index 0 (Adventurer) stays
+; index 0, unchanged. Variant selection is still AnimalDefinition.pick_variant(), stable per
+; resident, equal weight, no ordering preference (D-42 precedent) — a bigger pool, same rule.
+;
+; NO NEW FACT CARD, AND THAT IS DELIBERATE. These are LOOK VARIANTS of an item whose copy
+; already exists: `fact_text_pool` below is unchanged and still carries the source-verified,
+; double-sourced card documented at length above. A variant does not get its own fact card,
+; so Content Pipeline step 5 is not reopened by this pass.
+;
+; BASE AND `Smooth_` SETS ARE BOTH WIRED, ON PURPOSE — THIS IS A TEMPORARY COMPARISON STATE.
+; Human ruling (2026-08-29): "import both, decide in-engine." The two sets are the same
+; characters authored at different mesh smoothing, and which set reads better under this
+; game's fixed ~45 degree camera is a look call that cannot be made from a file listing. Both
+; are therefore in the pool at once so they can be seen side by side in a running game. THE
+; LOSING SET GETS PULLED once the human decides; until then, do not "deduplicate" this array
+; — the apparent duplication IS the experiment. Pulling a set afterwards is a model_scenes
+; edit plus removal of the corresponding ext_resource lines; the wrappers and attribution
+; entries stay on disk either way.
+;
+;   base   (5, incl. index 0):  Adventurer, Man, AnimatedWoman, HoodieCharacter, Punk
+;   base   (male, added):       MaleLongSleeve, MaleShirt
+;   base   (female, added):     FemaleAlternative, FemaleCasual, FemaleDress, FemaleTankTop
+;   Smooth (male, added):       SmoothMaleCasual, SmoothMaleLongSleeve, SmoothMaleShirt
+;   Smooth (female, added):     SmoothFemaleAlternative, SmoothFemaleCasual, SmoothFemaleDress,
+;                               SmoothFemaleTankTop
+;
+; HELD OUT ON PURPOSE — Male_Suit and Smooth_Male_Suit. Their absence is intentional, not a
+; missed import: art.md's palette rule excludes them at Kd 0.0185, i.e. effectively pure
+; black, which does not sit in this game's palette. Do not add them back without a human
+; ruling on that rule.
+;
+; ASYMMETRY WORTH SEEING, raised not decided: the base set has no `human_male_casual` on disk
+; while the Smooth set does have SmoothMaleCasual, so the two sets are 6-vs-7 rather than a
+; clean pairing. That is a property of the source pack as imported, not of this wiring, but it
+; means the in-engine comparison is not perfectly like-for-like. FLAG FOR HUMAN SIGN-OFF.
+[gd_resource type="Resource" script_class="AnimalDefinition" load_steps=20 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/animal_definition.gd" id="1_schema"]
+[ext_resource type="PackedScene" path="res://assets/animals/human_adventurer/Adventurer.tscn" id="2_model"]
+[ext_resource type="PackedScene" path="res://assets/animals/human_man/Man.tscn" id="3_model"]
+[ext_resource type="PackedScene" path="res://assets/animals/human_woman/AnimatedWoman.tscn" id="4_model"]
+[ext_resource type="PackedScene" path="res://assets/animals/human_hoodie/HoodieCharacter.tscn" id="5_model"]
+[ext_resource type="PackedScene" path="res://assets/animals/human_punk/Punk.tscn" id="6_model"]
+[ext_resource type="PackedScene" path="res://assets/animals/human_male_longsleeve/MaleLongSleeve.tscn" id="7_model"]
+[ext_resource type="PackedScene" path="res://assets/animals/human_male_shirt/MaleShirt.tscn" id="8_model"]
+[ext_resource type="PackedScene" path="res://assets/animals/human_smooth_male_casual/SmoothMaleCasual.tscn" id="9_model"]
+[ext_resource type="PackedScene" path="res://assets/animals/human_smooth_male_longsleeve/SmoothMaleLongSleeve.tscn" id="10_model"]
+[ext_resource type="PackedScene" path="res://assets/animals/human_smooth_male_shirt/SmoothMaleShirt.tscn" id="11_model"]
+[ext_resource type="PackedScene" path="res://assets/animals/human_female_alternative/FemaleAlternative.tscn" id="12_model"]
+[ext_resource type="PackedScene" path="res://assets/animals/human_female_casual/FemaleCasual.tscn" id="13_model"]
+[ext_resource type="PackedScene" path="res://assets/animals/human_female_dress/FemaleDress.tscn" id="14_model"]
+[ext_resource type="PackedScene" path="res://assets/animals/human_female_tanktop/FemaleTankTop.tscn" id="15_model"]
+[ext_resource type="PackedScene" path="res://assets/animals/human_smooth_female_alternative/SmoothFemaleAlternative.tscn" id="16_model"]
+[ext_resource type="PackedScene" path="res://assets/animals/human_smooth_female_casual/SmoothFemaleCasual.tscn" id="17_model"]
+[ext_resource type="PackedScene" path="res://assets/animals/human_smooth_female_dress/SmoothFemaleDress.tscn" id="18_model"]
+[ext_resource type="PackedScene" path="res://assets/animals/human_smooth_female_tanktop/SmoothFemaleTankTop.tscn" id="19_model"]
+
+[resource]
+script = ExtResource("1_schema")
+id = "human"
+display_name = "Villager"
+habitat_needs = Array[String](["house", "cultivated"])
+personality = "Bold"
+avoids = Array[String]([])
+farm_tolerant = true
+scout_radius = 8
+capacity_radius = 0
+tiles_per_individual = 1
+max_individuals = 6
+model_scenes = Array[PackedScene]([ExtResource("2_model"), ExtResource("3_model"), ExtResource("4_model"), ExtResource("5_model"), ExtResource("6_model"), ExtResource("7_model"), ExtResource("8_model"), ExtResource("9_model"), ExtResource("10_model"), ExtResource("11_model"), ExtResource("12_model"), ExtResource("13_model"), ExtResource("14_model"), ExtResource("15_model"), ExtResource("16_model"), ExtResource("17_model"), ExtResource("18_model"), ExtResource("19_model")])
+fact_text_pool = Array[String](["Long ago, people moved from place to place instead of staying in one home. About 10,000 to 12,000 years ago they learned to grow their own food, and little by little they settled down in one place."])
+news_reports = Array[String](["Word has it a family is looking for a new home — somewhere with room for a house and good soil close by to grow their own food…", "A family has been spotted looking over an empty patch of ground, picturing a house there and a field beside it.", "Rumor down the lane: a family wants a snug house with a little farmland close by, room enough to grow what they need…", "Smoke's been curling from the chimney most evenings this week.", "Someone's been out working the field again this morning, whistling while they go.", "A family brought a basket of vegetables in from the field today.", "There's a new fence post out by the field that wasn't there last week.", "More families have been moving in around here, little by little.", "Whoever visited today says every family seems to have a look all its own."])

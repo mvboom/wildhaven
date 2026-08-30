@@ -1,0 +1,105 @@
+; Wild grass — TerrainDefinition data entry (spec.md -> Data Schemas; terrain.md ->
+; Already-Defined Terrain, v1 tag-source mapping; gdd.md -> World Structure).
+;
+; THE EMPTY `emitted_tags` BELOW IS THE POINT OF THIS FILE. Read it as a deliberate value,
+; never as an unfinished entry.
+;
+; Wild grass is what untouched revealed land looks like: visually grass-family, but
+; TAG-INERT. It emits nothing, so it can never satisfy a species and can never raise a
+; neighbourhood's carrying capacity on its own. That is the INERT-LAND INVARIANT
+; (spec.md -> Shared Patterns), and v1 enforces it STRUCTURALLY rather than by rule: if
+; untouched land emitted anything, pushing the mist would hand the player free habitat,
+; breaking both the mist no-reward pillar and the rule that every resident is something
+; the player attracted.
+;
+; This entry is also the DERIVATION SOURCE spec.md requires. spec.md says BARE_TAGS must
+; be "derived from the tag-source mapping at validation time, never hardcoded";
+; TerrainDefinition.derive_bare_tags() reads exactly this file's emitted_tags to produce
+; it. Adding a tag here changes BARE_TAGS automatically instead of silently rotting a
+; hardcoded copy — and TerrainDefinition.validate() additionally rejects any wild_grass
+; entry with a non-empty emitted_tags, so the invariant cannot be broken by data edit.
+;
+; NOTE: AnimalDefinition.BARE_TAGS is still the hardcoded ["open_grass", "quiet"] and was
+; deliberately NOT touched in this task. Wiring it to the derivation is row 6's work; the
+; hardcoded set is strictly STRICTER than the derived empty set, so the invariant is
+; over-enforced rather than under-enforced in the meantime — the safe direction to err.
+;
+; cost = 0 — one free Terraform tap converts wild grass to true grass (terrain.md).
+;
+; MODEL_SCENE NOW POINTS AT REAL ART (2026-08-16): WildGrass.tscn — reuses the same
+; Grass_Common_Short.gltf mesh as true Grass (no new source), composed duller/sparser/
+; patchier per Open Question #29's exact wording ("must read as something to claim,
+; without reading as broken"). This is a PROPOSED treatment for #29, not a closure of it —
+; see WildGrass.tscn's own header for the full reasoning and the human-signoff flag.
+;
+; MODEL_SCENE PLURALIZED TO MODEL_SCENES (-> D-42): the field is now an array so a
+; terrain can carry multiple interchangeable visual variants, stably picked per tile by
+; TerrainDefinition.pick_variant(). This entry originally shipped exactly one scene; see
+; below for the 2026-08-26 addition of 3 more.
+;
+; SAND/DESERT VARIANTS ADDED (2026-08-26, content-variety pass Task 9), THEN REVERTED FROM
+; THE RANDOM POOL (2026-08-26, human eyeball pass): WildGrassCactus.tscn and
+; WildGrassPalm.tscn were built as siblings that instance THIS SAME WildGrass.tscn verbatim
+; plus one desert-flavor prop each (Cactus_1.fbx, PalmTree_1.fbx — Quaternius CC0). Human
+; ruling: plain Wild grass must stay the DEFAULT (not equal-weight-randomized down to 1-of-N
+; per tile), and Cactus/Palm should be exclusively player-selectable via the sub-project B
+; style picker, not part of the automatic random pick. So `model_scenes` is back to its
+; original single entry; WildGrassCactus.tscn/WildGrassPalm.tscn stay imported and
+; attributed on disk (see project/assets/terrain/wild_grass_{cactus,palm}/) for sub-project
+; B to wire in later, not deleted. This also resolves the "equal weight across N variants"
+; open question this file's header used to carry (water.tres's own header still carries the
+; open version of that question for its own array) — for wild_grass specifically, the human
+; decided the ratio directly rather than leaving it flagged.
+;
+; WildGrassCoconut.tscn — REMOVED COMPLETELY (2026-08-26, human eyeball pass): Coconut_Half.fbx
+; (a split-shell/harvest-endpoint prop) did not read well on wild grass and was rejected
+; outright, not deferred to a picker. Its .tscn wrapper, its raw Coconut_Half.fbx copy, and
+; its attribution row were deleted, not merely unwired — this is a different disposition
+; than Cactus/Palm.
+;
+; CACTUS/PALM RE-ADDED TO model_scenes (2026-08-27, sub-project B2 Task 2) — INTENT IS
+; PICKER-ONLY, BUT READ THE INTERIM WINDOW BELOW BEFORE ASSUMING THAT HOLDS AT RUNTIME.
+; This is a data-only change (no code in this task); it does NOT reverse the 2026-08-26
+; ruling above as a DESIGN decision — the human's intent is still that plain Wild grass is
+; the default and Cactus/Palm are picker-only, deliberate choices.
+;
+; HOWEVER: as of THIS task, `terrain_chunk_lod.gd`'s `_refresh_near_tile()` still calls
+; `TerrainDefinition.pick_variant(x, z)` UNCONDITIONALLY for every wild_grass tile (no
+; picker gate exists yet — that lands in sub-project B2 Task 5, which changes this exact
+; call site to resolve through `style_defaults` instead). `pick_variant()`'s own logic
+; (this file's script, untouched) is: 1 entry -> always that entry; >1 entries -> a stable
+; hash of (x, z, id) mod entry count. Growing `model_scenes` here from 1 to 3 therefore
+; DOES immediately change what actually renders — roughly 2/3 of wild_grass tiles will
+; start hash-picking Cactus or Palm instead of plain grass, in every build between this
+; task landing and Task 5 landing. That is a real, visible reversal of the human's stated
+; ruling during that window, not merely "data reachable for later" — flagged to the human
+; in Task 2's report; do not read this comment as claiming the interim behavior is safe.
+; `emitted_tags` below is untouched — still `Array[String]([])`, the inert-land invariant
+; is orthogonal to which model scene renders.
+;
+; CACTUS/PALM UNWIRED FROM model_scenes AGAIN (2026-08-27, post-B2 human ruling): sub-project
+; B2 shipped its long-press style picker (Task 5 landed the `style_defaults` resolution path
+; that the 2026-08-27 comment above was waiting on, closing the interim-window gap it flagged).
+; With the picker live, the human reviewed Cactus/Palm as picker options for Wild grass
+; specifically and ruled they should not be selectable there either — not just kept out of
+; the random pool. `model_scenes` is back to its original single entry, WildGrass.tscn. The
+; now-unreferenced `ext_resource` declarations for Cactus (`3_model`) and Palm (`4_model`)
+; were removed along with this array shrink (`.tres` doesn't require declaring resources it
+; doesn't reference; `load_steps` below was updated to match). WildGrassCactus.tscn and
+; WildGrassPalm.tscn remain imported, attributed, and on disk under
+; project/assets/terrain/wild_grass_{cactus,palm}/ — unused, not deleted — the same
+; disposition they had before B2 Task 2 re-added them; this is an unwire, not the
+; delete-outright treatment WildGrassCoconut.tscn got above.
+[gd_resource type="Resource" script_class="TerrainDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/terrain_definition.gd" id="1_schema"]
+[ext_resource type="PackedScene" path="res://assets/terrain/wild_grass/WildGrass.tscn" id="2_model"]
+
+[resource]
+script = ExtResource("1_schema")
+id = "wild_grass"
+display_name = "Wild grass"
+emitted_tags = Array[String]([])
+cost = 0
+model_scenes = Array[PackedScene]([ExtResource("2_model")])
+harvestable = null

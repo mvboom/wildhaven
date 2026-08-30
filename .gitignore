@@ -15,3 +15,26 @@ export_credentials.cfg
 .mono/
 data_*/
 mono_crash.*.json
+
+
+# Claude Code local state (settings.json IS committed; these are per-machine)
+.claude/settings.local.json
+.claude/local/
+.worktrees/
+
+godot/**
+
+# Secrets — never commit; the agent is also denied read access to these
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+.claude/worktrees
+.superpowers/
+builds/
+node_modules/
+
+personal-local-only/
+docs/superpowers/

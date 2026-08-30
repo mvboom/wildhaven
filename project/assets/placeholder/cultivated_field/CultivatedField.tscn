@@ -1,0 +1,29 @@
+; Cultivated field — GREY-BOX PLACEHOLDER. Authored in-repo from Godot primitives; no
+; third-party source, nothing to attribute (see assets/placeholder/README.md).
+;
+; The only terrain in v1 that costs Wood to paint (terrain.md's one pricing rule: "nature
+; is free; construction costs materials"), and the terrain villager carrying capacity
+; reads, so it must be unmistakable from grass at a glance — a player who cannot tell a
+; field from a lawn cannot tell why a villager did or did not move in.
+;
+; Slab dimensions track grid_manager.gd (0.94 across, TILE_HEIGHT 0.2 thick). Origin is
+; the tile's TOP surface. No crop decoration at grey-box stage: crops have real growth
+; stages in the sourced Nature Crops pack and a box would misrepresent them.
+;
+; COLOUR IS A PLACEHOLDER and a taste call reserved for the human: Color(0.62, 0.45, 0.26)
+; — tilled earth, deliberately a different HUE from every green in the set rather than a
+; different shade of one.
+[gd_scene load_steps=3 format=3]
+
+[sub_resource type="BoxMesh" id="BoxMesh_slab"]
+size = Vector3(0.94, 0.2, 0.94)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_slab"]
+albedo_color = Color(0.62, 0.45, 0.26, 1)
+
+[node name="CultivatedField" type="Node3D"]
+
+[node name="Slab" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+mesh = SubResource("BoxMesh_slab")
+material_override = SubResource("StandardMaterial3D_slab")

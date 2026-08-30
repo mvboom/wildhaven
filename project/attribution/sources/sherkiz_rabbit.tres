@@ -1,0 +1,49 @@
+[gd_resource type="Resource" script_class="AttributionEntry" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://attribution/attribution_entry.gd" id="1_entry"]
+
+[resource]
+script = ExtResource("1_entry")
+id = "sherkiz_rabbit"
+creator = "Sherkiz"
+source_name = "Rabbit"
+source_version = "Published 2025-06-28; downloaded 2026-07-20"
+creator_url = "https://poly.pizza/u/Sherkiz"
+source_url = "https://poly.pizza/m/Km89u3twcR"
+support_url = ""
+license_name = "Creative Commons Attribution 3.0 (CC BY 3.0)"
+license_url = "https://creativecommons.org/licenses/by/3.0/"
+license_file = "res://assets/licenses/Sherkiz_Rabbit_PolyPizza_CC-BY-3.0.txt"
+attribution_required = true
+required_notice = "\"Rabbit\" by Sherkiz, licensed under CC BY 3.0, via Poly Pizza —
+https://poly.pizza/m/Km89u3twcR"
+conditions = "CC BY 3.0. Credit must be visible to the player in the shipped build.
+The licence also requires that modifications be indicated where the work is
+distributed as a derivative — see the modification note below and in license_file."
+assets_used = PackedStringArray("Rabbit")
+per_file_licensing = false
+notes = "FIRST BINDING OBLIGATION IN THIS PROJECT. Everything else so far is CC0.
+Shipping without a visible credit for this model is infringement, which makes the
+in-game Credits screen a RELEASE BLOCKER rather than polish.
+
+THE REQUIRED NOTICE IS A CONSTRUCTION, NOT A QUOTATION. The Poly Pizza model page
+carries no author-supplied attribution string — Sherkiz did not state how they wish
+to be credited. The line in required_notice was assembled from creator + title +
+licence + source URL per standard CC BY practice. A future reviewer should not read
+it as text supplied by the author. If Sherkiz ever publishes a preferred credit
+line, it supersedes this.
+
+Full CC BY 3.0 legal code is NOT embedded in license_file: creativecommons.org was
+unreachable from the build container at import time. Read the canonical text at
+license_url before release.
+
+Aggregator terms resolved 2026-07-20: Poly Pizza's ToS (https://poly.pizza/docs/tos)
+layers no additional conditions, stating only that by downloading you agree to
+adhere to the Creative Commons licence applying at the time of download. No further
+obligation from the aggregator.
+
+Modification status: the .glb in-repo is byte-identical to the upstream download.
+Scale (0.72) and the metallic 0.4 -> 0.0 material fix live in Rabbit.tscn, so no
+modified copy of the work is distributed in source form. The rendered build does
+differ from the original; whether that triggers the CC BY 3.0 s4(b) change-note
+requirement is a release-review question, not settled here."

@@ -1,0 +1,123 @@
+{
+  "species_id": "horse",
+  "species_display_name": "Horse",
+  "generator_model": "claude-haiku-4-5-20251001",
+  "evaluator_model": "claude-opus-5",
+  "refiner_model": "claude-haiku-4-5-20251001",
+  "max_refine": 3,
+  "line_results": {
+    "warn": {
+      "status": "accepted",
+      "text": "The Horse family lives in grassy fields and gardens.",
+      "score": 10,
+      "attempts": [
+        {
+          "attempt": 1,
+          "text": "The Horse family will need grassy fields and gardens to live.",
+          "deterministic": {
+            "passed": true,
+            "problems": []
+          },
+          "score": 5,
+          "reason": "FORMATTING/STRUCTURE (constraint 3): clean pass \u2014 exactly one complete declarative sentence, no em dashes, no parentheses, no fragments, and the home is named by family as 'The Horse family'. Read-aloud-safe for a pre-fluent reader; no clause stacking, no hard vocabulary.\n\nVOCABULARY (constraint 2), narrow check: passes. No loss-coded words, no other Wildhaven species named, and 'grassy fields and gardens' is natural-language habitat description rather than a habitat-tag identifier (it does not surface the literal open_grass/cultivated tokens), which is the permitted way to name the habitat at all.\n\nFRAMING (constraint 2), the real failure: the doctrine requires the warning to name the habitat as a present fact \u2014 what this family's home *is* \u2014 not to project a future deficit. 'will need ... to live' does the latter twice over. 'will need' is future-tense and implicitly counterfactual: it only carries meaning if the player understands the family is about to be without the thing named, so the loss is fully communicated without any banned word ever appearing. That is precisely the implied-loss case a keyword sweep cannot catch. A compliant warn form states the habitat directly, e.g. 'The Horse family lives in grassy fields and gardens.'\n\nTONE (constraint 1), compounding: the trailing 'to live' raises the stakes from habitat to survival. Disclosure copy should tell the player what the home is; 'to live' tells the player what the family will not survive without, which is deterrence pressure and mild emotional leverage rather than a flat factual disclosure. It also sits adjacent to the player's action by construction \u2014 the line is triggered by that action, so 'will need ... to live' places the player's choice and the family's need in the same breath without naming either, which is the framing the doctrine forbids.\n\nNot a low score: the sentence is mechanically sound, warm-neutral in register, contains no pleading, no judgment, no urgency markers, and needs only the verb phrase rewritten from a projected need into a present description. Cannot ship as-is."
+        },
+        {
+          "attempt": 2,
+          "text": "The Horse family lives in grassy fields and gardens.",
+          "deterministic": {
+            "passed": true,
+            "problems": []
+          },
+          "score": 10,
+          "reason": "Passes all three constraint types.\n\nTONE/VOICE: Plain game voice throughout. It is a flat, factual statement of where the family lives, with no pleading, no 'please/poor/sadly/are you sure', no second-person address, no judgment, and no urgency markers (no 'still', 'soon', 'before', 'last'). It reads as disclosure rather than deterrence: it tells the player what this home is without any embedded appeal, and it contains nothing that a later departure or relocation line could refer back to, so it leaves no residue. It also avoids the News Report bulletin register entirely \u2014 no headline syntax, no reported-event framing, no colon-and-clause construction.\n\nVOCABULARY/FRAMING: This is textbook warn-line construction under the villager doctrine. It names the habitat ('grassy fields and gardens') and only the habitat; the loss is never named, implied, or gestured at. There is no loss-coded vocabulary ('lose/lost/losing/nowhere/kicked out/vanish/gone/homeless'), and just as importantly no oblique implication of loss \u2014 no 'has lived here since', no 'this is the only place', no 'for now', none of the constructions that smuggle in impermanence without a banned word. The player's action is entirely absent from the sentence, so there is no possibility of action and hardship sharing a clause. No other Wildhaven species is named, in noun or adjective form. On the closed-graph rule: the habitat is rendered in natural descriptive English rather than tag identifiers \u2014 'grassy fields' is not the identifier 'open_grass' and 'gardens' is not the identifier 'cultivated' \u2014 which is exactly the required technique, since the doctrine demands the habitat be named while the identifiers stay out of player-facing copy.\n\nFORMATTING/STRUCTURE: Exactly one complete sentence, subject\u2013verb\u2013complement, terminal period. No em dashes, no parentheses, no fragments, no semicolons or lists that would break screen-reader cadence. The home is named by family in the required form \u2014 'The Horse family' \u2014 and never reduced to 'they' or 'it'. Vocabulary and clause length are well within pre-fluent six-year-old range; 'grassy' and 'gardens' are concrete and picturable, and the coordinated pair 'fields and gardens' is the only structural complexity, which is trivially read-aloud safe.\n\nNo issue found that would hold up shipping; the deterministic sweep's clean result is correct here."
+        }
+      ]
+    },
+    "depart": {
+      "status": "escalated",
+      "text": "The Horse family found a new home where the grasslands and farmland meet.",
+      "score": 8,
+      "attempts": [
+        {
+          "attempt": 1,
+          "text": "The {display_name} family found a new home with wide grasslands and nearby farmland.",
+          "deterministic": {
+            "passed": false,
+            "problems": [
+              "contains an unresolved template placeholder (a literal { or } character) -- this file's {display_name} syntax belongs only in the *_GENERIC fallback templates, never in a per-species line.",
+              "does not name the affected home by family (\"the Horse family\") -- required structural rule.",
+              "no destination phrase found -- departure/relocation lines must name somewhere the family is going, not just that they left."
+            ]
+          },
+          "score": 4,
+          "reason": "TONE/VOICE (pass): The line is factual and upbeat, states the outcome without pleading, urgency, judgment, or apology, and carries no residue pointing back to a warning. Nothing here reads as bulletin voice.\n\nVOCABULARY/FRAMING (pass, with one thing to watch): The doctrine is honored exactly as written \u2014 the family is described as finding a home, never losing one, and the player's action is entirely absent from the sentence, so there is no adjacency between the action and any hardship. A destination is explicitly named ('a new home with wide grasslands and nearby farmland'), so the family is not left with nowhere to go. No loss-coded words and no other Wildhaven species is named. I disagree with the deterministic sweep's third finding: 'no destination phrase found' is a false positive \u2014 the destination is present and is in fact the strongest part of this draft. On habitat tags: 'grasslands' and 'farmland' are descriptive prose, not the literal tag identifiers open_grass/cultivated, so they do not breach the closed-graph rule; they are the kind of concrete habitat description the doctrine asks for. Worth flagging only that they sit close enough to the tag vocabulary that a stricter reviewer might want them varied.\n\nFORMATTING/STRUCTURE (fail): Exactly one complete sentence, no em dashes, no parentheses, no fragments \u2014 all good. But the line ships a literal unresolved '{display_name}' placeholder, which is disqualifying for a per-species Horse line: that syntax belongs only in the _GENERIC fallback templates. Consequently the structural requirement to name the affected home by family is not actually met \u2014 a screen reader or a pre-fluent six-year-old would hit raw brace-delimited token text instead of 'the Horse family'. I agree with the sweep's first two findings; they are the same defect viewed twice. Fix is mechanical: substitute 'the Horse family' for 'The {display_name} family' (capitalized as 'The Horse family' at sentence start) and the line ships at or near full marks."
+        },
+        {
+          "attempt": 2,
+          "text": "The Horse family found a new home with wide grasslands and nearby farmland.",
+          "deterministic": {
+            "passed": false,
+            "problems": [
+              "no destination phrase found -- departure/relocation lines must name somewhere the family is going, not just that they left."
+            ]
+          },
+          "score": 7,
+          "reason": "TONE/VOICE (pass): The line is factual and upbeat, carries no pleading, judgment, urgency, or hedging, and makes no backward reference to the warning \u2014 it reads as plain game voice, not bulletin voice.\n\nFORMATTING/STRUCTURE (pass): Exactly one complete sentence, no em dashes, no parentheses, no fragment, and the home is named by family as \"The Horse family\" rather than \"they\" or \"it.\" Vocabulary is simple enough for a pre-fluent reader and clean for a screen reader.\n\nVOCABULARY/FRAMING (main deduction): The line correctly frames the family as *finding* a home rather than losing one, and the player's action is entirely absent, so there is no action-adjacent-to-hardship problem and no loss-coded word. Two real weaknesses remain. First, I agree with the deterministic sweep in substance if not in severity: a departure line must carry a destination, and \"a new home with wide grasslands and nearby farmland\" gives only *attributes* of a destination, never a place the family is going. It describes what the new home is like without ever anchoring where it is, which leaves the destination effectively unnamed \u2014 the exact gap the \"never leave a family with nowhere named to go\" rule exists to close. A destination-bearing construction (\"found a new home out past the wide grasslands,\" \"found a new home down where the grasslands meet the fields\") would satisfy it with the same word count. Second, \"nearby\" is unanchored: nearby to what? The most available referent for a player reading this is the player's own plot, which invites a faint causal reading \u2014 the family relocated to the edge of the thing the player just did. That is oblique rather than a violation, but it works against the doctrine's insistence that departure copy carry destination and not cause.\n\nOn the closed-graph rule I read the line as compliant: \"grasslands\" and \"farmland\" are prose paraphrases, not the tag identifiers open_grass or cultivated, and \"home\" is not the house tag. No other Wildhaven species is named, and \"Horse\" is the family's own display_name, which the format requires.\n\nNot shippable as-is: fix the missing destination anchor and the dangling \"nearby,\" and this reaches full marks."
+        },
+        {
+          "attempt": 3,
+          "text": "The Horse family found a new home where the grasslands and farmland meet.",
+          "deterministic": {
+            "passed": false,
+            "problems": [
+              "no destination phrase found -- departure/relocation lines must name somewhere the family is going, not just that they left."
+            ]
+          },
+          "score": 8,
+          "reason": "TONE/VOICE (pass): Plain, factual, upbeat. No pleading, no 'poor'/'sadly', no urgency, no judgment of the player, and no residue pointing back at any warning. It reads as disclosure of an outcome, not as guilt or reassurance-after-harm.\n\nVOCABULARY/FRAMING (mostly pass, one soft concern): The doctrine is honored at the level that matters most \u2014 the family is described as *finding* a home, never losing one, and the player's action is entirely absent from the sentence, so no action/hardship adjacency. No loss-coded vocabulary ('lose', 'nowhere', 'gone', etc.), no other Wildhaven species named or used adjectivally, and no literal habitat-tag identifier appears: 'grasslands' is not 'open_grass', 'farmland' is not 'cultivated', and 'home' is not 'house' \u2014 these are the kind of paraphrase the closed-graph rule expects rather than violations of it. The concern is the destination itself. The line does gesture at somewhere ('where the grasslands and farmland meet'), so I do not fully endorse the deterministic sweep's claim that no destination exists \u2014 but I agree with its spirit. The doctrine requires never leaving a family with nowhere *named* to go, and this is a descriptive edge-condition rather than a named place the player can hold onto; 'where X and Y meet' is a boundary, not an address. For a depart line, whose entire job is to carry the destination, that is under-specified. A named locale would satisfy the requirement unambiguously.\n\nFORMATTING/STRUCTURE (pass): Exactly one complete sentence, no em dashes, no parentheses, no fragments, and the affected home is named by family ('The Horse family') rather than by pronoun.\n\nSecondary note: 'where the grasslands and farmland meet' leans faintly lyrical \u2014 closer to flavor cadence than the plain game voice. It is well short of the News Report register and depart lines have more latitude than the warning, so this alone would not cost much, but combined with the soft destination it keeps the line from shipping as-is."
+        }
+      ]
+    },
+    "move": {
+      "status": "escalated",
+      "text": "The horse family found a new pasture with plenty of room to roam.",
+      "score": 9,
+      "attempts": [
+        {
+          "attempt": 1,
+          "text": "The horse family found a new pasture with plenty of room to roam.",
+          "deterministic": {
+            "passed": true,
+            "problems": []
+          },
+          "score": 9,
+          "reason": "Tone/voice (constraint 1): clean. Factual and upbeat, disclosure rather than deterrence. No pleading, no 'please/poor/sadly', no judgment of the player, no urgency, and no residue \u2014 nothing in the line points back to a warning or to any triggering action. The past-tense 'found' reads as a settled, positive outcome, which is correct for a move line.\n\nVocabulary/framing (constraint 2): compliant. The line carries the DESTINATION ('a new pasture') and never the cause; the player's action is entirely absent, so there is no sentence that co-locates the action with hardship. No loss-coded vocabulary and no implied-loss-without-the-word: 'found a new' is the doctrine's own 'finding a home' framing rather than a euphemism for leaving one. The family is not left with nowhere named to go \u2014 the destination is explicit. No other Wildhaven species is named, and no habitat-tag identifier appears; 'pasture' is a plain-English destination noun that gestures at open ground without using the closed-graph token 'open_grass', which is the correct way to thread that needle.\n\nFormatting/structure (constraint 3): exactly one complete sentence, subject and verb present, no em dashes, no parentheses, no fragments, and the affected home is named by family rather than by a pronoun. Read-Aloud-safe: short, concrete, no clause nesting, all words within a pre-fluent reader's range.\n\nWhy not 10: two small things, both in the structural/voice band rather than the framing band. First, the required pattern is 'the {display_name} family', and display_name for this species is 'Horse' \u2014 the draft renders it lowercase ('The horse family'), which diverges from the templated form and would read as inconsistent next to lines where the display name is substituted verbatim. Second, 'plenty of room to roam' is a rhyming, faintly promotional flourish; it is not disqualifying in a relocation line (which is allowed to carry destination detail), but it leans a half-step toward the flavor register the guide keeps walled off from consent copy, and a plainer qualifier would sit more squarely in the plain game voice. Neither is a framing or loss violation; fix the casing and the line ships."
+        },
+        {
+          "attempt": 2,
+          "text": "The Horse family found a new pasture.",
+          "deterministic": {
+            "passed": false,
+            "problems": [
+              "no destination phrase found -- departure/relocation lines must name somewhere the family is going, not just that they left."
+            ]
+          },
+          "score": 9,
+          "reason": "TONE/VOICE: clean. Plain game voice, factual and quietly upbeat, no pleading, no 'please/poor/sadly', no second-person judgment, no urgency, and no residue pointing back at any earlier warning. It reads as a neutral status note, not a bulletin. VOCABULARY/FRAMING: essentially compliant and a good fit for the villager doctrine. The verb 'found' is the doctrine's own framing (a family is described as finding a home, never losing one), the sentence carries the destination and not the cause, the player's action is entirely absent so no action-and-hardship adjacency exists, no loss-coded words appear, and no other Wildhaven species is named. FORMATTING/STRUCTURE: exactly one complete sentence, subject-verb-object, no em dashes, no parentheses, no fragment, and the home is named by family as 'The Horse family' rather than a pronoun. Read-Aloud safe for a pre-fluent reader. I do NOT agree with the deterministic sweep: 'a new pasture' is an explicit destination, so the family is not left with nowhere named to go; the sweep appears to be pattern-matching on a preposition ('to/at/in the ...') that this construction simply does not need. The one real deduction is closed-graph adjacency: 'pasture' is a near-transparent surface form of the open_grass habitat tag, and while it is not the literal identifier string the rule bans, it sits close enough to the tag vocabulary that a stricter pass could read it as leaking a tag name into player-facing copy. A slightly more concrete, place-flavored destination noun would remove that ambiguity entirely and make the line a clean 10. Secondary, minor: 'new' faintly implies a prior home, but that is exactly the doctrine's sanctioned finding-framing, so it is not a violation."
+        },
+        {
+          "attempt": 3,
+          "text": "The Horse family found a new homestead.",
+          "deterministic": {
+            "passed": false,
+            "problems": [
+              "no destination phrase found -- departure/relocation lines must name somewhere the family is going, not just that they left."
+            ]
+          },
+          "score": 6,
+          "reason": "TONE/VOICE (constraint 1): clean. The line is factual and upbeat, contains no pleading, no judgment, no urgency, no 'sadly'/'poor'/'are you sure', and carries no residue pointing back to any warning. Nothing here reads as bulletin voice. FORMATTING/STRUCTURE (constraint 3): clean. It is exactly one complete sentence with a subject and verb, no em dashes, no parentheses, no fragment, and it names the affected home by family as 'the Horse family' rather than 'they' or 'it'. Read-aloud safe for a pre-fluent reader. VOCABULARY/FRAMING (constraint 2): this is where it fails, and I agree with the deterministic sweep. The doctrine requires that a relocation line carry the DESTINATION and never leave a family with nowhere named to go. 'A new homestead' is an indefinite placeholder, not a destination -- it asserts that finding happened without ever telling the player where, so the family is functionally unplaced. The positive-finding frame ('found', not 'left'/'lost') is correctly chosen and there are no loss-coded words, no named species, and no habitat-tag identifier, so the framing instinct is right; the line simply stops one clause short of satisfying the destination requirement. There is also a secondary, softer concern: 'homestead' sits semantically adjacent to the reserved 'house' tag and, paired with 'new', it faintly implies a prior home that no longer serves -- an implied displacement without an explicit loss word. That alone would not sink the line, but combined with the missing destination it keeps this well short of shippable. Fix by appending a concrete named destination in the same single sentence."
+        }
+      ]
+    }
+  }
+}

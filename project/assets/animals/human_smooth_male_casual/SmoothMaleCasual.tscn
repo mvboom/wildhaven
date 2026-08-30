@@ -1,0 +1,63 @@
+; SmoothMaleCasual — a new Human look variant (Villager). Import only: wiring this into
+; project/data/animals/human.tres's `model_scenes` is gameplay-engineer's step and is NOT
+; done here.
+;
+; Source: Quaternius, "Animated Men Characters" (Feb 2019) pack (FBX), Smooth_Male_Casual.fbx — CC0 1.0
+; Universal, confirmed from the pack's own License.txt before import (copied to
+; res://assets/licenses/Quaternius_AnimatedMenCharacters_License.txt).
+; NEW attribution entry for this project: project/attribution/sources/quaternius_animated_men_characters.tres.
+;
+; SMOOTH VARIANT: this is the pack's subdivided twin of Male_Casual (SHIPPED as human_man/Man.glb) —
+; identical silhouette and identical material set, ~4x the triangles (7932 here). Both
+; sets were imported deliberately so the base-vs-smooth comparison can be made
+; in-engine; the losing set gets pulled later. That comparison is a human call.
+;
+; RIG + CLIPS (MEASURED on this file, not assumed): `HumanArmature`, 42 bones, one
+; AnimationPlayer with 11 clips —
+; HumanArmature|Man_{Idle, Walk, Run, Standing, Sitting, Clapping, Jump, RunningJump,
+; Punch, SwordSlash, Death}. NOTE THE PREFIX: the men's pack names its clips
+; `HumanArmature|Man_*`, NOT `Male_*` — same convention the already-shipped
+; human_man/Man.glb uses, which is why `autoplay` below reads the way it does. The
+; women's pack uses `HumanArmature|Female_*`.
+; Bone count differs from the shipped Man.glb (42 here vs 31 there) even though the
+; armature name and all 11 clip names match exactly — the .glb was exported with
+; unskinned/unanimated bones stripped. Recorded, not corrected; no retarget is
+; involved either way.
+;
+; MATERIAL/TEXTURE AUDIT (measured on the raw, unmodified FBX): albedo_texture is null
+; on all 6 surfaces, and NO mesh surface carries an ARRAY_COLOR channel, so the
+; importer's `vertex_color_use_as_albedo = true` is inert (COLOR defaults to white) and
+; color comes entirely from each named material's albedo_color. Every surface has a
+; distinct, meaningful color — NOT the uniform ~0.9063 grey tell that flagged the
+; DeadTree/PineTree2 missing-texture bug. Nothing to fix; no material_override applied.
+; art.md's no-pure-black palette rule was checked per surface across all 13 models in
+; this batch: the darkest garment anywhere is linear 0.1652 (~44% sRGB grey), well clear
+; of the linear-0.0185 near-black that held Male_Suit/Smooth_Male_Suit out of this batch.
+;
+; SCALE: 0.206667 — MEASURED, not a judgment call. Raw AABB measured via manual
+; local-transform composition (NOT global_transform — see
+; project/data/terrain/cultivated_field.tres's header for why that silently returns
+; identity on a freshly-instantiated, not-yet-tree-attached node): 5.161108 x 4.838693 x
+; 0.918845 (x, y, z). scale = 1 / measured AABB height = 1 / 4.838693 = 0.206667, the same
+; rule Man.tscn states (tile height = 1.0 unit; gdd.md -> Level & world design, "a
+; villager stands ~1 tile tall"). Scaled height lands on 1.0000.
+; The bind pose spreads the arms wide (bbox width 5.1611 pre-scale, ~1.0666 post) —
+; a rest-pose artifact, not a height input; the eyeball check should confirm the Idle
+; clip resolves to a normal standing pose rather than the bind T-pose. Same note
+; Man.tscn carries.
+;
+; FACING: left as authored (identity transform, no rotation) — unconfirmed by a human
+; eye pass. FLAG FOR HUMAN SIGN-OFF.
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" uid="uid://b6sehihpqnt3d" path="res://assets/animals/human_smooth_male_casual/SmoothMaleCasual.fbx" id="1_model"]
+
+[node name="SmoothMaleCasual" type="Node3D"]
+
+[node name="Model" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.206667, 0, 0, 0, 0.206667, 0, 0, 0, 0.206667, 0, 0, 0)
+
+[node name="AnimationPlayer" parent="Model" index="1"]
+autoplay = "HumanArmature|Man_Idle"
+
+[editable path="Model"]

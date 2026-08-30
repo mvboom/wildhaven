@@ -1,0 +1,85 @@
+; Bush — 7th Forest tree pick, added 2026-08-26 (content-variety pass, Task 5). FIRST
+; non-tree Forest variant: ground-level undergrowth rather than a canopy tree, sitting well
+; under all 6 tree picks. Silhouette read is a genuinely different scale-class, not just
+; another shape — flag below.
+;
+; Source: "Bush_1.fbx", Ultimate Nature Pack by Quaternius, CC0 1.0 Universal —
+; License.txt at `source-content/assets/Ultimate Nature Pack - Jun 2019.../License.txt` re-checked
+; before import, per asset-import-pipeline.md's audit gate (states CC0 1.0 Universal /
+; Public Domain Dedication, same boilerplate as every other Quaternius pack in this repo).
+; Recorded in project/attribution/sources/quaternius_ultimate_nature_pack.tres (extends
+; that pack's existing assets_used list — same pack already used for Rock_1/Den pieces and
+; now also BirchTree.tscn).
+;
+; SCALE: the source file bakes a 90-degree axis correction + scale=100 into its own child
+; node (Blender Z-up -> FBX Y-up, same mechanism PineTree.tscn's header documents),
+; measured post-correction global AABB height = 1.2417 units (footprint ~1.328 x 1.690 at
+; that height) — scaled here by 0.483 to hit a ~0.6-tile ground-level canopy height, well
+; under every tree's ~2.2-2.5 tile target, per the task table. FIRST-PASS PROPOSAL, not a
+; measured GDD number — FLAG FOR HUMAN SIGN-OFF: whether a squat bush reads correctly (not
+; "a tree that failed to grow") at the fixed ~45 camera pitch, the same open question every
+; prior tree variant's height carried, but sharper here since this is the first Forest pick
+; at a fundamentally different scale rather than a height variant on the same "tree" class.
+;
+; SLAB IS 1.0x0.2x1.0 (matches every current-generation terrain slab, post the
+; "SLAB WIDENED 0.94 -> 1.0" cross-tile seam fix PineTree.tscn's header documents).
+;
+; FLOOR TREATMENT MATCHES EVERY OTHER FOREST VARIANT EXACTLY (same slab tint, same 3-patch
+; moss/litter blotch treatment, same relative transforms) so a Forest tile's floor reads
+; identically regardless of which of the now-7 picks it lands on.
+;
+; EVERYTHING NESTED UNDER ONE NODE NAMED "Slab" (required, not cosmetic): identical
+; OcclusionFader exemption requirement as every sibling terrain scene — see
+; CommonTree1.tscn's header for the full mechanism. The ground plane (renamed "Ground")
+; and all 3 floor patches are children of a wrapper Node3D literally named "Slab".
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="PackedScene" uid="uid://ckt0yg53yc7f" path="res://assets/terrain/bush/Bush.fbx" id="1_model"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_slab"]
+size = Vector3(1.0, 0.2, 1.0)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_slab"]
+albedo_color = Color(0.16, 0.4, 0.22, 1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_patch1"]
+size = Vector2(0.42, 0.36)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_patch_moss"]
+albedo_color = Color(0.11, 0.32, 0.16, 1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_patch2"]
+size = Vector2(0.3, 0.34)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_patch_litter"]
+albedo_color = Color(0.3, 0.22, 0.13, 1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_patch3"]
+size = Vector2(0.26, 0.3)
+
+[node name="Bush" type="Node3D"]
+
+[node name="Slab" type="Node3D" parent="."]
+
+[node name="Ground" type="MeshInstance3D" parent="Slab"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+mesh = SubResource("BoxMesh_slab")
+material_override = SubResource("StandardMaterial3D_slab")
+
+[node name="FloorPatch_1_Moss" type="MeshInstance3D" parent="Slab"]
+transform = Transform3D(0.965926, 0, -0.258819, 0, 1, 0, 0.258819, 0, 0.965926, -0.18, 0.001, -0.12)
+mesh = SubResource("PlaneMesh_patch1")
+material_override = SubResource("StandardMaterial3D_patch_moss")
+
+[node name="FloorPatch_2_Litter" type="MeshInstance3D" parent="Slab"]
+transform = Transform3D(0.642788, 0, -0.766044, 0, 1, 0, 0.766044, 0, 0.642788, 0.2, 0.001, 0.15)
+mesh = SubResource("PlaneMesh_patch2")
+material_override = SubResource("StandardMaterial3D_patch_litter")
+
+[node name="FloorPatch_3_Moss" type="MeshInstance3D" parent="Slab"]
+transform = Transform3D(-0.173648, 0, -0.984808, 0, 1, 0, 0.984808, 0, -0.173648, 0.05, 0.001, -0.28)
+mesh = SubResource("PlaneMesh_patch3")
+material_override = SubResource("StandardMaterial3D_patch_moss")
+
+[node name="Model" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.483, 0, 0, 0, 0.483, 0, 0, 0, 0.483, 0, 0, 0)

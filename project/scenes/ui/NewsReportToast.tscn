@@ -1,0 +1,65 @@
+[gd_scene load_steps=2 format=3]
+
+; Tier 1 row 12 — the News Report / first-time-nudge toast. spec.md -> Screen Layouts: "a
+; smaller, dismissable banner/toast (not a modal): slides in, never blocks input, auto-
+; dismisses or is tapped away." The panel styling mirrors `DisplacementNotice.tscn`'s own
+; Banner sub-resource exactly (this IS the toast register that scene's own header says it
+; borrows from) so the two read as the same voice; the script re-applies `UiPalette` at
+; runtime, which is the single authority.
+;
+; VERTICAL OFFSET (120px, vs. DisplacementNotice's Banner at 28px) is a JUDGMENT CALL, not a
+; spec value: the two toasts are independent and could in principle both be up at once (a
+; settlement's consequence line and an ambient News Report), and stacking them a body-height
+; apart is cheaper than teaching them to queue with each other across two different classes.
+; Flagged under Proposals.
+
+[ext_resource type="Script" path="res://scripts/ui/news_report_toast.gd" id="1"]
+
+[sub_resource type="StyleBoxFlat" id="BannerPanel"]
+content_margin_left = 18.0
+content_margin_top = 18.0
+content_margin_right = 18.0
+content_margin_bottom = 18.0
+bg_color = Color(1, 0.973, 0.906, 1)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 8
+border_color = Color(0.42, 0.29, 0.169, 1)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+
+[node name="NewsReportToast" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1")
+
+[node name="Banner" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(560, 0)
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_top = 120.0
+offset_bottom = 120.0
+grow_horizontal = 2
+size_flags_horizontal = 4
+theme_override_styles/panel = SubResource("BannerPanel")
+
+[node name="BannerLabel" type="Label" parent="Banner"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 26
+text = "Word has it a fox is looking for a new home — somewhere with plenty of trees and quiet places to tuck into…"
+autowrap_mode = 3
+horizontal_alignment = 1

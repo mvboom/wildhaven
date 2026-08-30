@@ -1,0 +1,66 @@
+[gd_resource type="Resource" script_class="AttributionEntry" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://attribution/attribution_entry.gd" id="1_entry"]
+
+[resource]
+script = ExtResource("1_entry")
+id = "quaternius_poly_pizza_nature"
+creator = "Quaternius"
+source_name = "Standalone Nature/Crops Models"
+source_version = "Downloaded individually via poly.pizza model pages, 2026-08-16 (exact
+retrieval date recorded, unlike quaternius_poly_pizza_characters.tres's undated set)."
+creator_url = "https://quaternius.com"
+source_url = "https://poly.pizza/u/Quaternius"
+support_url = "https://www.patreon.com/quaternius"
+license_name = "CC0 1.0 Universal (CC0 1.0) Public Domain Dedication"
+license_url = "https://creativecommons.org/publicdomain/zero/1.0/"
+license_file = "res://assets/licenses/Quaternius_UltimateAnimatedAnimals_License.txt"
+attribution_required = false
+required_notice = ""
+conditions = ""
+assets_used = PackedStringArray("Rock (poly.pizza/m/4MUaQTcDdc)", "Rock Medium (poly.pizza/m/s1OJ3bBzqc)", "Rocks (poly.pizza/m/OQvi8PIZ40)", "Grass (poly.pizza/m/UGTOzcO3P2)", "Crops (poly.pizza/m/Ro6K0Yg7mx)", "Wheat (poly.pizza/m/lPspzfC8Pu)", "Pine Tree (poly.pizza/m/gX8WmgkeEm)")
+per_file_licensing = false
+notes = "CC0 — crediting is courtesy, not compliance. Reuses
+Quaternius_UltimateAnimatedAnimals_License.txt as license_file rather than duplicating an
+identical generic CC0 boilerplate under a new filename, same convention as every other
+Quaternius entry in this project (the text is not pack-specific).
+
+Sourced for the 2026-08-16 terrain look-pass (grass/forest/rock/water/cultivated_field/
+wild_grass). Each model's exact poly.pizza page URL is recorded in assets_used above
+(unlike quaternius_poly_pizza_characters.tres, whose five files predate this convention) —
+confirmed Quaternius creator + CC0 license on each page before download, per
+asset-import-pipeline.md's audit gate.
+
+Per-asset destination and use:
+  - Rock_2.glb (\"Rock\") -> project/assets/terrain/rock_2/ -> used in RockCluster2.tscn,
+    RockCluster3.tscn, RockCluster4.tscn.
+  - RockMediumMoss.glb (\"Rock Medium\") -> project/assets/terrain/rock_medium_moss/ ->
+    used in RockCluster3.tscn as the mossy anchor piece.
+  - RocksCluster.glb (\"Rocks\", a pre-modeled 3-rock group) ->
+    project/assets/terrain/rocks_cluster/ -> used in RockCluster4.tscn.
+  - GrassTufts.glb (\"Grass\") -> project/assets/terrain/grass_tufts/ -> IMPORTED BUT NOT
+    WIRED. Its two internal mesh objects (Grass_Large_Extruded, Grass_Small) sit ~1.37
+    tile-units apart in the source file's own local space (confirmed by AABB measurement,
+    not assumed) — an artifact of how this file was assembled upstream, not a per-tile
+    prop pair. Instancing the whole file at tile scale would place one tuft off in empty
+    space well outside the tile; safely extracting just one internal node from a hand-
+    authored .tscn risks exactly the \"silently corrupts the scene\" failure mode
+    asset-import-pipeline.md warns about for scene-editing tools, so this was left
+    unwired rather than forced. Available for a future pass if a human wants to invest
+    editor time in splitting it.
+  - CropsPlot.glb (\"Crops\") -> project/assets/terrain/crops_plot/ -> used in
+    CultivatedCropsPlot.tscn.
+  - Wheat.glb (\"Wheat\") -> project/assets/terrain/wheat/ -> used in
+    CultivatedWheatRow.tscn.
+  - PineTree.glb (\"Pine Tree\") -> project/assets/terrain/pine_tree/ -> used in
+    PineTree.tscn, wired as forest.tres's 3rd model_scenes entry (2026-08-16, same-day
+    follow-up after a human eyeball pass on the look-pass above reported forest not
+    reading as alternating between assets — CommonTree1/CommonTree2 read as
+    indistinguishable at the fixed camera pitch; Pine Tree is a genuinely different
+    conifer silhouette, not a third round-canopy \"common tree\").
+
+DISTINCT FROM quaternius_ultimate_nature_pack.tres and
+quaternius_stylized_nature_megakit.tres: those are two specific named/versioned pack
+downloads with their own pack pages; these six are standalone poly.pizza model downloads
+whose parent pack (if any) was not identified, same relationship as
+quaternius_poly_pizza_characters.tres has to the two named animal packs."

@@ -1,0 +1,88 @@
+; WaterLilypad1 — 1st of 2 lilypad-dressed Water variants (content-variety pass Task 8,
+; 2026-08-26). Sparser of the two: 2 lilypads. See WaterLilypad2.tscn for the denser (4
+; lilypad) sibling and water.tres's own header for the model_scenes array change and the
+; equal-weight open question this pair raises.
+;
+; STRUCTURE: instances the existing res://assets/terrain/water/Water.tscn verbatim as a
+; child (identity transform — same position/shader/ripple/fresnel treatment as every plain
+; water tile, per the task's explicit "don't duplicate the shader setup" instruction) plus
+; 2 Lilypad.fbx prop instances scattered near the tile edges. This scene does NOT touch
+; Water.tscn or water_surface.gdshader.
+;
+; Source: "Lilypad.fbx", Ultimate Nature Pack by Quaternius, CC0 1.0 Universal — found by
+; on-disk `find` in the already-owned pack directory (source-content/assets/Ultimate Nature
+; Pack.../FBX/Lilypad.fbx), NOT a poly.pizza standalone download, so this pass extends
+; project/attribution/sources/quaternius_ultimate_nature_pack.tres's assets_used list
+; rather than quaternius_poly_pizza_nature.tres (see that file's own note on this
+; discrepancy from the task brief's file list, which named the poly.pizza source before
+; the on-disk search confirmed the pack source instead). License.txt re-checked at
+; `source-content/assets/Ultimate Nature Pack - Jun 2019.../License.txt` before import, per
+; asset-import-pipeline.md's audit gate — same boilerplate CC0 1.0 text as every other
+; Quaternius pack in this repo. No embedded textures (2 flat vertex-color materials,
+; "Green"/"Pink", per the source .mtl) so no texture files to carry over, same as
+; Bush.fbx/Rock_Moss_N.fbx's no-texture precedent.
+;
+; RAW SOURCE LOCATION: copied once to res://assets/terrain/lilypad/Lilypad.fbx (a shared
+; per-model directory, NOT duplicated into this scene's own folder) and referenced here by
+; uid from both WaterLilypad1.tscn and WaterLilypad2.tscn — same "one raw copy, reused by
+; uid across multiple composed scenes" convention RockCluster5.tscn/RockCluster6.tscn
+; already established for rock_moss_5/Rock_Moss_5.fbx and rock_moss_2/Rock_Moss_2.fbx,
+; chosen over a literal duplicate-per-scene copy (a reasonable reading of the task brief's
+; "(+ raw source)" file list, but not what this project's own precedent does for a shared
+; single-model source reused by more than one composed scene).
+;
+; SCALE: raw Lilypad.fbx measured AABB (one-off SceneTree script, same procedure Task 5/6
+; used) = size (1.197, 0.221, 1.189) in the file's own baked local space — i.e. a single
+; raw lilypad is nearly the FULL 1x1 tile footprint on its own, far too big for a scattered
+; edge prop. Scaled down to 0.24 and 0.28 per instance here (~0.29-0.34 footprint each) so
+; 2 lilypads read as discrete pads near the tile's edges rather than one giant pad covering
+; the tile. FIRST-PASS PROPOSAL, not a measured GDD number — FLAG FOR HUMAN SIGN-OFF: same
+; open question every prior prop-scale judgment call in this pass carries, whether the
+; lilypad reads at the correct relative size against the water surface and other terrain
+; props at the fixed ~45 degree camera pitch.
+;
+; PLACEMENT: both lilypads positioned toward two opposite corners (not tile-centered, not
+; overlapping the water tile's center where a future ripple/reflection focal point might
+; sit) — same "props near tile edges" placement Task 5's floor-patch scatter (see e.g.
+; Bush.tscn's FloorPatch_N transforms) already demonstrates for a different prop type on a
+; different terrain. Y = -0.11, ~0.03 above Water.tscn's own surface plane at y = -0.14, so
+; the pads read as resting on the water surface rather than z-fighting or floating detached
+; above it.
+;
+; TILE-BOUNDARY CLEARANCE (CORRECTED 2026-08-26, post-review fix): the original version of
+; this scene claimed a "|position| + scale * 0.6 < ~0.44" safety margin — that formula was
+; WRONG (it does not correctly account for the raw mesh's actual off-center local AABB, and
+; the reviewer's own recomputation of that exact formula got 0.53-0.56, already over the 0.5
+; tile half-footprint by the formula's own math). The TRUE worst-case footprint was measured
+; by transforming the raw model's actual local AABB corners through each instance's real
+; Transform3D (one-off SceneTree script, res://tests/_measure_lilypad_clearance.gd, deleted
+; after use — a proper full-corner transform, not a shortcut) and reading off clearance from
+; all 4 tile edges (x=+-0.5, z=+-0.5). Original placement measured this way: Lilypad_A
+; cleared its nearest edge (x=-0.5) by only 0.00047 units (0.09% of the tile half-width) and
+; Lilypad_B cleared its nearest edge (x=+0.5) by only 0.0016 — both technically inside but
+; effectively touching the line, not a real safety margin. FIXED by nudging both positions
+; ~0.03 units toward tile center (Lilypad_A: (-0.30,-0.11,-0.28) -> (-0.27,-0.11,-0.25);
+; Lilypad_B: (0.27,-0.11,0.25) -> (0.24,-0.11,0.22)) — same scale/rotation, only translation
+; changed. RE-VERIFIED with the same script: Lilypad_A worst-case clearance is now 0.0305,
+; Lilypad_B is now 0.0316 — both genuinely inside the tile with real margin, not by-a-hair.
+;
+; NO "Slab" WRAPPER NEEDED: unlike every land terrain, Water.tscn's own ground geometry
+; already lives under a node named "Slab" inside the instanced Water.tscn itself (see that
+; scene's own header — the OcclusionFader exemption mechanism is internal to Water.tscn,
+; not something this wrapper scene needs to reproduce). The lilypad props sit as plain
+; siblings of the Water instance; if OcclusionFader ever needs to fade them, that is a
+; deliberate future call, not an oversight — lilypads are small props, not ground.
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://assets/terrain/water/Water.tscn" id="1_water"]
+[ext_resource type="PackedScene" uid="uid://bkowrxvsd8s80" path="res://assets/terrain/lilypad/Lilypad.fbx" id="2_lilypad"]
+
+[node name="WaterLilypad1" type="Node3D"]
+
+[node name="Water" parent="." instance=ExtResource("1_water")]
+
+[node name="Lilypad_A" parent="." instance=ExtResource("2_lilypad")]
+transform = Transform3D(0.19660, 0, -0.13766, 0, 0.24, 0, 0.13766, 0, 0.19660, -0.27, -0.11, -0.25)
+
+[node name="Lilypad_B" parent="." instance=ExtResource("2_lilypad")]
+transform = Transform3D(-0.24249, 0, -0.14, 0, 0.28, 0, 0.14, 0, -0.24249, 0.24, -0.11, 0.22)

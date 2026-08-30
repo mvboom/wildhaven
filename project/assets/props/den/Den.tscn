@@ -1,0 +1,26 @@
+; Den — the move-in prop (den/burrow/nest) referenced by gdd.md -> Level & world design:
+; "the move-in prop (den, burrow, nest) is decoration — no tiles, no collision, gone if the
+; home relocates." Composed from 3 existing CC0 Quaternius pieces (Ultimate Nature Pack)
+; per art.md's own suggestion ("mossy log + rock + bush = a den") — no dedicated den model
+; exists in any evaluated pack.
+;
+; Arrangement is a FIRST-PASS look-pass composition, not yet eyeballed in-engine: log as
+; the base anchor, rock nestled against one end, bush behind/beside. Per-piece scale is a
+; proposal, not a measurement (unlike the animal wrappers, there is no person-scale target
+; to fit against) — flagged for human sign-off same as the House pick.
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="PackedScene" uid="uid://dcqsf5fte6jwi" path="res://assets/props/den/WoodLog_Moss.fbx" id="1_log"]
+[ext_resource type="PackedScene" uid="uid://b5pqr3l1dqg36" path="res://assets/props/den/Rock_Moss_3.fbx" id="2_rock"]
+[ext_resource type="PackedScene" uid="uid://chdchipy6x0be" path="res://assets/props/den/Bush_1.fbx" id="3_bush"]
+
+[node name="Den" type="Node3D"]
+
+[node name="Log" parent="." instance=ExtResource("1_log")]
+transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, 0, 0, 0)
+
+[node name="Rock" parent="." instance=ExtResource("2_rock")]
+transform = Transform3D(0.55, 0, 0, 0, 0.55, 0, 0, 0, 0.55, 0.35, 0, 0.3)
+
+[node name="Bush" parent="." instance=ExtResource("3_bush")]
+transform = Transform3D(0.45, 0, 0, 0, 0.45, 0, 0, 0, 0.45, -0.3, 0, -0.35)

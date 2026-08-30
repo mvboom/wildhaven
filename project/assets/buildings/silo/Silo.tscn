@@ -1,0 +1,40 @@
+; Silo — NEW farm-building placeable (content-variety pass Task 3, 2026-08-26), one of 8
+; brand-new PlaceableDefinition entries. See project/data/buildings/silo.tres for the full
+; data-entry header (proposed cost/footprint, human sign-off flag).
+;
+; Source: Quaternius, "Farm Buildings" pack (FBX), Silo.fbx — CC0 1.0 Universal.
+; License.txt confirmed CC0 1.0 Universal / Public Domain Dedication before import, per
+; asset-import-pipeline.md's audit gate. Same NEW pack as Barn.tscn — see
+; project/attribution/sources/quaternius_farm_buildings.tres.
+;
+; TEXTURE AUDIT (mandatory — DeadTree/PineTree2 precedent; see Barn.tscn's header for the
+; full method): probed every surface on the raw, unmodified FBX. albedo_texture null on
+; every surface, but vertex_color_use_as_albedo reads true with MEANINGFUL, DISTINCT
+; per-surface colors (mid red-brown ~(0.5601, 0.2625, 0.2265), light grey trim ~(0.821,
+; 0.821, 0.821), dark red ~(0.4872, 0.228, 0.1966), brown wood ~(0.5115, 0.3069, 0.2132),
+; mid grey metal ~(0.6269, 0.6269, 0.6269)) — same pack's named flat-color materials
+; baked into real per-vertex color, NOT the uniform near-(0.9063, 0.9063, 0.9063, 1.0)
+; missing-texture tell. No texture fix needed; no material_override applied. Plain
+; instance.
+;
+; SCALE: raw AABB measured via manual local-transform composition on the unmodified FBX
+; (NOT global_transform): footprint 3.6675 x 3.5100 (x, z) tile-units, height 9.0686 — a
+; naturally TALL, narrow-footprint structure (a grain silo). Target max-axis 0.869309
+; (House's own established 1x1 margin). Long axis (x) scaled by 0.237029. Scaled result:
+; 0.8693 x 2.1495 x 0.8320 (x, y, z) — a tall (~2.15 unit) silo standing on a 1x1
+; footprint, height deliberately NOT capped to match the other buildings (a silo reading
+; tall is the point of the shape; capping it to a shorter height would flatten the
+; silhouette this asset was picked for).
+;
+; FACING: left as authored (identity transform, no rotation) — unconfirmed by a human eye
+; pass. FLAG FOR HUMAN SIGN-OFF, including whether the ~2.15-unit height reads correctly
+; (not "too tall"/oddly proportioned) at the fixed camera pitch next to 1x1-footprint,
+; much-shorter neighbors.
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" uid="uid://cgekvvst84cvj" path="res://assets/buildings/silo/Silo.fbx" id="1_model"]
+
+[node name="Silo" type="Node3D"]
+
+[node name="Model" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.237029, 0, 0, 0, 0.237029, 0, 0, 0, 0.237029, 0, 0, 0)

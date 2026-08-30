@@ -1,0 +1,50 @@
+; Barn — NEW PlaceableDefinition (content-variety pass Task 3, 2026-08-26). One of 8
+; brand-new farm buildings (Barn, SmallBarn, OpenBarn, ChickenCoop, Silo, Windmill,
+; WaterTower, Well) — each a real, independent buildable, not a look variant of House or
+; of each other. See project/assets/buildings/barn/Barn.tscn for the asset-level header
+; (source, license, texture audit, measured-scale reasoning).
+;
+; NO DESIGN DOC STATES ANY OF THIS ITEM'S VALUES — buildings.md's only decided
+; buildable is the House. Every field below is a FIRST-PASS PROPOSAL, sourced only from
+; House's own stated baselines (~15 Wood/1x1, ~30 Wood/2x2 — buildings.md), not a decided
+; value. FLAG FOR HUMAN SIGN-OFF, cost/footprint especially:
+;
+;   footprint = Vector2i(2, 2) -> Barn is the ONE OUTLIER in this batch's proposal table:
+;                                  every other new farm building proposes 1x1; only Barn
+;                                  proposes 2x2, matching its own raw mesh being visibly
+;                                  the largest of the 8 (see Barn.tscn's header — raw
+;                                  footprint 7.7 x 8.2 units, tallest-footprint of the
+;                                  batch alongside SmallBarn/OpenBarn). This is a judgment
+;                                  call about relative SIZE reading, not a design decision
+;                                  — the human may prefer a uniform 1x1 table instead.
+;   cost = 30                  -> buildings.md's stated 2x2 baseline ("~30 Wood"),
+;                                  proposed here only because footprint = 2x2 was
+;                                  proposed above; the two proposals are linked, not
+;                                  independently decided.
+;
+; allowed_terrain = ["grass"] (matching House — "houses build on grass only" reasoning
+; extended to farm buildings generally, not evaluated per-building here) and
+; emitted_tags = [] (no species in the shared ten-tag vocabulary needs a farm-building
+; tag; House remains the only source of the `house` tag) are NOT proposals in the same
+; open-question sense — they are this task's own explicit, uniform choice, stated plainly
+; in this task's brief, not sourced from any design doc row.
+;
+; fact_text is Content Pipeline step 5 (content-writer's job, not tech-art's) — left as
+; PLACEHOLDER, the correct interim state PlaceableDefinition.pending_signoff() already
+; expects and handles (matches AnimalDefinition.PLACEHOLDER_MARKER's convention exactly).
+[gd_resource type="Resource" script_class="PlaceableDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/placeable_definition.gd" id="1_schema"]
+[ext_resource type="PackedScene" path="res://assets/buildings/barn/Barn.tscn" id="2_model"]
+
+[resource]
+script = ExtResource("1_schema")
+id = "barn"
+display_name = "Barn"
+hotbar_category = "farm_building"
+cost = 30
+footprint = Vector2i(2, 2)
+allowed_terrain = Array[String](["grass"])
+emitted_tags = Array[String]([])
+model_scenes = Array[PackedScene]([ExtResource("2_model")])
+fact_text = "PLACEHOLDER — flavor copy for the Barn pending Content Pipeline step 5."

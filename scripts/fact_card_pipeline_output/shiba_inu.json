@@ -1,0 +1,91 @@
+{
+  "species_id": "shiba_inu",
+  "species_display_name": "Shiba Inu",
+  "generator_model": "claude-haiku-4-5-20251001",
+  "evaluator_model": "claude-opus-5",
+  "max_refine": 3,
+  "requested_count": 2,
+  "accepted_fact_texts": [
+    "Shiba Inus are small dogs from Japan with fluffy double coats and distinctive white markings. These spirited pups form strong, loyal bonds with their families and are confident, independent thinkers!",
+    "Look closely at a Shiba Inu's tail\u2014it curls up and loops over their back in a beautiful curve!"
+  ],
+  "candidates": [
+    {
+      "status": "accepted",
+      "fact_text": "Shiba Inus are small dogs from Japan with fluffy double coats and distinctive white markings. These spirited pups form strong, loyal bonds with their families and are confident, independent thinkers!",
+      "attempts": [
+        {
+          "attempt": 1,
+          "fact_text": "Shiba Inus are small dogs from Japan with fluffy coats and special cream-colored markings. These spirited pups are smart and independent, and they like to keep their distance from unfamiliar dogs!",
+          "source_note": "en.wikipedia.org/wiki/Shiba_Inu \u2014 verified physical characteristics (fluffy double coat, cream-colored markings/urajiro), origin (Japan), and temperament (alert, independent, intelligent)",
+          "deterministic": {
+            "passed": true,
+            "problems": []
+          },
+          "llm_judge": {
+            "passed": false,
+            "problems": [
+              "Oblique fear/tension framing: 'like to keep their distance from unfamiliar dogs' presents other animals as something to be wary of and avoided, implying distrust or potential conflict between animals \u2014 a wariness cue that reads as danger-adjacent under the ban even though no banned word appears. Recast the aloofness trait positively, e.g. as loyalty to their own household/friends or enjoying their own quiet company."
+            ],
+            "skipped": false
+          },
+          "passed": false
+        },
+        {
+          "attempt": 2,
+          "fact_text": "Shiba Inus are small dogs from Japan with fluffy double coats and distinctive white markings. These spirited pups form strong, loyal bonds with their families and are confident, independent thinkers!",
+          "source_note": "en.wikipedia.org \u2014 Verified physical characteristics (small size, double coat, white markings/urajiro), origin (Japan), and temperament (independent, affectionate, intelligent, confident). Reframes independence positively as family loyalty and confident thinking rather than distance-keeping from other animals.",
+          "deterministic": {
+            "passed": true,
+            "problems": []
+          },
+          "llm_judge": {
+            "passed": true,
+            "problems": [],
+            "skipped": false
+          },
+          "passed": true
+        }
+      ]
+    },
+    {
+      "status": "accepted",
+      "fact_text": "Look closely at a Shiba Inu's tail\u2014it curls up and loops over their back in a beautiful curve!",
+      "attempts": [
+        {
+          "attempt": 1,
+          "fact_text": "Shiba Inus are one of Japan's oldest dog breeds, known for their bold independence and beautiful thick double coats. Their coats come in bright colors like red, cream, and black and tan, often with white markings.",
+          "source_note": "en.wikipedia.org/wiki/Shiba_Inu - information about Shiba Inu origin, temperament, and coat characteristics",
+          "deterministic": {
+            "passed": true,
+            "problems": []
+          },
+          "llm_judge": {
+            "passed": false,
+            "problems": [
+              "Duplicate fact: the substance overlaps almost entirely with the accepted card \u2014 both state the dog is from Japan, has a thick/fluffy double coat, has white markings, and is bold/independent. The only genuinely new material ('one of Japan's oldest breeds' plus the specific color list) is bundled inside a restatement of the existing card rather than standing as a distinct fact. Rewrite to center a single new trait (e.g. the breed's great age, or the coat colors) without re-listing double coat, white markings, and independent personality.",
+              "Tone reads like a breed-standard catalog entry rather than warm plain language for a 6-year-old: 'known for their bold independence and beautiful thick double coats' stacks abstract nouns ('independence') and show-catalog phrasing. Prefer concrete, friendly wording a young reader can picture, e.g. 'Shiba Inus have been living in Japan for a very, very long time!'"
+            ],
+            "skipped": false
+          },
+          "passed": false
+        },
+        {
+          "attempt": 2,
+          "fact_text": "Look closely at a Shiba Inu's tail\u2014it curls up and loops over their back in a beautiful curve!",
+          "source_note": "Verified from en.wikipedia.org (Shiba Inu article), which describes the breed's characteristic curled tail that curves over the back, distinguishing modern Shiba Inus from historical regional varieties.",
+          "deterministic": {
+            "passed": true,
+            "problems": []
+          },
+          "llm_judge": {
+            "passed": true,
+            "problems": [],
+            "skipped": false
+          },
+          "passed": true
+        }
+      ]
+    }
+  ]
+}

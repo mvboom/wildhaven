@@ -1,0 +1,31 @@
+; Wild grass — GREY-BOX PLACEHOLDER. Authored in-repo from Godot primitives; no
+; third-party source, nothing to attribute (see assets/placeholder/README.md).
+;
+; This is what UNTOUCHED REVEALED LAND looks like (gdd.md -> World Structure): visually
+; grass-family but tag-inert. It emits nothing, so it never satisfies a species or raises
+; a neighbourhood's carrying capacity — the inert-land invariant, made structural.
+;
+; Slab dimensions track grid_manager.gd (0.94 across, TILE_HEIGHT 0.2 thick). Origin is
+; the tile's TOP surface.
+;
+; COLOUR IS A PLACEHOLDER and a taste call reserved for the human, and this one is the
+; live end of OPEN QUESTION #29 ("how visibly untouched revealed land reads as *wild* vs.
+; true grass — it must read as something to claim, without reading as broken").
+; Color(0.55, 0.62, 0.36) is a duller, drier, yellower sibling of the true-grass green,
+; chosen so the two are distinguishable side by side while staying obviously the same
+; family. A grey-box cannot settle #29 — that is an art-pass call — but it must not
+; pre-empt it either, so nothing here reads as damaged or missing.
+[gd_scene load_steps=3 format=3]
+
+[sub_resource type="BoxMesh" id="BoxMesh_slab"]
+size = Vector3(0.94, 0.2, 0.94)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_slab"]
+albedo_color = Color(0.55, 0.62, 0.36, 1)
+
+[node name="WildGrass" type="Node3D"]
+
+[node name="Slab" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+mesh = SubResource("BoxMesh_slab")
+material_override = SubResource("StandardMaterial3D_slab")

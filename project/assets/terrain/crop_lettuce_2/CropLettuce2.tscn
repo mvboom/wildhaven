@@ -1,0 +1,44 @@
+; CropLettuce2 — Cultivated field crop variant (content-variety pass Task 7,
+; 2026-08-26). See cultivated_field.tres's header for the full batch rationale,
+; the measurement-tooling note, and the human sign-off flag.
+;
+; Source: Lettuce_2.fbx, "Nature Crops Pack" (Jan 2020) by Quaternius, CC0 1.0
+; Universal, Public Domain Dedication — see
+; project/attribution/sources/quaternius_nature_crops_pack.tres. Represents the
+; mid-growth ("_2") growth stage.
+;
+; Raw measured AABB (manually-composed local transform, not global_transform —
+; see cultivated_field.tres's header for why): footprint 0.3689x0.3673, height 0.3540
+; tile-units. Scaled to ~0.10 tile-units tall (footprint capped at ~0.22 on
+; whichever axis is larger — height-limited for this item). 3 small clustered
+; instances per tile, not a single plant in the middle of a box, same convention
+; as CultivatedWheatRow's clumps. FLAG FOR HUMAN SIGN-OFF — same posture as every
+; other scale/count decision in this pass.
+;
+; Slab matches CultivatedWheatRow/CultivatedCropsPlot's dirt-brown (Color(0.4, 0.28, 0.16, 1)) for
+; tonal consistency across all Cultivated field variants.
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="PackedScene" uid="uid://cxqtd8020k6de" path="res://assets/terrain/crop_lettuce_2/Lettuce_2.fbx" id="1_model"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_slab"]
+size = Vector3(1.0, 0.2, 1.0)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_slab"]
+albedo_color = Color(0.4, 0.28, 0.16, 1)
+
+[node name="CropLettuce2" type="Node3D"]
+
+[node name="Slab" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+mesh = SubResource("BoxMesh_slab")
+material_override = SubResource("StandardMaterial3D_slab")
+
+[node name="Lettuce_A" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.264267, 0, -0.046597, 0, 0.268344, 0, 0.046597, 0, 0.264267, -0.22, 0, -0.15)
+
+[node name="Lettuce_B" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.287781, 0, 0.071752, 0, 0.296591, 0, -0.071752, 0, 0.287781, 0.2, 0, 0.06)
+
+[node name="Lettuce_C" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.265433, 0, -0.096610, 0, 0.282468, 0, 0.096610, 0, 0.265433, -0.03, 0, 0.22)

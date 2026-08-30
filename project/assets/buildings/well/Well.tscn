@@ -1,0 +1,38 @@
+; Well — NEW farm-building placeable (content-variety pass Task 3, 2026-08-26), one of 8
+; brand-new PlaceableDefinition entries. See project/data/buildings/well.tres for the full
+; data-entry header (proposed cost/footprint, human sign-off flag).
+;
+; Source: Quaternius, "Farm Buildings" pack (FBX), Well.fbx — CC0 1.0 Universal.
+; License.txt confirmed CC0 1.0 Universal / Public Domain Dedication before import, per
+; asset-import-pipeline.md's audit gate. Same NEW pack as Barn.tscn — see
+; project/attribution/sources/quaternius_farm_buildings.tres.
+;
+; TEXTURE AUDIT (mandatory — DeadTree/PineTree2 precedent; see Barn.tscn's header for the
+; full method): probed every surface on the raw, unmodified FBX. albedo_texture null on
+; every surface, but vertex_color_use_as_albedo reads true with MEANINGFUL, DISTINCT
+; per-surface colors (mid grey ~(0.6269, 0.6269, 0.6269), brown wood ~(0.5115, 0.3069,
+; 0.2132), mid red-brown ~(0.5601, 0.2625, 0.2265), near-white bucket ~(0.8521, 0.821,
+; 0.821), dark grey ~(0.3778, 0.3778, 0.3778)) — same pack's named flat-color materials
+; baked into real per-vertex color, NOT the uniform near-(0.9063, 0.9063, 0.9063, 1.0)
+; missing-texture tell (the near-white 0.8521/0.821/0.821 value here is a distinct
+; material color, not a fallback — it differs from the 0.9063 tell on all three channels
+; and appears alongside four other clearly-distinct colors on the same mesh, so it reads
+; as an intentional pale bucket/rope color, not a broken default). No texture fix needed;
+; no material_override applied. Plain instance.
+;
+; SCALE: raw AABB measured via manual local-transform composition on the unmodified FBX
+; (NOT global_transform): footprint 1.2767 x 1.4869 (x, z) tile-units, height 2.1456 — the
+; smallest of the 8 raw meshes. Target max-axis 0.869309 (House's own established 1x1
+; margin). Long axis (z) scaled by 0.584652. Scaled result: 0.7465 x 1.2544 x 0.8693 (x,
+; y, z).
+;
+; FACING: left as authored (identity transform, no rotation) — unconfirmed by a human eye
+; pass. FLAG FOR HUMAN SIGN-OFF.
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" uid="uid://vxux24yt2nuw" path="res://assets/buildings/well/Well.fbx" id="1_model"]
+
+[node name="Well" type="Node3D"]
+
+[node name="Model" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.584652, 0, 0, 0, 0.584652, 0, 0, 0, 0.584652, 0, 0, 0)

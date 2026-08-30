@@ -1,0 +1,39 @@
+; Alpaca — model scene for AnimalDefinition.model_scenes.
+; Source: Quaternius "Ultimate Animated Animal Pack" (July 2021), CC0 1.0 — same pack as
+; Fox; see project/attribution/sources/quaternius_ultimate_animated_animals.tres.
+;
+; Design role: art.md → Newly Available Animals proposes open_grass · Bold · "exotic-cute
+; grazer." Not locked design.
+;
+; Audit (2026-07-26): 13 animation clips confirmed — Idle, Idle_2, Idle_Headlow,
+; Idle_HitReact1/2, Walk, Gallop, Gallop_Jump, Jump_toIdle, Eating, Attack_Headbutt,
+; Attack_Kick, Death. Idle/Walk both present and non-degenerate (48 tracks each). Node
+; structure matches Fox (AnimalArmature -> Skeleton3D -> mesh; AnimationPlayer sibling
+; index 1).
+;
+; STYLE/SCALE NOTE (flag, not a rejection per this task's non-floor rule): raw AABB height
+; is 5.398 units — taller than Horse (4.824) and almost as tall as Stag (5.378), which
+; does not match a real alpaca's proportions (shorter than a horse). This is measured off
+; the model's rest/bind pose, not its Idle clip frame, and alpacas are commonly rigged
+; with an alert, neck-up rest pose that reads much taller than the animal's relaxed
+; standing height — likely the cause, but this wrapper does not correct it, since no
+; mesh-level fix is available in this pipeline and the correct call is the human's eyeball
+; judgment against the rest of the roster at the same table (per art.md's Visual Style
+; "readability" rule and this task's Boundary note).
+;
+; Scale: 0.2, matching Fox's established factor for this pack (same rationale as
+; Deer.tscn) — kept uniform rather than compensating for the pose issue above with a
+; one-off number. Scaled height would be 1.080 at this factor. FLAGGED FOR HUMAN REVIEW.
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" uid="uid://bnl1ikwysshko" path="res://assets/animals/alpaca/Alpaca.gltf" id="1_model"]
+
+[node name="Alpaca" type="Node3D"]
+
+[node name="Model" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.2, 0, 0, 0, 0.2, 0, 0, 0, 0.2, 0, 0, 0)
+
+[node name="AnimationPlayer" parent="Model" index="1"]
+autoplay = "Idle"
+
+[editable path="Model"]

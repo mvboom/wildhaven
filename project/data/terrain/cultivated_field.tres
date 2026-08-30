@@ -1,0 +1,122 @@
+; Cultivated field — TerrainDefinition data entry (spec.md -> Data Schemas; terrain.md ->
+; Already-Defined Terrain, v1 tag-source mapping).
+;
+; emitted_tags = ["cultivated"] is DECIDED (terrain.md's tag-source mapping, #5 closed ->
+; D-25). This is the villager's habitat terrain: carrying capacity counts cultivated tiles
+; in radius to decide how many families a House supports, which is why cultivated ships at
+; the floor rather than as depth.
+;
+; cost = 2 is DECIDED 2026-08-01 (-> D-29), at terrain.md's stated baseline ("~2 Wood /
+; tile — fencing & tools", Open Question #8 closed). It is the only non-zero terrain cost
+; in v1 and therefore the only place terrain.md's pricing rule ("nature is free;
+; construction costs materials") has any teeth.
+;
+; Not harvestable: `land_use = cultivated` exists in the HarvestableTileDefinition schema
+; for the deferred multi-resource system, but no v1 crop yields anything (terrain.md names
+; Forest as v1's SOLE harvestable).
+;
+; MODEL_SCENE NOW POINTS AT REAL ART (2026-08-16): 2 variants, both newly sourced and
+; imported this pass — CultivatedWheatRow.tscn (Wheat.glb, 6-clump furrow arrangement) and
+; CultivatedCropsPlot.tscn (CropsPlot.glb, a pre-composed 5-row plot). Human complaint:
+; "needs to look like actual farm fields" — both compose a small plot with visible rows,
+; not a single plant in a box. New source pack: Nature/Crops assets individually sourced
+; via poly.pizza — project/attribution/sources/quaternius_poly_pizza_nature.tres (CC0).
+; See each .tscn's own header for scale/composition reasoning. FLAG FOR HUMAN SIGN-OFF —
+; same as every other terrain in this pass.
+;
+; MODEL_SCENE PLURALIZED TO MODEL_SCENES (-> D-42): the field is now an array so a
+; terrain can carry multiple interchangeable visual variants, stably picked per tile by
+; TerrainDefinition.pick_variant().
+;
+; 24 PER-SPECIES CROP VARIANTS ADDED (2026-08-26, content-variety pass Task 7): 8 species
+; (Wheat, Corn, Carrot, Lettuce, Tomato, Pumpkin, Apple, Cactus) x 3 variants each (a
+; mid-growth "_2" frame, a full-grown "_4" frame, and a post-harvest-reading 3rd variant —
+; the cap confirmed with the human at 2 growth stages + 1 harvested per species), 24 new
+; model_scenes entries total (2 -> 26). Source: "Nature Crops Pack" (Jan 2020) by
+; Quaternius, CC0 1.0 Universal — see
+; project/attribution/sources/quaternius_nature_crops_pack.tres. This is a DIFFERENT
+; source than CultivatedWheatRow/CultivatedCropsPlot above (those used individually
+; poly.pizza-downloaded "Wheat"/"Crops" models, quaternius_poly_pizza_nature.tres) — this
+; pack is an on-disk named/dated pack extraction, the same sourcing shape as the Ultimate
+; Nature Pack (quaternius_ultimate_nature_pack.tres), so it gets its own attribution file
+; rather than extending either existing one.
+;
+; AUDIT FINDING BEYOND THE BRIEF: the brief's table said only Carrot lacks a "_Harvested"
+; file (use "_Crop" instead). On-disk verification found WHEAT ALSO LACKS "_Harvested" —
+; same substitution applied (CropWheatCrop.tscn uses Wheat_Crop.fbx). Every other species
+; (Corn, Lettuce, Tomato, Pumpkin, Apple, Cactus) does ship a real "_Harvested" file, used
+; as specified.
+;
+; MEASUREMENT-TOOLING GOTCHA (applies to all 24 new scenes, recorded once here rather than
+; repeated in every header): the one-off SceneTree AABB script used to measure each raw
+; FBX's height/footprint initially reported implausibly tiny numbers (~0.001 tile-units)
+; because Node3D.global_transform silently returns Transform3D.IDENTITY when the node
+; hasn't actually been marked is_inside_tree() yet inside a --script SceneTree run's
+; _init() — which was the case here even after add_child(). This pack's raw FBX meshes
+; each carry a baked ~100x scale + 90-degree Y/Z-swap axis-correction transform on their
+; MeshInstance3D's LOCAL `transform` (a normal FBX up-axis artifact); the silent-identity
+; fallback hid that transform entirely and produced bogus (and, for Wheat, direction-
+; reversed) measurements. Fixed by manually composing each node's local `transform` from
+; the instanced root down to the mesh, not by reading global_transform. Re-verify this if
+; any future pass reuses the same measurement-script pattern against a new FBX pack.
+;
+; SCALE (measured via the corrected script above): each of the 24 items was scaled to a
+; per-role target — mid "~0.10 tile-units tall", grown "~0.16", harvested-reading
+; "~0.07" — capped by a max-footprint-axis limit (0.22/0.30/0.20 respectively) so wide/
+; short models (Cactus, Lettuce, Pumpkin) don't overrun the tile once scaled to their
+; target height. 3 small clustered instances per tile (not a single plant in the middle of
+; a box), same per-instance rotation+scale jitter convention CultivatedWheatRow's 6 clumps
+; already established. Per-item raw AABB and computed target are recorded in each item's
+; own .tscn header. FLAG FOR HUMAN SIGN-OFF — same posture as every other scale/count
+; decision in this pass: the stage choice ("_2"/"_4" over "_1"/"_3"), the per-role target
+; heights, the 3-instance cluster count, and the Wheat/Carrot "_Crop" substitution are all
+; first-pass judgment calls pending an in-engine eyeball pass.
+;
+; WHAT "FOOTPRINT CAPPED" MEANS IN ALL 24 HEADERS (recorded once here, 2026-08-26 final
+; whole-branch review, rather than restated in every scene): the cap is measured on the
+; model's AXIS-ALIGNED footprint BEFORE the per-instance rotation jitter each scene applies.
+; A rotated axis-aligned box reads wider on its diagonal — up to ~1.19x at 45 degrees — so a
+; post-jitter measurement of a "capped at 0.30" item can legitimately come back at ~0.36.
+; That is expected geometry, not a cap overrun: every capped value still leaves the
+; instance comfortably inside the 1x1 tile even at the worst-case diagonal, since the caps
+; (0.22/0.30/0.20) are well under the 0.5 tile half-footprint the clustered offsets work
+; against. Read a header's cap number as a pre-jitter control on the raw model's scale, not
+; as a claim about the shipped instance's world-space AABB.
+[gd_resource type="Resource" script_class="TerrainDefinition" load_steps=28 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/terrain_definition.gd" id="1_schema"]
+[ext_resource type="PackedScene" path="res://assets/terrain/cultivated_wheat_row/CultivatedWheatRow.tscn" id="2_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/cultivated_crops_plot/CultivatedCropsPlot.tscn" id="3_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/crop_wheat_2/CropWheat2.tscn" id="4_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/crop_wheat_4/CropWheat4.tscn" id="5_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/crop_wheat_crop/CropWheatCrop.tscn" id="6_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/crop_corn_2/CropCorn2.tscn" id="7_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/crop_corn_4/CropCorn4.tscn" id="8_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/crop_corn_harvested/CropCornHarvested.tscn" id="9_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/crop_carrot_2/CropCarrot2.tscn" id="10_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/crop_carrot_4/CropCarrot4.tscn" id="11_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/crop_carrot_crop/CropCarrotCrop.tscn" id="12_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/crop_lettuce_2/CropLettuce2.tscn" id="13_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/crop_lettuce_4/CropLettuce4.tscn" id="14_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/crop_lettuce_harvested/CropLettuceHarvested.tscn" id="15_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/crop_tomato_2/CropTomato2.tscn" id="16_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/crop_tomato_4/CropTomato4.tscn" id="17_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/crop_tomato_harvested/CropTomatoHarvested.tscn" id="18_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/crop_pumpkin_2/CropPumpkin2.tscn" id="19_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/crop_pumpkin_4/CropPumpkin4.tscn" id="20_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/crop_pumpkin_harvested/CropPumpkinHarvested.tscn" id="21_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/crop_apple_2/CropApple2.tscn" id="22_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/crop_apple_4/CropApple4.tscn" id="23_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/crop_apple_harvested/CropAppleHarvested.tscn" id="24_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/crop_cactus_2/CropCactus2.tscn" id="25_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/crop_cactus_4/CropCactus4.tscn" id="26_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/crop_cactus_harvested/CropCactusHarvested.tscn" id="27_model"]
+
+[resource]
+script = ExtResource("1_schema")
+id = "cultivated_field"
+display_name = "Farm"
+emitted_tags = Array[String](["cultivated"])
+cost = 2
+model_scenes = Array[PackedScene]([ExtResource("2_model"), ExtResource("3_model"), ExtResource("4_model"), ExtResource("5_model"), ExtResource("6_model"), ExtResource("7_model"), ExtResource("8_model"), ExtResource("9_model"), ExtResource("10_model"), ExtResource("11_model"), ExtResource("12_model"), ExtResource("13_model"), ExtResource("14_model"), ExtResource("15_model"), ExtResource("16_model"), ExtResource("17_model"), ExtResource("18_model"), ExtResource("19_model"), ExtResource("20_model"), ExtResource("21_model"), ExtResource("22_model"), ExtResource("23_model"), ExtResource("24_model"), ExtResource("25_model"), ExtResource("26_model"), ExtResource("27_model")])
+harvestable = null

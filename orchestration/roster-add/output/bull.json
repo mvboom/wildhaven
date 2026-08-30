@@ -1,0 +1,36 @@
+{
+  "species": "Bull",
+  "habitat_design": {
+    "habitat_needs": [
+      "open_grass",
+      "water",
+      "cultivated"
+    ],
+    "personality": "Bold",
+    "avoids": [],
+    "farm_tolerant": true,
+    "scout_radius": 8,
+    "tiles_per_individual": 6,
+    "max_individuals": 4,
+    "rationale": "Bulls are domesticated grazing cattle that need open pasture with reliable water access, and thrive on cultivated farmland alongside people."
+  },
+  "schema": {
+    "id": "bull",
+    "display_name": "Bull",
+    "tres_body": "[resource]\nscript = ExtResource(\"1\")\nid = \"bull\"\ndisplay_name = \"Bull\"\nhabitat_needs = [\"open_grass\", \"water\", \"cultivated\"]\npersonality = \"Bold\"\navoids = []\nfarm_tolerant = true\nscout_radius = 8\ncapacity_radius = 0\ntiles_per_individual = 6\nmax_individuals = 4\nmodel_scene = \"res://assets/animals/bull/Bull.tscn\"\nfact_text = \"PLACEHOLDER\"\n"
+  },
+  "content": {
+    "fact_text": "A bull is a full-grown male of the cattle family, and it's usually bigger and stronger than the other cattle in its herd. Bulls can weigh over 1,300 kilograms (about 3,000 pounds) and carry two hollow horns on their heads!",
+    "checklist_log": {
+      "source": "Drawn from animaldiversity.org's Bos taurus species account, which describes cattle size range (147-1363 kg), horns, and notes that male cattle are larger than females and lead the herd until challenged by younger males.",
+      "length": "Pass - exactly 2 sentences.",
+      "tone": "Pass - warm, exclamatory, kid-friendly phrasing with no snark.",
+      "predation": "Pass - no mention of predation, death, or threats; only positive descriptive facts about size and horns."
+    }
+  },
+  "tres_body": "[resource]\nscript = ExtResource(\"1\")\nid = \"bull\"\ndisplay_name = \"Bull\"\nhabitat_needs = [\"open_grass\", \"water\", \"cultivated\"]\npersonality = \"Bold\"\navoids = []\nfarm_tolerant = true\nscout_radius = 8\ncapacity_radius = 0\ntiles_per_individual = 6\nmax_individuals = 4\nmodel_scene = \"res://assets/animals/bull/Bull.tscn\"\nfact_text = \"A bull is a full-grown male of the cattle family, and it's usually bigger and stronger than the other cattle in its herd. Bulls can weigh over 1,300 kilograms (about 3,000 pounds) and carry two hollow horns on their heads!\"\n",
+  "qa": {
+    "passed": true,
+    "problems": []
+  }
+}

@@ -1,0 +1,56 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/world_root.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/ui/camera_rig.gd" id="2"]
+[ext_resource type="PackedScene" path="res://scenes/ui/GameUI.tscn" id="3"]
+[ext_resource type="PackedScene" path="res://scenes/menu/LeaveOverlay.tscn" id="4"]
+[ext_resource type="Script" path="res://scripts/world/mist_boundary.gd" id="6"]
+[ext_resource type="Script" path="res://scripts/world/occlusion_fader.gd" id="5"]
+
+[sub_resource type="Environment" id="Environment_1"]
+background_mode = 1
+background_color = Color(0.53, 0.72, 0.86, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.6, 0.63, 0.68, 1)
+ambient_light_energy = 0.6
+
+[node name="Main" type="Node3D"]
+script = ExtResource("1")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_1")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+unique_name_in_owner = true
+transform = Transform3D(0.707107, -0.5, 0.5, 0, 0.707107, 0.707107, -0.707107, -0.5, 0.5, 4, 10, 4)
+light_energy = 1.1
+shadow_enabled = true
+
+; THE CAMERA (D-41). Fixed orthographic, yaw=45/pitch≈-26.565 (IsoCameraFraming).
+; A direct child of Main again, not of a Player CharacterBody3D — nothing walks.
+[node name="CameraRig" type="Camera3D" parent="."]
+script = ExtResource("2")
+
+; THE SAVE-THUMBNAIL CAPTURE. A SubViewport nothing ever displays; CameraRig.
+; capture_save_thumbnail() configures ThumbnailCamera (a plain, script-less
+; Camera3D) fresh on every call via IsoCameraFraming, so this stays correct
+; automatically if the world's bounds change (mist reveal, world grow).
+[node name="ThumbnailViewport" type="SubViewport" parent="."]
+unique_name_in_owner = true
+size = Vector2i(480, 270)
+render_target_update_mode = 0
+
+[node name="ThumbnailCamera" type="Camera3D" parent="ThumbnailViewport"]
+unique_name_in_owner = true
+current = true
+
+[node name="MistBoundary" type="Node3D" parent="."]
+script = ExtResource("6")
+
+[node name="OcclusionFader" type="Node" parent="."]
+script = ExtResource("5")
+
+[node name="GameUI" parent="." instance=ExtResource("3")]
+
+; ITS OWN CANVASLAYER, added AFTER GameUI so it draws above it (human ruling 5, 2026-08-01).
+[node name="LeaveOverlay" parent="." instance=ExtResource("4")]

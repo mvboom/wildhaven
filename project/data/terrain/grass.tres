@@ -1,0 +1,60 @@
+; Grass — TerrainDefinition data entry (spec.md -> Data Schemas; terrain.md ->
+; Already-Defined Terrain, v1 tag-source mapping).
+;
+; emitted_tags = ["open_grass"] is DECIDED (terrain.md's tag-source mapping, Open Question
+; #5 closed -> D-25). No radius, no weight, no threshold: a tile emits its terrain's tags
+; and nothing else.
+;
+; cost = 0 is terrain.md's one pricing rule — "nature is free; construction costs
+; materials" — a decided design rule rather than a tuning number.
+;
+; MODEL_SCENE NOW POINTS AT REAL ART: GrassCommonShort.tscn (CC0, MegaKit), chosen over
+; GrassCommonTall as the default because "short" reads as the more generic ground-cover
+; pick for a tile that is meant to be the default open-grass floor, not an accent; Tall
+; remains imported and available at
+; project/assets/terrain/grass_common_tall/GrassCommonTall.tscn for a future per-tile
+; variety pass (out of scope here — no random-variant scattering logic added). Scale is
+; still the FIRST-PASS PROPOSAL recorded in GrassCommonShort.tscn's own header comment
+; (raw mesh scaled to ~0.15 tile-units, judgment call, no GDD number) — NOT eyeball-
+; confirmed in-engine; that confirmation is a human call, not this repo's to make.
+;
+; SLAB REINSTATED (2026-08-03) in GrassCommonShort.tscn: TerrainView._refresh_tile_visual()
+; instantiates model_scene as a tile's ENTIRE visual, and the bare grass-tuft prop alone
+; left most of the tile showing scenes/Main.tscn's configured WorldEnvironment sky-blue
+; background_color (0.53, 0.72, 0.86) straight through the gap — reported by an in-engine
+; human look as "completely transparent, just blue." Fixed by reinstating a ground slab
+; matching the grey-box placeholder's geometry and color verbatim. See
+; GrassCommonShort.tscn's own header for detail. Prop-on-slab look still awaits full
+; human sign-off.
+;
+; SCATTERED CLUSTER (2026-08-03): a follow-up human look reported the single tuft-on-slab
+; as looking wrong ("a single tuft," "quite funny"); GrassCommonShort.tscn now hand-places
+; 6 varied instances of the same imported mesh instead of one, to read as coverage — see
+; that scene's header for the transforms. Still awaits full human sign-off.
+;
+; MODEL_SCENE PLURALIZED TO MODEL_SCENES (-> D-42): the field is now an array so a
+; terrain can carry multiple interchangeable visual variants, stably picked per tile by
+; TerrainDefinition.pick_variant().
+;
+; LOOK-PASS REWORK (2026-08-16): GrassCommonTall is now wired as a second live variant
+; alongside GrassCommonShort — human complaint was "needs to actually look like grass
+; across the whole tile, rather than just a few sprigs." Both scenes were reworked first
+; (denser scatter, blotchy floor patches — see each .tscn's own header) so either variant a
+; tile lands on reads as full-tile grass coverage, not just the previously-live Short. No
+; new grass mesh source was pulled in for THIS wiring (Tall was already imported and
+; unused, same D-42 opportunity as Forest's CommonTree2) — see this pass's other terrain
+; entries (Rock, Cultivated field) for where genuinely new sources were needed instead.
+[gd_resource type="Resource" script_class="TerrainDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/terrain_definition.gd" id="1_schema"]
+[ext_resource type="PackedScene" path="res://assets/terrain/grass_common_short/GrassCommonShort.tscn" id="2_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/grass_common_tall/GrassCommonTall.tscn" id="3_model"]
+
+[resource]
+script = ExtResource("1_schema")
+id = "grass"
+display_name = "Grass"
+emitted_tags = Array[String](["open_grass"])
+cost = 0
+model_scenes = Array[PackedScene]([ExtResource("2_model"), ExtResource("3_model")])
+harvestable = null

@@ -1,0 +1,35 @@
+{
+  "species": "Donkey",
+  "habitat_design": {
+    "habitat_needs": [
+      "open_grass",
+      "cultivated"
+    ],
+    "personality": "Bold",
+    "avoids": [],
+    "farm_tolerant": true,
+    "scout_radius": 9,
+    "tiles_per_individual": 4,
+    "max_individuals": 6,
+    "rationale": "Donkeys are hardy grazers long domesticated alongside farms and pastures, thriving on open grassland and cultivated land near people rather than deep wilderness."
+  },
+  "schema": {
+    "id": "donkey",
+    "display_name": "Donkey",
+    "tres_body": "[resource]\nscript = ExtResource(\"1\")\nid = \"donkey\"\ndisplay_name = \"Donkey\"\nhabitat_needs = PackedStringArray(\"open_grass\", \"cultivated\")\npersonality = \"Bold\"\navoids = PackedStringArray()\nfarm_tolerant = true\nscout_radius = 9\ncapacity_radius = 0\ntiles_per_individual = 4\nmax_individuals = 6\nmodel_scene = \"res://assets/animals/donkey/Donkey.tscn\"\nfact_text = \"PLACEHOLDER\"\n"
+  },
+  "content": {
+    "fact_text": "Donkeys have big, sensitive ears that help them hear really well, and their loud hee-haw call can travel up to 3 kilometers to reach faraway friends! They live together in cozy herds and love to rest in the shade during the hottest part of the day.",
+    "checklist_log": {
+      "source": "Drawn from animaldiversity.org's Equus asinus (ass) account, which covers donkey hearing, hee-haw calls carrying up to 3 km, herd social structure, and resting behavior in hot afternoons.",
+      "length": "pass - two sentences",
+      "tone": "pass - warm and playful, focuses on friendship and comfort (cozy herds, resting in shade)",
+      "predation": "pass - no predation, death, or threat framing; describes hearing and social behavior only"
+    }
+  },
+  "tres_body": "[resource]\nscript = ExtResource(\"1\")\nid = \"donkey\"\ndisplay_name = \"Donkey\"\nhabitat_needs = PackedStringArray(\"open_grass\", \"cultivated\")\npersonality = \"Bold\"\navoids = PackedStringArray()\nfarm_tolerant = true\nscout_radius = 9\ncapacity_radius = 0\ntiles_per_individual = 4\nmax_individuals = 6\nmodel_scene = \"res://assets/animals/donkey/Donkey.tscn\"\nfact_text = \"Donkeys have big, sensitive ears that help them hear really well, and their loud hee-haw call can travel up to 3 kilometers to reach faraway friends! They live together in cozy herds and love to rest in the shade during the hottest part of the day.\"\n",
+  "qa": {
+    "passed": true,
+    "problems": []
+  }
+}

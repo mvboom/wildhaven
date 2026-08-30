@@ -1,0 +1,45 @@
+[gd_scene load_steps=2 format=3]
+
+; The right-side rolling feed — Tier 1 rows 7 and 10's non-blocking presentation half for
+; repeat Fact Cards and Displacement Warnings. See scripts/ui/notification_feed.gd.
+;
+; Root is full-rect and mouse-ignoring, same pattern FactCard/DisplacementNotice/
+; NewsReportToast use — the actual visible content (%Stack) is a child anchored to the
+; top-right corner, below the Field Guide button (spec.md -> Screen Layouts), growing left
+; and down as entries are added/removed in script.
+;
+; Exact offsets are PROPOSED — the POC review (implementation plan Task 2) is where these get
+; checked against the real Field Guide button and the toast queue's own top-strip slot.
+
+[ext_resource type="Script" path="res://scripts/ui/notification_feed.gd" id="1"]
+
+[node name="NotificationFeed" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+script = ExtResource("1")
+
+[node name="StackScroll" type="ScrollContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 1.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -384.0
+offset_top = 140.0
+offset_right = -24.0
+; offset_bottom is PROPOSED — human owns this, same status every other pixel constant in this
+; widget already carries. Meant to clear the HUD's bottom-right button row; exact number is
+; the human's to tune after looking at a real build.
+offset_bottom = -140.0
+mouse_filter = 2
+
+[node name="Stack" type="VBoxContainer" parent="StackScroll"]
+unique_name_in_owner = true
+layout_mode = 1
+mouse_filter = 2
+theme_override_constants/separation = 12

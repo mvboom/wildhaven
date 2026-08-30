@@ -1,0 +1,44 @@
+; CropCornHarvested — Cultivated field crop variant (content-variety pass Task 7,
+; 2026-08-26). See cultivated_field.tres's header for the full batch rationale,
+; the measurement-tooling note, and the human sign-off flag.
+;
+; Source: Corn_Harvested.fbx, "Nature Crops Pack" (Jan 2020) by Quaternius, CC0 1.0
+; Universal, Public Domain Dedication — see
+; project/attribution/sources/quaternius_nature_crops_pack.tres. Represents the
+; post-harvest ("_Harvested") growth stage.
+;
+; Raw measured AABB (manually-composed local transform, not global_transform —
+; see cultivated_field.tres's header for why): footprint 0.8873x0.6490, height 1.9671
+; tile-units. Scaled to ~0.07 tile-units tall (footprint capped at ~0.20 on
+; whichever axis is larger — height-limited for this item). 3 small clustered
+; instances per tile, not a single plant in the middle of a box, same convention
+; as CultivatedWheatRow's clumps. FLAG FOR HUMAN SIGN-OFF — same posture as every
+; other scale/count decision in this pass.
+;
+; Slab matches CultivatedWheatRow/CultivatedCropsPlot's dirt-brown (Color(0.4, 0.28, 0.16, 1)) for
+; tonal consistency across all Cultivated field variants.
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="PackedScene" uid="uid://dqmd8xb5gjgh0" path="res://assets/terrain/crop_corn_harvested/Corn_Harvested.fbx" id="1_model"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_slab"]
+size = Vector3(1.0, 0.2, 1.0)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_slab"]
+albedo_color = Color(0.4, 0.28, 0.16, 1)
+
+[node name="CropCornHarvested" type="Node3D"]
+
+[node name="Slab" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+mesh = SubResource("BoxMesh_slab")
+material_override = SubResource("StandardMaterial3D_slab")
+
+[node name="Corn_A" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.033293, 0, -0.005870, 0, 0.033806, 0, 0.005870, 0, 0.033293, -0.22, 0, -0.15)
+
+[node name="Corn_B" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.036255, 0, 0.009039, 0, 0.037365, 0, -0.009039, 0, 0.036255, 0.2, 0, 0.06)
+
+[node name="Corn_C" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.033439, 0, -0.012171, 0, 0.035585, 0, 0.012171, 0, 0.033439, -0.03, 0, 0.22)

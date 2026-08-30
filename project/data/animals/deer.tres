@@ -1,0 +1,47 @@
+; Deer — AnimalDefinition data entry (gdd.md -> Data Schemas / Content Architecture).
+; Roster row: roster.md -> Already-Defined Roster | Ruled: decisions.md -> D-43.
+; Asset: Quaternius "Ultimate Animated Animal Pack", CC0 1.0 Universal — see
+;   project/attribution/sources/quaternius_ultimate_animated_animals.tres.
+;
+; SPECIES CHOICE: white-tailed deer (Odocoileus virginianus) — the same pin
+; docs/content/cleared-pool-fact-cards.md § Deer commits to, chosen over red deer
+; specifically so Deer and Stag do not source the same real animal under two roster
+; entries (Stag is red deer, Cervus elaphus).
+;
+; CAPACITY FIELDS (D-43): capacity_radius = 0 -> the SENTINEL
+; `CAPACITY_RADIUS_FOLLOWS_SCOUT`, meaning "equal to scout_radius" (10), not a radius of
+; zero. tiles_per_individual = 6, max_individuals = 6 — D-43's decided values, forest-edge
+; grazer of open ground, not farm-tolerant.
+;
+; fact_text is docs/content/cleared-pool-fact-cards.md § Deer's proposed line, transcribed
+; verbatim — all four checklist steps PASS there. Per-clause sourcing:
+;   "spotted coat ... turned a grayish brown" -> ADW Odocoileus virginianus, "Physical
+;   Description" (fawn coloration and molt at first winter).
+; https://animaldiversity.org/accounts/Odocoileus_virginianus/
+; A companion predation-adjacent sentence in the same ADW paragraph (fawn scent-hiding
+; behavior) and a diet-adjacent grazing sentence were both cut during drafting — see the
+; source file's Checklist step 4 for the full note.
+;
+; news_reports intentionally empty — News Report pools for this pool are a separate, later
+; purchase (not part of Content Pipeline step 4/5 for this dispatch).
+[gd_resource type="Resource" script_class="AnimalDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/animal_definition.gd" id="1_schema"]
+[ext_resource type="PackedScene" path="res://assets/animals/deer/Deer.tscn" id="2_model"]
+
+[resource]
+script = ExtResource("1_schema")
+id = "deer"
+display_name = "Deer"
+habitat_needs = Array[String](["open_grass", "forest"])
+personality = "Shy"
+avoids = Array[String]([])
+farm_tolerant = false
+scout_radius = 10
+capacity_radius = 0
+tiles_per_individual = 6
+max_individuals = 6
+model_scenes = Array[PackedScene]([ExtResource("2_model")])
+; fact_text_pool REPLACED by scripts/fact_card_pipeline.py (2026-08-17) -- AWAITING STEP-8 HUMAN SIGN-OFF, not yet reviewed.
+fact_text_pool = Array[String](["Every year, male deer grow brand new antlers that start soft and velvety before gradually hardening into strong, branching structures.", "Deer's coats change color with the seasons, turning from reddish-brown in summer to gray-brown in winter. Each year, their fur switches back and forth as the world around them transforms!", "Baby deer called fawns are born with white spots scattered across their coats, but these spots gradually fade and disappear by their first winter.", "Baby deer called fawns can stand and take their first steps within just twenty minutes of being born!"])
+news_reports = Array[String]([])

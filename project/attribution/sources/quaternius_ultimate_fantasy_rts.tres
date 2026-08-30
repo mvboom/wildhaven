@@ -1,0 +1,57 @@
+[gd_resource type="Resource" script_class="AttributionEntry" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://attribution/attribution_entry.gd" id="1_entry"]
+
+[resource]
+script = ExtResource("1_entry")
+id = "quaternius_ultimate_fantasy_rts"
+creator = "Quaternius"
+source_name = "Ultimate Fantasy RTS"
+source_version = "August 2022"
+creator_url = "https://quaternius.com"
+source_url = "https://quaternius.com"
+support_url = "https://www.patreon.com/quaternius"
+license_name = "CC0 1.0 Universal (CC0 1.0) Public Domain Dedication"
+license_url = "https://creativecommons.org/publicdomain/zero/1.0/"
+license_file = "res://assets/licenses/Quaternius_UltimateAnimatedAnimals_License.txt"
+attribution_required = false
+required_notice = ""
+conditions = ""
+assets_used = PackedStringArray("Houses_FirstAge_1_Level1", "Houses_FirstAge_1_Level2", "Houses_FirstAge_1_Level3", "Houses_FirstAge_2_Level1", "Houses_FirstAge_2_Level2", "Houses_FirstAge_2_Level3", "Houses_FirstAge_3_Level1", "Houses_FirstAge_3_Level2", "Houses_FirstAge_3_Level3", "TowerHouse_FirstAge", "Houses_SecondAge_1_Level1", "Houses_SecondAge_1_Level2", "Houses_SecondAge_1_Level3", "Houses_SecondAge_2_Level1", "Houses_SecondAge_2_Level2", "Houses_SecondAge_2_Level3", "Houses_SecondAge_3_Level1", "Houses_SecondAge_3_Level2", "Houses_SecondAge_3_Level3", "TowerHouse_SecondAge")
+per_file_licensing = false
+notes = "CC0 — crediting is courtesy, not compliance. Reuses the generic Quaternius CC0
+license text already in-repo (same reasoning as the other two entries added alongside this
+one) rather than duplicating it.
+
+NAMING ODDITY, recorded honestly rather than silently corrected: this pack's own
+License.txt (source-content/assets/Ultimate Fantasy RTS - Aug 2022.../License.txt) reads \"Ultimate
+Platformer Pack by @Quaternius\" — apparently reused boilerplate from a different pack,
+not this one. Doesn't change anything: the license terms (CC0 1.0 Universal) are identical
+either way, and Quaternius's CC0 dedication is blanket across all their packs per
+source-content/assets/ASSET_AUDIT.md's locked audit.
+
+First use: Houses_FirstAge_1_Level1, the fixed v1 House variant (one look, one facing —
+see project/assets/buildings/house/House.tscn for the selection rationale).
+
+9 MORE ASSETS ADDED (2026-08-26, content-variety pass Task 2): the remaining 8
+Houses_FirstAge_{1,2,3}_Level{1,2,3} variants plus TowerHouse_FirstAge, all imported as
+House look variants (project/data/buildings/house.tres's model_scenes, 1 -> 10 entries) —
+see each new .tscn's own header under project/assets/buildings/house_*/ for per-variant
+measured-AABB/scale reasoning. The pack still ships walls/market stalls/docks not
+evaluated here; append to assets_used as any more are imported, do NOT create a second
+entry for this pack.
+
+10 MORE ASSETS ADDED (SecondAge house batch): Houses_SecondAge_{1,2,3}_Level{1,2,3} plus
+TowerHouse_SecondAge — the pack's whole SecondAge house catalogue, which had never been
+imported (a `grep -rli secondage project/` returned nothing before this run). Same pack,
+same artist, same palette: the Wood and Stone materials are byte-identical to the two the
+shipped Houses_FirstAge_1_Level1 uses, and the tier adds Main / Walls / Wood_Light /
+Stone_Light on top. The reason for importing them is detail, not variety alone — the
+shipped FirstAge_1_Level1 is 404 triangles across 2 materials with no modelled door or
+windows, where the SecondAge tier runs 964-5,948 triangles across 5-6 materials with
+both. Wrapper scenes live at project/assets/buildings/house_secondage_*/ and
+house_tower_secondage/, each with its own measured-AABB/scale header; import-tested by
+project/tests/test_house_secondage_variants_import.gd. Wiring them into
+project/data/buildings/house.tres's model_scenes is NOT done — that is gameplay-engineer's
+step. The pack still ships walls/market stalls/docks/farms not evaluated here; append to
+assets_used as any more are imported, do NOT create a second entry for this pack."

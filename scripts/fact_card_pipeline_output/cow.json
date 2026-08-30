@@ -1,0 +1,51 @@
+{
+  "species_id": "cow",
+  "species_display_name": "Cow",
+  "generator_model": "claude-haiku-4-5-20251001",
+  "evaluator_model": "claude-opus-5",
+  "max_refine": 3,
+  "requested_count": 1,
+  "accepted_fact_texts": [
+    "Baby calves are ready to move! A newborn calf can already stand up and walk within just an hour of being born."
+  ],
+  "candidates": [
+    {
+      "status": "accepted",
+      "fact_text": "Baby calves are ready to move! A newborn calf can already stand up and walk within just an hour of being born.",
+      "attempts": [
+        {
+          "attempt": 1,
+          "fact_text": "Each cow has a unique spot pattern, just like a fingerprint or snowflake! No two cows have exactly the same pattern of spots.",
+          "source_note": "Animal Diversity Web (animaldiversity.org) - Bos taurus account, and Smithsonian's National Zoo and Conservation Biology Institute (nationalzoo.si.edu)",
+          "deterministic": {
+            "passed": true,
+            "problems": []
+          },
+          "llm_judge": {
+            "passed": false,
+            "problems": [
+              "Plausibility/source-grounding: the card asserts a universal ('Each cow...', 'No two cows...') but many common cattle breeds (e.g. solid-colored ones) have no spots at all, so the claim as written is not accurate for cows generally. The well-supported version of this fact is about patterned breeds \u2014 it should be scoped, e.g. 'Cows with spots each have their own one-of-a-kind pattern.'"
+            ],
+            "skipped": false
+          },
+          "passed": false
+        },
+        {
+          "attempt": 2,
+          "fact_text": "Baby calves are ready to move! A newborn calf can already stand up and walk within just an hour of being born.",
+          "source_note": "nationalzoo.si.edu (Cow) and en.wikipedia.org (Cattle) \u2014 both confirm calves are born precocial, able to stand and walk within an hour of birth.",
+          "deterministic": {
+            "passed": true,
+            "problems": []
+          },
+          "llm_judge": {
+            "passed": true,
+            "problems": [],
+            "skipped": false
+          },
+          "passed": true
+        }
+      ]
+    }
+  ]
+}

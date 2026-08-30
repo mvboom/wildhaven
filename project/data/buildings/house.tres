@@ -1,0 +1,218 @@
+; House — PlaceableDefinition data entry (spec.md -> Data Schemas; buildings.md ->
+; Already-Defined Buildings). v1's only buildable.
+;
+; DECIDED (buildings.md), not tuning:
+;   emitted_tags = ["house"]   -> the House is the `house` tag's only source. A tile under
+;                                 the footprint stops emitting its terrain tags and emits
+;                                 this instead.
+;   allowed_terrain = ["grass"] -> "houses build on grass only", which closes the
+;                                 footprint-overlap eviction family at the source. It does
+;                                 NOT close capacity-loss displacement: suppressing a
+;                                 tile's terrain tags can drop capacity with no overlap at
+;                                 all, which is why the displacement warning is
+;                                 mode-agnostic.
+;
+; PLACEHOLDERS — the human's decision, listed in the build report's Proposals:
+;   cost = 15       -> buildings.md's stated floor baseline ("~15 Wood" at 1x1; ~30 at
+;                      2x2). Open Questions #8 (cost-table values) and #26 (starting
+;                      stockpile, sized to cover the first build).
+;   footprint = 1x1 -> the Tier 1 floor form (Open Question #18). The 2x2 full form is
+;                      depth (row 4); the 1x1 asset is retained afterwards as a Shed.
+;
+; ------------------------------------------------------------------------------------
+; fact_text — CONTENT PIPELINE STEP 5, CLOSED 2026-08-06. This is Inspect-Mode
+; BUILDING FLAVOR (gdd.md line 115: "a House gives building flavor info the same way"
+; a tapped animal replays its fact card), not a fact card: there is no external
+; wildlife source to verify, per this item's brief. Source is INTERNAL —
+; already-decided game-design copy, never an invented claim — and the two-register
+; rule (content-pipeline-status.md's `human` entry, ~line 193: "town"/"village" cut
+; because `display_name` is "Villager" and the HUD counter is "Village Population")
+; is held exactly as human.tres's real fact card was held to it.
+;
+; SOURCES (internal docs, quoted, none recalled):
+;   [GDD-115]  gdd.md line 115 — "a **House** gives building flavor info the same way"
+;              (establishes this field's register: flavor, not a real-world fact).
+;   [GDD-117]  gdd.md line 117 — "v1's only buildable is the House; ... floor: 1x1,
+;              'a simple house,' grass only." <- source of "simple house."
+;   [GDD-87]   gdd.md line 87 — "when one meets an animal's needs, it moves in — a
+;              small den, burrow, or nest appears" <- the general move-in mechanic;
+;              a House is a villager's version of that den/burrow/nest.
+;   [BLD-75]   buildings.md lines 75-81 — "A House is a home site with a fixed
+;              footprint. It supports villager families via carrying capacity exactly
+;              like any other species' home site... floor: the 1x1 House supports one
+;              family... A villager moves in when its habitat is met ships whole at
+;              the floor." <- source of "home for a family" and "plant a field."
+;   [GDD-60]   gdd.md line 60 — "a house-with-farm is their habitat, and a villager
+;              moving in is the same payoff as any move-in." <- source of "plant a
+;              field close by" as the trigger for a move-in.
+;   [HUM-119]  human.tres header, lines 119-131 (its "RE-RUN 2026-07-28" note) —
+;              "SETTLED" is already-cleared shipped GAME-register copy (fox/rabbit
+;              News Report pools: "a fox family has settled in," "a group of rabbits
+;              has settled in"). This card's "settle in" reuses that already-cleared
+;              GAME-register word rather than reopening it; it is never used here in
+;              the FACT register human.tres's card occupies.
+;
+; PER-CLAUSE SOURCING:
+;   "This simple house is ready to be someone's new home."
+;     <- [GDD-117] "a simple house" (verbatim) + [BLD-75] "A House is a home site" +
+;        [GDD-87] "it moves in" (the move-in mechanic a House stands ready for).
+;   "Plant a field close by, and a family will settle in before long."
+;     <- [GDD-60] "a house-with-farm is their habitat" + [BLD-75] "supports one
+;        family" + [HUM-119] the cleared GAME-register use of "settled in."
+;
+; CHECKLIST (spec.md -> Fact-Card Content Checklist, applied to flavor copy since
+; that's the closest ground truth on file — no external source exists here per the
+; brief):
+;   1. Source        -> PASS, internal, cited above (no external wildlife source needed
+;                        or claimed; this is flavor, not a fact card, per GDD-115).
+;   2. 1-2 sentences  -> PASS, exactly 2, plain vocabulary (simple, ready, home, plant,
+;                        field, family, settle, before long).
+;   3. Tone           -> PASS, warm/upbeat, no lecture, no urgency framing.
+;   4. Predation       -> PASS, N/A — no species named, no relationship described.
+;   5. Graph check     -> PASS, N/A — `avoids` not touched by this field; no species
+;                        relationship asserted.
+;   TWO-REGISTER SWEEP -> PASS, no literal "town" or "village" anywhere in the string.
+;   DISTINCT FROM VILLAGER CARD -> PASS: human.tres's fact_text is about real human
+;     prehistory (nomadism -> agriculture -> settling, ~10-12k years ago); this string
+;     never touches that claim. It is about the House object itself, right now, in this
+;     game — a home waiting for a family, and the field that brings one home.
+;
+; This closes Content Pipeline step 5 for `house`; content-pipeline-status.md's
+; `house` row `copy_content_location` is updated to match.
+; ------------------------------------------------------------------------------------
+;
+; MODEL: the REAL imported asset, not a grey-box. assets/buildings/house/House.tscn wraps
+; Quaternius "Ultimate Fantasy RTS" Houses_FirstAge_1_Level1 (CC0), measured at
+; 0.869 x 0.761 units — already inside a 1x1 tile with no rescale — and covered by
+; test_house_import.gd. A grey-box House does exist at assets/placeholder/house/House.tscn
+; as a deliberate fallback (the real asset's FACING under the fixed ~45 degree camera is
+; still unconfirmed by a human); swapping is a one-field edit.
+;
+; 9 MORE LOOK VARIANTS ADDED (2026-08-26, content-variety pass Task 2): the remaining 8
+; Houses_FirstAge_{1,2,3}_Level{1,2,3} candidates (minus the already-shipped
+; HousesFirstAge1Level1) plus TowerHouse_FirstAge, all from the same already-attributed
+; Quaternius "Ultimate Fantasy RTS" pack (CC0) — see
+; project/attribution/sources/quaternius_ultimate_fantasy_rts.tres, `assets_used` extended
+; with all 9 new source filenames. model_scenes grows from 1 to 10 entries; index 0 stays
+; ExtResource("2_model") (HousesFirstAge1Level1), unchanged. Each new variant sits on this
+; same building shape/convention as House.tscn (Node3D -> Model instance, no Slab, no
+; floor patch — a building sits ON a terrain tile, not in place of it). Every new variant
+; was uniformly scaled (where its raw footprint exceeded a 1x1 tile) so its max footprint
+; axis matches HousesFirstAge1Level1's own natural (unscaled) 0.8693 max-axis footprint —
+; the same "small margin, not edge-to-edge" fit that variant already established; two
+; variants (HousesFirstAge3Level1, already smaller than that target) needed no rescale at
+; all. Full raw-AABB numbers and computed scale factor are recorded per variant in each
+; new .tscn's own header (never a guessed number). Facing left at identity (no rotation)
+; for every variant, matching House.tscn's own convention — none of the 9 has had a human
+; eye pass yet. FLAG FOR HUMAN SIGN-OFF (consolidated, covers all 9): per-variant scale
+; fit, and any facing that reads wrong under the fixed camera — same posture as every
+; other placement judgment call in this project (see cultivated_field.tres's header for
+; the precedent). Selecting WHICH of these 10 variants a given placed House instance shows
+; (pick_variant() or similar) is not this task's concern — Content Pipeline step 3 /
+; gameplay-engineer's call, same boundary as every other model_scenes array in this repo.
+;
+; SIGN-OFF AID, ADDED BY THE WHOLE-BRANCH REVIEW (2026-08-26): the per-variant headers each
+; record their own numbers honestly, but the ONE consequence that only shows up when all 10
+; are tabulated side by side is HEIGHT. The fit rule chosen here scales UNIFORMLY to bring
+; each variant's longest FOOTPRINT axis to 0.8693 — which necessarily drags height down by
+; the same factor, and the wide/low variants have the biggest factor. Measured, all 10:
+;
+;   idx  height   x-foot  z-foot   variant
+;    0   0.7645   0.8693  0.7614   House (HousesFirstAge1Level1) — the shipped default
+;    1   0.5669   0.6446  0.8693   FirstAge 1 Level 2
+;    2   0.5669   0.6446  0.8693   FirstAge 1 Level 3
+;    3   0.5687   0.6739  0.8693   FirstAge 2 Level 1
+;    4   0.4564   0.8693  0.6977   FirstAge 2 Level 2
+;    5   0.4564   0.8693  0.6977   FirstAge 2 Level 3
+;    6   0.5741   0.6765  0.6513   FirstAge 3 Level 1  (no rescale — already fit)
+;    7   0.3469   0.7984  0.8693   FirstAge 3 Level 2
+;    8   0.3469   0.7984  0.8693   FirstAge 3 Level 3
+;    9   0.9236   0.8693  0.7340   TowerHouse FirstAge
+;
+; So: 8 of the 9 new variants are SHORTER than the shipped default, and the set spans 2.66x
+; in height (0.3469 .. 0.9236). Since B2's whole point is letting a player swap which look a
+; House wears, a swap between idx 7/8 and idx 9 changes the building's height by ~2.7x. THE
+; HUMAN'S CALL, and the actual question behind the "per-variant scale fit" flag above:
+; (a) accept it — these are visibly different house types, so differing heights read as
+; variety; (b) keep the uniform 0.8693 footprint target but ALSO floor/normalize height
+; toward the default's 0.7645; or (c) switch the rule from "uniform absolute max-axis" to
+; "match the default's MARGIN RATIO per variant", which preserves each mesh's own
+; proportions instead of pinning one axis. Nothing here is decided — recorded so the choice
+; is visible at the decision point rather than only derivable from nine separate headers.
+;
+; 8 SECONDAGE LOOK VARIANTS ADDED (2026-08-29, Content Pipeline step 4 — model_scenes wiring
+; only; no other PlaceableDefinition field is touched by this pass). Same already-attributed
+; Quaternius "Ultimate Fantasy RTS" pack (CC0) as the 10 FirstAge entries above — imported,
+; wrapped, tested and attributed by tech-art before this pass. model_scenes grows from 10 to
+; 18 entries; index 0 stays ExtResource("2_model") (HousesFirstAge1Level1), unchanged. Same
+; wrapper convention as every entry above (Node3D -> Model instance, no Slab, no floor patch),
+; and per-variant raw AABB + computed scale factor live in each .tscn's own header.
+;
+; TWO SECONDAGE FILES ARE DELIBERATELY NOT WIRED — house_secondage_2_level2 and
+; house_secondage_2_level3. THIS IS NOT AN OVERSIGHT; DO NOT "FIX" IT. Human ruling
+; (2026-08-29): both are multi-building COMPOUNDS whose uniform fit-to-1x1 rescale drives them
+; to 0.5315 and 0.4316 tile-heights respectively — under half a villager tall (villagers are
+; normalized to 1.0). The fit that would keep them building-shaped is a 2x2 footprint, and
+; `footprint` is a property of the BUILDABLE (this file: Vector2i(1, 1)), not of a variant —
+; a variant cannot declare its own footprint, so a 2x2 rescale here would overflow tiles the
+; buildable does not own. The .gltf files, wrappers, tests and attribution entries all remain
+; on disk against a possible future second (2x2) buildable; only the model_scenes wiring is
+; withheld. footprint, cost, allowed_terrain and emitted_tags are untouched by this pass.
+;
+; HEIGHT TABLE for the 8 newly-wired entries (indices 10-17), in the same
+; height / x-footprint / z-footprint form as the FirstAge table above, so the whole 18-entry
+; set can be read side by side at sign-off. Numbers are transcribed from each wrapper's own
+; measured header, not recomputed here:
+;
+;   idx  height   x-foot  z-foot   variant
+;   10   0.7722   0.8900  0.8645   SecondAge 1 Level 1  (no rescale — already fit)
+;   11   0.7060   0.8215  0.8693   SecondAge 1 Level 2
+;   12   0.9092   0.6599  0.8693   SecondAge 1 Level 3
+;   13   0.9455   0.8874  0.8112   SecondAge 2 Level 1  (no rescale — already fit)
+;   14   0.5908   0.6765  0.6765   SecondAge 3 Level 1  (no rescale — already fit)
+;   15   0.3515   0.8051  0.8693   SecondAge 3 Level 2
+;   16   0.6327   0.8051  0.8693   SecondAge 3 Level 3
+;   17   0.9540   0.8693  0.7421   TowerHouse SecondAge
+;
+; NOTE FOR THE HUMAN, raised not decided: idx 15 (SecondAge 3 Level 2, height 0.3515) carries
+; the SAME "multi-building compound / shorter than a villager" flag in its wrapper header as
+; the two held-out SecondAge 2 variants, and is in fact SHORTER than either of them. It is
+; wired because the 2026-08-29 ruling named the two held-out files explicitly and because the
+; already-shipped FirstAge idx 7/8 sit at 0.3469 — shorter still — so height alone is not the
+; disqualifier here; footprint compound-ness was. Recorded so the inconsistency is visible at
+; the decision point rather than buried in one wrapper header. FLAG FOR HUMAN SIGN-OFF.
+;
+; The unresolved (a)/(b)/(c) height-rule question in the FirstAge sign-off aid above is
+; unchanged by this pass and now spans 18 entries rather than 10.
+[gd_resource type="Resource" script_class="PlaceableDefinition" load_steps=20 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/placeable_definition.gd" id="1_schema"]
+[ext_resource type="PackedScene" path="res://assets/buildings/house/House.tscn" id="2_model"]
+[ext_resource type="PackedScene" path="res://assets/buildings/house_firstage_1_level2/HouseFirstage1Level2.tscn" id="3_model"]
+[ext_resource type="PackedScene" path="res://assets/buildings/house_firstage_1_level3/HouseFirstage1Level3.tscn" id="4_model"]
+[ext_resource type="PackedScene" path="res://assets/buildings/house_firstage_2_level1/HouseFirstage2Level1.tscn" id="5_model"]
+[ext_resource type="PackedScene" path="res://assets/buildings/house_firstage_2_level2/HouseFirstage2Level2.tscn" id="6_model"]
+[ext_resource type="PackedScene" path="res://assets/buildings/house_firstage_2_level3/HouseFirstage2Level3.tscn" id="7_model"]
+[ext_resource type="PackedScene" path="res://assets/buildings/house_firstage_3_level1/HouseFirstage3Level1.tscn" id="8_model"]
+[ext_resource type="PackedScene" path="res://assets/buildings/house_firstage_3_level2/HouseFirstage3Level2.tscn" id="9_model"]
+[ext_resource type="PackedScene" path="res://assets/buildings/house_firstage_3_level3/HouseFirstage3Level3.tscn" id="10_model"]
+[ext_resource type="PackedScene" path="res://assets/buildings/house_tower_firstage/HouseTowerFirstage.tscn" id="11_model"]
+[ext_resource type="PackedScene" path="res://assets/buildings/house_secondage_1_level1/HouseSecondage1Level1.tscn" id="12_model"]
+[ext_resource type="PackedScene" path="res://assets/buildings/house_secondage_1_level2/HouseSecondage1Level2.tscn" id="13_model"]
+[ext_resource type="PackedScene" path="res://assets/buildings/house_secondage_1_level3/HouseSecondage1Level3.tscn" id="14_model"]
+[ext_resource type="PackedScene" path="res://assets/buildings/house_secondage_2_level1/HouseSecondage2Level1.tscn" id="15_model"]
+[ext_resource type="PackedScene" path="res://assets/buildings/house_secondage_3_level1/HouseSecondage3Level1.tscn" id="16_model"]
+[ext_resource type="PackedScene" path="res://assets/buildings/house_secondage_3_level2/HouseSecondage3Level2.tscn" id="17_model"]
+[ext_resource type="PackedScene" path="res://assets/buildings/house_secondage_3_level3/HouseSecondage3Level3.tscn" id="18_model"]
+[ext_resource type="PackedScene" path="res://assets/buildings/house_tower_secondage/HouseTowerSecondage.tscn" id="19_model"]
+
+[resource]
+script = ExtResource("1_schema")
+id = "house"
+display_name = "House"
+cost = 15
+footprint = Vector2i(1, 1)
+allowed_terrain = Array[String](["grass"])
+emitted_tags = Array[String](["house"])
+model_scenes = Array[PackedScene]([ExtResource("2_model"), ExtResource("3_model"), ExtResource("4_model"), ExtResource("5_model"), ExtResource("6_model"), ExtResource("7_model"), ExtResource("8_model"), ExtResource("9_model"), ExtResource("10_model"), ExtResource("11_model"), ExtResource("12_model"), ExtResource("13_model"), ExtResource("14_model"), ExtResource("15_model"), ExtResource("16_model"), ExtResource("17_model"), ExtResource("18_model"), ExtResource("19_model")])
+fact_text = "This simple house is ready to be someone's new home. Plant a field close by, and a family will settle in before long."

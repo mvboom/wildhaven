@@ -1,0 +1,33 @@
+; Husky — model scene for AnimalDefinition.model_scenes.
+; Source: Quaternius "Ultimate Animated Animal Pack" (July 2021), CC0 1.0 — same pack as
+; Fox; see project/attribution/sources/quaternius_ultimate_animated_animals.tres.
+;
+; Design role: art.md → Newly Available Animals proposes house, open_grass · Bold,
+; farm-tolerant · "village dog," pairs with Cat. Not locked design.
+;
+; Audit (2026-07-26): 12 animation clips confirmed — Idle, Idle_2, Idle_2_HeadLow,
+; Idle_HitReact1/2, Walk, Gallop, Gallop_Jump, Jump_ToIdle, Eating, Attack, Death. (One
+; fewer clip than the hooved animals in this pack — canids get a single "Attack" instead
+; of separate Attack_Headbutt/Attack_Kick.) Idle/Walk both present and non-degenerate (54
+; tracks each). Node structure matches Fox (AnimalArmature -> Skeleton3D -> mesh;
+; AnimationPlayer sibling index 1) — note the mesh node itself is literally named "Cube"
+; in the raw glTF, a modeler-naming artifact, not a placeholder/missing-mesh issue (the
+; mesh data and material are the real husky model).
+;
+; Scale: 0.2, matching Fox's established factor for this pack (same rationale as
+; Deer.tscn). Raw AABB height 3.191 -> scaled height 0.638, a bit taller than Fox (0.535)
+; and ShibaInu (0.619) — plausible size ordering for these three canids. FLAG FOR HUMAN
+; REVIEW: not yet eyeball-confirmed in engine.
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" uid="uid://mv5g6qm8jy60" path="res://assets/animals/husky/Husky.gltf" id="1_model"]
+
+[node name="Husky" type="Node3D"]
+
+[node name="Model" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.2, 0, 0, 0, 0.2, 0, 0, 0, 0.2, 0, 0, 0)
+
+[node name="AnimationPlayer" parent="Model" index="1"]
+autoplay = "Idle"
+
+[editable path="Model"]

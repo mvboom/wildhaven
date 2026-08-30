@@ -1,0 +1,37 @@
+{
+  "species": "Cow",
+  "habitat_design": {
+    "habitat_needs": [
+      "cultivated",
+      "open_grass"
+    ],
+    "personality": "Bold",
+    "avoids": [],
+    "farm_tolerant": true,
+    "scout_radius": 8,
+    "tiles_per_individual": 5,
+    "max_individuals": 6,
+    "rationale": "Cows are domesticated grazers that thrive on cultivated pasture and open grassland, calmly tolerating human presence and farm activity."
+  },
+  "schema": {
+    "id": "cow",
+    "display_name": "Cow",
+    "tres_body": "[resource]\nscript = ExtResource(\"1\")\nid = \"cow\"\ndisplay_name = \"Cow\"\nhabitat_needs = [\"cultivated\", \"open_grass\"]\npersonality = \"Bold\"\navoids = []\nfarm_tolerant = true\nscout_radius = 8\ncapacity_radius = 0\ntiles_per_individual = 5\nmax_individuals = 6\nmodel_scene = \"res://assets/animals/cow/Cow.tscn\"\nfact_text = \"PLACEHOLDER\"\n"
+  },
+  "content": {
+    "fact_text": "PLACEHOLDER - Content Writer's research step timed out before returning a result",
+    "checklist_log": {
+      "source": "n/a (timeout)",
+      "length": "n/a",
+      "tone": "n/a",
+      "predation": "n/a"
+    }
+  },
+  "tres_body": "[resource]\nscript = ExtResource(\"1\")\nid = \"cow\"\ndisplay_name = \"Cow\"\nhabitat_needs = [\"cultivated\", \"open_grass\"]\npersonality = \"Bold\"\navoids = []\nfarm_tolerant = true\nscout_radius = 8\ncapacity_radius = 0\ntiles_per_individual = 5\nmax_individuals = 6\nmodel_scene = \"res://assets/animals/cow/Cow.tscn\"\nfact_text = \"PLACEHOLDER - Content Writer's research step timed out before returning a result\"\n",
+  "qa": {
+    "passed": false,
+    "problems": [
+      "`fact_text` is still a placeholder."
+    ]
+  }
+}

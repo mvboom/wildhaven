@@ -1,0 +1,298 @@
+[gd_scene load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://scripts/menu/saved_worlds_screen.gd" id="1"]
+
+; Same sky gradient as TitleScreen.tscn (2026-08-24 "match the main screen" pass) — kept as a
+; local copy per this project's existing per-scene styling convention.
+[sub_resource type="Gradient" id="SkyGradient"]
+offsets = PackedFloat32Array(0, 0.7, 1)
+colors = PackedColorArray(0.5608, 0.8275, 0.9373, 1, 0.8078, 0.9373, 0.8902, 1, 0.9647, 0.9373, 0.7882, 1)
+
+[sub_resource type="GradientTexture2D" id="SkyTexture"]
+gradient = SubResource("SkyGradient")
+fill_to = Vector2(0, 1)
+
+[sub_resource type="StyleBoxFlat" id="PrimaryNormal"]
+content_margin_left = 32.0
+content_margin_top = 12.0
+content_margin_right = 32.0
+content_margin_bottom = 12.0
+bg_color = Color(1.0, 0.6235, 0.2902, 1)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 6
+border_color = Color(0.8784, 0.4941, 0.1647, 1)
+corner_radius_top_left = 28
+corner_radius_top_right = 28
+corner_radius_bottom_right = 28
+corner_radius_bottom_left = 28
+shadow_color = Color(0, 0, 0, 0.133)
+shadow_size = 3
+shadow_offset = Vector2(0, 2)
+
+[sub_resource type="StyleBoxFlat" id="PrimaryHover"]
+content_margin_left = 32.0
+content_margin_top = 12.0
+content_margin_right = 32.0
+content_margin_bottom = 12.0
+bg_color = Color(1.0, 0.698, 0.4, 1)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 6
+border_color = Color(0.8784, 0.4941, 0.1647, 1)
+corner_radius_top_left = 28
+corner_radius_top_right = 28
+corner_radius_bottom_right = 28
+corner_radius_bottom_left = 28
+shadow_color = Color(0, 0, 0, 0.133)
+shadow_size = 3
+shadow_offset = Vector2(0, 2)
+
+[sub_resource type="StyleBoxFlat" id="SecondaryNormal"]
+content_margin_left = 24.0
+content_margin_top = 10.0
+content_margin_right = 24.0
+content_margin_bottom = 10.0
+bg_color = Color(1.0, 0.9922, 0.9569, 1)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 5
+border_color = Color(0.902, 0.8275, 0.651, 1)
+corner_radius_top_left = 22
+corner_radius_top_right = 22
+corner_radius_bottom_right = 22
+corner_radius_bottom_left = 22
+shadow_color = Color(0, 0, 0, 0.1)
+shadow_size = 3
+shadow_offset = Vector2(0, 2)
+
+[sub_resource type="StyleBoxFlat" id="SecondaryHover"]
+content_margin_left = 24.0
+content_margin_top = 10.0
+content_margin_right = 24.0
+content_margin_bottom = 10.0
+bg_color = Color(0.851, 0.784, 0.541, 1)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 5
+border_color = Color(0.902, 0.8275, 0.651, 1)
+corner_radius_top_left = 22
+corner_radius_top_right = 22
+corner_radius_bottom_right = 22
+corner_radius_bottom_left = 22
+shadow_color = Color(0, 0, 0, 0.1)
+shadow_size = 3
+shadow_offset = Vector2(0, 2)
+
+[sub_resource type="StyleBoxFlat" id="FocusRing"]
+bg_color = Color(1, 1, 1, 0)
+border_width_left = 6
+border_width_top = 6
+border_width_right = 6
+border_width_bottom = 6
+border_color = Color(1, 1, 1, 0.9)
+corner_radius_top_left = 32
+corner_radius_top_right = 32
+corner_radius_bottom_right = 32
+corner_radius_bottom_left = 32
+expand_margin_left = 6.0
+expand_margin_top = 6.0
+expand_margin_right = 6.0
+expand_margin_bottom = 6.0
+
+[sub_resource type="StyleBoxFlat" id="FieldStyle"]
+content_margin_left = 24.0
+content_margin_top = 12.0
+content_margin_right = 24.0
+content_margin_bottom = 12.0
+bg_color = Color(1.0, 0.9922, 0.9569, 1)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.902, 0.8275, 0.651, 1)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+
+[node name="SavedWorldsScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1")
+
+[node name="Background" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = SubResource("SkyTexture")
+expand_mode = 1
+stretch_mode = 0
+
+[node name="Layout" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 48
+theme_override_constants/margin_top = 40
+theme_override_constants/margin_right = 48
+theme_override_constants/margin_bottom = 40
+
+[node name="Stack" type="VBoxContainer" parent="Layout"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 18
+alignment = 0
+
+[node name="Heading" type="Label" parent="Layout/Stack"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_constants/outline_size = 10
+theme_override_font_sizes/font_size = 48
+text = "Saved Worlds"
+horizontal_alignment = 1
+
+[node name="ScrollArea" type="ScrollContainer" parent="Layout/Stack"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="SaveList" type="GridContainer" parent="Layout/Stack/ScrollArea"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/h_separation = 16
+theme_override_constants/v_separation = 16
+columns = 3
+
+[node name="EmptyLabel" type="Label" parent="Layout/Stack"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 24
+text = "No worlds yet — start a new one!"
+horizontal_alignment = 1
+
+[node name="Gap" type="Control" parent="Layout/Stack"]
+custom_minimum_size = Vector2(0, 4)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="ActionRow" type="HBoxContainer" parent="Layout/Stack"]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_constants/separation = 16
+alignment = 1
+
+[node name="PlayButton" type="Button" parent="Layout/Stack/ActionRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(200, 60)
+layout_mode = 2
+disabled = true
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
+theme_override_colors/font_pressed_color = Color(1, 1, 1, 1)
+theme_override_colors/font_focus_color = Color(1, 1, 1, 1)
+theme_override_colors/font_disabled_color = Color(1, 1, 1, 0.7)
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = SubResource("PrimaryNormal")
+theme_override_styles/hover = SubResource("PrimaryHover")
+theme_override_styles/pressed = SubResource("PrimaryHover")
+theme_override_styles/focus = SubResource("FocusRing")
+text = "Play World"
+
+[node name="RenameButton" type="Button" parent="Layout/Stack/ActionRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(160, 60)
+layout_mode = 2
+disabled = true
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_colors/font_hover_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_colors/font_pressed_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_colors/font_focus_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_colors/font_disabled_color = Color(0.42, 0.29, 0.169, 0.5)
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = SubResource("SecondaryNormal")
+theme_override_styles/hover = SubResource("SecondaryHover")
+theme_override_styles/pressed = SubResource("SecondaryHover")
+theme_override_styles/focus = SubResource("FocusRing")
+text = "Rename"
+
+[node name="DeleteButton" type="Button" parent="Layout/Stack/ActionRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(160, 60)
+layout_mode = 2
+disabled = true
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_colors/font_hover_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_colors/font_pressed_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_colors/font_focus_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_colors/font_disabled_color = Color(0.42, 0.29, 0.169, 0.5)
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = SubResource("SecondaryNormal")
+theme_override_styles/hover = SubResource("SecondaryHover")
+theme_override_styles/pressed = SubResource("SecondaryHover")
+theme_override_styles/focus = SubResource("FocusRing")
+text = "Delete"
+
+[node name="BackButton" type="Button" parent="Layout/Stack/ActionRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(160, 60)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_colors/font_hover_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_colors/font_pressed_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_colors/font_focus_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = SubResource("SecondaryNormal")
+theme_override_styles/hover = SubResource("SecondaryHover")
+theme_override_styles/pressed = SubResource("SecondaryHover")
+theme_override_styles/focus = SubResource("FocusRing")
+text = "Back"
+
+[node name="RenameDialog" type="ConfirmationDialog" parent="."]
+unique_name_in_owner = true
+title = "[COPY] Rename World"
+dialog_text = "[COPY] Choose a new name for this world."
+ok_button_text = "OK"
+cancel_button_text = "Cancel"
+
+[node name="RenameField" type="LineEdit" parent="RenameDialog"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(360, 64)
+offset_left = 8.0
+offset_top = 8.0
+offset_right = 368.0
+offset_bottom = 72.0
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 28
+theme_override_styles/normal = SubResource("FieldStyle")
+theme_override_styles/focus = SubResource("FieldStyle")
+horizontal_alignment = 1
+max_length = 40
+
+[node name="DeleteConfirmDialog" type="ConfirmationDialog" parent="."]
+unique_name_in_owner = true
+title = "[COPY] Delete World?"
+dialog_text = "[COPY] This can't be undone."
+ok_button_text = "OK"
+cancel_button_text = "Cancel"

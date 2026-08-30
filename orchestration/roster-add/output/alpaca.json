@@ -1,0 +1,35 @@
+{
+  "species": "Alpaca",
+  "habitat_design": {
+    "habitat_needs": [
+      "cultivated",
+      "open_grass"
+    ],
+    "personality": "Bold",
+    "avoids": [],
+    "farm_tolerant": true,
+    "scout_radius": 8,
+    "tiles_per_individual": 4,
+    "max_individuals": 6,
+    "rationale": "Alpacas are domesticated South American camelids raised on managed pasture, grazing contentedly on open grassland tended by farmers, and their calm, curious nature around people makes them confident rather than skittish."
+  },
+  "schema": {
+    "id": "alpaca",
+    "display_name": "Alpaca",
+    "tres_body": "[resource]\nscript = ExtResource(\"1\")\nid = \"alpaca\"\ndisplay_name = \"Alpaca\"\nhabitat_needs = Array[StringName]([\"cultivated\", \"open_grass\"])\npersonality = \"Bold\"\navoids = Array[StringName]([])\nfarm_tolerant = true\nscout_radius = 8\ncapacity_radius = 0\ntiles_per_individual = 4\nmax_individuals = 6\nmodel_scene = \"res://assets/animals/alpaca/Alpaca.tscn\"\nfact_text = \"PLACEHOLDER\""
+  },
+  "content": {
+    "fact_text": "Alpacas are gentle, fluffy animals with long necks, small heads, and big pointed ears, and their soft wool comes in about 22 different colors! They love staying close to their herd friends and even hum softly to chat with one another.",
+    "checklist_log": {
+      "source": "Drawn from nationalzoo.si.edu/animals/alpaca (Smithsonian's National Zoo), which covers alpaca physical traits, wool, and herd/social behavior.",
+      "length": "Pass - 2 sentences.",
+      "tone": "Pass - warm, friendly wording ('gentle', 'love staying close', 'chat with one another') with no snark.",
+      "predation": "Pass - no predation, death, or threat framing; only positive social behavior (herd bonding, humming) is described."
+    }
+  },
+  "tres_body": "[resource]\nscript = ExtResource(\"1\")\nid = \"alpaca\"\ndisplay_name = \"Alpaca\"\nhabitat_needs = Array[StringName]([\"cultivated\", \"open_grass\"])\npersonality = \"Bold\"\navoids = Array[StringName]([])\nfarm_tolerant = true\nscout_radius = 8\ncapacity_radius = 0\ntiles_per_individual = 4\nmax_individuals = 6\nmodel_scene = \"res://assets/animals/alpaca/Alpaca.tscn\"\nfact_text = \"Alpacas are gentle, fluffy animals with long necks, small heads, and big pointed ears, and their soft wool comes in about 22 different colors! They love staying close to their herd friends and even hum softly to chat with one another.\"",
+  "qa": {
+    "passed": true,
+    "problems": []
+  }
+}

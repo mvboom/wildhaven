@@ -1,0 +1,60 @@
+[gd_resource type="Resource" script_class="AttributionEntry" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://attribution/attribution_entry.gd" id="1_entry"]
+
+[resource]
+script = ExtResource("1_entry")
+id = "quaternius_animated_men_characters"
+creator = "Quaternius"
+source_name = "Animated Men Characters"
+source_version = "February 2019"
+creator_url = "https://quaternius.com"
+source_url = "https://quaternius.com"
+support_url = "https://www.patreon.com/quaternius"
+license_name = "CC0 1.0 Universal (CC0 1.0) Public Domain Dedication"
+license_url = "https://creativecommons.org/publicdomain/zero/1.0/"
+license_file = "res://assets/licenses/Quaternius_AnimatedMenCharacters_License.txt"
+attribution_required = false
+required_notice = ""
+conditions = ""
+assets_used = PackedStringArray("Male_Casual (in-repo as assets/animals/human_man/Man.glb)", "Male_LongSleeve", "Male_Shirt", "Smooth_Male_Casual", "Smooth_Male_LongSleeve", "Smooth_Male_Shirt")
+per_file_licensing = false
+notes = "CC0 — crediting is courtesy, not compliance. This entry has its OWN license_file
+(the pack's own License.txt, copied verbatim from
+source-content/assets/Animated Men Characters - Feb 2019.../License.txt) rather than reusing the
+generic Quaternius CC0 boilerplate other entries share. The text is byte-identical apart
+from CRLF line endings; the copy exists so a compliance review can point at THIS pack's
+own file.
+
+CORRECTS A PRIOR MISATTRIBUTION. The shipped assets/animals/human_man/Man.glb was
+recorded in quaternius_poly_pizza_characters.tres as a \"standalone single-model
+download\" whose \"exact model-page URLs were not verified\", and its odd rig was
+explained there as \"a modeling-generation difference\". It is in fact THIS PACK's
+Male_Casual, re-downloaded as a standalone .glb while the pack itself sat on disk. It is
+therefore listed in assets_used above and REMOVED from that entry. Evidence measured on
+this run, not asserted: Man.glb carries exactly the six named materials of
+Smooth_Male_Casual (this pack's subdivided twin of Male_Casual) with albedo_color
+matching to four decimals on every one — Shirt 0.3969/0.4506/0.4689, Skin
+0.6633/0.5418/0.4001, Pants 0.2442/0.2276/0.2276, Eyes 0.1531 grey, Socks
+0.6694/0.6245/0.6245, Hair 0.2259/0.1827/0.1857 — and the same HumanArmature rig with the
+same 11 clip names (HumanArmature|Man_Clapping/Death/Idle/Jump/Punch/Run/RunningJump/
+Sitting/Standing/SwordSlash/Walk). Its AABB (5.197165 x 4.841252 x 0.942781) matches this
+pack's base-tier male bodies to 1e-6. NO COMPLIANCE RISK EITHER WAY — CC0, same creator,
+same terms — the correction is about the record being true, not about a licence exposure.
+
+ONE MEASURED DIFFERENCE, recorded rather than smoothed over: Man.glb's skeleton has 31
+bones where every FBX in this pack has 42, despite identical armature and clip names.
+The likely cause is the .glb export dropping bones with no skin weights and no animation
+tracks. Not a retarget, not a defect; noted so nobody re-derives it.
+
+CLIP-NAME ODDITY, also recorded rather than corrected: the MEN's models name their clips
+`HumanArmature|Man_*`, not `Male_*`, even though the model files are named `Male_*`. The
+women's pack is self-consistent (`Female_*` files, `HumanArmature|Female_*` clips). Any
+code or wrapper autoplay string for a male variant must use `Man_`.
+
+Male_Suit and Smooth_Male_Suit are ON DISK BUT DELIBERATELY NOT IMPORTED: their shirt and
+pants materials read Kd 0.0185, effectively pure black, which art.md's palette rule
+(\"no pure black or pure white\") excludes. That is a rule applied, not a taste call, and
+it is reversible — if the human overrules it, add the two files here and import them.
+Every model that WAS imported was checked against the same rule: the darkest garment
+anywhere in the batch is linear 0.1652 (~44% sRGB grey)."

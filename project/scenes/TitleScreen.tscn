@@ -1,0 +1,348 @@
+[gd_scene load_steps=13 format=3]
+
+[ext_resource type="Script" path="res://scripts/title_screen.gd" id="1"]
+
+; Background: a vertical sky gradient (blue -> mint -> cream), ported from
+; archive/images/mockups/01-title.svg's `skyTitle` gradient (2026-08-24 title screen
+; redesign). Distinct on purpose from UiPalette's green/cream in-game chrome — the title
+; screen is the game's "front door" moment, not part of the HUD's own palette family.
+[sub_resource type="Gradient" id="SkyGradient"]
+offsets = PackedFloat32Array(0, 0.7, 1)
+colors = PackedColorArray(0.5608, 0.8275, 0.9373, 1, 0.8078, 0.9373, 0.8902, 1, 0.9647, 0.9373, 0.7882, 1)
+
+[sub_resource type="GradientTexture2D" id="SkyTexture"]
+gradient = SubResource("SkyGradient")
+fill_to = Vector2(0, 1)
+
+[sub_resource type="StyleBoxFlat" id="PrimaryNormal"]
+content_margin_left = 40.0
+content_margin_top = 16.0
+content_margin_right = 40.0
+content_margin_bottom = 16.0
+bg_color = Color(1.0, 0.6235, 0.2902, 1)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 6
+border_color = Color(0.8784, 0.4941, 0.1647, 1)
+corner_radius_top_left = 32
+corner_radius_top_right = 32
+corner_radius_bottom_right = 32
+corner_radius_bottom_left = 32
+shadow_color = Color(0, 0, 0, 0.133)
+shadow_size = 4
+shadow_offset = Vector2(0, 3)
+
+[sub_resource type="StyleBoxFlat" id="PrimaryHover"]
+content_margin_left = 40.0
+content_margin_top = 16.0
+content_margin_right = 40.0
+content_margin_bottom = 16.0
+bg_color = Color(1.0, 0.698, 0.4, 1)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 6
+border_color = Color(0.8784, 0.4941, 0.1647, 1)
+corner_radius_top_left = 32
+corner_radius_top_right = 32
+corner_radius_bottom_right = 32
+corner_radius_bottom_left = 32
+shadow_color = Color(0, 0, 0, 0.133)
+shadow_size = 4
+shadow_offset = Vector2(0, 3)
+
+[sub_resource type="StyleBoxFlat" id="SecondaryNormal"]
+content_margin_left = 32.0
+content_margin_top = 12.0
+content_margin_right = 32.0
+content_margin_bottom = 12.0
+bg_color = Color(1.0, 0.9922, 0.9569, 1)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 5
+border_color = Color(0.902, 0.8275, 0.651, 1)
+corner_radius_top_left = 28
+corner_radius_top_right = 28
+corner_radius_bottom_right = 28
+corner_radius_bottom_left = 28
+shadow_color = Color(0, 0, 0, 0.1)
+shadow_size = 3
+shadow_offset = Vector2(0, 3)
+
+[sub_resource type="StyleBoxFlat" id="SecondaryHover"]
+content_margin_left = 32.0
+content_margin_top = 12.0
+content_margin_right = 32.0
+content_margin_bottom = 12.0
+bg_color = Color(0.851, 0.784, 0.541, 1)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 5
+border_color = Color(0.902, 0.8275, 0.651, 1)
+corner_radius_top_left = 28
+corner_radius_top_right = 28
+corner_radius_bottom_right = 28
+corner_radius_bottom_left = 28
+shadow_color = Color(0, 0, 0, 0.1)
+shadow_size = 3
+shadow_offset = Vector2(0, 3)
+
+[sub_resource type="StyleBoxFlat" id="SmallNormal"]
+content_margin_left = 18.0
+content_margin_top = 8.0
+content_margin_right = 18.0
+content_margin_bottom = 8.0
+bg_color = Color(1, 1, 1, 0.6902)
+corner_radius_top_left = 17
+corner_radius_top_right = 17
+corner_radius_bottom_right = 17
+corner_radius_bottom_left = 17
+
+[sub_resource type="StyleBoxFlat" id="SmallHover"]
+content_margin_left = 18.0
+content_margin_top = 8.0
+content_margin_right = 18.0
+content_margin_bottom = 8.0
+bg_color = Color(1, 1, 1, 0.85)
+corner_radius_top_left = 17
+corner_radius_top_right = 17
+corner_radius_bottom_right = 17
+corner_radius_bottom_left = 17
+
+[sub_resource type="StyleBoxFlat" id="FocusRing"]
+bg_color = Color(1, 1, 1, 0)
+border_width_left = 6
+border_width_top = 6
+border_width_right = 6
+border_width_bottom = 6
+border_color = Color(1, 1, 1, 0.9)
+corner_radius_top_left = 32
+corner_radius_top_right = 32
+corner_radius_bottom_right = 32
+corner_radius_bottom_left = 32
+expand_margin_left = 6.0
+expand_margin_top = 6.0
+expand_margin_right = 6.0
+expand_margin_bottom = 6.0
+
+[sub_resource type="StyleBoxFlat" id="TitleBackdrop"]
+bg_color = Color(1, 1, 1, 0)
+
+[node name="TitleScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1")
+
+[node name="Background" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = SubResource("SkyTexture")
+expand_mode = 1
+stretch_mode = 0
+
+[node name="Layout" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 48
+theme_override_constants/margin_top = 48
+theme_override_constants/margin_right = 32
+theme_override_constants/margin_bottom = 48
+
+[node name="Stack" type="VBoxContainer" parent="Layout"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 18
+alignment = 1
+
+[node name="Title" type="Label" parent="Layout/Stack"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_constants/outline_size = 14
+theme_override_font_sizes/font_size = 80
+theme_override_styles/normal = SubResource("TitleBackdrop")
+text = "Wildhaven"
+horizontal_alignment = 0
+
+[node name="Tagline" type="Label" parent="Layout/Stack"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 24
+text = "build a home for everyone"
+horizontal_alignment = 0
+autowrap_mode = 2
+
+[node name="Gap" type="Control" parent="Layout/Stack"]
+custom_minimum_size = Vector2(0, 24)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="NewGameButton" type="Button" parent="Layout/Stack"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(320, 72)
+layout_mode = 2
+size_flags_horizontal = 0
+focus_neighbor_top = NodePath("../SpeakingCheck")
+focus_neighbor_bottom = NodePath("../LoadGameButton")
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_hover_color = Color(1, 1, 1, 1)
+theme_override_colors/font_pressed_color = Color(1, 1, 1, 1)
+theme_override_colors/font_focus_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 26
+theme_override_styles/normal = SubResource("PrimaryNormal")
+theme_override_styles/hover = SubResource("PrimaryHover")
+theme_override_styles/pressed = SubResource("PrimaryHover")
+theme_override_styles/focus = SubResource("FocusRing")
+text = "New Game"
+
+[node name="LoadGameButton" type="Button" parent="Layout/Stack"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(320, 60)
+layout_mode = 2
+size_flags_horizontal = 0
+focus_neighbor_top = NodePath("../NewGameButton")
+focus_neighbor_bottom = NodePath("../TutorialButton")
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_colors/font_hover_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_colors/font_pressed_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_colors/font_focus_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = SubResource("SecondaryNormal")
+theme_override_styles/hover = SubResource("SecondaryHover")
+theme_override_styles/pressed = SubResource("SecondaryHover")
+theme_override_styles/focus = SubResource("FocusRing")
+text = "Load Game"
+
+[node name="TutorialButton" type="Button" parent="Layout/Stack"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(320, 60)
+layout_mode = 2
+size_flags_horizontal = 0
+focus_neighbor_top = NodePath("../LoadGameButton")
+focus_neighbor_bottom = NodePath("../SmallRow/HelpButton")
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_colors/font_hover_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_colors/font_pressed_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_colors/font_focus_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = SubResource("SecondaryNormal")
+theme_override_styles/hover = SubResource("SecondaryHover")
+theme_override_styles/pressed = SubResource("SecondaryHover")
+theme_override_styles/focus = SubResource("FocusRing")
+text = "Tutorial"
+
+[node name="SmallGap" type="Control" parent="Layout/Stack"]
+custom_minimum_size = Vector2(0, 8)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="SmallRow" type="HBoxContainer" parent="Layout/Stack"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 12
+
+[node name="SettingsButton" type="Button" parent="Layout/Stack/SmallRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(100, 40)
+layout_mode = 2
+focus_neighbor_top = NodePath("../../TutorialButton")
+focus_neighbor_bottom = NodePath("../../SpeakingCheck")
+theme_override_colors/font_color = Color(0.5412, 0.4157, 0.2824, 1)
+theme_override_colors/font_hover_color = Color(0.5412, 0.4157, 0.2824, 1)
+theme_override_colors/font_pressed_color = Color(0.5412, 0.4157, 0.2824, 1)
+theme_override_colors/font_focus_color = Color(0.5412, 0.4157, 0.2824, 1)
+theme_override_font_sizes/font_size = 16
+theme_override_styles/normal = SubResource("SmallNormal")
+theme_override_styles/hover = SubResource("SmallHover")
+theme_override_styles/pressed = SubResource("SmallHover")
+theme_override_styles/focus = SubResource("FocusRing")
+text = "Settings"
+
+[node name="HelpButton" type="Button" parent="Layout/Stack/SmallRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(100, 40)
+layout_mode = 2
+focus_neighbor_top = NodePath("../../TutorialButton")
+focus_neighbor_bottom = NodePath("../../SpeakingCheck")
+theme_override_colors/font_color = Color(0.5412, 0.4157, 0.2824, 1)
+theme_override_colors/font_hover_color = Color(0.5412, 0.4157, 0.2824, 1)
+theme_override_colors/font_pressed_color = Color(0.5412, 0.4157, 0.2824, 1)
+theme_override_colors/font_focus_color = Color(0.5412, 0.4157, 0.2824, 1)
+theme_override_font_sizes/font_size = 16
+theme_override_styles/normal = SubResource("SmallNormal")
+theme_override_styles/hover = SubResource("SmallHover")
+theme_override_styles/pressed = SubResource("SmallHover")
+theme_override_styles/focus = SubResource("FocusRing")
+text = "Help"
+
+[node name="CreditsButton" type="Button" parent="Layout/Stack/SmallRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(100, 40)
+layout_mode = 2
+focus_neighbor_top = NodePath("../../TutorialButton")
+focus_neighbor_bottom = NodePath("../../SpeakingCheck")
+theme_override_colors/font_color = Color(0.5412, 0.4157, 0.2824, 1)
+theme_override_colors/font_hover_color = Color(0.5412, 0.4157, 0.2824, 1)
+theme_override_colors/font_pressed_color = Color(0.5412, 0.4157, 0.2824, 1)
+theme_override_colors/font_focus_color = Color(0.5412, 0.4157, 0.2824, 1)
+theme_override_font_sizes/font_size = 16
+theme_override_styles/normal = SubResource("SmallNormal")
+theme_override_styles/hover = SubResource("SmallHover")
+theme_override_styles/pressed = SubResource("SmallHover")
+theme_override_styles/focus = SubResource("FocusRing")
+text = "Credits"
+
+[node name="SpeakingCheck" type="CheckButton" parent="Layout/Stack"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 0
+focus_neighbor_top = NodePath("../SmallRow/HelpButton")
+focus_neighbor_bottom = NodePath("../NewGameButton")
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_colors/font_hover_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_colors/font_pressed_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_colors/font_hover_pressed_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_colors/font_focus_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_colors/font_disabled_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 22
+text = "Read Text Aloud"
+
+[node name="BuildTag" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = -48.0
+offset_right = -24.0
+offset_bottom = -16.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 0.7)
+theme_override_font_sizes/font_size = 18
+text = "[COPY] build tag"
+horizontal_alignment = 1

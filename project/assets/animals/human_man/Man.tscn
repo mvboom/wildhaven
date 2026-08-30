@@ -1,0 +1,41 @@
+; Man — one of the Human look variants (see art.md; Adventurer is the recommended
+; default).
+;
+; ATTRIBUTION CORRECTED (SecondAge/character-pack import run) — THE FILE IS UNCHANGED,
+; ONLY THE RECORD IS. This model was recorded as an unidentified "standalone glb,
+; poly.pizza-style filename" under
+; project/attribution/sources/quaternius_poly_pizza_characters.tres. It is in fact
+; Male_Casual from Quaternius's "Animated Men Characters" (Feb 2019) pack, which is on
+; disk under source-content/assets/ with its own License.txt; the .glb was re-downloaded
+; standalone without anyone noticing. Correct entry:
+; project/attribution/sources/quaternius_animated_men_characters.tres (CC0 1.0 Universal
+; either way — same creator, same dedication, no compliance consequence). Evidence is
+; recorded in that entry: six materials matching this pack's Smooth_Male_Casual to four
+; decimals, same HumanArmature rig, same 11 clip names, AABB matching to 1e-6.
+;
+; Different rig/animation-name convention than the CharacterArmature siblings
+; (HumanArmature, 11 clips vs. 24) — because it is a different, older pack, which is now
+; identified rather than guessed at. Raw scale is also much larger than those siblings
+; (measured, not assumed). Its 13 pack siblings are imported under
+; project/assets/animals/human_{male,female,smooth_*}/ and share this exact rig; note
+; that the men's clips are named HumanArmature|Man_*, not Male_*.
+;
+; Scale is a MEASURED first-pass fit to person-scale (tile height = 1.0 unit, gdd.md ->
+; Level & world design): scale = 1 / combined mesh AABB height at rest pose
+; (4.841252 units -> 0.207). Bbox min y ~0 — no grounding anomaly. Note: this rest pose
+; has arms spread wide (bbox width 5.2 units pre-scale) — a bind-pose artifact, not
+; relevant to height, but the eyeball check should confirm the Idle clip resolves to a
+; normal standing pose rather than the bind T-pose.
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" uid="uid://crd2p7i7po410" path="res://assets/animals/human_man/Man.glb" id="1_model"]
+
+[node name="Man" type="Node3D"]
+
+[node name="Model" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.207, 0, 0, 0, 0.207, 0, 0, 0, 0.207, 0, 0, 0)
+
+[node name="AnimationPlayer" parent="Model" index="1"]
+autoplay = "HumanArmature|Man_Idle"
+
+[editable path="Model"]

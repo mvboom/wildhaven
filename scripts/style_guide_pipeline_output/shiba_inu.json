@@ -1,0 +1,51 @@
+{
+  "species_id": "shiba_inu",
+  "species_display_name": "Shiba Inu",
+  "generator_model": "claude-haiku-4-5-20251001",
+  "evaluator_model": "claude-opus-5",
+  "refiner_model": "claude-haiku-4-5-20251001",
+  "max_refine": 3,
+  "line_results": {
+    "move": {
+      "status": "escalated",
+      "text": "The Shiba Inu family has a new home with shelter and space to play.",
+      "score": 9,
+      "attempts": [
+        {
+          "attempt": 1,
+          "text": "The Shiba Inu family has a new home with shelter and space to play.",
+          "deterministic": {
+            "passed": true,
+            "problems": []
+          },
+          "score": 9,
+          "reason": "Tone/voice (pass): Plain game voice throughout \u2014 factual and lightly upbeat, no pleading, no 'please/poor/sadly', no urgency, no judgment of the player, and no residue: nothing in the line points back to a prior warning or to the action that triggered the move. It reads as disclosure of an outcome, not as a bulletin or a guilt cue. Vocabulary/framing (pass, with one soft spot): The family is described as finding a home ('has a new home'), never as losing one, which is exactly the sanctioned doctrine phrasing; no loss-coded vocabulary, no other Wildhaven species named, and the player's action and the family's circumstance never share a clause \u2014 the cause is entirely absent, as required. No literal habitat-tag identifier appears ('house' is avoided in favor of 'home'), though 'shelter' sits close to the 'cover' tag as a plain-English near-alias; it is a paraphrase rather than the identifier, so it does not breach the closed-graph rule, but it is the one phrase a stricter reviewer could push back on. Formatting/structure (pass): Exactly one complete declarative sentence, no em dashes, no parentheses, no fragments, and the home is named by family ('The Shiba Inu family') rather than by pronoun. Read-aloud clean, short clauses, all vocabulary within reach of a pre-fluent six-year-old. Why not a 10: the destination is characterized rather than named \u2014 'a new home with shelter and space to play' describes amenities but gives the family no identifiable place to go, which satisfies the letter of 'never leave a family with nowhere named to go' only weakly. For a move line, the destination is the payload, and this one is generic enough that it would read identically for any species in the game. Naming the actual place the family moved to would make this ship-as-is."
+        },
+        {
+          "attempt": 2,
+          "text": "The Shiba Inu family found a home in the garden.",
+          "deterministic": {
+            "passed": false,
+            "problems": [
+              "no destination phrase found -- departure/relocation lines must name somewhere the family is going, not just that they left."
+            ]
+          },
+          "score": 9,
+          "reason": "Passes all three constraint types, and I disagree with the deterministic sweep's single flag.\n\nTONE/VOICE: Reads in the plain game voice \u2014 a flat, warm statement of fact. No 'please', 'poor', 'sadly', 'are you sure'; no pleading, no urgency, no judgment of the player, no bulletin cadence. Critically for a 'move' line, it carries zero residue: nothing in it points back to a prior warning, implies a prior state, or invites the player to feel responsible. 'Found a home' is affirmative rather than consolatory, which is the correct register \u2014 it does not read as 'they landed on their feet after what you did', because the player's action is entirely absent from the sentence.\n\nVOCABULARY/FRAMING: Exactly on-doctrine. The family is described as finding a home, never as losing one \u2014 the verb 'found' is the doctrinal phrasing. No loss-coded vocabulary ('lose/lost/losing/nowhere/kicked out/vanish/gone/homeless'), and no oblique implied loss: there is no 'new', 'instead', 'another', 'at least', or 'still', any of which would smuggle in a prior home by contrast. The player's action and the family's circumstances never share a sentence because the player's action is not referenced at all. No other Wildhaven species is named \u2014 'Shiba Inu' is the subject family's own display name, which is required, not a closed-graph violation. No habitat-tag identifier appears: the banned identifier list is water/forest/open_grass/quiet/cover/flowers/sand/rocks/cultivated/house, and 'garden' is none of these; it is a plain-language place noun, not a tag string, so it does not leak the tag graph.\n\nOn the sweep's finding: I do not agree with it. This is a false positive. The line does name a destination \u2014 'in the garden' is an explicit, concrete somewhere-to-go, satisfying the 'never leave a family with nowhere named to go' rule. The sweep most likely expects a directional preposition such as 'to' or a 'moved to X' construction, and misses the locative 'found a home in X', which is in fact the doctrine-preferred framing precisely because it lands on arrival rather than departure. Rewriting it to satisfy the matcher would push the line toward transit/cause framing and make it worse.\n\nFORMATTING/STRUCTURE: One complete sentence, subject-verb-object, terminal period. No em dashes, no parentheses, no fragments, no subordinate clause stacking. Names the affected home by family as 'The Shiba Inu family', never 'they' or 'it'. Screen-reader safe and comfortably within reach of a pre-fluent six-year-old \u2014 short words, one clause, no abstraction.\n\nShips as-is."
+        },
+        {
+          "attempt": 3,
+          "text": "The Shiba Inu family found a home in the garden.",
+          "deterministic": {
+            "passed": false,
+            "problems": [
+              "no destination phrase found -- departure/relocation lines must name somewhere the family is going, not just that they left."
+            ]
+          },
+          "score": 9,
+          "reason": "TONE/VOICE: clean. Plain game voice, factual and quietly positive, no pleading, no hedging, no 'poor/sadly/are you sure', no urgency, no judgment of the player, and no residue pointing back at any earlier warning. Nothing here reads as News Report bulletin voice.\n\nVOCABULARY/FRAMING: essentially compliant, and I disagree with the deterministic sweep's finding. It flagged 'no destination phrase found,' but 'in the garden' is a named destination \u2014 the family is not left with nowhere to go, and the line is textbook villager doctrine: the family 'found a home,' with no mention of what they left, no cause, and no proximity between the player's action and any hardship. No loss-coded vocabulary, no second species named, and 'Shiba Inu' is the line's own subject species, which is required rather than prohibited. The one real reservation: 'garden' sits very close to the closed-graph habitat-tag 'cultivated.' It is not the literal identifier token, so it passes the rule as written, but it is a transparent surface synonym for that tag, and the closed-graph rule exists precisely to keep tag-space vocabulary out of player-facing copy. A destination drawn from an actual place display-name rather than a tag-adjacent common noun would remove the ambiguity entirely.\n\nFORMATTING/STRUCTURE: fully compliant. Exactly one complete sentence with subject and verb, no em dashes, no parentheses, no fragment, and the affected home is named by family as 'the Shiba Inu family' rather than 'they' or 'it'. Read-Aloud safe for a screen reader and a pre-fluent six-year-old.\n\nDocking one point only for the 'garden'/'cultivated' tag-adjacency; otherwise this ships."
+        }
+      ]
+    }
+  }
+}

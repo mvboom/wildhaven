@@ -1,0 +1,52 @@
+; Forest — GREY-BOX PLACEHOLDER. Authored in-repo from Godot primitives; no third-party
+; source, nothing to attribute (see assets/placeholder/README.md).
+;
+; One Forest tile grows one tree (terrain.md -> "Terraform mechanics stay paint-bucket-
+; simple"). The tree's proportions are copied verbatim from grid_manager.gd:114-141
+; `_add_tree()` — trunk 0.14 x 0.4 x 0.14 at y 0.2, canopy 0.5 cube at y 0.6 — so the
+; grey-box set matches the pilot-1 spike exactly rather than introducing a second set of
+; unexplained numbers.
+;
+; Slab dimensions track grid_manager.gd (0.94 across, TILE_HEIGHT 0.2 thick). Origin is
+; the tile's TOP surface, which is where the tree sits.
+;
+; COLOURS ARE PLACEHOLDERS and a taste call reserved for the human — all three are
+; grid_manager.gd's existing COLOR_FOREST / COLOR_TREE_TRUNK / COLOR_TREE_CANOPY.
+[gd_scene load_steps=7 format=3]
+
+[sub_resource type="BoxMesh" id="BoxMesh_slab"]
+size = Vector3(0.94, 0.2, 0.94)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_slab"]
+albedo_color = Color(0.16, 0.4, 0.22, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_trunk"]
+size = Vector3(0.14, 0.4, 0.14)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_trunk"]
+albedo_color = Color(0.36, 0.24, 0.14, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_canopy"]
+size = Vector3(0.5, 0.5, 0.5)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_canopy"]
+albedo_color = Color(0.2, 0.52, 0.28, 1)
+
+[node name="Forest" type="Node3D"]
+
+[node name="Slab" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+mesh = SubResource("BoxMesh_slab")
+material_override = SubResource("StandardMaterial3D_slab")
+
+[node name="Tree" type="Node3D" parent="."]
+
+[node name="Trunk" type="MeshInstance3D" parent="Tree"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 0)
+mesh = SubResource("BoxMesh_trunk")
+material_override = SubResource("StandardMaterial3D_trunk")
+
+[node name="Canopy" type="MeshInstance3D" parent="Tree"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+mesh = SubResource("BoxMesh_canopy")
+material_override = SubResource("StandardMaterial3D_canopy")

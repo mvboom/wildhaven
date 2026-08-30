@@ -1,0 +1,59 @@
+[gd_resource type="Resource" script_class="AttributionEntry" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://attribution/attribution_entry.gd" id="1_entry"]
+
+[resource]
+script = ExtResource("1_entry")
+id = "quaternius_nature_crops_pack"
+creator = "Quaternius"
+source_name = "Nature Crops Pack"
+source_version = "January 2020"
+creator_url = "https://quaternius.com"
+source_url = "https://quaternius.com"
+support_url = "https://www.patreon.com/quaternius"
+license_name = "CC0 1.0 Universal (CC0 1.0) Public Domain Dedication"
+license_url = "https://creativecommons.org/publicdomain/zero/1.0/"
+license_file = "res://assets/licenses/Quaternius_UltimateAnimatedAnimals_License.txt"
+attribution_required = false
+required_notice = ""
+conditions = ""
+assets_used = PackedStringArray("Wheat_2", "Wheat_4", "Wheat_Crop", "Corn_2", "Corn_4", "Corn_Harvested", "Carrot_2", "Carrot_4", "Carrot_Crop", "Lettuce_2", "Lettuce_4", "Lettuce_Harvested", "Tomato_2", "Tomato_4", "Tomato_Harvested", "Pumpkin_2", "Pumpkin_4", "Pumpkin_Harvested", "Apple_2", "Apple_4", "Apple_Harvested", "Cactus_2", "Cactus_4", "Cactus_Harvested")
+per_file_licensing = false
+notes = "CC0 — crediting is courtesy, not compliance. Pack ships its own License.txt at
+`source-content/assets/Nature Crops Pack - Jan 2020.../License.txt`, byte-identical boilerplate to
+the one already preserved as license_file for the Ultimate Animated Animal Pack (same
+generic Quaternius CC0 1.0 dedication text, not pack-specific) — reused rather than
+duplicated, same reasoning as every other Quaternius entry in this project.
+
+DISTINCT FROM quaternius_poly_pizza_nature.tres and quaternius_ultimate_nature_pack.tres:
+this is a THIRD, separately-named/dated Quaternius pack extraction
+(`Nature Crops Pack - Jan 2020`, FBX/ subfolder), not a reuse of either existing Quaternius
+nature source. quaternius_poly_pizza_nature.tres's \"Wheat\"/\"Crops\" entries are
+individually-downloaded poly.pizza model pages, a different, unrelated download of
+similarly-named but visually distinct assets already wired as CultivatedWheatRow.tscn/
+CultivatedCropsPlot.tscn — this pack's own Wheat_2/Wheat_4/etc. are NOT the same files and
+are not a duplicate of those two entries.
+
+First use (2026-08-26, content-variety pass Task 7): 8 species (Wheat, Corn, Carrot,
+Lettuce, Tomato, Pumpkin, Apple, Cactus) x 3 chosen growth-stage/harvested frames each (24
+files total, all listed in assets_used above) imported as 24 new
+project/assets/terrain/crop_<species>_<stage>/ wrapper scenes, all wired as new
+model_scenes entries on project/data/terrain/cultivated_field.tres (see that resource's
+own header for the full batch rationale, the Wheat/Carrot \"_Harvested\"-file-missing
+substitution, and the human sign-off flag).
+
+Second use (2026-08-26, content-variety pass Task 9), REVERTED THE SAME DAY (human eyeball
+pass): Coconut_Half.fbx was briefly imported as
+res://assets/terrain/wild_grass_coconut/WildGrassCoconut.tscn, a 3rd Wild grass
+model_scenes entry — the human's direct verdict was "does not look good at all, remove it
+completely." The .tscn wrapper and the raw Coconut_Half.fbx copy under
+project/assets/terrain/wild_grass_coconut/ were deleted (not just unwired), and this
+`assets_used` entry removed accordingly. Cactus_1.fbx/PalmTree_1.fbx (Ultimate Nature
+Pack — see quaternius_ultimate_nature_pack.tres) had a different fate: also pulled from
+wild_grass.tres's random model_scenes pool per the same eyeball pass, but kept imported on
+disk rather than deleted, reserved for sub-project B's player-facing style picker.
+
+The pack ships several more species (Beet, Bamboo, and others) not used by this pass —
+append to assets_used as each is imported, do NOT create a second entry for this pack,
+same convention as quaternius_ultimate_nature_pack.tres and
+quaternius_ultimate_animated_animals.tres."

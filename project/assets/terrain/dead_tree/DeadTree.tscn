@@ -1,0 +1,115 @@
+; DeadTree — 5th Forest tree pick, added 2026-08-26 (content-variety pass, Task 5). A
+; bare-branch silhouette, visually distinct from all 4 living-canopy picks (CommonTree1/2,
+; PineTree, BirchTree) — scenery variety only, not implying anything about Forest's
+; gameplay meaning (the tile still emits `forest` and harvests the same Wood regardless of
+; which of the now-5 trees a given tile's stable hash lands on).
+;
+; Source: "DeadTree_3.fbx", Textured Stylized Trees (May 2020) by Quaternius, CC0 1.0
+; Universal — License.txt at `source-content/assets/Textured Stylized Trees - May 2020.../
+; License.txt` re-checked before import, per asset-import-pipeline.md's audit gate (states
+; CC0 1.0 Universal / Public Domain Dedication, same boilerplate as every other Quaternius
+; pack in this repo). This is a NEW pack for this project (no prior entry existed) —
+; recorded in the newly-authored
+; project/attribution/sources/quaternius_textured_stylized_trees.tres.
+;
+; SCALE: the source file bakes a 90-degree axis correction + scale=100 into its own child
+; node (Blender Z-up -> FBX Y-up, same mechanism PineTree.tscn's header documents),
+; measured post-correction global AABB height = 5.6187 units (footprint ~4.504 x 4.516 at
+; that height) — scaled here by 0.392 to hit a ~2.2-tile canopy height, DELIBERATELY
+; SHORTER than the other 4 trees' ~2.5-tile target: bare branches read visually taller/
+; busier at a given height than a filled canopy, so this pass's proposal is to undershoot
+; slightly rather than match height exactly. FIRST-PASS PROPOSAL, not a measured GDD
+; number — FLAG FOR HUMAN SIGN-OFF, both on the ~2.2 vs ~2.5 height judgment call itself and
+; on whether a bare-branch tree reads correctly (not "broken"/"dead level") at the fixed
+; ~45 camera pitch next to 4 living-canopy neighbors.
+;
+; SLAB IS 1.0x0.2x1.0 (matches every current-generation terrain slab, post the
+; "SLAB WIDENED 0.94 -> 1.0" cross-tile seam fix PineTree.tscn's header documents).
+;
+; FLOOR TREATMENT MATCHES COMMONTREE1/COMMONTREE2/PINETREE/BIRCHTREE EXACTLY (same slab
+; tint, same 3-patch moss/litter blotch treatment, same relative transforms) so a Forest
+; tile's floor reads identically regardless of which of the now-5 trees it lands on.
+;
+; EVERYTHING NESTED UNDER ONE NODE NAMED "Slab" (required, not cosmetic): identical
+; OcclusionFader exemption requirement as every sibling terrain scene — see
+; CommonTree1.tscn's header for the full mechanism. The ground plane (renamed "Ground")
+; and all 3 floor patches are children of a wrapper Node3D literally named "Slab".
+;
+; MATERIAL OVERRIDE ADDED (2026-08-26, human-reported bug: "some of the trees are just
+; plain white"). Root cause: unlike BirchTree.fbx (Ultimate Nature Pack), this pack —
+; "Textured Stylized Trees" — ships real bark/leaf textures rather than baked per-vertex
+; color, but only the raw .fbx was copied into the project at import time; no texture ever
+; accompanied it, so the FBX's "Bark" material had nothing to sample and Godot's importer
+; fell back to a near-white default (measured albedo_color 0.9063/0.9063/0.9063,
+; vertex_color_use_as_albedo=true reading empty per-vertex data). Fixed the same way
+; Rabbit.tscn overrides its imported material (see that file for the precedent): the raw
+; `Bark_Dead.png` texture (this pack's own dedicated dead-wood variant, `Textures/Color
+; Variations/Bark_Dead.png` — chosen over the generic `Tree_Bark.jpg` PineTree2.tscn uses,
+; since this is specifically the DEAD tree) was copied to
+; `res://assets/terrain/dead_tree/Bark_Dead.png` and wired as a `surface_material_override`
+; on the instanced FBX's "DeadTree_3" mesh node below, with `vertex_color_use_as_albedo`
+; explicitly false so the texture is not multiplied against the (meaningless, near-white)
+; per-vertex data. `[editable path="Model"]` is required for the override to apply to a
+; node living inside an instanced sub-scene — omitting it is the mistake that would silently
+; leave this override inert.
+[gd_scene load_steps=10 format=3]
+
+[ext_resource type="PackedScene" uid="uid://dwadcv8vn386p" path="res://assets/terrain/dead_tree/DeadTree.fbx" id="1_model"]
+[ext_resource type="Texture2D" path="res://assets/terrain/dead_tree/Bark_Dead.png" id="2_bark_texture"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_slab"]
+size = Vector3(1.0, 0.2, 1.0)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_slab"]
+albedo_color = Color(0.16, 0.4, 0.22, 1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_patch1"]
+size = Vector2(0.42, 0.36)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_patch_moss"]
+albedo_color = Color(0.11, 0.32, 0.16, 1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_patch2"]
+size = Vector2(0.3, 0.34)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_patch_litter"]
+albedo_color = Color(0.3, 0.22, 0.13, 1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_patch3"]
+size = Vector2(0.26, 0.3)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_bark_dead"]
+albedo_texture = ExtResource("2_bark_texture")
+vertex_color_use_as_albedo = false
+
+[node name="DeadTree" type="Node3D"]
+
+[node name="Slab" type="Node3D" parent="."]
+
+[node name="Ground" type="MeshInstance3D" parent="Slab"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+mesh = SubResource("BoxMesh_slab")
+material_override = SubResource("StandardMaterial3D_slab")
+
+[node name="FloorPatch_1_Moss" type="MeshInstance3D" parent="Slab"]
+transform = Transform3D(0.965926, 0, -0.258819, 0, 1, 0, 0.258819, 0, 0.965926, -0.18, 0.001, -0.12)
+mesh = SubResource("PlaneMesh_patch1")
+material_override = SubResource("StandardMaterial3D_patch_moss")
+
+[node name="FloorPatch_2_Litter" type="MeshInstance3D" parent="Slab"]
+transform = Transform3D(0.642788, 0, -0.766044, 0, 1, 0, 0.766044, 0, 0.642788, 0.2, 0.001, 0.15)
+mesh = SubResource("PlaneMesh_patch2")
+material_override = SubResource("StandardMaterial3D_patch_litter")
+
+[node name="FloorPatch_3_Moss" type="MeshInstance3D" parent="Slab"]
+transform = Transform3D(-0.173648, 0, -0.984808, 0, 1, 0, 0.984808, 0, -0.173648, 0.05, 0.001, -0.28)
+mesh = SubResource("PlaneMesh_patch3")
+material_override = SubResource("StandardMaterial3D_patch_moss")
+
+[node name="Model" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.392, 0, 0, 0, 0.392, 0, 0, 0, 0.392, 0, 0, 0)
+
+[node name="DeadTree_3" parent="Model" index="0"]
+surface_material_override/0 = SubResource("StandardMaterial3D_bark_dead")
+
+[editable path="Model"]

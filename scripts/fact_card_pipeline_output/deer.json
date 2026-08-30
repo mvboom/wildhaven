@@ -1,0 +1,192 @@
+{
+  "species_id": "deer",
+  "species_display_name": "Deer",
+  "generator_model": "claude-haiku-4-5-20251001",
+  "evaluator_model": "claude-opus-5",
+  "max_refine": 3,
+  "requested_count": 5,
+  "accepted_fact_texts": [
+    "Every year, male deer grow brand new antlers that start soft and velvety before gradually hardening into strong, branching structures.",
+    "Deer's coats change color with the seasons, turning from reddish-brown in summer to gray-brown in winter. Each year, their fur switches back and forth as the world around them transforms!",
+    "Baby deer called fawns are born with white spots scattered across their coats, but these spots gradually fade and disappear by their first winter.",
+    "Baby deer called fawns can stand and take their first steps within just twenty minutes of being born!"
+  ],
+  "candidates": [
+    {
+      "status": "accepted",
+      "fact_text": "Every year, male deer grow brand new antlers that start soft and velvety before gradually hardening into strong, branching structures.",
+      "attempts": [
+        {
+          "attempt": 1,
+          "fact_text": "Every year, male deer grow brand new antlers that start soft and velvety before gradually hardening into strong, branching structures.",
+          "source_note": "en.wikipedia.org (Deer article) and animaldiversity.org (white-tailed deer account) \u2014 verified that male deer shed and regrow antlers annually, starting as soft velvet tissue and hardening into bony structures.",
+          "deterministic": {
+            "passed": true,
+            "problems": []
+          },
+          "llm_judge": {
+            "passed": true,
+            "problems": [],
+            "skipped": false
+          },
+          "passed": true
+        }
+      ]
+    },
+    {
+      "status": "accepted",
+      "fact_text": "Deer's coats change color with the seasons, turning from reddish-brown in summer to gray-brown in winter. Each year, their fur switches back and forth as the world around them transforms!",
+      "attempts": [
+        {
+          "attempt": 1,
+          "fact_text": "Male deer grow new antlers every year, starting soft and fuzzy before hardening into impressive branching crowns. White-tailed deer also change their coat colors with the seasons\u2014grayer in winter and richer red in summer!",
+          "source_note": "en.wikipedia.org (Deer entry) and animaldiversity.org (white-tailed deer account) confirm annual antler growth starting in velvet and seasonal coat color variation.",
+          "deterministic": {
+            "passed": true,
+            "problems": []
+          },
+          "llm_judge": {
+            "passed": false,
+            "problems": [
+              "Duplicate content: the draft's first sentence restates the already-accepted card almost point-for-point (males regrow antlers annually, soft/velvety start, hardening into branching structures). Even though the second sentence adds a genuinely new fact about seasonal coat color, the card leads with and is half-built on an accepted fact. Rewrite it to cover only the seasonal coat-color change (grayer in winter, redder in summer) and drop the antler material."
+            ],
+            "skipped": false
+          },
+          "passed": false
+        },
+        {
+          "attempt": 2,
+          "fact_text": "Deer's coats change color with the seasons, turning from reddish-brown in summer to gray-brown in winter. Each year, their fur switches back and forth as the world around them transforms!",
+          "source_note": "animaldiversity.org (Odocoileus virginianus - white-tailed deer account). Fact verified: white-tailed deer undergo seasonal pelage color shifts, appearing grayer in winter and redder in summer due to photoperiod changes and molting cycles.",
+          "deterministic": {
+            "passed": true,
+            "problems": []
+          },
+          "llm_judge": {
+            "passed": true,
+            "problems": [],
+            "skipped": false
+          },
+          "passed": true
+        }
+      ]
+    },
+    {
+      "status": "accepted",
+      "fact_text": "Baby deer called fawns are born with white spots scattered across their coats, but these spots gradually fade and disappear by their first winter.",
+      "attempts": [
+        {
+          "attempt": 1,
+          "fact_text": "Male deer grow new antlers every year, shed them when they're done, and grow brand new ones the next year!",
+          "source_note": "animaldiversity.org (Cervidae account) and en.wikipedia.org (Deer entry) \u2014 confirmed that male deer grow and shed deciduous antlers annually in a repeating cycle.",
+          "deterministic": {
+            "passed": true,
+            "problems": []
+          },
+          "llm_judge": {
+            "passed": false,
+            "problems": [
+              "Duplicate fact: the draft restates already-accepted card #1 ('Every year, male deer grow brand new antlers...'). Both cards are fundamentally about the same underlying fact \u2014 the annual antler regrowth cycle in male deer. The draft adds 'shed them' but shedding is an inherent part of the same yearly grow-new-antlers cycle already described, not a genuinely different trait. To be distinct, this card would need a different underlying fact (e.g. what antlers are made of, how fast they grow, or something unrelated to antlers entirely)."
+            ],
+            "skipped": false
+          },
+          "passed": false
+        },
+        {
+          "attempt": 2,
+          "fact_text": "Baby deer called fawns are born with white spots scattered across their coats, but these spots gradually fade and disappear by their first winter.",
+          "source_note": "Verified from animaldiversity.org (Odocoileus virginianus account) and en.wikipedia.org (Deer article). Both sources confirm fawns display white spots at birth that are lost by first winter.",
+          "deterministic": {
+            "passed": true,
+            "problems": []
+          },
+          "llm_judge": {
+            "passed": true,
+            "problems": [],
+            "skipped": false
+          },
+          "passed": true
+        }
+      ]
+    },
+    {
+      "status": "escalated",
+      "attempts": [
+        {
+          "attempt": 1,
+          "fact_text": "Deer have powerful long legs built for running fast, and they're excellent jumpers that can leap very high.",
+          "source_note": "en.wikipedia.org - Physical characteristics and special abilities of deer",
+          "deterministic": {
+            "passed": true,
+            "problems": []
+          },
+          "llm_judge": {
+            "passed": false,
+            "problems": [
+              "Oblique danger framing: 'legs built for running fast' states a purpose for the deer's speed, and the well-known reason deer are fast is escape from things chasing them. It mirrors the structure of the disallowed 'bred to help hunters retrieve game' pattern \u2014 a purpose clause pointing at a banned concept without using a banned word. Reframe speed and leaping as a joyful ability rather than something the body is 'built for' (e.g. 'Deer have long, springy legs \u2014 they can bound across a meadow and leap right over a tall fence!').",
+              "Tone is anatomical and mechanical ('powerful long legs built for running fast') rather than warm and delightful for a 6-year-old; the other accepted cards for this species have a sense of wonder this one lacks."
+            ],
+            "skipped": false
+          },
+          "passed": false
+        },
+        {
+          "attempt": 2,
+          "fact_text": "Fawns are born with white spots scattered across their fur\u2014like nature sprinkled polka dots on them! These spots help them blend perfectly into forest sunlight and shadows.",
+          "source_note": "Traced to en.wikipedia.org (Deer article: 'Most fawns are born with their fur covered with white spots') and animaldiversity.org (White-tailed deer account: 'At birth, fawns are spotted with white in coloration'; camouflage function verified across multiple fawn descriptions).",
+          "deterministic": {
+            "passed": true,
+            "problems": []
+          },
+          "llm_judge": {
+            "passed": false,
+            "problems": [
+              "Duplicate fact: the draft covers the same underlying fact as the already-accepted card 'Baby deer called fawns are born with white spots scattered across their coats...' \u2014 both are fundamentally about fawns being born with white spots. The accepted card's second half (spots fade by winter) versus this draft's second half (spots help them blend in) is an extension of the same core trait, not a genuinely different fact."
+            ],
+            "skipped": false
+          },
+          "passed": false
+        },
+        {
+          "attempt": 3,
+          "fact_text": "Male deer grow brand new antlers every spring and shed the old ones in winter\u2014so their antlers are always changing!",
+          "source_note": "animaldiversity.org (white-tailed deer account) and en.wikipedia.org (Deer article). Verified facts: Males shed antlers January\u2013March annually and regrow them by spring; antlers serve as a natural yearly growth-and-shed cycle visible to children.",
+          "deterministic": {
+            "passed": true,
+            "problems": []
+          },
+          "llm_judge": {
+            "passed": false,
+            "problems": [
+              "Duplicate fact: this is fundamentally the same underlying fact as the already-accepted card about male deer growing brand new antlers every year. Both cards are 'male deer regrow their antlers annually' \u2014 the draft only adds the shed/regrow timing detail, which is the same trait restated rather than a genuinely different fact.",
+              "Plausibility concern: the stated timing is reversed/inaccurate. Deer typically shed old antlers in late winter/early spring and grow the new set through spring and summer, so 'grow new antlers every spring and shed the old ones in winter' presents the cycle in a confusing order for a child (shedding is described as happening after the new growth)."
+            ],
+            "skipped": false
+          },
+          "passed": false
+        }
+      ]
+    },
+    {
+      "status": "accepted",
+      "fact_text": "Baby deer called fawns can stand and take their first steps within just twenty minutes of being born!",
+      "attempts": [
+        {
+          "attempt": 1,
+          "fact_text": "Baby deer called fawns can stand and take their first steps within just twenty minutes of being born!",
+          "source_note": "en.wikipedia.org - Deer article; verified through Animal Diversity Web white-tailed deer account. Fact about fawn mobility and bonding with mothers.",
+          "deterministic": {
+            "passed": true,
+            "problems": []
+          },
+          "llm_judge": {
+            "passed": true,
+            "problems": [],
+            "skipped": false
+          },
+          "passed": true
+        }
+      ]
+    }
+  ]
+}

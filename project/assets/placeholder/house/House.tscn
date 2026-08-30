@@ -1,0 +1,45 @@
+; House — GREY-BOX PLACEHOLDER. Authored in-repo from Godot primitives; no third-party
+; source, nothing to attribute (see assets/placeholder/README.md).
+;
+; NOT CURRENTLY REFERENCED BY data/buildings/house.tres, and that is deliberate: a real,
+; imported, CC0, import-tested House already exists at
+; assets/buildings/house/House.tscn (Quaternius "Ultimate Fantasy RTS",
+; Houses_FirstAge_1_Level1, measured at 0.869 x 0.761 units inside a 1x1 tile). Pointing
+; the data entry at a grey-box when a shipped asset exists would be a regression, so
+; house.tres uses the real one and this scene is the deliberate FALLBACK — swapping to it
+; is a one-field edit if the real asset's still-unconfirmed facing fails its human look
+; pass. See the build report's Proposals.
+;
+; NO SLAB: a building occupies a terrain footprint and the terrain tile renders beneath
+; it, so the origin is ground level (y = 0) and everything here sits above it. Volume is
+; kept inside a 1x1 tile (0.7 wide walls, 0.8 wide roof overhang) to match the floor
+; form's 1x1 footprint (#18).
+;
+; COLOURS ARE PLACEHOLDERS and a taste call reserved for the human: walls
+; Color(0.86, 0.80, 0.68) (warm plaster), roof Color(0.66, 0.30, 0.24) (terracotta) —
+; chosen only to be the one warm, obviously-built object among six natural terrains.
+[gd_scene load_steps=5 format=3]
+
+[sub_resource type="BoxMesh" id="BoxMesh_walls"]
+size = Vector3(0.7, 0.5, 0.7)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_walls"]
+albedo_color = Color(0.86, 0.8, 0.68, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_roof"]
+size = Vector3(0.8, 0.2, 0.8)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_roof"]
+albedo_color = Color(0.66, 0.3, 0.24, 1)
+
+[node name="House" type="Node3D"]
+
+[node name="Walls" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.25, 0)
+mesh = SubResource("BoxMesh_walls")
+material_override = SubResource("StandardMaterial3D_walls")
+
+[node name="Roof" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+mesh = SubResource("BoxMesh_roof")
+material_override = SubResource("StandardMaterial3D_roof")

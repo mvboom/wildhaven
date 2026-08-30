@@ -1,0 +1,60 @@
+[gd_resource type="Resource" script_class="AttributionEntry" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://attribution/attribution_entry.gd" id="1_entry"]
+
+[resource]
+script = ExtResource("1_entry")
+id = "quaternius_poly_pizza_characters"
+creator = "Quaternius"
+source_name = "Standalone Character Models"
+source_version = "Downloaded as hash-named files (e.g. \"Adventurer by Quaternius -
+5EGWBMpuXq.glb\"); no per-model page metadata was preserved with the download, so an
+exact retrieval date is not recorded."
+creator_url = "https://quaternius.com"
+source_url = "https://poly.pizza/u/Quaternius"
+support_url = "https://www.patreon.com/quaternius"
+license_name = "CC0 1.0 Universal (CC0 1.0) Public Domain Dedication"
+license_url = "https://creativecommons.org/publicdomain/zero/1.0/"
+license_file = "res://assets/licenses/Quaternius_UltimateAnimatedAnimals_License.txt"
+attribution_required = false
+required_notice = ""
+conditions = ""
+assets_used = PackedStringArray("Adventurer", "Punk", "HoodieCharacter", "AnimatedWoman")
+per_file_licensing = false
+notes = "CC0 — crediting is courtesy, not compliance. Per art.md's locked sourcing policy,
+poly.pizza's whole Quaternius catalog is CC0 1.0 Universal (same dedication as every other
+Quaternius pack in this project), so this entry reuses
+Quaternius_UltimateAnimatedAnimals_License.txt as license_file rather than duplicating an
+identical generic CC0 boilerplate under a new filename — the license text is not
+pack-specific.
+
+DISTINCT FROM quaternius_ultimate_animated_animals.tres: that entry is one named pack
+(Ultimate Animated Animal Pack) with a preserved License.txt and pack page. These four are
+standalone single-model downloads whose filenames carry a poly.pizza-style hash
+(e.g. 5EGWBMpuXq) but whose exact model-page URLs were not verified — network egress is
+default-deny for agents (gdd.md Technical Strategy #1), so source_url points at the
+verified Quaternius poly.pizza profile (cited already in source-content/assets/ASSET_AUDIT.md) and
+NOT at four invented per-model page URLs. If a human later confirms each hash's exact
+poly.pizza page, add per-model source_url via per_file_licensing/AttributionAsset entries.
+
+CORRECTED — \"Man\" WAS REMOVED FROM assets_used AND FROM THIS ENTRY'S SCOPE.
+This entry previously listed five models and explained Man's odd rig as \"a
+modeling-generation difference.\" That explanation was wrong. Man is not a standalone
+download of unknown provenance: it is Male_Casual from Quaternius's \"Animated Men
+Characters\" (Feb 2019) pack, which was sitting in source-content/assets/ the whole time and
+has its own License.txt. It was re-downloaded as a standalone .glb without anyone noticing
+the pack was on disk. The shipped file assets/animals/human_man/Man.glb is UNCHANGED and
+still where it was — only the record moved, to
+project/attribution/sources/quaternius_animated_men_characters.tres, which carries the
+measured evidence (six materials matching Male_Casual's subdivided twin to four decimals,
+same rig, same 11 clip names, AABB matching to 1e-6). NO COMPLIANCE CONSEQUENCE: both
+sources are the same creator under the same CC0 dedication, so nothing about what may be
+shipped changes. The correction was made because 13 of Man's siblings from that pack were
+imported in the same run, and adding them while leaving a known-wrong source_name in place
+would have baked the error in.
+
+The four models THIS entry still covers all share one rig convention, measured on import:
+Adventurer / Punk / HoodieCharacter / AnimatedWoman use a \"CharacterArmature\" rig with 24
+clips. That is now the entry's only convention — the \"HumanArmature\" 11-clip models all
+belong to the two Feb 2019 character packs. See project/tests/test_human_*_import.gd and
+project/tests/test_human_pack_variants_import.gd for the per-model clip data."

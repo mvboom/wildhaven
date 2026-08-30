@@ -1,0 +1,130 @@
+; PineTree2 — 6th Forest tree pick, added 2026-08-26 (content-variety pass, Task 5). A
+; SECOND conifer pick alongside the existing PineTree.tscn — same reasoning PineTree.tscn
+; itself used against CommonTree1/CommonTree2 (same-height-different-shape reads better
+; than a near-duplicate), applied one level deeper: matched canopy HEIGHT to the rest of
+; the set, but a deliberately NARROWER footprint than PineTree.tscn so the two conifers
+; don't read as the same silhouette repeated.
+;
+; Source: "Pine_2.fbx", Textured Stylized Trees (May 2020) by Quaternius, CC0 1.0
+; Universal — License.txt at `source-content/assets/Textured Stylized Trees - May 2020.../
+; License.txt` re-checked before import, per asset-import-pipeline.md's audit gate (states
+; CC0 1.0 Universal / Public Domain Dedication, same boilerplate as every other Quaternius
+; pack in this repo). Recorded in the newly-authored
+; project/attribution/sources/quaternius_textured_stylized_trees.tres (same pack as
+; DeadTree.tscn, extended rather than duplicated).
+;
+; SCALE (NON-UNIFORM — the one variant in this pass that isn't a plain uniform rescale):
+; the source file bakes a 90-degree axis correction + scale=100 into its own child node
+; (Blender Z-up -> FBX Y-up, same mechanism PineTree.tscn's header documents), measured
+; post-correction global AABB height = 8.3438 units, footprint 6.6126 x 6.7847 at that
+; height — i.e. this raw asset is a naturally BUSHY/wide pine (footprint/height ratio
+; ~0.79-0.81), unlike PineTree.glb's naturally narrow/tapered raw proportions
+; (~0.35-0.38 ratio). A uniform rescale to the ~2.5-tile height target used by every other
+; Forest tree would therefore produce a ~2.0-tile-wide canopy — nearly 2.5x PineTree.tscn's
+; own scaled footprint (0.883 x 0.960) and badly overflowing a 1x1 tile. To hit BOTH the
+; ~2.5-tile height target from the task table AND a footprint narrower than PineTree.tscn's
+; (the explicit ask), this scene applies a non-uniform scale: Y = 0.300 (2.5 / 8.3438,
+; height) and X/Z = 0.096 (0.65 / 6.7847, footprint capped PRE-ROTATION at ~0.65 on the raw
+; axis) — giving a scaled footprint of ~0.635 x 0.651, narrower than PineTree.tscn's
+; ~0.88 x 0.96 as asked. Those scaled numbers are also the SHIPPED world-space footprint
+; here, unlike the crop scenes' capped numbers: this Model node carries a scale-only
+; transform with no rotation, so there is no diagonal-widening jitter to account for (see
+; cultivated_field.tres's header for the rotated case).
+; FIRST-PASS PROPOSAL, not a measured GDD number — FLAG FOR HUMAN
+; SIGN-OFF: this is a genuine judgment call, and unlike the plain rescales used everywhere
+; else in this pass, a non-uniform stretch changes the raw mesh's proportions (flattens a
+; naturally bushy pine into a narrower profile) rather than preserving them, which is a
+; different kind of risk to the "out-of-the-box silhouettes ship as-is" policy (art.md) —
+; worth a specific eyeball check for whether the squash reads as an intentional narrow
+; conifer or as a visibly distorted mesh.
+;
+; SLAB IS 1.0x0.2x1.0 (matches every current-generation terrain slab, post the
+; "SLAB WIDENED 0.94 -> 1.0" cross-tile seam fix PineTree.tscn's header documents).
+;
+; FLOOR TREATMENT MATCHES EVERY OTHER FOREST VARIANT EXACTLY (same slab tint, same 3-patch
+; moss/litter blotch treatment, same relative transforms) so a Forest tile's floor reads
+; identically regardless of which of the now-6 trees it lands on.
+;
+; EVERYTHING NESTED UNDER ONE NODE NAMED "Slab" (required, not cosmetic): identical
+; OcclusionFader exemption requirement as every sibling terrain scene — see
+; CommonTree1.tscn's header for the full mechanism. The ground plane (renamed "Ground")
+; and all 3 floor patches are children of a wrapper Node3D literally named "Slab".
+;
+; MATERIAL OVERRIDE ADDED (2026-08-26, human-reported bug: "some of the trees are just
+; plain white") — same root cause and same fix as DeadTree.tscn (see that file's header for
+; the full mechanism): "Textured Stylized Trees" ships real textures, but only the raw
+; .fbx was copied at import time, so both of this mesh's surfaces ("Bark", "Pine_Leaves")
+; fell back to Godot's near-white default (measured albedo_color 0.9063/0.9063/0.9063 on
+; both). Fixed via `surface_material_override` on the instanced FBX's "Pine_2" mesh node,
+; matching Rabbit.tscn's precedent: `Tree_Bark.jpg` (this pack's generic bark texture — no
+; pine-specific bark exists) for surface 0, `Pine_Leaves.png` for surface 1, both copied to
+; this directory, both overrides with `vertex_color_use_as_albedo` explicitly false.
+; `[editable path="Model"]` is required for the override to apply to a node living inside an
+; instanced sub-scene.
+[gd_scene load_steps=12 format=3]
+
+[ext_resource type="PackedScene" uid="uid://dogf1efo04bcn" path="res://assets/terrain/pine_tree_2/PineTree2.fbx" id="1_model"]
+[ext_resource type="Texture2D" path="res://assets/terrain/pine_tree_2/Tree_Bark.jpg" id="2_bark_texture"]
+[ext_resource type="Texture2D" path="res://assets/terrain/pine_tree_2/Pine_Leaves.png" id="3_leaves_texture"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_slab"]
+size = Vector3(1.0, 0.2, 1.0)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_slab"]
+albedo_color = Color(0.16, 0.4, 0.22, 1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_patch1"]
+size = Vector2(0.42, 0.36)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_patch_moss"]
+albedo_color = Color(0.11, 0.32, 0.16, 1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_patch2"]
+size = Vector2(0.3, 0.34)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_patch_litter"]
+albedo_color = Color(0.3, 0.22, 0.13, 1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_patch3"]
+size = Vector2(0.26, 0.3)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_bark"]
+albedo_texture = ExtResource("2_bark_texture")
+vertex_color_use_as_albedo = false
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_pine_leaves"]
+albedo_texture = ExtResource("3_leaves_texture")
+vertex_color_use_as_albedo = false
+
+[node name="PineTree2" type="Node3D"]
+
+[node name="Slab" type="Node3D" parent="."]
+
+[node name="Ground" type="MeshInstance3D" parent="Slab"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+mesh = SubResource("BoxMesh_slab")
+material_override = SubResource("StandardMaterial3D_slab")
+
+[node name="FloorPatch_1_Moss" type="MeshInstance3D" parent="Slab"]
+transform = Transform3D(0.965926, 0, -0.258819, 0, 1, 0, 0.258819, 0, 0.965926, -0.18, 0.001, -0.12)
+mesh = SubResource("PlaneMesh_patch1")
+material_override = SubResource("StandardMaterial3D_patch_moss")
+
+[node name="FloorPatch_2_Litter" type="MeshInstance3D" parent="Slab"]
+transform = Transform3D(0.642788, 0, -0.766044, 0, 1, 0, 0.766044, 0, 0.642788, 0.2, 0.001, 0.15)
+mesh = SubResource("PlaneMesh_patch2")
+material_override = SubResource("StandardMaterial3D_patch_litter")
+
+[node name="FloorPatch_3_Moss" type="MeshInstance3D" parent="Slab"]
+transform = Transform3D(-0.173648, 0, -0.984808, 0, 1, 0, 0.984808, 0, -0.173648, 0.05, 0.001, -0.28)
+mesh = SubResource("PlaneMesh_patch3")
+material_override = SubResource("StandardMaterial3D_patch_moss")
+
+[node name="Model" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.096, 0, 0, 0, 0.3, 0, 0, 0, 0.096, 0, 0, 0)
+
+[node name="Pine_2" parent="Model" index="0"]
+surface_material_override/0 = SubResource("StandardMaterial3D_bark")
+surface_material_override/1 = SubResource("StandardMaterial3D_pine_leaves")
+
+[editable path="Model"]

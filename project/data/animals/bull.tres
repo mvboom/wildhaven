@@ -1,0 +1,58 @@
+; Bull — AnimalDefinition data entry (gdd.md -> Data Schemas / Content Architecture).
+; Roster row: roster.md -> Already-Defined Roster | Ruled: decisions.md -> D-43.
+; Asset: Quaternius "Ultimate Animated Animal Pack", CC0 1.0 Universal — see
+;   project/attribution/sources/quaternius_ultimate_animated_animals.tres.
+;
+; SPECIES: domestic cattle (Bos taurus). Same real species as Cow — no ecological basis to
+; split habitat axes, so Bull and Cow share identical habitat_needs/personality/
+; farm_tolerant by design (D-43). Bull's mesh is the same base mesh as Cow (identical AABB,
+; mesh literally named "Cow" in the raw glTF — content-pipeline-status.md's flagged
+; shared-mesh risk); the human ruled 2026-07-26 to keep both as separate roster spots
+; regardless. This fact card is deliberately about a different real-world aspect (a working
+; trait) than Cow's (an appearance trait), so the two cards do not read as the same fact
+; with the species name swapped even where the model itself might.
+;
+; CAPACITY FIELDS (D-43): capacity_radius = 0 -> SENTINEL `CAPACITY_RADIUS_FOLLOWS_SCOUT`,
+; meaning "equal to scout_radius" (8), not a radius of zero. tiles_per_individual = 6
+; (vs. Cow's 5 — a bull kept singly needs more room than a cow in a herd; explicitly
+; acknowledged in D-43 as the thin, one-number-only distinction between the two).
+; max_individuals = 6. Farm-tolerant.
+;
+; fact_text is docs/content/cleared-pool-fact-cards.md § Bull's proposed line, transcribed
+; verbatim. SHIPPED PROVISIONAL, per D-43 and content-pipeline-status.md's `bull` row:
+; PASS but flagged as thin — the ADW source sentence is about Bos taurus generally, not
+; gendered to bulls specifically (historically working cattle were overwhelmingly male
+; oxen, the real-world basis for attributing the trait to "Bulls" here, but the source
+; itself does not say "bulls"). No bull-specific alternative could be cleared — see the
+; source file's Checklist step 1 for the full search record. Ruled to ship anyway; revisit
+; if a better-sourced, more distinctly "bull" fact turns up later.
+;   "big and strong ... help pull heavy loads and plows" -> ADW Bos taurus, "Physical
+;   Description": "They can be used as working animals for plowing and moving heavy
+;   loads."
+; https://animaldiversity.org/accounts/Bos_taurus/
+; A combat-adjacent clause on the same ADW page (dominance challenges) was cut entirely,
+; not softened — see the source file's Checklist step 4.
+;
+; news_reports intentionally empty — News Report pools for this pool are a separate, later
+; purchase (not part of Content Pipeline step 4/5 for this dispatch).
+[gd_resource type="Resource" script_class="AnimalDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/animal_definition.gd" id="1_schema"]
+[ext_resource type="PackedScene" path="res://assets/animals/bull/Bull.tscn" id="2_model"]
+
+[resource]
+script = ExtResource("1_schema")
+id = "bull"
+display_name = "Bull"
+habitat_needs = Array[String](["cultivated", "open_grass"])
+personality = "Bold"
+avoids = Array[String]([])
+farm_tolerant = true
+scout_radius = 8
+capacity_radius = 0
+tiles_per_individual = 6
+max_individuals = 6
+model_scenes = Array[PackedScene]([ExtResource("2_model")])
+; fact_text_pool REPLACED by scripts/fact_card_pipeline.py (2026-08-17) -- AWAITING STEP-8 HUMAN SIGN-OFF, not yet reviewed.
+fact_text_pool = Array[String](["Bulls can see almost all the way around themselves without moving their heads!", "Bulls are super strong animals that people have used for thousands of years to help pull heavy plows and carry big loads."])
+news_reports = Array[String]([])

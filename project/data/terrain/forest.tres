@@ -1,0 +1,107 @@
+; Forest — TerrainDefinition data entry (spec.md -> Data Schemas; terrain.md ->
+; Already-Defined Terrain, v1 tag-source mapping).
+;
+; emitted_tags = ["forest"] is DECIDED (terrain.md's tag-source mapping, #5 closed ->
+; D-25). Forest emits `forest` and NOT `cover`: rock is the v1 `cover` source, which is
+; what keeps Fox habitat a two-brushstroke composition (forest NEAR rock) instead of a
+; side effect of painting forest for Wood. Adding `cover` here would silently collapse
+; that design.
+;
+; cost = 0 — nature is free (terrain.md), and here that rule is load-bearing rather than
+; cosmetic: free Forest IS the no-dead-ends guarantee. A player at zero Wood can always
+; paint Forest, wait, and build again.
+;
+; harvestable -> forest_harvest.tres. Forest is v1's sole harvestable.
+;
+; MODEL_SCENE NOW POINTS AT REAL ART: CommonTree1.tscn (CC0, MegaKit), chosen over
+; CommonTree2 as the default because it is listed first among the two "common" picks
+; documented in content-pipeline-status.md and no distinguishing reason favors the other;
+; CommonTree2 remains imported and available at
+; project/assets/terrain/common_tree_2/CommonTree2.tscn for a future per-tile variety pass
+; (out of scope here — no random-variant scattering logic added). Scale is still the
+; FIRST-PASS PROPOSAL recorded in CommonTree1.tscn's own header comment (raw mesh scaled
+; to a ~2.5-tile canopy height, judgment call, no GDD number) — NOT eyeball-confirmed
+; in-engine; that confirmation is a human call, not this repo's to make.
+;
+; SLAB REINSTATED (2026-08-03) in CommonTree1.tscn: TerrainView._refresh_tile_visual()
+; instantiates model_scene as a tile's ENTIRE visual, and the trunk+canopy prop alone left
+; much of the tile showing scenes/Main.tscn's configured WorldEnvironment sky-blue
+; background_color (0.53, 0.72, 0.86) straight through the gap — reported by an in-engine
+; human look as "a lot of transparency, lots of blue showing." Fixed by reinstating a
+; ground slab matching the grey-box placeholder's geometry and color verbatim. See
+; CommonTree1.tscn's own header for detail. Prop-on-slab look still awaits full human
+; sign-off.
+;
+; MODEL_SCENE PLURALIZED TO MODEL_SCENES (-> D-42): the field is now an array so a
+; terrain can carry multiple interchangeable visual variants, stably picked per tile by
+; TerrainDefinition.pick_variant().
+;
+; LOOK-PASS REWORK (2026-08-16): CommonTree2 is now wired as a second live variant
+; alongside CommonTree1 (equal weight, no ordering preference — both are "the common set"
+; per art.md, and D-42's pick_variant() is a stable hash, not a priority list). CommonTree2
+; was brought to visual parity with CommonTree1 first (slab + floor-blotch patches added —
+; see CommonTree2.tscn's own header) so a tile does not visibly change floor treatment
+; depending on which tree it lands. No new tree source was pulled in for this pass (the
+; task's "1-2 more if a good candidate exists" was optional) — the 2 existing common trees
+; already give real per-tile alternation, which is the D-42 capability this pass exists to
+; exercise.
+;
+; blocks_movement = true, ADDED (animal-navigation pass, 2026-08-24): the trees Forest paints
+; are now a real pathing obstacle for roaming animals — human-confirmed only Forest gets this
+; in the first pass; Rock stays crossable (deferred, human's call to revisit).
+;
+; THIRD VARIANT ADDED (2026-08-16, human-reported follow-up, same day): human eyeball pass
+; on the look-pass above reported "It does not seem like forest cycles between multiple
+; assets." pick_variant()'s hash was confirmed still distributing evenly and both trees
+; were confirmed correctly wired — the actual problem was that CommonTree1 and CommonTree2
+; are both "common tree" picks from the same MegaKit set at the same ~2.5-tile canopy
+; height, and read as visually indistinguishable at the fixed ~45 camera pitch. Added
+; PineTree.tscn — a freshly-sourced, genuinely different silhouette (a narrow tapered
+; conifer, not another round-canopy common tree; "Pine Tree" by Quaternius, CC0, sourced
+; fresh via poly.pizza — see PineTree.tscn's own header and
+; quaternius_poly_pizza_nature.tres) — as a third equal-weight model_scenes entry. Both
+; existing trees are UNCHANGED and still live; this adds variety, it does not replace
+; anything.
+;
+; 5 MORE VARIANTS ADDED (2026-08-26, content-variety pass Task 5), taking model_scenes from
+; 3 to 8: BirchTree.tscn (Ultimate Nature Pack, CC0, thin trunk / light canopy, ~2.5-tile
+; height), DeadTree.tscn (Textured Stylized Trees, CC0, bare-branch silhouette, ~2.2-tile —
+; deliberately shorter than the living-canopy trees, see its own header), PineTree2.tscn
+; (Textured Stylized Trees, CC0, a second conifer — same ~2.5-tile height as PineTree.tscn
+; but a NON-UNIFORM scale for a deliberately narrower footprint, see its own header for
+; why a plain uniform rescale couldn't hit both targets at once), Bush.tscn and
+; BushBerries.tscn (both Ultimate Nature Pack, CC0, the first two non-tree, ground-level
+; undergrowth picks, ~0.6-tile height, well under every tree). Quaternius CC0 for all 5,
+; License.txt re-checked per-pack before import (asset-import-pipeline.md's audit gate).
+; Attribution: BirchTree/Bush/BushBerries extend the existing
+; quaternius_ultimate_nature_pack.tres assets_used list; DeadTree/PineTree2 are recorded in
+; a newly-authored quaternius_textured_stylized_trees.tres (first use of that pack in this
+; project). EVERY new scale is a FIRST-PASS PROPOSAL, not a measured GDD number — FLAG FOR
+; HUMAN SIGN-OFF on all 5 (per-scene headers carry the specific reasoning and open
+; questions: DeadTree's shorter-height judgment call and bare-branch read, PineTree2's
+; non-uniform-scale footprint squash, Bush/BushBerries' undergrowth-scale-class read and
+; BushBerries' berry-detail legibility at scale). All 3 existing trees are UNCHANGED and
+; still live; this adds variety, it does not replace anything. All 8 variants are equal
+; weight in pick_variant() — no ordering/priority intended.
+[gd_resource type="Resource" script_class="TerrainDefinition" load_steps=11 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/terrain_definition.gd" id="1_schema"]
+[ext_resource type="PackedScene" path="res://assets/terrain/common_tree_1/CommonTree1.tscn" id="2_model"]
+[ext_resource type="Resource" path="res://data/terrain/forest_harvest.tres" id="3_harvest"]
+[ext_resource type="PackedScene" path="res://assets/terrain/common_tree_2/CommonTree2.tscn" id="4_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/pine_tree/PineTree.tscn" id="5_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/birch_tree/BirchTree.tscn" id="6_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/dead_tree/DeadTree.tscn" id="7_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/pine_tree_2/PineTree2.tscn" id="8_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/bush/Bush.tscn" id="9_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/bush_berries/BushBerries.tscn" id="10_model"]
+
+[resource]
+script = ExtResource("1_schema")
+id = "forest"
+display_name = "Forest"
+emitted_tags = Array[String](["forest"])
+cost = 0
+blocks_movement = true
+model_scenes = Array[PackedScene]([ExtResource("2_model"), ExtResource("4_model"), ExtResource("5_model"), ExtResource("6_model"), ExtResource("7_model"), ExtResource("8_model"), ExtResource("9_model"), ExtResource("10_model")])
+harvestable = ExtResource("3_harvest")

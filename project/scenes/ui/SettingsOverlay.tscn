@@ -1,0 +1,73 @@
+[gd_scene load_steps=2 format=3]
+
+; Tier 1 row 12's minimal Settings overlay — see scripts/ui/settings_overlay.gd for why this
+; is "the existing overlay" tier1-status.md row 15 already refers to. As of Task 5
+; (Minecraft-style inventory window), this is pure tab content hosted inside MenuWindow.tscn
+; rather than its own standalone scrim+card overlay — MenuWindow supplies the one shared scrim
+; and dismiss gesture for all of its tabs.
+
+[ext_resource type="Script" path="res://scripts/ui/settings_overlay.gd" id="1"]
+
+[node name="SettingsOverlay" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1")
+
+[node name="Stack" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/separation = 18
+
+[node name="MasterVolumeRow" type="HBoxContainer" parent="Stack"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 14
+
+[node name="MasterVolumeLabel" type="Label" parent="Stack/MasterVolumeRow"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 26
+text = "[COPY] Master Volume"
+
+[node name="MasterVolumeSlider" type="HSlider" parent="Stack/MasterVolumeRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(220, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+max_value = 100.0
+value = 80.0
+
+[node name="MasterVolumeValue" type="Label" parent="Stack/MasterVolumeRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(64, 0)
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 26
+text = "80%"
+horizontal_alignment = 2
+
+[node name="Rule" type="HSeparator" parent="Stack"]
+layout_mode = 2
+
+[node name="HintsCheck" type="CheckButton" parent="Stack"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 26
+button_pressed = true
+text = "[COPY] Gameplay Hints"

@@ -1,0 +1,34 @@
+; OpenBarn — NEW farm-building placeable (content-variety pass Task 3, 2026-08-26), one
+; of 8 brand-new PlaceableDefinition entries. See project/data/buildings/open_barn.tres
+; for the full data-entry header (proposed cost/footprint, human sign-off flag).
+;
+; Source: Quaternius, "Farm Buildings" pack (FBX), OpenBarn.fbx — CC0 1.0 Universal.
+; License.txt confirmed CC0 1.0 Universal / Public Domain Dedication before import, per
+; asset-import-pipeline.md's audit gate. Same NEW pack as Barn.tscn — see
+; project/attribution/sources/quaternius_farm_buildings.tres.
+;
+; TEXTURE AUDIT (mandatory — DeadTree/PineTree2 precedent; see Barn.tscn's header for the
+; full method): probed every surface on the raw, unmodified FBX. albedo_texture null on
+; every surface, but vertex_color_use_as_albedo reads true with MEANINGFUL, DISTINCT
+; per-surface colors (dark red ~(0.4872, 0.228, 0.1966), light grey trim ~(0.821, 0.821,
+; 0.821), mid red-brown ~(0.5601, 0.2625, 0.2265), brown wood ~(0.5115, 0.3069, 0.2132),
+; dark grey/roof ~(0.311, 0.311, 0.311)) — same pack's named flat-color materials baked
+; into real per-vertex color, NOT the uniform near-(0.9063, 0.9063, 0.9063, 1.0)
+; missing-texture tell. No texture fix needed; no material_override applied. Plain
+; instance.
+;
+; SCALE: raw AABB measured via manual local-transform composition on the unmodified FBX
+; (NOT global_transform): footprint 5.7438 x 6.1820 (x, z) tile-units, height 4.7435.
+; Target max-axis 0.869309 (House's own established 1x1 margin). Long axis (z) scaled by
+; 0.140618. Scaled result: 0.8077 x 0.6670 x 0.8693 (x, y, z).
+;
+; FACING: left as authored (identity transform, no rotation) — unconfirmed by a human eye
+; pass. FLAG FOR HUMAN SIGN-OFF.
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" uid="uid://bd3og0uuayqc8" path="res://assets/buildings/open_barn/OpenBarn.fbx" id="1_model"]
+
+[node name="OpenBarn" type="Node3D"]
+
+[node name="Model" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.140618, 0, 0, 0, 0.140618, 0, 0, 0, 0.140618, 0, 0, 0)

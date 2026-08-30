@@ -1,0 +1,44 @@
+; Horse — AnimalDefinition data entry (gdd.md -> Data Schemas / Content Architecture).
+; Roster row: roster.md -> Already-Defined Roster | Ruled: decisions.md -> D-43.
+; Asset: Quaternius "Ultimate Animated Animal Pack", CC0 1.0 Universal — see
+;   project/attribution/sources/quaternius_ultimate_animated_animals.tres.
+;
+; SPECIES: domestic horse (Equus caballus).
+;
+; CAPACITY FIELDS (D-43): capacity_radius = 0 -> SENTINEL `CAPACITY_RADIUS_FOLLOWS_SCOUT`,
+; meaning "equal to scout_radius" (8), not a radius of zero. tiles_per_individual = 5,
+; max_individuals = 6. Horse and Donkey were ruled apart on real ecology despite
+; art.md proposing identical axes: donkeys are the more arid/rough-terrain-tolerant of the
+; two, so Horse keeps open_grass while Donkey trades it for rocks. Farm-tolerant.
+;
+; fact_text is docs/content/cleared-pool-fact-cards.md § Horse's proposed line, transcribed
+; verbatim — all four checklist steps PASS there.
+;   "stand up on its own in about an hour ... walk just a few hours after that" -> ADW
+;   Equus caballus, "Foals are born precocial and well-developed, usually being able to
+;   stand within an hour of birth and walk within four to five hours."
+; https://animaldiversity.org/accounts/Equus_caballus/
+; kids.nationalgeographic.com was checked and rejected: its only live equine page is
+; Przewalski's horse, a different species — see the source file's retrieval trace.
+;
+; news_reports intentionally empty — News Report pools for this pool are a separate, later
+; purchase (not part of Content Pipeline step 4/5 for this dispatch).
+[gd_resource type="Resource" script_class="AnimalDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/animal_definition.gd" id="1_schema"]
+[ext_resource type="PackedScene" path="res://assets/animals/horse/Horse.tscn" id="2_model"]
+
+[resource]
+script = ExtResource("1_schema")
+id = "horse"
+display_name = "Horse"
+habitat_needs = Array[String](["open_grass", "cultivated"])
+personality = "Bold"
+avoids = Array[String]([])
+farm_tolerant = true
+scout_radius = 8
+capacity_radius = 0
+tiles_per_individual = 5
+max_individuals = 6
+model_scenes = Array[PackedScene]([ExtResource("2_model")])
+fact_text_pool = Array[String](["A newborn foal can already stand up on its own in about an hour, and it can walk just a few hours after that."])
+news_reports = Array[String]([])

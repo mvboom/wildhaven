@@ -1,0 +1,83 @@
+; Rock — TerrainDefinition data entry (spec.md -> Data Schemas; terrain.md ->
+; Already-Defined Terrain, v1 tag-source mapping).
+;
+; emitted_tags = ["cover", "rocks"] is DECIDED (terrain.md's tag-source mapping, #5 closed
+; -> D-25) and is the single most load-bearing terrain row in the floor: ROCK, NOT FOREST,
+; IS THE `cover` SOURCE. Both floor species need `cover` (Fox: forest + cover; Rabbit:
+; open_grass + cover), so this entry is what makes either of them possible, and moving
+; `cover` to any other terrain changes the shape of the whole floor.
+;
+; `rocks` has no consuming species in v1 and ships anyway — free to keep (terrain.md).
+;
+; cost = 0 — nature is free (terrain.md's one pricing rule).
+;
+; MODEL_SCENE NOW POINTS AT REAL ART: Rock1.tscn (CC0, Ultimate Nature Pack) — the only
+; real Rock variant imported, so this is a straightforward repoint, not a variant choice.
+; No rescale is applied: Rock1.tscn's own header comment records that its raw mesh already
+; fits a 1x1 tile at natural size, but this is still a first-pass call — NOT eyeball-
+; confirmed in-engine; that confirmation is a human call, not this repo's to make.
+;
+; SLAB REINSTATED (2026-08-03) in Rock1.tscn: TerrainView._refresh_tile_visual()
+; instantiates model_scene as a tile's ENTIRE visual, and the bare rock prop alone left
+; much of the tile showing scenes/Main.tscn's configured WorldEnvironment sky-blue
+; background_color (0.53, 0.72, 0.86) straight through the gap — reported by an in-engine
+; human look as "a lot of transparency, lots of blue showing." Fixed by reinstating a
+; ground slab matching the grey-box placeholder's geometry and color verbatim. See
+; Rock1.tscn's own header for detail. Prop-on-slab look still awaits full human sign-off.
+;
+; MODEL_SCENE PLURALIZED TO MODEL_SCENES (-> D-42): the field is now an array so a
+; terrain can carry multiple interchangeable visual variants, stably picked per tile by
+; TerrainDefinition.pick_variant().
+;
+; LOOK-PASS REWORK (2026-08-16): the single-variant Rock1.tscn (one Rock_1 mesh at NATURAL
+; scale, height 0.877 — nearly tile-height) read in-engine as "one giant rock," an explicit
+; human complaint ("much much shorter, look like a bunch of rocks, not a giant rock, varied
+; preferred"). Replaced Rock1.tscn as the live model with 4 new SCATTERED-CLUSTER variants,
+; each composing 3-4 small rocks (max height ~0.25, well under the old 0.877) on their own
+; slab — see each RockClusterN.tscn's own header for sourcing/scale detail:
+;   - RockCluster1.tscn: reuses already-imported Rock_1 (x2, scaled down) + Rock_Moss_3
+;     (x1, reused from the Den prop's pack) — no new download.
+;   - RockCluster2.tscn: 4x newly-sourced small Rock_2.glb (poly.pizza, CC0 Quaternius).
+;   - RockCluster3.tscn: newly-sourced RockMediumMoss.glb anchor + 2x Rock_2.glb, mossy
+;     slab tint.
+;   - RockCluster4.tscn: newly-sourced RocksCluster.glb (already a pre-modeled 3-rock
+;     group) scaled up + 1x Rock_2.glb for a 4th piece.
+; New sources: project/attribution/sources/quaternius_poly_pizza_nature.tres (CC0).
+; Rock1.tscn itself is left on disk, imported and attributed, but no longer referenced —
+; same "imported but superseded" posture as GrassCommonTall/CommonTree2 before this pass.
+; FLAG FOR HUMAN SIGN-OFF: which of the 4 clusters reads best, whether 4 is enough variety
+; without looking noisy, and the per-cluster scale/density choices in each .tscn's header.
+;
+; 2 MORE MOSSY VARIANTS ADDED (2026-08-26, content-variety pass Task 6), model_scenes now
+; 6 entries: RockCluster5.tscn (3 pieces: 2x Rock_Moss_2.fbx + 1x Rock_Moss_5.fbx, max
+; piece height 0.220) and RockCluster6.tscn (4 pieces: 2x Rock_Moss_5.fbx + 2x
+; Rock_Moss_2.fbx, different arrangement from Cluster5, max piece height 0.240) — both
+; SAME cluster-composition convention and SAME ~0.25 height cap as RockCluster1..4, not a
+; new number. Both new source files (Rock_Moss_2.fbx, Rock_Moss_5.fbx) come from the
+; Ultimate Nature Pack (CC0, Quaternius) already used for Rock_1/Rock_Moss_3 — see each
+; RockClusterN.tscn's own header for full sourcing/measured-scale detail. Attribution
+; extended in project/attribution/sources/quaternius_ultimate_nature_pack.tres (NOT
+; quaternius_poly_pizza_nature.tres, despite that file being the source for
+; RockCluster2/3/4's poly.pizza-sourced pieces — Rock_Moss_2/5 are on-disk pack files, the
+; same reuse case as RockCluster1's Rock_Moss_3, so they belong under the pack's own
+; attribution entry). FLAG FOR HUMAN SIGN-OFF: whether 6 clusters is too many / too noisy
+; a rotation, and which of the now-6 reads best — same open question as the 4-cluster
+; flag above, now extended to 6.
+[gd_resource type="Resource" script_class="TerrainDefinition" load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/terrain_definition.gd" id="1_schema"]
+[ext_resource type="PackedScene" path="res://assets/terrain/rock_cluster_1/RockCluster1.tscn" id="2_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/rock_cluster_2/RockCluster2.tscn" id="3_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/rock_cluster_3/RockCluster3.tscn" id="4_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/rock_cluster_4/RockCluster4.tscn" id="5_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/rock_cluster_5/RockCluster5.tscn" id="6_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/rock_cluster_6/RockCluster6.tscn" id="7_model"]
+
+[resource]
+script = ExtResource("1_schema")
+id = "rock"
+display_name = "Rock"
+emitted_tags = Array[String](["cover", "rocks"])
+cost = 0
+model_scenes = Array[PackedScene]([ExtResource("2_model"), ExtResource("3_model"), ExtResource("4_model"), ExtResource("5_model"), ExtResource("6_model"), ExtResource("7_model")])
+harvestable = null

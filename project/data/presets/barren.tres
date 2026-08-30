@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="WorldPreset" load_steps=2 format=3]
+
+; base_terrain_id is deliberately "wild_grass", same as meadow_start — Open Question #10's
+; real terrain differentiation (e.g. sand/rock) is NOT wired up yet (WorldGrid.build() still
+; ignores base_terrain_id entirely, see world_preset.gd's own header), and the non-grass
+; terrains on disk aren't tag-inert, which is the one invariant this schema can't relax
+; (test_world_preset.gd). This card is real and selectable; what it actually builds is
+; deferred to a separate, deliberate ruling — human decision, 2026-08-24.
+
+[ext_resource type="Script" path="res://scripts/definitions/world_preset.gd" id="1_schema"]
+
+[resource]
+script = ExtResource("1_schema")
+id = "barren_start"
+display_name = "Barren"
+width = 36
+depth = 36
+base_terrain_id = "wild_grass"

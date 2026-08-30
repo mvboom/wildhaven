@@ -1,0 +1,356 @@
+[gd_scene load_steps=15 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/game_ui.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/ui/game_hud.gd" id="2"]
+[ext_resource type="Script" path="res://scripts/ui/tap_cue.gd" id="3"]
+[ext_resource type="Script" path="res://scripts/ui/tap_router.gd" id="4"]
+[ext_resource type="Script" path="res://scripts/ui/crosshair.gd" id="11"]
+[ext_resource type="Script" path="res://scripts/ui/rotate_icon.gd" id="15"]
+[ext_resource type="PackedScene" path="res://scenes/ui/FactCard.tscn" id="5"]
+[ext_resource type="PackedScene" path="res://scenes/ui/DisplacementNotice.tscn" id="6"]
+[ext_resource type="PackedScene" path="res://scenes/ui/NewsReportToast.tscn" id="8"]
+[ext_resource type="Script" path="res://scripts/ui/news_report_presenter.gd" id="10"]
+[ext_resource type="PackedScene" path="res://scenes/ui/MenuWindow.tscn" id="13"]
+[ext_resource type="PackedScene" path="res://scenes/ui/NotificationFeed.tscn" id="14"]
+
+[sub_resource type="StyleBoxFlat" id="HudPanel"]
+content_margin_left = 24.0
+content_margin_top = 14.0
+content_margin_right = 24.0
+content_margin_bottom = 14.0
+bg_color = Color(1, 0.973, 0.906, 1)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 8
+border_color = Color(0.42, 0.29, 0.169, 1)
+corner_radius_top_left = 28
+corner_radius_top_right = 28
+corner_radius_bottom_right = 28
+corner_radius_bottom_left = 28
+
+[sub_resource type="StyleBoxFlat" id="ReadoutPanel"]
+content_margin_left = 24.0
+content_margin_top = 12.0
+content_margin_right = 24.0
+content_margin_bottom = 12.0
+bg_color = Color(1, 0.973, 0.906, 0.94)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 8
+border_color = Color(0.42, 0.29, 0.169, 1)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+
+[sub_resource type="StyleBoxFlat" id="ButtonCream"]
+content_margin_left = 14.0
+content_margin_top = 14.0
+content_margin_right = 14.0
+content_margin_bottom = 14.0
+bg_color = Color(1, 0.973, 0.906, 1)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 8
+border_color = Color(0.42, 0.29, 0.169, 1)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+
+[node name="GameUI" type="CanvasLayer"]
+script = ExtResource("1")
+
+[node name="TapCue" type="Control" parent="."]
+unique_name_in_owner = true
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("3")
+
+[node name="Crosshair" type="Control" parent="."]
+unique_name_in_owner = true
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("11")
+
+[node name="HUD" type="Control" parent="."]
+unique_name_in_owner = true
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("2")
+
+[node name="WoodPanel" type="PanelContainer" parent="HUD"]
+layout_mode = 1
+offset_left = 24.0
+offset_top = 24.0
+offset_right = 24.0
+offset_bottom = 24.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("HudPanel")
+
+[node name="CountersColumn" type="VBoxContainer" parent="HUD/WoodPanel"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 6
+
+[node name="WoodRow" type="HBoxContainer" parent="HUD/WoodPanel/CountersColumn"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 14
+
+[node name="WoodLabel" type="Label" parent="HUD/WoodPanel/CountersColumn/WoodRow"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 30
+text = "Wood"
+
+[node name="WoodValue" type="Label" parent="HUD/WoodPanel/CountersColumn/WoodRow"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 30
+text = "0"
+
+[node name="SpeciesHostedRow" type="HBoxContainer" parent="HUD/WoodPanel/CountersColumn"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 14
+
+[node name="SpeciesHostedLabel" type="Label" parent="HUD/WoodPanel/CountersColumn/SpeciesHostedRow"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 22
+text = "Species Hosted"
+
+[node name="SpeciesHostedValue" type="Label" parent="HUD/WoodPanel/CountersColumn/SpeciesHostedRow"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 22
+text = "0"
+
+[node name="CurrentlyResidentRow" type="HBoxContainer" parent="HUD/WoodPanel/CountersColumn"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 14
+
+[node name="CurrentlyResidentLabel" type="Label" parent="HUD/WoodPanel/CountersColumn/CurrentlyResidentRow"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 22
+text = "Currently Resident"
+
+[node name="CurrentlyResidentValue" type="Label" parent="HUD/WoodPanel/CountersColumn/CurrentlyResidentRow"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 22
+text = "0"
+
+[node name="VillagePopulationRow" type="HBoxContainer" parent="HUD/WoodPanel/CountersColumn"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 14
+
+[node name="VillagePopulationLabel" type="Label" parent="HUD/WoodPanel/CountersColumn/VillagePopulationRow"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 22
+text = "Village Population"
+
+[node name="VillagePopulationValue" type="Label" parent="HUD/WoodPanel/CountersColumn/VillagePopulationRow"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 22
+text = "0"
+
+[node name="TileReadout" type="PanelContainer" parent="HUD"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_top = -170.0
+offset_bottom = -170.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("ReadoutPanel")
+
+[node name="TileReadoutLabel" type="Label" parent="HUD/TileReadout"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 24
+text = "Grass
+open_grass · quiet"
+horizontal_alignment = 1
+
+[node name="PreviewPanel" type="PanelContainer" parent="HUD"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_top = 32.0
+offset_bottom = 32.0
+grow_horizontal = 2
+grow_vertical = 1
+mouse_filter = 2
+theme_override_styles/panel = SubResource("ReadoutPanel")
+
+[node name="PreviewLabel" type="Label" parent="HUD/PreviewPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 26
+text = "this spot is getting cozy for someone"
+horizontal_alignment = 1
+
+
+[node name="PaletteRow" type="HBoxContainer" parent="HUD"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_top = -24.0
+offset_bottom = -24.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+theme_override_constants/separation = 10
+
+; InspectButton ("Look") is declared here, not built in script — the one hand-authored child
+; PaletteRow starts with. GameHud's `_add_palette_button()` inserts every catalog button, then
+; the fixed Erase button, immediately before whichever child currently sits at Erase's own
+; index — so pre-authoring Look as the row's ONLY starting child guarantees it stays leftmost
+; (key "0", read before key "1") without any index bookkeeping in the script.
+[node name="InspectButton" type="Button" parent="HUD/PaletteRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(72, 72)
+layout_mode = 2
+focus_mode = 0
+theme_override_styles/normal = SubResource("ButtonCream")
+
+; Bottom-right corner, positioned to sit immediately left of `LeaveOverlay`'s Exit button (its
+; own separate CanvasLayer/scene — see that file's header for why it stays a sibling rather
+; than folding in here) so the two read as one cluster despite being different scenes. Exit
+; occupies offset_right -24 to offset_left -96 (a 72px button, 24px corner margin); this
+; container's own offset_right -106 leaves a 10px gap, matching PaletteRow's own separation.
+[node name="BottomRight" type="HBoxContainer" parent="HUD"]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -260.0
+offset_top = -96.0
+offset_right = -106.0
+offset_bottom = -24.0
+grow_horizontal = 0
+grow_vertical = 0
+mouse_filter = 2
+theme_override_constants/separation = 10
+
+[node name="RotateCcwButton" type="Button" parent="HUD/BottomRight"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(72, 72)
+layout_mode = 2
+focus_mode = 0
+theme_override_styles/normal = SubResource("ButtonCream")
+
+[node name="Icon" type="Control" parent="HUD/BottomRight/RotateCcwButton"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("15")
+clockwise = false
+
+[node name="RotateCwButton" type="Button" parent="HUD/BottomRight"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(72, 72)
+layout_mode = 2
+focus_mode = 0
+theme_override_styles/normal = SubResource("ButtonCream")
+
+[node name="Icon" type="Control" parent="HUD/BottomRight/RotateCwButton"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("15")
+clockwise = true
+
+; Added BEFORE the fact card/displacement notice — row 12's toast is the lowest-priority
+; surface in the stack (a bulletin about the world in general, never consent and never the
+; move-in payoff), so it must never draw on top of either.
+[node name="NewsReportToast" parent="." instance=ExtResource("8")]
+unique_name_in_owner = true
+
+[node name="FactCard" parent="." instance=ExtResource("5")]
+unique_name_in_owner = true
+
+; Added AFTER the fact card so the row-10 warning draws on top of it. Both can be up at once —
+; a move-in and a settlement are independent events — and consent outranks flavour.
+[node name="DisplacementNotice" parent="." instance=ExtResource("6")]
+unique_name_in_owner = true
+
+[node name="NotificationFeed" parent="." instance=ExtResource("14")]
+unique_name_in_owner = true
+
+; Added LAST, on top of everything else — the player opened this deliberately (a HUD tap),
+; unlike the fact card or the displacement notice, which the simulation fires at them. Task 5
+; folded the standalone FieldGuide/CatalogPanel/SettingsOverlay overlays into this single
+; window's tabs (Terrain, Buildings, Field Guide, Settings) — one shell instead of three.
+[node name="MenuWindow" parent="." instance=ExtResource("13")]
+unique_name_in_owner = true
+
+[node name="TapRouter" type="Node" parent="."]
+unique_name_in_owner = true
+script = ExtResource("4")
+
+[node name="NewsReportPresenter" type="Node" parent="."]
+unique_name_in_owner = true
+script = ExtResource("10")

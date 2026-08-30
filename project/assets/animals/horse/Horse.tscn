@@ -1,0 +1,34 @@
+; Horse — model scene for AnimalDefinition.model_scenes.
+; Source: Quaternius "Ultimate Animated Animal Pack" (July 2021), CC0 1.0 — same pack as
+; Fox; see project/attribution/sources/quaternius_ultimate_animated_animals.tres.
+;
+; Design role: art.md → Newly Available Animals proposes open_grass, cultivated ·
+; Bold, farm-tolerant · pasture animal, paired with Donkey. Not locked design.
+;
+; Audit (2026-07-26): 13 animation clips confirmed — Idle, Idle_2, Idle_Headlow,
+; Idle_HitReact1/2, Walk, Gallop, Gallop_Jump, Jump_toIdle, Eating, Attack_Headbutt,
+; Attack_Kick, Death. Idle/Walk both present and non-degenerate (52 tracks each). Node
+; structure matches Fox (AnimalArmature -> Skeleton3D -> mesh; AnimationPlayer sibling
+; index 1).
+;
+; Note: the pack also ships a "Horse_White" colour variant of this exact model
+; (source-content/assets/.../glTF/Horse_White.gltf) — deliberately NOT imported here; only the 9
+; animals in this task's scope were requested.
+;
+; Scale: 0.2, matching Fox's established factor for this pack (same rationale as
+; Deer.tscn). Raw AABB height 4.824 -> scaled height 0.965, close to person-scale (Human
+; wrapper normalizes to 1.0) — plausible for a horse viewed at withers/head height. FLAG
+; FOR HUMAN REVIEW: not yet eyeball-confirmed in engine.
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" uid="uid://dif7rjm3u3wk8" path="res://assets/animals/horse/Horse.gltf" id="1_model"]
+
+[node name="Horse" type="Node3D"]
+
+[node name="Model" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.2, 0, 0, 0, 0.2, 0, 0, 0, 0.2, 0, 0, 0)
+
+[node name="AnimationPlayer" parent="Model" index="1"]
+autoplay = "Idle"
+
+[editable path="Model"]

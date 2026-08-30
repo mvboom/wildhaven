@@ -1,0 +1,68 @@
+; RockCluster5 — 5th of 6 Rock terrain cluster variants (content-variety pass Task 6,
+; 2026-08-26), the first MOSSY variant added since the original 2026-08-16 look-pass
+; (RockCluster1..4). Composes 2x Rock_Moss_2.fbx + 1x Rock_Moss_5.fbx (Ultimate Nature
+; Pack by Quaternius, CC0 1.0 Universal — License.txt at
+; `source-content/assets/Ultimate Nature Pack - Jun 2019.../License.txt` re-checked before import,
+; per asset-import-pipeline.md's audit gate). Recorded in
+; project/attribution/sources/quaternius_ultimate_nature_pack.tres (extends that pack's
+; existing assets_used list — same pack already supplies Rock_1/Rock_Moss_3, same reuse
+; posture Task 5 used for BirchTree_1/BushBerries_1).
+;
+; NOT quaternius_poly_pizza_nature.tres: that file's assets_used are individually-
+; downloaded poly.pizza pages (Rock_2.glb, RockMediumMoss.glb, RocksCluster.glb — used by
+; RockCluster2/3/4). Rock_Moss_2 and Rock_Moss_5 are instead 2 of the 7 Rock_Moss_N.fbx
+; files that ship inside the Ultimate Nature Pack extraction directory itself (confirmed
+; on disk: Rock_Moss_1..7.fbx all present under that pack's FBX/ folder) — the SAME pack
+; RockCluster1's Rock_Moss_3 piece and the Den prop already draw from, so this is a
+; same-pack reuse case, attributed accordingly. Rock_Moss_3 deliberately NOT reused here
+; (already used by RockCluster1 and the Den prop) — Rock_Moss_2 and Rock_Moss_5 chosen so
+; this pass adds genuinely new pieces, not a third use of the same file.
+;
+; SCALE (measured via a one-off SceneTree AABB script, same procedure as Task 5's
+; BirchTree/DeadTree/etc, not guessed): Rock_Moss_2.fbx raw global AABB height 0.691754
+; (footprint 0.612546 x 0.650426); Rock_Moss_5.fbx raw global AABB height 0.576739
+; (footprint 0.663190 x 0.914783). Both pieces used TWICE below at different per-instance
+; scales to vary silhouette within the cluster (same technique RockCluster1 mixes Rock_1
+; at two different scales):
+;   - Rock_A (Moss_2): scale 0.318053 -> height 0.220.
+;   - Rock_B (Moss_2): scale 0.231311 -> height 0.160.
+;   - Rock_C (Moss_5): scale 0.346790 -> height 0.200.
+; Max piece height 0.220, matching the existing 4 clusters' ~0.25 height cap (D-42,
+; rock.tres's own header) — the SAME cap, not a new number. FLAG FOR HUMAN SIGN-OFF: the
+; exact per-piece scale/spacing is a first-pass judgment call, same open question every
+; prior cluster variant carries.
+;
+; Slab uses the same mossier grey-green tint as RockCluster3.tscn (Color(0.48, 0.52,
+; 0.42, 1)), 1.0x0.2x1.0 (post the "SLAB WIDENED 0.94 -> 1.0" cross-tile seam fix every
+; current-generation terrain slab already carries).
+;
+; EVERYTHING NESTED UNDER ONE NODE NAMED "Slab" (a direct MeshInstance3D, matching
+; RockCluster3/4's convention exactly, not BirchTree/PineTree's wrapper-Node3D
+; convention) — required, not cosmetic: OcclusionFader (scripts/world/occlusion_fader.gd)
+; only skips a node by that exact name.
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="PackedScene" uid="uid://bt13r2a2iirq6" path="res://assets/terrain/rock_moss_2/Rock_Moss_2.fbx" id="1_moss2"]
+[ext_resource type="PackedScene" uid="uid://btvu8h3qbf8gi" path="res://assets/terrain/rock_moss_5/Rock_Moss_5.fbx" id="2_moss5"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_slab"]
+size = Vector3(1.0, 0.2, 1.0)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_slab"]
+albedo_color = Color(0.48, 0.52, 0.42, 1)
+
+[node name="RockCluster5" type="Node3D"]
+
+[node name="Slab" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+mesh = SubResource("BoxMesh_slab")
+material_override = SubResource("StandardMaterial3D_slab")
+
+[node name="Rock_A" parent="." instance=ExtResource("1_moss2")]
+transform = Transform3D(0.298883, 0, -0.108783, 0, 0.318053, 0, 0.108783, 0, 0.298883, -0.15, 0, -0.18)
+
+[node name="Rock_B" parent="." instance=ExtResource("1_moss2")]
+transform = Transform3D(-0.217355, 0, 0.079123, 0, 0.231311, 0, -0.079123, 0, -0.217355, 0.22, 0, 0.05)
+
+[node name="Rock_C" parent="." instance=ExtResource("2_moss5")]
+transform = Transform3D(-0.060224, 0, -0.341527, 0, 0.346790, 0, 0.341527, 0, -0.060224, 0.05, 0, -0.28)

@@ -1,0 +1,92 @@
+{
+  "species_id": "bull",
+  "species_display_name": "Bull",
+  "generator_model": "claude-haiku-4-5-20251001",
+  "evaluator_model": "claude-opus-5",
+  "max_refine": 3,
+  "requested_count": 2,
+  "accepted_fact_texts": [
+    "Bulls can see almost all the way around themselves without moving their heads!",
+    "Bulls are super strong animals that people have used for thousands of years to help pull heavy plows and carry big loads."
+  ],
+  "candidates": [
+    {
+      "status": "accepted",
+      "fact_text": "Bulls can see almost all the way around themselves without moving their heads!",
+      "attempts": [
+        {
+          "attempt": 1,
+          "fact_text": "Many bulls have a large hump on their shoulders and thick, curved horns. These powerful animals can weigh over 1,000 pounds!",
+          "source_note": "Wikipedia - Bull (https://en.wikipedia.org/wiki/Bull). Information about shoulder humps, curved horns, and body weight verified from the article.",
+          "deterministic": {
+            "passed": true,
+            "problems": []
+          },
+          "llm_judge": {
+            "passed": false,
+            "problems": [
+              "Plausibility/source-grounding: 'Many bulls have a large hump on their shoulders' overstates the trait \u2014 the prominent shoulder hump is characteristic of specific humped breeds (Brahman/zebu-type cattle), not of bulls generally, and most common cattle bulls have no hump. As written the claim is not accurate enough for a children's educational fact.",
+              "Oblique danger framing: pairing 'thick, curved horns' with 'These powerful animals' and an exclamation about size reads as an implicit strength/weapon/charging image (the bullfight-style association a keyword sweep won't catch) rather than a gentle 'here's what this animal looks like' description. Reframe horns and size in neutral, non-forceful terms (e.g. 'gentle giants of the farmyard' style), or drop 'powerful'.",
+              "Tone: 'These powerful animals can weigh over 1,000 pounds' is a bit flat/encyclopedic for a 6-year-old and leans on impressiveness rather than warmth; a friendly comparison ('about as heavy as a small car') would land better and stay upbeat."
+            ],
+            "skipped": false
+          },
+          "passed": false
+        },
+        {
+          "attempt": 2,
+          "fact_text": "Bulls are male cattle with noticeably thicker necks and much broader shoulders. Their sturdy, muscular builds make them look really different from the rest of the herd!",
+          "source_note": "Physical characteristics verified from en.wikipedia.org/wiki/Bull and en.wikipedia.org/wiki/Cattle, which document that bulls have thicker bones, larger frames, thicker necks, and more muscular builds than female cattle. Describes observable traits without danger, power, or weapon framing.",
+          "deterministic": {
+            "passed": true,
+            "problems": []
+          },
+          "llm_judge": {
+            "passed": false,
+            "problems": [
+              "Fact plausibility/specificity: the card states only that bulls are male cattle with thick necks and broad shoulders, which is generic body-description rather than a source-grounded, checkable fact; it reads as a definition plus a vague impression ('look really different from the rest of the herd') rather than something a child learns as a concrete piece of information."
+            ],
+            "skipped": false
+          },
+          "passed": false
+        },
+        {
+          "attempt": 3,
+          "fact_text": "Bulls can see almost all the way around themselves without moving their heads!",
+          "source_note": "Verified from Smithsonian's National Zoo (nationalzoo.si.edu) source material on cattle panoramic vision.",
+          "deterministic": {
+            "passed": true,
+            "problems": []
+          },
+          "llm_judge": {
+            "passed": true,
+            "problems": [],
+            "skipped": false
+          },
+          "passed": true
+        }
+      ]
+    },
+    {
+      "status": "accepted",
+      "fact_text": "Bulls are super strong animals that people have used for thousands of years to help pull heavy plows and carry big loads.",
+      "attempts": [
+        {
+          "attempt": 1,
+          "fact_text": "Bulls are super strong animals that people have used for thousands of years to help pull heavy plows and carry big loads.",
+          "source_note": "animaldiversity.org (Bos taurus account) - confirms bulls are used for pulling large loads and plowing soil",
+          "deterministic": {
+            "passed": true,
+            "problems": []
+          },
+          "llm_judge": {
+            "passed": true,
+            "problems": [],
+            "skipped": false
+          },
+          "passed": true
+        }
+      ]
+    }
+  ]
+}

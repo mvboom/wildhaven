@@ -1,0 +1,62 @@
+; RockCluster6 — 6th of 6 Rock terrain cluster variants (content-variety pass Task 6,
+; 2026-08-26), the second MOSSY variant added alongside RockCluster5.tscn — see that
+; scene's header for the full sourcing/attribution rationale (same pack, same 2
+; Rock_Moss_N.fbx source files reused here, plus deliberately DIFFERENT arrangement/piece
+; count so the two mossy clusters don't read as duplicates: 4 pieces here vs. 3 in
+; RockCluster5, different scale/rotation/position per piece, different lead piece
+; (Rock_Moss_5 first here vs. Rock_Moss_2 first in RockCluster5)).
+;
+; Source: 2x Rock_Moss_5.fbx + 2x Rock_Moss_2.fbx (Ultimate Nature Pack by Quaternius,
+; CC0 1.0 Universal — same License.txt re-check as RockCluster5.tscn). Attributed in
+; project/attribution/sources/quaternius_ultimate_nature_pack.tres (assets_used already
+; extended by RockCluster5.tscn's own addition — no further entry needed, same 2
+; filenames).
+;
+; SCALE (measured via the same one-off SceneTree AABB script as RockCluster5.tscn — see
+; that scene's header for the raw measured numbers): both raw pieces reused at 4 more
+; distinct per-instance scales for a different silhouette mix than RockCluster5:
+;   - Rock_A (Moss_5): scale 0.416132 -> height 0.240.
+;   - Rock_B (Moss_5): scale 0.260083 -> height 0.150.
+;   - Rock_C (Moss_2): scale 0.274653 -> height 0.190.
+;   - Rock_D (Moss_2): scale 0.187920 -> height 0.130.
+; Max piece height 0.240, matching the existing 4 clusters' ~0.25 height cap (D-42,
+; rock.tres's own header) — the SAME cap, not a new number, and consistent with
+; RockCluster5.tscn's 0.220 max. FLAG FOR HUMAN SIGN-OFF: same open question as every
+; prior cluster variant — the exact per-piece scale/spacing is a first-pass judgment call.
+;
+; Slab uses the same mossier grey-green tint as RockCluster3.tscn/RockCluster5.tscn
+; (Color(0.48, 0.52, 0.42, 1)), 1.0x0.2x1.0 (post the "SLAB WIDENED 0.94 -> 1.0"
+; cross-tile seam fix every current-generation terrain slab already carries).
+;
+; EVERYTHING NESTED UNDER ONE NODE NAMED "Slab" (a direct MeshInstance3D, matching
+; RockCluster3/4/5's convention) — required, not cosmetic: OcclusionFader
+; (scripts/world/occlusion_fader.gd) only skips a node by that exact name.
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="PackedScene" uid="uid://btvu8h3qbf8gi" path="res://assets/terrain/rock_moss_5/Rock_Moss_5.fbx" id="1_moss5"]
+[ext_resource type="PackedScene" uid="uid://bt13r2a2iirq6" path="res://assets/terrain/rock_moss_2/Rock_Moss_2.fbx" id="2_moss2"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_slab"]
+size = Vector3(1.0, 0.2, 1.0)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_slab"]
+albedo_color = Color(0.48, 0.52, 0.42, 1)
+
+[node name="RockCluster6" type="Node3D"]
+
+[node name="Slab" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+mesh = SubResource("BoxMesh_slab")
+material_override = SubResource("StandardMaterial3D_slab")
+
+[node name="Rock_A" parent="." instance=ExtResource("1_moss5")]
+transform = Transform3D(0.208066, 0, -0.360391, 0, 0.416132, 0, 0.360391, 0, 0.208066, -0.25, 0, 0.15)
+
+[node name="Rock_B" parent="." instance=ExtResource("1_moss5")]
+transform = Transform3D(0.167185, 0, 0.199249, 0, 0.260083, 0, -0.199249, 0, 0.167185, 0.28, 0, -0.22)
+
+[node name="Rock_C" parent="." instance=ExtResource("2_moss2")]
+transform = Transform3D(-0.237872, 0, -0.137327, 0, 0.274653, 0, 0.137327, 0, -0.237872, 0.05, 0, 0.28)
+
+[node name="Rock_D" parent="." instance=ExtResource("2_moss2")]
+transform = Transform3D(-0.064274, 0, 0.176576, 0, 0.187920, 0, -0.176576, 0, -0.064274, -0.05, 0, -0.05)

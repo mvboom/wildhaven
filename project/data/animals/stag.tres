@@ -1,0 +1,53 @@
+; Stag — AnimalDefinition data entry (gdd.md -> Data Schemas / Content Architecture).
+; Roster row: roster.md -> Already-Defined Roster | Ruled: decisions.md -> D-43.
+; Asset: Quaternius "Ultimate Animated Animal Pack", CC0 1.0 Universal — see
+;   project/attribution/sources/quaternius_ultimate_animated_animals.tres.
+;
+; SPECIES CHOICE: red deer (Cervus elaphus) — "stag" is specifically the term for an adult
+; male red deer, which is also the species docs/content/cleared-pool-fact-cards.md § Stag
+; sources against (ADW + The Wildlife Trusts).
+;
+; CAPACITY FIELDS (D-43): capacity_radius = 0 -> SENTINEL `CAPACITY_RADIUS_FOLLOWS_SCOUT`,
+; meaning "equal to scout_radius" (12), not a radius of zero. Three habitat tags
+; (forest + cover + rocks) deliberately mirror Fox's "hardest habitat" framing one tag
+; harder; max_individuals = 3 (half the roster's ~6 baseline) plus the pool's highest
+; tiles_per_individual (8) makes art.md's "rare trophy" framing literal through scarcity.
+; Not farm-tolerant.
+;
+; fact_text is docs/content/cleared-pool-fact-cards.md § Stag's proposed line, transcribed
+; verbatim — all four checklist steps PASS there. Per-clause sourcing:
+;   "male red deer"                          -> Wildlife Trusts, "A male red deer is
+;                                                called a 'stag'..."
+;   "grows a brand-new set ... every year"    -> ADW ("widely branching antlers ... found
+;                                                on males only"); Wildlife Trusts ("Within
+;                                                a few weeks of shedding old antlers, new
+;                                                ones will start to grow.")
+;   "bigger than the year before"             -> Wildlife Trusts ("increasing in size as
+;                                                they get older")
+; https://animaldiversity.org/accounts/Cervus_elaphus/
+; https://www.wildlifetrusts.org/wildlife-explorer/mammals/red-deer
+; A combat-adjacent clause (rutting/fighting) on the same Wildlife Trusts page was cut
+; entirely, not softened — see the source file's Checklist step 4.
+;
+; news_reports intentionally empty — News Report pools for this pool are a separate, later
+; purchase (not part of Content Pipeline step 4/5 for this dispatch).
+[gd_resource type="Resource" script_class="AnimalDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/animal_definition.gd" id="1_schema"]
+[ext_resource type="PackedScene" path="res://assets/animals/stag/Stag.tscn" id="2_model"]
+
+[resource]
+script = ExtResource("1_schema")
+id = "stag"
+display_name = "Stag"
+habitat_needs = Array[String](["forest", "cover", "rocks"])
+personality = "Shy"
+avoids = Array[String]([])
+farm_tolerant = false
+scout_radius = 12
+capacity_radius = 0
+tiles_per_individual = 8
+max_individuals = 3
+model_scenes = Array[PackedScene]([ExtResource("2_model")])
+fact_text_pool = Array[String](["A stag is a male red deer, and every year it grows a brand-new set of branching antlers that are bigger than the year before."])
+news_reports = Array[String]([])

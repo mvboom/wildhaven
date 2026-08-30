@@ -1,0 +1,58 @@
+; CultivatedWheatRow — one of 2 Cultivated field terrain variants. FIRST REAL ASSET for
+; this terrain (2026-08-16); previously a grey-box placeholder. Human complaint: "needs to
+; look like actual farm fields." Composes a small wheat plot, not a single plant in a box.
+;
+; Source: Wheat.glb, "Wheat" by Quaternius, CC0 1.0 Universal, poly.pizza — see
+; project/attribution/sources/quaternius_poly_pizza_nature.tres.
+;
+; Raw measured AABB: footprint 0.358x0.356, height 1.102 tile-units (very tall relative to
+; a tile — similar "taller than a villager" situation the grass picks needed correcting
+; on import). Scaled to a target ~0.44-0.46 tile-units tall (scale ~0.40-0.43, mild
+; per-instance jitter), a stylized "waist-high wheat" judgment call — FLAG FOR HUMAN
+; SIGN-OFF, no GDD number exists for crop height.
+;
+; 6 clumps arranged as 2 loose rows (furrow idiom, not a grid) across the tile — enough to
+; read as a small planted plot without the "single plant in the middle of a box" the task
+; brief explicitly called out to avoid, and without over-cluttering the tile (explicit
+; "variety without noise" caution).
+;
+; Slab is a dirt-brown (Color(0.4, 0.28, 0.16, 1)), distinct from every natural terrain's
+; green/grey slabs — cultivated field is the one terrain that costs Wood and should read
+; as worked soil, not wild ground. FLAG FOR HUMAN SIGN-OFF on the exact tone.
+;
+; SLAB WIDENED 0.94 -> 1.0 (2026-08-16, human-reported cross-tile seam gap) — same fix,
+; same reasoning as CommonTree1.tscn's header. X/Z only, Y (0.2) untouched.
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="PackedScene" uid="uid://dpc87q0wy585j" path="res://assets/terrain/wheat/Wheat.glb" id="1_model"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_slab"]
+size = Vector3(1.0, 0.2, 1.0)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_slab"]
+albedo_color = Color(0.4, 0.28, 0.16, 1)
+
+[node name="CultivatedWheatRow" type="Node3D"]
+
+[node name="Slab" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+mesh = SubResource("BoxMesh_slab")
+material_override = SubResource("StandardMaterial3D_slab")
+
+[node name="Wheat_1" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.398478, 0, -0.034862, 0, 0.4, 0, 0.034862, 0, 0.398478, -0.28, 0, -0.22)
+
+[node name="Wheat_2" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.415913, 0, 0.058453, 0, 0.42, 0, -0.058453, 0, 0.415913, 0, 0, -0.2)
+
+[node name="Wheat_3" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.381478, 0, -0.081086, 0, 0.39, 0, 0.081086, 0, 0.381478, 0.28, 0, -0.24)
+
+[node name="Wheat_4" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.40844, 0, 0.035734, 0, 0.41, 0, -0.035734, 0, 0.40844, -0.27, 0, 0.18)
+
+[node name="Wheat_5" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.38637, 0, -0.103528, 0, 0.4, 0, 0.103528, 0, 0.38637, 0.02, 0, 0.2)
+
+[node name="Wheat_6" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.420603, 0, 0.089402, 0, 0.43, 0, -0.089402, 0, 0.420603, 0.27, 0, 0.16)

@@ -1,0 +1,45 @@
+; RockCluster3 — one of 4 Rock terrain cluster variants (D-42 model_scenes variety pass).
+; A mossy-anchored cluster: 1x RockMediumMoss.glb ("Rock Medium" by Quaternius, CC0,
+; poly.pizza — see project/attribution/sources/quaternius_poly_pizza_nature.tres) as the
+; larger anchor piece, plus 2x the small Rock_2.glb (same source as RockCluster2) for the
+; "several rocks" read.
+;
+; RockMediumMoss raw measured AABB is LARGE (footprint 3.23x2.99, height 2.26 tile-units —
+; modeled at a different unit scale than the other pieces, unrelated to being a "big"
+; rock in-fiction) — scaled down hard (0.124x) to a ~0.28-tall anchor, comparable to
+; RockCluster1's pieces, not a return to the old giant-rock problem. FLAG FOR HUMAN
+; SIGN-OFF: scale and the mossy-vs-plain slab tint are first-pass judgment calls.
+;
+; Slab uses a mossier grey-green tint (Color(0.48, 0.52, 0.42, 1)) instead of the plain
+; Rock grey, to read as a moss-touched cluster rather than a color-identical repaint of
+; the other 3 variants — a deliberate per-variant differentiation, not required by schema
+; (pick_variant() only needs distinct model_scenes entries, not distinct slab colors).
+;
+; SLAB WIDENED 0.94 -> 1.0 (2026-08-16, human-reported cross-tile seam gap) — same fix,
+; same reasoning as CommonTree1.tscn's header. X/Z only, Y (0.2) untouched.
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="PackedScene" uid="uid://01whnt02yyky" path="res://assets/terrain/rock_medium_moss/RockMediumMoss.glb" id="1_mossanchor"]
+[ext_resource type="PackedScene" uid="uid://8gkn3krirfwv" path="res://assets/terrain/rock_2/Rock_2.glb" id="2_rock2"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_slab"]
+size = Vector3(1.0, 0.2, 1.0)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_slab"]
+albedo_color = Color(0.48, 0.52, 0.42, 1)
+
+[node name="RockCluster3" type="Node3D"]
+
+[node name="Slab" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+mesh = SubResource("BoxMesh_slab")
+material_override = SubResource("StandardMaterial3D_slab")
+
+[node name="Rock_Anchor_Moss" parent="." instance=ExtResource("1_mossanchor")]
+transform = Transform3D(0.09499, 0, -0.079706, 0, 0.124, 0, 0.079706, 0, 0.09499, 0.05, 0, 0.05)
+
+[node name="Rock_A" parent="." instance=ExtResource("2_rock2")]
+transform = Transform3D(0.173648, 0, -0.984808, 0, 1, 0, 0.984808, 0, 0.173648, -0.28, 0, -0.2)
+
+[node name="Rock_B" parent="." instance=ExtResource("2_rock2")]
+transform = Transform3D(-0.751754, 0, 0.273616, 0, 0.8, 0, -0.273616, 0, -0.751754, 0.3, 0, -0.15)

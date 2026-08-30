@@ -1,0 +1,37 @@
+{
+  "species": "Husky",
+  "habitat_design": {
+    "habitat_needs": [
+      "open_grass",
+      "house"
+    ],
+    "personality": "Bold",
+    "avoids": [],
+    "farm_tolerant": true,
+    "scout_radius": 11,
+    "tiles_per_individual": 4,
+    "max_individuals": 6,
+    "rationale": "Huskies are energetic working dogs that need open space to run and thrive living close to human settlements, having been bred for centuries as companions and sled dogs."
+  },
+  "schema": {
+    "id": "husky",
+    "display_name": "Husky",
+    "tres_body": "[resource]\nscript = ExtResource(\"1\")\nid = \"husky\"\ndisplay_name = \"Husky\"\nhabitat_needs = [\"open_grass\", \"house\"]\npersonality = \"Bold\"\navoids = []\nfarm_tolerant = true\nscout_radius = 11\ncapacity_radius = 0\ntiles_per_individual = 4\nmax_individuals = 6\nmodel_scene = \"res://assets/animals/husky/Husky.tscn\"\nfact_text = \"PLACEHOLDER\"\n"
+  },
+  "content": {
+    "fact_text": "PLACEHOLDER - Content Writer's research step timed out before returning a result",
+    "checklist_log": {
+      "source": "n/a (timeout)",
+      "length": "n/a",
+      "tone": "n/a",
+      "predation": "n/a"
+    }
+  },
+  "tres_body": "[resource]\nscript = ExtResource(\"1\")\nid = \"husky\"\ndisplay_name = \"Husky\"\nhabitat_needs = [\"open_grass\", \"house\"]\npersonality = \"Bold\"\navoids = []\nfarm_tolerant = true\nscout_radius = 11\ncapacity_radius = 0\ntiles_per_individual = 4\nmax_individuals = 6\nmodel_scene = \"res://assets/animals/husky/Husky.tscn\"\nfact_text = \"PLACEHOLDER - Content Writer's research step timed out before returning a result\"\n",
+  "qa": {
+    "passed": false,
+    "problems": [
+      "`fact_text` is still a placeholder."
+    ]
+  }
+}

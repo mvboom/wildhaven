@@ -1,0 +1,29 @@
+; Cow — model scene for AnimalDefinition.model_scenes.
+; Source: Quaternius "Ultimate Animated Animal Pack" (July 2021), CC0 1.0 — same pack as
+; Fox; see project/attribution/sources/quaternius_ultimate_animated_animals.tres.
+;
+; Design role: art.md → Newly Available Animals proposes cultivated, open_grass · Bold,
+; farm-tolerant · barnyard life by the village, paired with Bull. Not locked design.
+;
+; Audit (2026-07-26): 13 animation clips confirmed — Idle, Idle_2, Idle_Headlow,
+; Idle_HitReact1/2, Walk, Gallop, Gallop_Jump, Jump_toIdle, Eating, Attack_Headbutt,
+; Attack_Kick, Death. Idle/Walk both present and non-degenerate (47 tracks each). Node
+; structure matches Fox (AnimalArmature -> Skeleton3D -> mesh; AnimationPlayer sibling
+; index 1).
+;
+; Scale: 0.16 (20% reduction from the original 0.2, matching Fox's established factor
+; for this pack — same rationale as Deer.tscn). Raw AABB height 4.587 -> scaled height
+; 0.734. FLAG FOR HUMAN REVIEW: not yet eyeball-confirmed in engine.
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" uid="uid://cr41tek0w0aeo" path="res://assets/animals/cow/Cow.gltf" id="1_model"]
+
+[node name="Cow" type="Node3D"]
+
+[node name="Model" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.16, 0, 0, 0, 0.16, 0, 0, 0, 0.16, 0, 0, 0)
+
+[node name="AnimationPlayer" parent="Model" index="1"]
+autoplay = "Idle"
+
+[editable path="Model"]

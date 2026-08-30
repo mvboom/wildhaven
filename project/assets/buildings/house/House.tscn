@@ -1,0 +1,22 @@
+; House — the fixed v1 House variant + facing (art.md's explicit v1 constraint: one fixed
+; variant, one fixed facing). Picked from 9 live candidates (RTS Houses_FirstAge_{1,2,3}_
+; Level{1,2,3} vs. Farm Buildings Silo_House): Houses_FirstAge_1_Level1, per art.md's own
+; note that FirstAge cottages "read most picture-book" — CONFIRMED by measurement, not just
+; asserted: its footprint (0.869 x 0.761 units) already sits within a single 1x1 tile
+; (TILE_SIZE = 1.0, grid_manager.gd) with a small margin, no rescale needed. The other 8
+; variants run larger (up to 1.464 x 1.175) — plausible 2x2-footprint candidates for the
+; later "broad farm" House form (gdd.md's villager section), not evaluated here.
+;
+; FACING: left as authored (identity transform, no rotation). CONFIRMED 2026-08-03 — the
+; variant pick and the facing were both visually approved under the first-person walk
+; camera (D-33 replaced the old fixed ~45° pitch this note originally referred to).
+;
+; Source: Quaternius, "Ultimate Fantasy RTS" pack (glTF) — CC0 1.0 Universal. See
+; project/attribution/sources/quaternius_ultimate_fantasy_rts.tres.
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" uid="uid://p6gu3wdetvh2" path="res://assets/buildings/house/HousesFirstAge1Level1.gltf" id="1_model"]
+
+[node name="House" type="Node3D"]
+
+[node name="Model" parent="." instance=ExtResource("1_model")]

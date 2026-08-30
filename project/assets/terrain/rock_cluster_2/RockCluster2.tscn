@@ -1,0 +1,45 @@
+; RockCluster2 — one of 4 Rock terrain cluster variants (D-42 model_scenes variety pass).
+; Composes 4 instances of the SAME newly-sourced small rock (Rock_2.glb, "Rock" by
+; Quaternius, CC0, poly.pizza — see
+; project/attribution/sources/quaternius_poly_pizza_nature.tres) at varied position/
+; rotation/scale jitter — same repetition-plus-variation idiom as
+; GrassCommonShort.tscn's scattered cluster.
+;
+; Rock_2 raw measured AABB: footprint 0.155x0.147, height 0.190 tile-units — already a
+; genuinely SMALL rock at natural scale (no giant-boulder problem here), so this variant
+; needed only mild jitter (0.85x-1.25x) rather than a big scale-down, unlike
+; RockCluster1's reused Rock_1 piece. FLAG FOR HUMAN SIGN-OFF: density (4 rocks) and
+; jitter amounts are first-pass judgment calls.
+;
+; Slab matches the existing Rock terrain grey (Color(0.55, 0.55, 0.58, 1)).
+;
+; SLAB WIDENED 0.94 -> 1.0 (2026-08-16, human-reported cross-tile seam gap) — same fix,
+; same reasoning as CommonTree1.tscn's header. X/Z only, Y (0.2) untouched.
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="PackedScene" uid="uid://8gkn3krirfwv" path="res://assets/terrain/rock_2/Rock_2.glb" id="1_rock2"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_slab"]
+size = Vector3(1.0, 0.2, 1.0)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_slab"]
+albedo_color = Color(0.55, 0.55, 0.58, 1)
+
+[node name="RockCluster2" type="Node3D"]
+
+[node name="Slab" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+mesh = SubResource("BoxMesh_slab")
+material_override = SubResource("StandardMaterial3D_slab")
+
+[node name="Rock_A" parent="." instance=ExtResource("1_rock2")]
+transform = Transform3D(1.062518, 0, -0.284701, 0, 1.1, 0, 0.284701, 0, 1.062518, -0.25, 0, -0.2)
+
+[node name="Rock_B" parent="." instance=ExtResource("1_rock2")]
+transform = Transform3D(-0.68944, 0, -0.578509, 0, 0.9, 0, 0.578509, 0, -0.68944, 0.15, 0, -0.28)
+
+[node name="Rock_C" parent="." instance=ExtResource("1_rock2")]
+transform = Transform3D(-0.21706, 0, 1.23101, 0, 1.25, 0, -1.23101, 0, -0.21706, 0.22, 0, 0.1)
+
+[node name="Rock_D" parent="." instance=ExtResource("1_rock2")]
+transform = Transform3D(0.651138, 0, 0.546369, 0, 0.85, 0, -0.546369, 0, 0.651138, -0.1, 0, 0.25)

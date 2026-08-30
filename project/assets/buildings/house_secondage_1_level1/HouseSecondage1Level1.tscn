@@ -1,0 +1,42 @@
+; House look variant — HouseSecondage1Level1 (SecondAge house batch).
+; The SecondAge tier of the same pack, artist and palette as the 10 shipped FirstAge
+; House variants — imported so the House's `model_scenes` pool can be widened.
+; Wiring these into project/data/buildings/house.tres is gameplay-engineer's step, NOT
+; done here.
+;
+; Source: Quaternius, "Ultimate Fantasy RTS" pack (glTF), Houses_SecondAge_1_Level1.gltf — CC0 1.0
+; Universal, same pack as every shipped House variant. Pack License.txt re-read on this
+; run; no new attribution entry — `assets_used` extended in
+; project/attribution/sources/quaternius_ultimate_fantasy_rts.tres.
+;
+; MATERIAL/TEXTURE AUDIT (measured on the raw, unmodified glTF, same probe method the
+; Farm Buildings batch used): albedo_texture is null on all 5 surfaces and NO mesh
+; surface carries an ARRAY_COLOR channel at all — color comes entirely from each named
+; material's albedo_color (Main 0.6933/0.3491/0.2691, Walls 0.6910/0.6933/0.6520, Stone
+; 0.5315/0.5333/0.5015, Wood 0.5333/0.4160/0.2572, Wood_Light 0.6467/0.5303/0.3449, and
+; Stone_Light 0.7042/0.7067/0.6645 where present). Wood and Stone are byte-identical to
+; the shipped FirstAge variants' two materials, so the SecondAge tier is the same palette,
+; not a second one. Nothing to fix; no material_override applied.
+;
+; TRIANGLES: 2336 across 5 materials (the shipped Houses_FirstAge_1_Level1 is 404
+; across 2) — this tier models doors and windows the FirstAge lean-to does not.
+;
+; SCALE: NONE — 1.0 scale, no transform written at all. Raw AABB measured via manual
+; local-transform composition (NOT global_transform — see
+; project/data/terrain/cultivated_field.tres's header for why that silently returns
+; identity on a freshly-instantiated, not-yet-tree-attached node): footprint 0.889953 x
+; 0.864464 tile-units (x, z), height 0.772206. Both footprint axes already sit inside a
+; 1x1 tile (WorldGrid.TILE_SIZE = 1.0), so nothing is rescaled and NO judgment call is
+; embedded here — this is a measurement, not a proposal, the same posture
+; Houses_FirstAge_1_Level1 ships with.
+;
+; FACING: left as authored (identity transform, no rotation) — unconfirmed by a human eye
+; pass, same posture as every other placement judgment call in this project. FLAG FOR
+; HUMAN SIGN-OFF.
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" uid="uid://bftf8vvfjhk1m" path="res://assets/buildings/house_secondage_1_level1/HousesSecondAge1Level1.gltf" id="1_model"]
+
+[node name="HouseSecondage1Level1" type="Node3D"]
+
+[node name="Model" parent="." instance=ExtResource("1_model")]

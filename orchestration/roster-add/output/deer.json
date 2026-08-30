@@ -1,0 +1,38 @@
+{
+  "species": "Deer",
+  "habitat_design": {
+    "habitat_needs": [
+      "forest",
+      "cover",
+      "water"
+    ],
+    "personality": "Shy",
+    "avoids": [
+      "fox"
+    ],
+    "farm_tolerant": false,
+    "scout_radius": 10,
+    "tiles_per_individual": 5,
+    "max_individuals": 6,
+    "rationale": "Deer rely on forest edges and dense cover for browsing and concealment from predators, staying close to reliable water sources, and startle easily around canids like foxes."
+  },
+  "schema": {
+    "id": "deer",
+    "display_name": "Deer",
+    "tres_body": "[resource]\nscript = ExtResource(\"1\")\nid = \"deer\"\ndisplay_name = \"Deer\"\nhabitat_needs = Array[String]([\"forest\", \"cover\", \"water\"])\npersonality = \"Shy\"\navoids = Array[String]([\"fox\"])\nfarm_tolerant = false\nscout_radius = 10\ncapacity_radius = 0\ntiles_per_individual = 5\nmax_individuals = 6\nmodel_scene = \"res://assets/animals/deer/Deer.tscn\"\nfact_text = \"PLACEHOLDER\"\n"
+  },
+  "content": {
+    "fact_text": "Baby deer, called fawns, are born with white spots on their reddish-brown coats that help them blend in with the dappled sunlight in the forest. By their first winter, those cute spots fade away and their coats turn a soft grayish color.",
+    "checklist_log": {
+      "source": "Drawn from animaldiversity.org (Odocoileus_virginianus account), which describes fawns' spotted coats and the shift to grayish coloring by first winter.",
+      "length": "Pass - two sentences, fits the 1-2 sentence limit.",
+      "tone": "Pass - warm and gentle, describing fawns as cute and focusing on camouflage and coat color, no snark.",
+      "predation": "Pass - no mention of predators, danger, or death; the camouflage detail is framed purely around blending with sunlight, not escaping threats."
+    }
+  },
+  "tres_body": "[resource]\nscript = ExtResource(\"1\")\nid = \"deer\"\ndisplay_name = \"Deer\"\nhabitat_needs = Array[String]([\"forest\", \"cover\", \"water\"])\npersonality = \"Shy\"\navoids = Array[String]([\"fox\"])\nfarm_tolerant = false\nscout_radius = 10\ncapacity_radius = 0\ntiles_per_individual = 5\nmax_individuals = 6\nmodel_scene = \"res://assets/animals/deer/Deer.tscn\"\nfact_text = \"Baby deer, called fawns, are born with white spots on their reddish-brown coats that help them blend in with the dappled sunlight in the forest. By their first winter, those cute spots fade away and their coats turn a soft grayish color.\"\n",
+  "qa": {
+    "passed": true,
+    "problems": []
+  }
+}

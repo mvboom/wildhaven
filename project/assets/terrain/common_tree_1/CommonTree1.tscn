@@ -1,0 +1,107 @@
+; CommonTree1 — one of 2 "common" tree picks for the Forest terrain tile
+; (terrain.md: emits `forest`; v1's sole harvestable). Source: Stylized Nature MegaKit
+; (Standard/free), Quaternius, CC0 1.0 Universal — see
+; project/attribution/sources/quaternius_stylized_nature_megakit.tres.
+;
+; Scale is a FIRST-PASS PROPOSAL, not a measured fit like the animals (there is no
+; "1 tile tall" target for a tree the way there is for a villager). Raw mesh height
+; 7.264786 units -> scaled to a target ~2.5-tile canopy height (scale 0.344), a
+; stylized-picture-book judgment call, not derived from any GDD number. FLAG FOR HUMAN
+; SIGN-OFF: this is exactly the kind of look-affecting parameter the tech-art boundary
+; reserves for the human's eyeball call.
+;
+; SLAB REINSTATED (2026-08-03): TerrainView._refresh_tile_visual() instantiates
+; model_scene as a tile's ENTIRE visual — nothing else is drawn per tile — and this prop
+; alone (trunk + canopy) doesn't cover the tile's footprint. Without a slab, the rest of
+; the tile showed scenes/Main.tscn's configured WorldEnvironment sky-blue background_color
+; (0.53, 0.72, 0.86) showing straight through the gap, which an in-engine human look
+; reported as "a lot of transparency, lots of blue showing." This was confirmed by that
+; look, not assumed. Slab geometry/position/color are
+; copied verbatim from the grey-box placeholder this scene replaced
+; (assets/placeholder/forest/Forest.tscn) — same taste call, not a new one. The look of
+; the prop-on-slab combo still awaits full human sign-off.
+;
+; FLOOR BLOTCH PATCHES ADDED (2026-08-16): human complaint — "floor should not just be a
+; solid color." No tileable ground texture exists in the already-audited MegaKit files
+; (Grass.png etc. are thin UV-strip palette textures for vertex-style mesh coloring, not
+; tiling ground textures — confirmed by inspection, not assumed), so per the task's
+; explicit fallback this uses a BLOTCHY MULTI-TONE color treatment instead of a shader
+; rewrite: 3 flat, unlit-color PlaneMesh patches (moss-dark-green and leaf-litter-brown)
+; laid 0.001 units above the slab top to avoid z-fighting, at varied position/rotation —
+; same "small mesh, varied placement" idiom as the grass/rock scatter passes, applied to
+; color instead of props. FLAG FOR HUMAN SIGN-OFF: whether 3 patches read as "mottled
+; forest floor" rather than as stray shapes, and the exact tones chosen.
+;
+; ALL GROUND MESHES NESTED UNDER ONE NODE NAMED "Slab" (2026-08-16, required, not
+; cosmetic): OcclusionFader._collect_fadeable_meshes() (scripts/world/occlusion_fader.gd)
+; skips exactly one node by exact name match, "Slab", and returns without recursing into
+; it — the mechanism that keeps the ground plane from ever being faded ("fading it would
+; open a transparent hole in the ground, not 'see past the tree'", its own header). The 3
+; floor patches are ground decals, not tree parts, so they need the same exemption; as
+; flat siblings of "Slab" they were NOT exempt and OcclusionFader picked them up as
+; fadeable tree material by mistake (caught by test_occlusion_fader.gd's precondition
+; checks). Fixed by moving the BoxMesh ground plane (renamed "Ground") and all 3 patches
+; to be CHILDREN of one wrapper Node3D literally named "Slab", at identity transform so
+; every child keeps its previous absolute-equivalent transform unchanged.
+;
+; SLAB WIDENED 0.94 -> 1.0 (2026-08-16, human-reported): human eyeball pass on the prior
+; look-pass reported "tiles did not have separation between each tile, so you can't tell
+; where the first tile ends and the next tile begins" — the OPPOSITE of the intended read.
+; `WorldGrid.TILE_SIZE` is 1.0 (world_grid.gd), so a 0.94 slab left a real 0.03-unit gap on
+; every tile edge showing the sky-blue WorldEnvironment background straight through between
+; adjacent tiles. Widened X/Z to exactly 1.0 (an exact `TILE_SIZE` match, not a tiny
+; overlap — 1.0 is exactly representable in float, so adjacent tile edges meet with no
+; accumulation error) so neighboring slabs' edges touch with no gap. Y (height, 0.2)
+; untouched. Applied identically across all 10 composed terrain scenes this pass touches —
+; see content-pipeline-status.md -> Terrain for the full list.
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="PackedScene" uid="uid://pyt385qy8x3x" path="res://assets/terrain/common_tree_1/CommonTree_1.gltf" id="1_model"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_slab"]
+size = Vector3(1.0, 0.2, 1.0)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_slab"]
+albedo_color = Color(0.16, 0.4, 0.22, 1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_patch1"]
+size = Vector2(0.42, 0.36)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_patch_moss"]
+albedo_color = Color(0.11, 0.32, 0.16, 1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_patch2"]
+size = Vector2(0.3, 0.34)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_patch_litter"]
+albedo_color = Color(0.3, 0.22, 0.13, 1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_patch3"]
+size = Vector2(0.26, 0.3)
+
+[node name="CommonTree1" type="Node3D"]
+
+[node name="Slab" type="Node3D" parent="."]
+
+[node name="Ground" type="MeshInstance3D" parent="Slab"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+mesh = SubResource("BoxMesh_slab")
+material_override = SubResource("StandardMaterial3D_slab")
+
+[node name="FloorPatch_1_Moss" type="MeshInstance3D" parent="Slab"]
+transform = Transform3D(0.965926, 0, -0.258819, 0, 1, 0, 0.258819, 0, 0.965926, -0.18, 0.001, -0.12)
+mesh = SubResource("PlaneMesh_patch1")
+material_override = SubResource("StandardMaterial3D_patch_moss")
+
+[node name="FloorPatch_2_Litter" type="MeshInstance3D" parent="Slab"]
+transform = Transform3D(0.642788, 0, -0.766044, 0, 1, 0, 0.766044, 0, 0.642788, 0.2, 0.001, 0.15)
+mesh = SubResource("PlaneMesh_patch2")
+material_override = SubResource("StandardMaterial3D_patch_litter")
+
+[node name="FloorPatch_3_Moss" type="MeshInstance3D" parent="Slab"]
+transform = Transform3D(-0.173648, 0, -0.984808, 0, 1, 0, 0.984808, 0, -0.173648, 0.05, 0.001, -0.28)
+mesh = SubResource("PlaneMesh_patch3")
+material_override = SubResource("StandardMaterial3D_patch_moss")
+
+[node name="Model" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.344, 0, 0, 0, 0.344, 0, 0, 0, 0.344, 0, 0, 0)

@@ -1,0 +1,52 @@
+; Shiba Inu — AnimalDefinition data entry (gdd.md -> Data Schemas / Content Architecture).
+; Roster row: roster.md -> Already-Defined Roster | Ruled: decisions.md -> D-43.
+; Asset: Quaternius "Ultimate Animated Animal Pack", CC0 1.0 Universal — see
+;   project/attribution/sources/quaternius_ultimate_animated_animals.tres.
+; Display name "Shiba Inu"; id/directory use `shiba_inu` (content-pipeline-status.md).
+;
+; SPECIES: domestic dog, Shiba Inu breed (Canis lupus familiaris).
+;
+; AVOIDS: ruled in as row 9's second Avoids pair (D-43) — mutual and symmetric with Husky.
+; Both are domestic dogs, so the structural predation-graph check stays clean the same way
+; it does for Rabbit <-> Fox. Personality split (Husky Bold, Shiba Inu Shy) matches each
+; breed's documented real temperament (huskies outgoing/pack-social, Shiba Inu independent/
+; reserved) and gives this second pair its own visibility hook.
+;
+; CAPACITY FIELDS (D-43): capacity_radius = 0 -> SENTINEL `CAPACITY_RADIUS_FOLLOWS_SCOUT`,
+; meaning "equal to scout_radius" (8), not a radius of zero. tiles_per_individual = 2,
+; max_individuals = 6. Farm-tolerant, "village dog" — house + open_grass habitat.
+;
+; fact_text: NO CLEARED COPY EXISTS. docs/content/cleared-pool-fact-cards.md § Shiba Inu
+; ran the full four-approved-source search (ADW's general Canis lupus familiaris account
+; never names Shiba Inu; Nat Geo Kids has no breed page for either dog in this pool; Nat
+; Geo Society Education turned up nothing breed-specific; a widely repeated "most wolf-like
+; genetically" claim traces to no locatable primary source on either approved NatGeo domain)
+; and explicitly declined to fabricate or ship a weak substitute — D-43 records this as
+; "not ruled on here". Per this dispatch's brief, `fact_text` is set to the required
+; PLACEHOLDER form so validate() reports a known, correctly-flagged gap rather than a
+; silent empty string. DO NOT invent a fact here — replace only once step 1/5 clears a
+; real source.
+;
+; news_reports intentionally empty — News Report pools for this pool are a separate, later
+; purchase (not part of Content Pipeline step 4/5 for this dispatch).
+[gd_resource type="Resource" script_class="AnimalDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/animal_definition.gd" id="1_schema"]
+[ext_resource type="PackedScene" path="res://assets/animals/shiba_inu/ShibaInu.tscn" id="2_model"]
+
+[resource]
+script = ExtResource("1_schema")
+id = "shiba_inu"
+display_name = "Shiba Inu"
+habitat_needs = Array[String](["house", "open_grass"])
+personality = "Shy"
+avoids = Array[String](["husky"])
+farm_tolerant = true
+scout_radius = 8
+capacity_radius = 0
+tiles_per_individual = 2
+max_individuals = 6
+model_scenes = Array[PackedScene]([ExtResource("2_model")])
+; fact_text_pool REPLACED by scripts/fact_card_pipeline.py (2026-08-17) -- AWAITING STEP-8 HUMAN SIGN-OFF, not yet reviewed.
+fact_text_pool = Array[String](["Shiba Inus are small dogs from Japan with fluffy double coats and distinctive white markings. These spirited pups form strong, loyal bonds with their families and are confident, independent thinkers!", "Look closely at a Shiba Inu's tail—it curls up and loops over their back in a beautiful curve!"])
+news_reports = Array[String]([])

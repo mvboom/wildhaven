@@ -1,0 +1,29 @@
+; SmallBarn — NEW PlaceableDefinition (content-variety pass Task 3, 2026-08-26). One of 8
+; brand-new farm buildings. See project/assets/buildings/small_barn/SmallBarn.tscn for the
+; asset-level header (source, license, texture audit, measured-scale reasoning).
+;
+; NO DESIGN DOC STATES ANY OF THIS ITEM'S VALUES. cost = 15, footprint = Vector2i(1, 1)
+; are FIRST-PASS PROPOSALS sourced only from House's own stated 1x1 baseline (~15 Wood
+; — buildings.md) — FLAG FOR HUMAN SIGN-OFF, same as every other new farm building in
+; this batch. allowed_terrain = ["grass"] (matching House) and emitted_tags = [] (no
+; species in the shared vocabulary needs a farm-building tag) are this task's own explicit
+; uniform choice, not sourced from a design doc row.
+;
+; fact_text is Content Pipeline step 5 (content-writer's job) — left as PLACEHOLDER, the
+; correct interim state PlaceableDefinition.pending_signoff() already expects and handles.
+[gd_resource type="Resource" script_class="PlaceableDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/placeable_definition.gd" id="1_schema"]
+[ext_resource type="PackedScene" path="res://assets/buildings/small_barn/SmallBarn.tscn" id="2_model"]
+
+[resource]
+script = ExtResource("1_schema")
+id = "small_barn"
+display_name = "Small Barn"
+hotbar_category = "farm_building"
+cost = 15
+footprint = Vector2i(1, 1)
+allowed_terrain = Array[String](["grass"])
+emitted_tags = Array[String]([])
+model_scenes = Array[PackedScene]([ExtResource("2_model")])
+fact_text = "PLACEHOLDER — flavor copy for the Small Barn pending Content Pipeline step 5."

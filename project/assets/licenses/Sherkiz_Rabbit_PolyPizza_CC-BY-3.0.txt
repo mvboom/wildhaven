@@ -1,0 +1,49 @@
+Asset:        Rabbit
+Creator:      Sherkiz
+Obtained via: Poly Pizza — https://poly.pizza/m/Km89u3twcR
+Downloaded:   2026-07-20
+File:         res://assets/animals/rabbit/Rabbit.glb (glTF binary, 227,128 bytes)
+License:      Creative Commons Attribution 3.0 (CC BY 3.0)
+License URL:  https://creativecommons.org/licenses/by/3.0/
+
+ATTRIBUTION IS REQUIRED. Unlike the Quaternius CC0 assets, crediting this model is a
+condition of the licence, not a courtesy. Shipping a build containing this model
+without a visible credit is copyright infringement.
+
+--------------------------------------------------------------------------------
+IMPORTANT — WHAT THIS FILE IS AND IS NOT
+
+This is a RECORD of the licence terms, not a copy of the licence text.
+
+The full CC BY 3.0 legal code could NOT be retrieved and embedded here:
+creativecommons.org was unreachable from the build container at the time of import
+(connection timeout, exit code 000). The canonical text at the License URL above is
+authoritative and MUST be read before release.
+
+The model page on Poly Pizza carries NO author-supplied attribution string — Sherkiz
+did not specify how they wish to be credited. The credit line recorded in
+project/attribution/sources/sherkiz_rabbit.tres is therefore CONSTRUCTED from the
+creator name, work title, licence, and source URL per standard CC BY practice. It is
+not a quotation of anything the author wrote.
+
+--------------------------------------------------------------------------------
+AGGREGATOR TERMS (resolved 2026-07-20)
+
+Poly Pizza's Terms of Service (https://poly.pizza/docs/tos) add no conditions of
+their own. Verbatim, the only clause bearing on downloaded models:
+
+    "By downloading User Content made available by other Users, you agree to adhere
+    to the terms of the Creative Commons license that applies at the time of
+    download."
+
+The licence "at the time of download" was CC BY 3.0, as recorded above.
+
+--------------------------------------------------------------------------------
+MODIFICATION STATUS
+
+The .glb in this repository is BYTE-IDENTICAL to the upstream download. Scale and
+material adjustments live in the wrapper scene (Rabbit.tscn), not in the asset, so
+no modified copy of Sherkiz's work is distributed in source form. Note that the
+game BINARY does render the model with an altered material (metallic 0.4 -> 0.0)
+and a uniform scale; whether that constitutes a derivative requiring a change note
+under CC BY 3.0 s4(b) is a question for release review.

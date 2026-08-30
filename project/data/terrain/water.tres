@@ -1,0 +1,58 @@
+; Water — TerrainDefinition data entry (spec.md -> Data Schemas; terrain.md ->
+; Already-Defined Terrain, v1 tag-source mapping).
+;
+; emitted_tags = ["water"] is DECIDED (terrain.md's tag-source mapping, #5 closed -> D-25).
+; NOTE: `water` currently has no consuming species in the v1 floor roster — Duck is the
+; only water-habitat species in any list and is unsourced (content-pipeline-status.md).
+; The tag ships anyway; it is free to keep and terrain.md says so explicitly.
+;
+; cost = 0 — nature is free (terrain.md's one pricing rule).
+;
+; MODEL_SCENE NOW POINTS AT REAL ART (2026-08-16): Water.tscn — a subdivided BoxMesh with
+; water_surface.gdshader applied (depth-tint gradient, fresnel rim, gentle animated
+; ripple), exactly art.md's own "shader/plane, no model" plan. No third-party asset used —
+; see Water.tscn's own header. Lilypad/reeds edge dressing (art.md's optional nice-to-have)
+; was NOT pursued in that pass — see the 2026-08-26 entry below: it now has been.
+;
+; MODEL_SCENE PLURALIZED TO MODEL_SCENES (-> D-42): the field is now an array so a
+; terrain can carry multiple interchangeable visual variants, stably picked per tile by
+; TerrainDefinition.pick_variant(). This entry originally shipped exactly one scene; see
+; below for the 2026-08-26 addition of 2 more.
+;
+; LILYPAD-DRESSED VARIANTS ADDED (2026-08-26, content-variety pass Task 8):
+; WaterLilypad1.tscn (2 lilypads) and WaterLilypad2.tscn (4 lilypads), both siblings that
+; instance THIS SAME Water.tscn verbatim as a child plus scattered Lilypad.fbx props near
+; the tile edges (see each scene's own header for source/scale/placement detail) — the
+; shader/ripple/fresnel treatment is identical across all 3 entries now, only the
+; instanced-prop dressing differs. Source: Lilypad.fbx, Quaternius Ultimate Nature Pack,
+; CC0 1.0 Universal, found on disk in the already-owned pack (not a poly.pizza standalone
+; download) — attributed in
+; project/attribution/sources/quaternius_ultimate_nature_pack.tres.
+;
+; OPEN QUESTION — EQUAL WEIGHT ACROSS 3 ENTRIES, FLAG FOR HUMAN SIGN-OFF (explicit, not
+; silently decided): TerrainDefinition.pick_variant() picks uniformly at random (stably per
+; tile) across whatever model_scenes holds. Growing this array from 1 entry to 3 means
+; plain open water — previously the ONLY water look — now shows on only 1/3 of water tiles,
+; with lilypad-dressed water (2 variants combined) showing on the other 2/3. That is very
+; likely NOT the intended ratio: "dressing" reads as an accent case, not a majority state,
+; and 2/3-lilypad-covered water may look busier/more "pond" than "lake/river" depending on
+; the map's water density. This pass ships the literal 3-entry array per the task brief's
+; instruction and does NOT add a weighting mechanism or duplicate plain-water entries to
+; compensate (either fix is a real option — duplicate ExtResource("2_model") N more times
+; in the array for a cheap weighted-by-count trick, or build actual weighted picking into
+; pick_variant() — but both are a human call on the target ratio, not a tech-art default).
+[gd_resource type="Resource" script_class="TerrainDefinition" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/terrain_definition.gd" id="1_schema"]
+[ext_resource type="PackedScene" path="res://assets/terrain/water/Water.tscn" id="2_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/water_lilypad_1/WaterLilypad1.tscn" id="3_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/water_lilypad_2/WaterLilypad2.tscn" id="4_model"]
+
+[resource]
+script = ExtResource("1_schema")
+id = "water"
+display_name = "Water"
+emitted_tags = Array[String](["water"])
+cost = 0
+model_scenes = Array[PackedScene]([ExtResource("2_model"), ExtResource("3_model"), ExtResource("4_model")])
+harvestable = null

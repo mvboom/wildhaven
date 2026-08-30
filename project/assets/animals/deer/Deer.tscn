@@ -1,0 +1,34 @@
+; Deer — model scene for AnimalDefinition.model_scenes.
+; Source: Quaternius "Ultimate Animated Animal Pack" (July 2021), CC0 1.0 — same pack as
+; Fox; see project/attribution/sources/quaternius_ultimate_animated_animals.tres.
+;
+; Design role: decided substitute for the Monkey gap (art.md → Newly Available Animals /
+; Desired Roster Assets — Still Missing) as well as a first-class roster candidate in its
+; own right (art.md → Newly Available Animals: open_grass, forest · Shy).
+;
+; Audit (2026-07-26): 13 animation clips confirmed on the raw glTF — Idle, Idle_2,
+; Idle_Headlow, Idle_HitReact1/2, Walk, Gallop, Gallop_Jump, Jump_toIdle, Eating,
+; Attack_Headbutt, Attack_Kick, Death. Idle/Walk (the hard requirement) both present and
+; non-degenerate (48 tracks each). Node structure matches Fox exactly (AnimalArmature ->
+; Skeleton3D -> mesh, AnimationPlayer as sibling index 1), so the wrapper shape below is
+; the same as Fox.tscn's.
+;
+; Scale: 0.2, matching Fox's already-established factor for this exact pack — same
+; creator, same Blender export convention, so reusing Fox's factor preserves the
+; modeler's own relative sizing between pack-mates rather than inventing a new per-species
+; number. Raw AABB height 4.274 -> scaled height 0.855 (a little under person-scale
+; height, believable for a deer). FLAG FOR HUMAN REVIEW: not yet eyeball-confirmed in
+; engine against Fox/Rabbit/Human at the same table.
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" uid="uid://n4xlotxbff4y" path="res://assets/animals/deer/Deer.gltf" id="1_model"]
+
+[node name="Deer" type="Node3D"]
+
+[node name="Model" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.2, 0, 0, 0, 0.2, 0, 0, 0, 0.2, 0, 0, 0)
+
+[node name="AnimationPlayer" parent="Model" index="1"]
+autoplay = "Idle"
+
+[editable path="Model"]
