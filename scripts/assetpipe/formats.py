@@ -81,16 +81,18 @@ def probe(path: Path) -> ModelProbe:
     return ModelProbe(fmt=ext.lstrip("."))
 
 
-# Preference order. Higher index wins. `blend` is present so it can be REPORTED as
-# rejected rather than silently ignored -- an operator who sees only .blend on disk
-# should learn why, and that it is a one-setting fix.
+# Preference order, used as the LAST tiebreak only. Higher index wins, which ranks the
+# formats needing no conversion above `blend` -- converting is work, and work we only do
+# when it buys something. It is not a veto: for a rigged need, required-clip coverage and
+# then raw clip count are compared first (see resolve), so a .blend that carries Walk
+# outranks an fbx that does not. `blend` is a real candidate whenever Blender can run;
+# when it cannot, it is still listed as REJECTED with the reason, so an operator who sees
+# only .blend on disk learns why and that it is a one-setting fix.
 RANK = ("blend", "obj", "fbx", "gltf", "glb")
 
 ASSETS_ROOT = Path("source-content/assets")
 
-_REJECTIONS = {
-    "obj": "no skeleton or animation",
-}
+OBJ_REJECTION = "no skeleton or animation"
 
 # A .blend is usable only if we can convert it. Checked at resolution time so it is never
 # chosen and then found unconvertible at import.
@@ -136,7 +138,8 @@ def siblings(asset: Path, assets_root: Path = ASSETS_ROOT) -> dict[str, Path]:
     return out
 
 
-def resolve(asset: Path, needs_rig: bool, assets_root: Path = ASSETS_ROOT) -> Resolution:
+def resolve(asset: Path, needs_rig: bool, assets_root: Path = ASSETS_ROOT,
+            required_clips=()) -> Resolution:
     found = siblings(asset, assets_root)
     rejected: dict[str, str] = {}
     usable: list[str] = []
@@ -149,7 +152,7 @@ def resolve(asset: Path, needs_rig: bool, assets_root: Path = ASSETS_ROOT) -> Re
                 continue
             usable.append(ext)
         elif ext == "obj" and needs_rig:
-            rejected[ext] = _REJECTIONS["obj"]
+            rejected[ext] = OBJ_REJECTION
         else:
             usable.append(ext)
 
@@ -160,33 +163,50 @@ def resolve(asset: Path, needs_rig: bool, assets_root: Path = ASSETS_ROOT) -> Re
                 ", ".join(sorted(found)) or "nothing"),
         )
 
-    # For a RIGGED need the animations are the whole point, so prefer the source that
-    # actually carries more of them, tie-broken by RANK toward the format needing no
-    # conversion. Real case: Pig's fbx has 2 of the 6 actions its .blend holds, and the
-    # four it dropped include Walk -- the clip the animal gate requires. Static content
-    # ignores clip counts and keeps the plain ranking.
+    # For a RIGGED need the animations are the whole point. What matters FIRST is whether
+    # a source carries the clips the audit gate will demand -- raw count is only a
+    # tiebreak after that. Count alone was the wrong question: animal.SPEC.required_clips
+    # is ["Idle", "Walk"], so an fbx with 7 clips none of which is Walk beat a 6-clip
+    # .blend that had it, and the asset was then rejected at the gate as unusable while a
+    # usable source sat beside it. Real case: Pig's fbx has 2 of the 6 actions its .blend
+    # holds, and the four it dropped include Walk. Static content ignores clips entirely
+    # and keeps the plain ranking.
     # CAVEAT on the comparison: a .blend's action names are read exactly (ID blocks), but
     # the FBX side is the binary "Armature|<name>" heuristic, which can OVER-report -- the
-    # real Cow.fbx scans as 8 when it holds 6. Outcomes here are still right (an inflated
-    # fbx only ever wins a tie it would already win), but a large enough over-read could in
-    # principle mask a genuinely richer .blend. The post-import Godot test enumerates the
-    # real AnimationPlayer and remains the authority, as it does for the audit gate.
-    counts = {ext: len(probe(found[ext]).clips) for ext in usable} if needs_rig else {}
-    if needs_rig:
-        best = max(usable, key=lambda e: (counts[e], RANK.index(e)))
-    else:
-        best = max(usable, key=RANK.index)
+    # real Cow.fbx scans as 8 when it holds 6, and on this pack Cow, Horse and Zebra all
+    # win 8-vs-6 on phantom names alone. Ranking by required-clip coverage first blunts
+    # that, since a phantom name is not one of the two clips being looked for, but an
+    # over-read can still swing the raw-count tiebreak. The post-import Godot test
+    # enumerates the real AnimationPlayer and remains the authority, as for the audit gate.
+    probes = {ext: probe(found[ext]) for ext in usable} if needs_rig else {}
+    counts = {ext: len(p.clips) for ext, p in probes.items()}
+    covered = {ext: sum(1 for clip in required_clips if clip in p.clips)
+               for ext, p in probes.items()}
+
+    def _rank_rigged(ext: str) -> tuple:
+        return (covered[ext], counts[ext], RANK.index(ext))
+
+    best = max(usable, key=_rank_rigged) if needs_rig else max(usable, key=RANK.index)
     for ext in usable:
         if ext != best:
             rejected[ext] = f"{best} outranks it"
 
+    # Reuse the probe already taken above rather than re-reading a multi-megabyte binary.
+    chosen_probe = probes[best] if best in probes else probe(found[best])
+
     if needs_rig and len(usable) > 1:
-        runner = max((e for e in usable if e != best),
-                     key=lambda e: (counts[e], RANK.index(e)))
-        if counts[best] > counts[runner]:
-            prefix = "" if any(e in found for e in ("gltf", "glb")) else "no gltf in pack; "
+        runner = max((e for e in usable if e != best), key=_rank_rigged)
+        prefix = "" if any(e in found for e in ("gltf", "glb")) else "no gltf in pack; "
+        if covered[best] > covered[runner]:
             return Resolution(
-                chosen=best, chosen_path=found[best], probe=probe(found[best]),
+                chosen=best, chosen_path=found[best], probe=chosen_probe,
+                rejected=rejected,
+                reason=(f"{prefix}{best} carries {covered[best]} of the "
+                        f"{len(required_clips)} required clips vs {runner}'s "
+                        f"{covered[runner]}"))
+        if counts[best] > counts[runner]:
+            return Resolution(
+                chosen=best, chosen_path=found[best], probe=chosen_probe,
                 rejected=rejected,
                 reason=(f"{prefix}{best} carries {counts[best]} clips vs "
                         f"{runner}'s {counts[runner]}"))
@@ -197,7 +217,7 @@ def resolve(asset: Path, needs_rig: bool, assets_root: Path = ASSETS_ROOT) -> Re
         if preferred_present else
         f"no gltf in pack; {best} is the highest-ranked option that meets the need"
     )
-    return Resolution(chosen=best, chosen_path=found[best], probe=probe(found[best]),
+    return Resolution(chosen=best, chosen_path=found[best], probe=chosen_probe,
                       reason=reason, rejected=rejected)
 
 
@@ -308,6 +328,39 @@ def selftest_cases(c) -> None:
                 b"ACWalk\x00ACWalkSlow\x00")
             rc_ = resolve(farm / "FBX" / "Cow.fbx", needs_rig=True, assets_root=d / "assets")
             c.eq(rc_.chosen, "fbx", "an equally rich fbx wins the tie -- no needless convert")
+
+            # REGRESSION, review IMPORTANT 1: raw clip COUNT was the whole predicate, so
+            # an fbx with MORE total clips beat a .blend carrying the clips the audit gate
+            # actually requires. animal.SPEC.required_clips is ["Idle", "Walk"]; a 7-clip
+            # fbx with no Walk beat a 6-clip .blend that had it, and the asset was then
+            # rejected at the audit gate as unusable while a usable source sat beside it.
+            # The old comment claiming "an inflated fbx only ever wins a tie it would
+            # already win" is false for this very pack: Cow, Horse and Zebra all score
+            # fbx=8 vs blend=6, outright wins produced entirely by phantom names from the
+            # binary heuristic.
+            (farm / "FBX" / "Goat.fbx").write_bytes(
+                b"\x00Armature|Idle\x00Armature|Jump\x00Armature|Run\x00"
+                b"Armature|Death\x00Armature|Sit\x00Armature|Eat\x00Armature|Sleep\x00")
+            (farm / "Blends" / "Goat.blend").write_bytes(
+                b"BLENDER-v279\x00ACIdle\x00ACWalk\x00ACRun\x00ACDeath\x00"
+                b"ACJump\x00ACWalkSlow\x00")
+            rg = resolve(farm / "FBX" / "Goat.fbx", needs_rig=True,
+                         assets_root=d / "assets", required_clips=["Idle", "Walk"])
+            c.eq(rg.chosen, "blend",
+                 "the source satisfying more REQUIRED clips wins over the one with more "
+                 "clips overall")
+            c.check("required" in rg.reason,
+                    "the reason names the required-clip comparison it made")
+
+            rg2 = resolve(farm / "FBX" / "Goat.fbx", needs_rig=True,
+                          assets_root=d / "assets")
+            c.eq(rg2.chosen, "fbx",
+                 "with no required clips stated, raw count is still the tiebreak")
+
+            rc2 = resolve(farm / "FBX" / "Cow.fbx", needs_rig=True,
+                          assets_root=d / "assets", required_clips=["Idle", "Walk"])
+            c.eq(rc2.chosen, "fbx",
+                 "an fbx that already covers the required clips still wins the tie")
 
             # Static content ignores clip counts entirely.
             rs = resolve(farm / "FBX" / "Pig.fbx", needs_rig=False, assets_root=d / "assets")

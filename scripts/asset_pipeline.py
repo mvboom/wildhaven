@@ -316,7 +316,12 @@ def run(asset: Path, adapter_name: str, repo: Path, notes: str = "",
 
     project = tree / "project"
     try:
-        resolution = formats.resolve(asset, spec.needs_rig)
+        # required_clips goes IN, not just to the gate afterwards: whichever source
+        # covers more of what the gate will demand wins, so we never pick a clip-rich
+        # source that lacks Walk and then reject the asset as unusable at stage 2 while a
+        # usable sibling sat beside it.
+        resolution = formats.resolve(asset, spec.needs_rig,
+                                     required_clips=spec.required_clips)
         print(f"[1/10] format...... {resolution.chosen or 'NONE'} -- {resolution.reason}")
 
         gate = audit.gate(resolution, spec.required_clips, formats.pack_root(asset),
