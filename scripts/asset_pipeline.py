@@ -25,10 +25,11 @@ ADAPTERS = ("animal", "building", "terrain")
 
 
 def selftest() -> int:
-    from assetpipe import audit, formats
+    from assetpipe import audit, formats, dedupe
     c = Checks()
     formats.selftest_cases(c)
     audit.selftest_cases(c)
+    dedupe.selftest_cases(c)
     return c.report("SELFTEST")
 
 
