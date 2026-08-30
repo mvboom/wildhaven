@@ -35,6 +35,7 @@ godot/**
 .superpowers/
 builds/
 node_modules/
+runs/
 
 personal-local-only/
 docs/superpowers/
