@@ -22,6 +22,11 @@ ALLOWED_VERBS = {"worktree", "branch", "commit", "merge", "status", "rev-parse",
 
 WATCHED_DIRS = ("project", "scripts")
 
+# Where this pipeline puts its own worktrees, and nothing else's. preflight only refuses
+# a worktree matching BOTH, so the operator's unrelated feature worktrees are left alone.
+PIPELINE_WORKTREE_DIR = ".worktrees"
+PIPELINE_WORKTREE_PREFIX = "asset-"
+
 
 def git(repo: Path, *args: str) -> str:
     verb = next((a for a in args if not a.startswith("-") and "=" not in a), "")
@@ -61,9 +66,22 @@ def preflight(repo: Path) -> list[str]:
     if not git(repo, "ls-files", "project").strip():
         problems.append("project/ is untracked -- worktree isolation needs it committed")
 
-    existing = git(repo, "worktree", "list")
-    for line in existing.splitlines()[1:]:
-        problems.append(f"stale worktree present: {line.split()[0]}")
+    # Only a worktree THIS PIPELINE owns blocks a run. The docstring above and the spec
+    # both say "a stale worktree of the same name"; reporting every entry after the first
+    # refused a run whenever the operator had any unrelated feature worktree open, which
+    # .claude/CLAUDE.md's standard procedure actively encourages. --porcelain rather than
+    # the plain listing because a worktree path may contain spaces.
+    seen_main = False
+    for line in git(repo, "worktree", "list", "--porcelain").splitlines():
+        if not line.startswith("worktree "):
+            continue
+        if not seen_main:
+            seen_main = True  # the first entry is the main checkout itself
+            continue
+        path = Path(line[len("worktree "):])
+        if path.parent.name == PIPELINE_WORKTREE_DIR \
+                and path.name.startswith(PIPELINE_WORKTREE_PREFIX):
+            problems.append(f"stale worktree present: {path}")
 
     return problems
 
@@ -178,6 +196,21 @@ def selftest_cases(c) -> None:
 
         c.check(any("asset-pig" in p for p in preflight(repo)),
                 "a stale worktree of the same name is reported")
+
+        # REGRESSION, whole-branch review IMPORTANT 11: preflight reported EVERY entry
+        # after the first, so any unrelated feature worktree the operator had open blocked
+        # the pipeline outright.
+        other = create(repo, "feature/unrelated", repo / ".worktrees" / "feature-unrelated")
+        elsewhere = create(repo, "feature/faraway", Path(td) / "somewhere-else")
+        problems = preflight(repo)
+        c.check(not any("feature-unrelated" in p for p in problems),
+                "an unrelated worktree under .worktrees/ does not block a run")
+        c.check(not any("somewhere-else" in p for p in problems),
+                "a worktree outside .worktrees/ does not block a run")
+        c.eq(len([p for p in problems if "stale worktree" in p]), 1,
+             "only the pipeline's own worktree is reported, and only once")
+        abandon(repo, other, "feature/unrelated")
+        abandon(repo, elsewhere, "feature/faraway")
 
         abandon(repo, tree, "asset/pig")
         c.check(not tree.exists(), "abandon removes the worktree")
