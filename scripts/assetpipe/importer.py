@@ -15,8 +15,9 @@ from pathlib import Path
 
 
 class MissingTexture(RuntimeError):
-    """A material references a file that is not on disk. Hard fail: shipping it would
-    mean a pink mesh discovered at look-pass time instead of here."""
+    """A model references a file that is not on disk. Hard fail: shipping it would mean
+    a pink mesh -- or, for a missing buffer, an EMPTY mesh -- discovered at look-pass
+    time instead of here."""
 
 
 # Copied verbatim from the proven params at project/assets/props/den/Bush_1.fbx.import
@@ -91,7 +92,17 @@ autoplay = "Idle"
 
 
 def material_deps(model: Path, fmt: str) -> list[Path]:
-    """External files the model's materials reference. Empty for fbx (embedded)."""
+    """Every EXTERNAL file the model references. Empty for fbx (all embedded).
+
+    For .gltf that is both `images[].uri` and `buffers[].uri`. The buffers matter as much
+    as the textures and were the silent gap: `Stylized Nature MegaKit[Standard](1)/glTF/
+    Plant_7.gltf` carries buffers[0].uri == "Plant_7.bin", 68 such .bin files exist on
+    disk, and dropping one imports an EMPTY mesh rather than a pink one -- with no error
+    anywhere. asset-import-pipeline.md's promise is that every referenced file is copied
+    alongside the model, and that one which cannot be located is a hard fail.
+
+    `data:` URIs are skipped: those are embedded payloads, not files.
+    """
     out: list[Path] = []
     if fmt == "obj":
         mtl = model.with_suffix(".mtl")
@@ -103,15 +114,21 @@ def material_deps(model: Path, fmt: str) -> list[Path]:
                     raise MissingTexture(f"{mtl.name} references {ref}, not found on disk")
                 out.append(candidate)
     elif fmt in ("gltf", "glb"):
+        # .glb packs its buffer and images into the file's own chunks, so it has nothing
+        # external to collect; every .glb in source-content/assets was verified to carry
+        # no external buffer uri.
         doc = json.loads(model.read_text()) if fmt == "gltf" else {}
-        for image in doc.get("images", []):
-            uri = image.get("uri", "")
-            if not uri or uri.startswith("data:"):
-                continue
-            candidate = model.parent / uri
-            if not candidate.is_file():
-                raise MissingTexture(f"{model.name} references {uri}, not found on disk")
-            out.append(candidate)
+        for referrer in ("images", "buffers"):
+            for item in doc.get(referrer, []):
+                uri = item.get("uri", "")
+                if not uri or uri.startswith("data:"):
+                    continue
+                candidate = model.parent / uri
+                if not candidate.is_file():
+                    raise MissingTexture(
+                        f"{model.name} references {uri}, not found on disk")
+                if candidate not in out:
+                    out.append(candidate)
     return out
 
 
@@ -182,6 +199,42 @@ def selftest_cases(c) -> None:
         (src / "deer_tex.png").write_bytes(b"PNG")
         c.eq([p.name for p in material_deps(src / "Deer.gltf", "gltf")], ["deer_tex.png"],
              "gltf pulls its referenced images")
+
+        # REGRESSION, whole-branch review CRITICAL 3: an EXTERNAL .bin buffer was never
+        # collected, so the mesh imported empty with no error. Shaped after the real
+        # Stylized Nature MegaKit/glTF/Plant_7.gltf, which has exactly this pair.
+        (src / "Plant_7.gltf").write_text(json.dumps(
+            {"images": [{"uri": "Leaves.png"}], "buffers": [{"byteLength": 2016,
+                                                             "uri": "Plant_7.bin"}]}))
+        (src / "Leaves.png").write_bytes(b"PNG")
+        (src / "Plant_7.bin").write_bytes(b"\x00" * 16)
+        c.eq(sorted(p.name for p in material_deps(src / "Plant_7.gltf", "gltf")),
+             ["Leaves.png", "Plant_7.bin"],
+             "gltf pulls its external .bin buffer as well as its textures")
+
+        (src / "Embedded.gltf").write_text(json.dumps(
+            {"buffers": [{"byteLength": 4, "uri": "data:application/octet-stream;base64,AAAA"}]}))
+        c.eq(material_deps(src / "Embedded.gltf", "gltf"), [],
+             "a data: buffer is embedded, not a file to copy")
+
+        (src / "NoBuffer.gltf").write_text(json.dumps(
+            {"images": [], "buffers": [{"byteLength": 12, "uri": "NoBuffer.bin"}]}))
+        missing_buffer = False
+        try:
+            material_deps(src / "NoBuffer.gltf", "gltf")
+        except MissingTexture as exc:
+            missing_buffer = "NoBuffer.bin" in str(exc)
+        c.check(missing_buffer,
+                "an unlocatable .bin buffer is a hard fail, not a silently empty mesh")
+
+        real = Path("source-content/assets/Stylized Nature MegaKit[Standard](1)/glTF/"
+                    "Plant_7.gltf")
+        if real.is_file():
+            c.eq(sorted(p.name for p in material_deps(real, "gltf")),
+                 ["Leaves.png", "Plant_7.bin"],
+                 "the real Plant_7.gltf yields its real external buffer")
+        else:
+            c.check(True, "real Plant_7.gltf check skipped, source-content not on this path")
 
         (src / "Pig.fbx").write_bytes(b"\x00Armature|Idle\x00")
         c.eq(material_deps(src / "Pig.fbx", "fbx"), [],
