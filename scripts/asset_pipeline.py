@@ -62,6 +62,16 @@ def _selftest_cli(c) -> None:
         c.check("REPO_ROOT / \"scripts\"" not in src,
                 "no absolute main-checkout path is built for the GER pipelines")
 
+        # Both GER copy pipelines are wired per the design's adapter table (line 181):
+        # fact_card_pipeline -> fact_text_pool, style_guide_pipeline -> WARN_/DEPART_/
+        # MOVE_. Missing the second one ships a new animal with no Gentle Displacement
+        # lines, falling through to WARN_GENERIC.
+        c.check('"scripts/style_guide_pipeline.py"' in src,
+                "style_guide_pipeline is invoked for the Gentle Displacement copy")
+        c.check('payload["adapter"] == "animal"' in src,
+                "style_guide_pipeline is guarded to animals only -- buildings and "
+                "terrain have no WARN_/DEPART_/MOVE_ lines")
+
         payload = {"decisions": [{"field": "cost", "proposal": 40, "value": None,
                                   "source": "s", "confidence": "med"}]}
         c.check(not review.ready(payload), "resume refuses an unruled review")
@@ -287,9 +297,22 @@ def resume(run_id: str, repo: Path) -> int:
         path = module.write(project, ident, display, values, header)
         print(f"[7/10] data entry.. {path.relative_to(tree)}")
 
+    # BOTH copy pipelines, per the design's adapter table. fact_card takes a DISPLAY name;
+    # style_guide takes a species ID. Both run from the WORKTREE's copy (cwd=tree) because
+    # they resolve their repo root from __file__ -- invoking the main checkout's copy would
+    # patch the main checkout while this run believes it is sandboxed.
     subprocess.run(["python3", "scripts/fact_card_pipeline.py", display, "--count", "2"],
                    cwd=tree, check=False)
     print("[8/10] copy........ fact_card_pipeline (worktree copy)")
+
+    # Gentle Displacement copy is ANIMALS ONLY -- displacement_copy.gd has WARN_/DEPART_/
+    # MOVE_ lines per species; buildings and terrain have none. Without this a new animal
+    # ships with fact cards but falls through to WARN_GENERIC, which is exactly the gap
+    # style_guide_pipeline.py exists to close.
+    if payload["adapter"] == "animal":
+        subprocess.run(["python3", "scripts/style_guide_pipeline.py", ident,
+                        "--line-type", "all"], cwd=tree, check=False)
+        print("[8/10] copy........ style_guide_pipeline (WARN/DEPART/MOVE)")
 
     # Extending an existing pack's AttributionEntry is a generated-file operation; creating
     # a NEW entry is a licensing decision that belongs to game-design/art.md, not this
