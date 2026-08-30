@@ -79,7 +79,7 @@ Further binding conditions:
 - License text in repo: `res://assets/licenses/Quaternius_FarmAnimalsByQuaternius_License.txt`
 - Crediting: not required; shown as courtesy
 - Support the creator: [https://www.patreon.com/quaternius](https://www.patreon.com/quaternius)
-- Assets used: Pig, Sheep
+- Assets used: Pig, Sheep, Pug
 
 ### Quaternius — [Farm Buildings](https://quaternius.com)
 

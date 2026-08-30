@@ -1,0 +1,18 @@
+; Pug — model scene for AnimalDefinition.model_scenes
+; Source: CC0-1.0
+; Wrapper exists so the world-scale factor and any future look-pass overrides live in
+; readable text and survive a re-import of Pug.gltf.
+; SCALE IS A PROPOSAL, not a measurement — the human rules it at the checkpoint.
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" path="res://assets/animals/pug/Pug.gltf" id="1_model"]
+
+[node name="Pug" type="Node3D"]
+
+[node name="Model" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.2, 0, 0, 0, 0.2, 0, 0, 0, 0.2, 0, 0, 0)
+
+[node name="AnimationPlayer" parent="Model" index="1"]
+autoplay = "Idle"
+
+[editable path="Model"]
