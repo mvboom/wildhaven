@@ -16,6 +16,12 @@
 > sign-off are **not** covered here — those belong to Gameplay Engineer, Content Writer, and
 > the human respectively.
 
+> **Automation:** `scripts/asset_pipeline.py` executes this procedure end to end
+> (design: `docs/superpowers/specs/2026-08-30-asset-pipeline-design.md`; front-end:
+> `/add-asset`). This document remains authoritative for the conventions it states —
+> paths, naming, wrapper authoring, attribution shapes — and the pipeline implements
+> them. Where the two disagree, this document is right and the pipeline has a bug.
+
 ## Directory & naming conventions
 
 Codified from the working Fox/Rabbit imports already in the repo:
