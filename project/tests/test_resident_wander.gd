@@ -75,6 +75,7 @@ const EXPECTED_CLIPS: Dictionary = {
 	"alpaca": {"idle": "Idle", "walk": "Walk", "run": "Gallop", "idle_flavors": ["Eating", "Idle_2", "Idle_Headlow"]},
 	"husky": {"idle": "Idle", "walk": "Walk", "run": "Gallop", "idle_flavors": ["Eating", "Idle_2", "Idle_2_HeadLow"]},
 	"shiba_inu": {"idle": "Idle", "walk": "Walk", "run": "Gallop", "idle_flavors": ["Eating", "Idle_2", "Idle_2_HeadLow"]},
+	"pig": {"idle": "Idle", "walk": "Walk", "run": "Run", "idle_flavors": []},
 }
 
 ## A wide site: `WANDER_RADIUS_TILES` is the binding constraint here.

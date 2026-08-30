@@ -15,6 +15,7 @@ the same `.tres` entries this file is generated from, so the two cannot drift.
 |---|---|---|
 | Quaternius — Animated Men Characters | CC0 1.0 Universal (CC0 1.0) Public Domain Dedication | courtesy only |
 | Quaternius — Animated Women Characters | CC0 1.0 Universal (CC0 1.0) Public Domain Dedication | courtesy only |
+| Quaternius — Farm Animals by @Quaternius | CC0 1.0 Universal (CC0 1.0) Public Domain Dedication | courtesy only |
 | Quaternius — Farm Buildings | CC0 1.0 Universal (CC0 1.0) Public Domain Dedication | courtesy only |
 | Quaternius — Nature Crops Pack | CC0 1.0 Universal (CC0 1.0) Public Domain Dedication | courtesy only |
 | Quaternius — Standalone Character Models | CC0 1.0 Universal (CC0 1.0) Public Domain Dedication | courtesy only |
@@ -71,6 +72,14 @@ Further binding conditions:
 - Crediting: not required; shown as courtesy
 - Support the creator: [https://www.patreon.com/quaternius](https://www.patreon.com/quaternius)
 - Assets used: Female_Alternative, Female_Casual, Female_Dress, Female_TankTop, Smooth_Female_Alternative, Smooth_Female_Casual, Smooth_Female_Dress, Smooth_Female_TankTop
+
+### Quaternius — Farm Animals by @Quaternius
+
+- License: [CC0 1.0 Universal (CC0 1.0) Public Domain Dedication](https://creativecommons.org/publicdomain/zero/1.0/)
+- License text in repo: `res://assets/licenses/Quaternius_FarmAnimalsByQuaternius_License.txt`
+- Crediting: not required; shown as courtesy
+- Support the creator: [https://www.patreon.com/quaternius](https://www.patreon.com/quaternius)
+- Assets used: Pig
 
 ### Quaternius — [Farm Buildings](https://quaternius.com)
 
