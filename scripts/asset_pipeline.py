@@ -83,6 +83,50 @@ def _selftest_cli(c) -> None:
 
 
 
+
+    import json as _json
+    import tempfile as _tf
+
+    # --- stage 8's cost line -------------------------------------------------
+    # Stage 6 prints what it spent; stage 8 runs a full GER loop per candidate through
+    # BOTH copy pipelines and printed nothing, so the most expensive stage of a run was
+    # the one with no number against it. Both pipelines now write their per-species cost
+    # into the log they already produce, in llm.py's key shape, so the two add up.
+    with _tf.TemporaryDirectory() as _td:
+        _tree = Path(_td)
+        for _dir, _cost in (
+                ("fact_card_pipeline_output",
+                 {"in": 120, "out": 3000, "usd": 0.15, "usd_known": True}),
+                ("style_guide_pipeline_output",
+                 {"in": 80, "out": 2000, "usd": 0.10, "usd_known": True})):
+            _d = _tree / "scripts" / _dir
+            _d.mkdir(parents=True)
+            _d.joinpath("pig.json").write_text(_json.dumps({"cost": _cost}))
+
+        _total = _copy_cost(_tree, "pig")
+        c.eq(_total["in"], 200, "both pipelines' input tokens are summed")
+        c.eq(_total["out"], 5000, "and their output tokens")
+        c.eq(round(_total["usd"], 4), 0.25, "and their dollars")
+        c.check(_total["usd_known"], "a dollar figure is claimed only when both knew one")
+
+        # An SDK-backed run reports tokens but no price. One such call makes the whole
+        # total unknown -- printing the other half as the total would show real spend as
+        # nearly free, the same rule _format_cost_line already applies at the checkpoint.
+        (_tree / "scripts" / "style_guide_pipeline_output" / "pig.json").write_text(
+            _json.dumps({"cost": {"in": 80, "out": 2000, "usd": 0.0,
+                                  "usd_known": False}}))
+        c.check(not _copy_cost(_tree, "pig")["usd_known"],
+                "one backend with no price makes the summed dollar figure unknown")
+        c.check("not reported" in _format_cost_line(_copy_cost(_tree, "pig")),
+                "and the printed line says so rather than showing $0.10")
+
+        # A log that predates this change, or a stage that never ran, contributes
+        # nothing rather than crashing the stage that is only REPORTING on it.
+        c.eq(_copy_cost(_tree, "goose"), None, "no logs at all yields no cost line")
+        (_tree / "scripts" / "fact_card_pipeline_output" / "old.json").write_text(
+            _json.dumps({"candidates": []}))
+        c.eq(_copy_cost(_tree, "old"), None, "a log with no cost key yields none either")
+
     # --- stage 7's tracker stub ----------------------------------------------
     # content-pipeline-status.md's field owners all patch a section they assume exists;
     # nothing created it, so a new species could not be recorded by the pipeline that
@@ -117,8 +161,6 @@ def _selftest_cli(c) -> None:
     # "wrote NOTHING ... run it by hand for the real error" over three lines that were
     # sitting in displacement_copy.gd, sending the operator after an error that did not
     # exist. The log is the evidence; rc alone is not.
-    import json as _json
-    import tempfile as _tf
     with _tf.TemporaryDirectory() as _td:
         _tree = Path(_td)
         _out = _tree / "scripts" / "style_guide_pipeline_output"
@@ -898,6 +940,35 @@ def _tracker_rows(payload: dict, run_id: str, tres_rel: str,
     ]
 
 
+COPY_LOG_DIRS = ("fact_card_pipeline_output", "style_guide_pipeline_output")
+
+
+def _copy_cost(tree: Path, ident: str) -> dict | None:
+    """What stage 8's two GER runs cost, summed from the logs they already write.
+
+    None when neither log carries a cost -- a log written before this existed, or a
+    pipeline that never ran. A reporting step must not fail the stage it reports on.
+    """
+    total = {"in": 0, "out": 0, "usd": 0.0, "usd_known": True}
+    found = False
+    for dirname in COPY_LOG_DIRS:
+        log = tree / "scripts" / dirname / f"{ident}.json"
+        if not log.is_file():
+            continue
+        try:
+            cost = json.loads(log.read_text()).get("cost")
+        except (json.JSONDecodeError, OSError):
+            continue
+        if not cost:
+            continue
+        found = True
+        total["in"] += cost.get("in", 0)
+        total["out"] += cost.get("out", 0)
+        total["usd"] += cost.get("usd", 0.0)
+        total["usd_known"] = total["usd_known"] and cost.get("usd_known", True)
+    return total if found else None
+
+
 def _style_guide_report(tree: Path, ident: str, rc: int) -> str:
     """What stage 8's Gentle Displacement run actually did.
 
@@ -983,6 +1054,10 @@ def _copy_stage(adapter_name: str, tree: Path, display: str, ident: str,
         rc = subprocess.run(["python3", "scripts/style_guide_pipeline.py", ident,
                              "--line-type", "all"], cwd=tree, check=False).returncode
         print(f"[8/10] copy........ {_style_guide_report(tree, ident, rc)}")
+
+    cost = _copy_cost(tree, ident)
+    if cost is not None:
+        print(f"[8/10] copy........ cost: {_format_cost_line(cost)}")
 
 
 def _preserve_license(pack: Path, project: Path, tree: Path) -> None:

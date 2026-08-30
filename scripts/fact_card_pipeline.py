@@ -204,6 +204,46 @@ def _parse_json_response(raw_text: str) -> dict:
         ) from e
 
 
+# ---------------------------------------------------------------------------
+# Cost ledger
+# ---------------------------------------------------------------------------
+# Stage 6 of the asset pipeline prints what its own LLM work cost; stage 8 -- which runs
+# a full GER loop per candidate -- printed nothing, so the most expensive stage of a run
+# was the one with no number against it. Every backend already returns the numbers; they
+# were simply dropped on the floor. Key shape matches scripts/assetpipe/llm.py so the two
+# ledgers can be added together.
+_COST = {"in": 0, "out": 0, "usd": 0.0, "usd_known": True}
+
+
+def _record_cost(tokens_in: int, tokens_out: int, usd: float, usd_known: bool) -> None:
+    _COST["in"] += tokens_in
+    _COST["out"] += tokens_out
+    _COST["usd"] += usd
+    # Sticky: one call through a backend that reports no dollar figure makes the whole
+    # total unknown. Printing a partial sum as if it were the full one would present real
+    # spend as free -- the same reasoning _format_cost_line already applies upstream.
+    _COST["usd_known"] = _COST["usd_known"] and usd_known
+
+
+def run_cost() -> dict:
+    return dict(_COST)
+
+
+def cost_delta(before: dict, after: dict) -> dict:
+    """This species' share of the ledger, so a multi-species invocation does not write
+    the running total into every log it produces."""
+    return {"in": after["in"] - before["in"], "out": after["out"] - before["out"],
+            "usd": round(after["usd"] - before["usd"], 6),
+            "usd_known": after["usd_known"]}
+def format_cost(cost: dict) -> str:
+    """Never print $0.00 for real spend: the SDK backend reports no dollar figure, so a
+    total that includes one says so instead of implying the run was free."""
+    tokens = f"{cost.get('in', 0):,} in / {cost.get('out', 0):,} out tokens"
+    if cost.get("usd_known", True):
+        return f"${cost.get('usd', 0.0):.4f} ({tokens})"
+    return f"{tokens} (dollar cost not reported by this backend)"
+
+
 def _client() -> "anthropic.Anthropic":
     if anthropic is None:
         raise RuntimeError("pip install anthropic first.")
@@ -225,6 +265,9 @@ def _call_json_sdk(system: str, user: str, model: str, use_web_tools: bool = Fal
     if resp.stop_reason == "pause_turn":
         messages.append({"role": "assistant", "content": resp.content})
         resp = _client().messages.create(model=model, max_tokens=1024, system=system, messages=messages, **kwargs)
+    # The Messages API returns usage but no dollar figure, and this repo has no
+    # pricing table -- so tokens are real and usd is explicitly unknown.
+    _record_cost(resp.usage.input_tokens, resp.usage.output_tokens, 0.0, False)
     text = next(block.text for block in reversed(resp.content) if block.type == "text")
     return _parse_json_response(text)
 
@@ -242,6 +285,9 @@ def _call_json_cli(system: str, user: str, model: str, tools: str = "") -> dict:
         capture_output=True, text=True, check=True, timeout=180,
     )
     envelope = json.loads(result.stdout)
+    usage = envelope.get("usage") or {}
+    _record_cost(usage.get("input_tokens", 0), usage.get("output_tokens", 0),
+                 envelope.get("total_cost_usd", 0.0), True)
     if envelope.get("is_error"):
         raise RuntimeError(f"claude CLI turn failed: {envelope.get('result')}")
     return _parse_json_response(envelope["result"])
@@ -735,6 +781,30 @@ def selftest() -> int:
           f"({len(ROSTER)} species from {_tres_count} .tres files), not hardcoded")
     ok = ok and _derived_ok
 
+
+    # Cost ledger. The asset pipeline's stage 8 reads the `cost` key this writes, so the
+    # accumulation, the sticky usd_known flag and the per-species delta are all load-bearing.
+    _before = run_cost()
+    _record_cost(10, 100, 0.01, True)
+    _record_cost(5, 50, 0.02, True)
+    _delta = cost_delta(_before, run_cost())
+    _ledger_ok = (_delta["in"] == 15 and _delta["out"] == 150
+                  and round(_delta["usd"], 4) == 0.03 and _delta["usd_known"])
+    print(f"[{'PASS' if _ledger_ok else 'FAIL'}] cost ledger accumulates tokens and dollars "
+          f"per species (got {_delta})")
+    ok = ok and _ledger_ok
+
+    _record_cost(1, 1, 0.0, False)
+    _unknown_ok = not run_cost()["usd_known"] and "not reported" in format_cost(run_cost())
+    print(f"[{'PASS' if _unknown_ok else 'FAIL'}] one backend with no price makes the whole "
+          f"total unknown, and the printed line says so instead of showing a partial sum")
+    ok = ok and _unknown_ok
+
+    _fmt_ok = format_cost({"in": 16, "out": 5564, "usd": 0.2884, "usd_known": True}) \
+        == "$0.2884 (16 in / 5,564 out tokens)"
+    print(f"[{'PASS' if _fmt_ok else 'FAIL'}] cost line matches the shape stage 6 already prints")
+    ok = ok and _fmt_ok
+
     print("SELFTEST " + ("PASSED" if ok else "FAILED"))
     return 0 if ok else 1
 
@@ -793,10 +863,15 @@ def main() -> int:
             exit_code = 1
             continue
 
+        before = run_cost()
         result = run_species(species_id, args.count, generator_model_id,
                              evaluator_model_id, args.max_refine,
                              subject=lookup.get(species_id))
+        # This species' own spend, not the invocation's running total -- so a caller
+        # reading one log (the asset pipeline's stage 8 does) gets that species' cost.
+        result["cost"] = cost_delta(before, run_cost())
         json_path = write_output_json(result)
+        _progress(f"  cost: {format_cost(result['cost'])}")
         _progress(f"  archive log: {json_path.relative_to(REPO_ROOT)}")
 
         if args.dry_run:
