@@ -106,6 +106,10 @@ def _find_repo_root(start: Path) -> Path:
 
 
 REPO_ROOT = _find_repo_root(Path(__file__).resolve().parent)
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import roster_data  # noqa: E402  (needs REPO_ROOT above)
+RosterSpecies = roster_data.RosterSpecies
 DISPLACEMENT_COPY_PATH = REPO_ROOT / "project" / "scripts" / "ui" / "displacement_copy.gd"
 OUTPUT_DIR = Path(__file__).resolve().parent / "style_guide_pipeline_output"
 
@@ -138,43 +142,11 @@ ALLOWED_NON_ASCII = set("‘’“”")
 MAX_SENTENCES = 1
 
 
-@dataclass
-class RosterSpecies:
-    id: str
-    display_name: str
-    tags: list = field(default_factory=list)
-    avoids: list = field(default_factory=list)
-
-
-# gdd.md/roster.md's full roster (D-43), needed for the closed-graph check -- a
-# displacement line may not name any OTHER roster species. Floor species (fox, rabbit,
-# human) already ship real, human-verified lines in displacement_copy.gd and are excluded
-# from CLEARED_POOL_IDS (this pipeline's actual targets) but stay in ROSTER so the graph
-# check still knows they exist.
-ROSTER = {
-    s.id: s
-    for s in [
-        RosterSpecies("rabbit", "Rabbit", tags=["open_grass", "cover"], avoids=["fox"]),
-        RosterSpecies("fox", "Fox", tags=["forest", "cover"], avoids=["rabbit"]),
-        RosterSpecies("human", "Villager", tags=["house", "cultivated"]),
-        RosterSpecies("deer", "Deer", tags=["open_grass", "forest"]),
-        RosterSpecies("stag", "Stag", tags=["forest", "cover", "rocks"]),
-        RosterSpecies("horse", "Horse", tags=["open_grass", "cultivated"]),
-        RosterSpecies("donkey", "Donkey", tags=["cultivated", "rocks"]),
-        RosterSpecies("cow", "Cow", tags=["cultivated", "open_grass"]),
-        RosterSpecies("bull", "Bull", tags=["cultivated", "open_grass"]),
-        RosterSpecies("alpaca", "Alpaca", tags=["open_grass", "cultivated"]),
-        RosterSpecies("husky", "Husky", tags=["house", "open_grass"], avoids=["shiba_inu"]),
-        RosterSpecies("shiba_inu", "Shiba Inu", tags=["house", "open_grass"], avoids=["husky"]),
-    ]
-}
-
-# This pipeline's actual targets: the nine cleared-pool species with no displacement copy
-# of their own yet (roster.md -> "The cleared pool"). Fox/Rabbit/Human already ship
-# human-verified lines and are deliberately NOT auto-overwritten by this pipeline.
-CLEARED_POOL_IDS = [
-    "deer", "stag", "horse", "donkey", "cow", "bull", "alpaca", "husky", "shiba_inu",
-]
+# The roster is DERIVED from project/data/animals/*.tres -- see scripts/roster_data.py.
+# It feeds the closed-graph check: a displacement line may not name any OTHER roster
+# species. Deriving it means a newly imported species joins the graph the moment its
+# .tres exists, and a missing data dir raises instead of quietly shrinking the check.
+ROSTER = roster_data.load_roster(REPO_ROOT)
 
 
 # ---------------------------------------------------------------------------
@@ -789,6 +761,12 @@ def selftest() -> int:
             print(f"         - {p}")
 
     print()
+    _tres_count = len(list((REPO_ROOT / roster_data.ANIMALS_DIR).glob("*.tres")))
+    _derived_ok = len(ROSTER) == _tres_count and _tres_count > 0
+    print(f"[{'PASS' if _derived_ok else 'FAIL'}] ROSTER is derived from the data dir "
+          f"({len(ROSTER)} species from {_tres_count} .tres files), not hardcoded")
+    ok = ok and _derived_ok
+
     print("SELFTEST " + ("PASSED" if ok else "FAILED"))
     return 0 if ok else 1
 
@@ -847,10 +825,18 @@ def main() -> int:
             print(f"ERROR: unknown species id {species_id!r} -- not in ROSTER", file=sys.stderr)
             exit_code = 1
             continue
-        if species_id not in CLEARED_POOL_IDS:
+        # Refuse only copy a HUMAN has verified. Three states exist: verified copy is
+        # protected; copy this pipeline generated but nobody has reviewed (still marked
+        # AWAITING CONTENT-WRITER SIGN-OFF) is regenerable; a species with no copy at all
+        # -- including a newly imported one -- is the target. The old CLEARED_POOL_IDS
+        # allowlist could not tell the second state from the first, and refused every
+        # species it did not already name.
+        if roster_data.has_verified_copy(
+                species_id, REPO_ROOT / roster_data.DISPLACEMENT_COPY):
             print(
                 f"ERROR: {species_id!r} already has human-verified displacement copy "
-                f"(floor species) -- this pipeline targets the cleared pool only.",
+                f"-- refusing to overwrite it. (Copy still marked "
+                f"{roster_data.AWAITING_MARKER!r} would be regenerable.)",
                 file=sys.stderr,
             )
             exit_code = 1

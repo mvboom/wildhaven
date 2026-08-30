@@ -84,6 +84,10 @@ def _find_repo_root(start: Path) -> Path:
 
 
 REPO_ROOT = _find_repo_root(Path(__file__).resolve().parent)
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import roster_data  # noqa: E402  (needs REPO_ROOT above)
+RosterSpecies = roster_data.RosterSpecies
 DATA_DIR = REPO_ROOT / "project" / "data" / "animals"
 OUTPUT_DIR = Path(__file__).resolve().parent / "fact_card_pipeline_output"
 CONTENT_STATUS_PATH = REPO_ROOT / "game-design" / "content-pipeline-status.md"
@@ -131,35 +135,15 @@ REGISTER_BANNED = ["town", "towns", "village", "villages", "villager", "villager
 MAX_SENTENCES = 2
 
 
-@dataclass
-class RosterSpecies:
-    id: str
-    display_name: str
-    avoids: list = field(default_factory=list)
-
-
-# The roster this pipeline knows about (roster.md -> Already-Defined Roster, D-43).
-# Used for (a) the closed-predation-graph check -- a card must name no OTHER roster
-# species -- and (b) telling the Generator about a species' own avoids partner, since
-# that is exactly the copy that's hardest to keep predation-free ("keeps its distance
-# from Husky" reads dangerously close to a predator/prey line if worded carelessly).
-ROSTER = {
-    s.id: s
-    for s in [
-        RosterSpecies("rabbit", "Rabbit", avoids=["fox"]),
-        RosterSpecies("fox", "Fox", avoids=["rabbit"]),
-        RosterSpecies("human", "Villager"),
-        RosterSpecies("deer", "Deer"),
-        RosterSpecies("stag", "Stag"),
-        RosterSpecies("horse", "Horse"),
-        RosterSpecies("donkey", "Donkey"),
-        RosterSpecies("cow", "Cow"),
-        RosterSpecies("bull", "Bull"),
-        RosterSpecies("alpaca", "Alpaca"),
-        RosterSpecies("husky", "Husky", avoids=["shiba_inu"]),
-        RosterSpecies("shiba_inu", "Shiba Inu", avoids=["husky"]),
-    ]
-}
+# The roster is DERIVED from project/data/animals/*.tres, not restated here -- see
+# scripts/roster_data.py for why. It feeds (a) the closed-predation-graph check -- a card
+# must name no OTHER roster species -- and (b) telling the Generator about a species' own
+# avoids partner, since that is exactly the copy that is hardest to keep predation-free
+# ("keeps its distance from Husky" reads dangerously close to a predator/prey line if
+# worded carelessly). Deriving it means a newly imported species is in the graph the
+# moment its .tres exists, with no hand edit -- and a missing data dir raises rather than
+# silently shrinking the graph this evaluator depends on.
+ROSTER = roster_data.load_roster(REPO_ROOT)
 
 
 # ---------------------------------------------------------------------------
@@ -498,10 +482,14 @@ def run_species(
     generator_model: str,
     evaluator_model: str,
     max_refine: int,
+    subject=None,
 ) -> dict:
-    species = ROSTER.get(species_id)
+    # `subject` lets a BUILDING flow through this same loop for --target building_text.
+    # The closed-predation-graph check below still runs against the animal ROSTER: a
+    # building's fact card must not name a species either.
+    species = subject or ROSTER.get(species_id)
     if species is None:
-        raise ValueError(f'Unknown species id "{species_id}" -- not in ROSTER.')
+        raise ValueError(f'Unknown id "{species_id}" -- not in the derived roster.')
 
     _progress(f"=== {species.display_name} ({species_id}) -- generating {count} candidate(s) ===")
     accepted: list[str] = []
@@ -731,6 +719,12 @@ def selftest() -> int:
         ok = ok and _refused_ok
 
     print()
+    _tres_count = len(list((REPO_ROOT / roster_data.ANIMALS_DIR).glob("*.tres")))
+    _derived_ok = len(ROSTER) == _tres_count and _tres_count > 0
+    print(f"[{'PASS' if _derived_ok else 'FAIL'}] ROSTER is derived from the data dir "
+          f"({len(ROSTER)} species from {_tres_count} .tres files), not hardcoded")
+    ok = ok and _derived_ok
+
     print("SELFTEST " + ("PASSED" if ok else "FAILED"))
     return 0 if ok else 1
 
@@ -770,17 +764,28 @@ def main() -> int:
     generator_model_id = MODEL_IDS[args.generator_model]
     evaluator_model_id = MODEL_IDS[evaluator_model]
 
-    by_display_name = {s.display_name.lower(): s.id for s in ROSTER.values()}
+    # --target building_text resolves against project/data/buildings/, not the animals
+    # roster -- without this the flag Task 13 added is unreachable, because a building
+    # display name can never appear in ROSTER.
+    if args.target == "building_text":
+        lookup, what = roster_data.load_buildings(REPO_ROOT), "building"
+    else:
+        lookup, what = ROSTER, "species"
+    by_display_name = {s.display_name.lower(): s.id for s in lookup.values()}
 
     exit_code = 0
     for name in args.species:
-        species_id = by_display_name.get(name.lower()) or (name.lower() if name.lower() in ROSTER else None)
+        species_id = by_display_name.get(name.lower()) or (
+            name.lower() if name.lower() in lookup else None)
         if species_id is None:
-            print(f"ERROR: unknown species {name!r} -- not in ROSTER", file=sys.stderr)
+            print(f"ERROR: unknown {what} {name!r} -- not in the derived roster",
+                  file=sys.stderr)
             exit_code = 1
             continue
 
-        result = run_species(species_id, args.count, generator_model_id, evaluator_model_id, args.max_refine)
+        result = run_species(species_id, args.count, generator_model_id,
+                             evaluator_model_id, args.max_refine,
+                             subject=lookup.get(species_id))
         json_path = write_output_json(result)
         _progress(f"  archive log: {json_path.relative_to(REPO_ROOT)}")
 
