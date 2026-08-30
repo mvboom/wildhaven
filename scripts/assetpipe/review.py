@@ -60,6 +60,16 @@ def apply_rulings(payload: dict, rulings: dict) -> dict:
 def selftest_cases(c) -> None:
     import tempfile
     with tempfile.TemporaryDirectory() as td:
+        # Test Decision construction and .to_dict() round-trip
+        d = Decision(field="scout_radius", proposal=10, source="roster.md band 8-12",
+                     confidence="med")
+        as_dict = d.to_dict()
+        c.eq(as_dict["field"], "scout_radius", "Decision.to_dict carries field")
+        c.eq(as_dict["proposal"], 10, "Decision.to_dict carries proposal")
+        c.eq(as_dict["value"], None, "a fresh Decision is unruled by default")
+        c.eq(sorted(as_dict), ["confidence", "field", "proposal", "source", "value"],
+             "Decision's field set is the contract later tasks construct")
+
         path = Path(td) / "review.json"
         payload = {
             "run_id": "20260830-pig-abcd", "adapter": "animal",
@@ -71,7 +81,14 @@ def selftest_cases(c) -> None:
             ],
         }
         write(path, payload)
-        c.eq(read(path)["run_id"], "20260830-pig-abcd", "round-trips")
+        back = read(path)
+        c.eq(back["run_id"], "20260830-pig-abcd", "round-trips")
+        c.eq(back["decisions"][1]["proposal"], [2, 2],
+             "a nested list proposal survives the file round-trip")
+        c.eq(back["decisions"][0]["value"], None,
+             "a null value survives the file round-trip as null, not absent")
+        c.eq(len(back["decisions"]), len(payload["decisions"]),
+             "every decision survives the file round-trip")
 
         c.eq(unruled(payload), ["cost", "footprint"], "both fields start unruled")
         c.check(not ready(payload), "unruled payload is not ready to resume")
@@ -87,6 +104,14 @@ def selftest_cases(c) -> None:
 
         zeroed = apply_rulings(payload, {"cost": 0, "footprint": [1, 1]})
         c.check(ready(zeroed), "a ruling of 0 is a real ruling, not an absent one")
+
+        falsed = apply_rulings(payload, {"cost": False, "footprint": [1, 1]})
+        c.check(ready(falsed), "a ruling of False is a real ruling, not an absent one")
+
+        before = apply_rulings(payload, {"cost": 25})
+        c.eq(payload["decisions"][0]["value"], None,
+             "apply_rulings does NOT mutate the caller's payload")
+        c.eq(before["decisions"][0]["value"], 25, "the returned copy carries the ruling")
 
         unknown = False
         try:
