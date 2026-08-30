@@ -117,19 +117,29 @@ def anim_index(tree: Path, scene_res: str) -> int:
         probe.unlink(missing_ok=True)
 
 
-def import_test_text(name: str, display: str, category: str, clips: list[str]) -> str:
-    if not clips:
+def import_test_text(name: str, display: str, category: str, clips: list[str],
+                     required_clips: list[str] | None = None) -> str:
+    """Which template to emit is the ADAPTER's decision, not the file's.
+
+    Keying off `clips` alone would hand the animated template to a building that happens
+    to carry an incidental clip (a rotating windmill blade), producing an empty
+    REQUIRED_CLIPS that asserts nothing plus an `autoplay == "Idle"` check the adapter
+    never asked for -- which would false-fail on legitimate static content. `anim_index`'s
+    call site already keys off spec.required_clips; this matches it.
+    """
+    required_clips = required_clips or []
+    if not required_clips:
         return _STATIC_TEST.format(name=name, display=display, category=category)
-    required = ", ".join(f'"{c}"' for c in ("Idle", "Walk") if c in clips)
+    required = ", ".join(f'"{c}"' for c in required_clips if c in clips)
     return _ANIMATED_TEST.format(name=name, display=display, category=category,
                                  required=required, count=len(clips))
 
 
 def write_import_test(tree: Path, name: str, display: str, category: str,
-                      clips: list[str]) -> Path:
+                      clips: list[str], required_clips: list[str] | None = None) -> Path:
     path = tree / "project" / "tests" / f"test_{name}_import.gd"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(import_test_text(name, display, category, clips))
+    path.write_text(import_test_text(name, display, category, clips, required_clips))
     return path
 
 
@@ -152,7 +162,9 @@ def regenerate_credits(tree: Path) -> str:
 
 
 def selftest_cases(c) -> None:
-    text = import_test_text("pig", "Pig", "animals", ["Idle", "Walk", "Jump"])
+    # Animated adapter with clips -- the normal case
+    text = import_test_text("pig", "Pig", "animals", ["Idle", "Walk", "Jump"],
+                            required_clips=["Idle", "Walk"])
     c.check(text.startswith("extends QATestCase"), "generated test extends QATestCase")
     c.check('const MODEL_PATH: String = "res://assets/animals/pig/Pig.tscn"' in text,
             "model path points at the wrapper, not the raw file")
@@ -161,10 +173,26 @@ def selftest_cases(c) -> None:
     c.check("EXPECTED_CLIP_COUNT: int = 3" in text, "clip count filled from the audit")
     c.check('check_eq(player.autoplay, "Idle"' in text, "autoplay asserted")
 
+    # Static adapter with no required clips -- gets static template even with clips
+    static_no_req = import_test_text("windmill", "Windmill", "buildings",
+                                      clips=["Rotate", "Idle"],
+                                      required_clips=[])
+    c.check("AnimationPlayer" not in static_no_req,
+            "static adapter with incidental clips skips AnimationPlayer assertions")
+    c.check("REQUIRED_CLIPS" not in static_no_req,
+            "static adapter with incidental clips omits REQUIRED_CLIPS const")
+    c.check("instantiates" in static_no_req, "static adapter still asserts instantiate")
+
+    # Static adapter with empty clips list -- backward compat, no required_clips arg
     static = import_test_text("well", "Well", "buildings", [])
     c.check("AnimationPlayer" not in static,
             "static content's test skips the AnimationPlayer assertions")
     c.check("instantiates" in static, "static content still asserts load and instantiate")
+
+    # No required_clips specified at all -- safe default to static template
+    default = import_test_text("tree", "Tree", "terrain", ["Sway"])
+    c.check("AnimationPlayer" not in default,
+            "unspecified required_clips defaults to static template")
 
     probe = anim_probe_text("assets/animals/pig/Pig.tscn")
     c.check("ANIM_INDEX=" in probe, "probe prints a parseable marker")

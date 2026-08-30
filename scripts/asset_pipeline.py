@@ -134,7 +134,7 @@ def run(asset: Path, adapter_name: str, repo: Path, notes: str = "",
                                    gate.evidence["license"], idx, spec.schema)
             godot.import_project(tree)
         godot.write_import_test(tree, ident, display, spec.category,
-                                resolution.probe.clips)
+                                resolution.probe.clips, spec.required_clips)
         heuristic = set(resolution.probe.clips)
         print(f"[5/10] verify...... AnimationPlayer index {idx}; "
               f"{len(heuristic)} clips from the pre-gate")
