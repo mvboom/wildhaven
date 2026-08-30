@@ -36,6 +36,42 @@ from assetpipe.formats import UNKNOWN, ModelProbe, probe_gltf
 
 BLENDER_ENV = "BLENDER_PATH"
 
+# A gitignored, repo-local settings file. BLENDER_PATH otherwise has to be re-exported in
+# every new shell, and forgetting it does not fail loudly -- it makes a .blend resolve to
+# a worse format that then fails the audit gate for an unrelated-looking reason. Machine
+# paths do not belong in git, so this file is per-checkout and ignored.
+CONFIG_NAME = ".assetpipe.local"
+
+
+def _repo_root() -> Path:
+    """The checkout this module lives in, found from __file__ rather than the cwd."""
+    marker = Path("project") / "scripts" / "definitions" / "animal_definition.gd"
+    start = Path(__file__).resolve().parent
+    for candidate in [start, *start.parents]:
+        if (candidate / marker).is_file():
+            return candidate
+    return start.parent.parent
+
+
+def read_local_config(repo_root: Path | None = None) -> dict:
+    """`KEY=value` lines from `.assetpipe.local`. Absent file is not an error.
+
+    Deliberately not `.env`: that name is claimed elsewhere in this repo and is on the
+    agent read-deny list, so a setting placed there would be invisible to tooling.
+    """
+    root = repo_root if repo_root is not None else _repo_root()
+    path = root / CONFIG_NAME
+    if not path.is_file():
+        return {}
+    out: dict = {}
+    for line in path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        out[key.strip()] = value.strip()
+    return out
+
 # Blender stores each Action as an ID block whose name is prefixed "AC". Reading them is a
 # pure file read -- no Blender needed -- so the audit gate can judge a .blend before any
 # conversion is attempted, and the whole selftest stays offline.
@@ -51,11 +87,20 @@ BLENDER_ENV = "BLENDER_PATH"
 _ACTION = re.compile(rb"AC([A-Za-z][A-Za-z0-9_.\- ]{1,30})\x00")
 
 
-def binary() -> str | None:
-    """The Blender executable, or None. `BLENDER_PATH` wins over PATH discovery."""
+def binary(repo_root: Path | None = None) -> str | None:
+    """The Blender executable, or None.
+
+    Precedence, most explicit first: the BLENDER_PATH environment variable, then
+    BLENDER_PATH in the repo-local `.assetpipe.local`, then PATH discovery. PATH is last
+    because on this machine it finds a snap build that cannot run under a confined
+    sandbox -- a configured path should always beat a discovered one.
+    """
     override = os.environ.get(BLENDER_ENV)
     if override is not None:
         return override or None
+    configured = read_local_config(repo_root).get(BLENDER_ENV)
+    if configured:
+        return configured
     return shutil.which("blender")
 
 
@@ -64,7 +109,7 @@ def binary() -> str | None:
 _RUNNABLE: dict = {}
 
 
-def available() -> bool:
+def available(repo_root: Path | None = None) -> bool:
     """True when a Blender we can actually RUN is present.
 
     Deliberately LAUNCHES it rather than checking the file exists. A snap Blender is on
@@ -74,7 +119,7 @@ def available() -> bool:
     it and failing mid-import, after the worktree is built. Every other gate in this
     pipeline fails at the cheapest point; this one now does too.
     """
-    path = binary()
+    path = binary(repo_root)
     if not path:
         return False
     if path not in _RUNNABLE:
@@ -86,16 +131,17 @@ def available() -> bool:
     return _RUNNABLE[path]
 
 
-def unavailable_reason() -> str:
+def unavailable_reason(repo_root: Path | None = None) -> str:
     """Why .blend is not a candidate, accurately.
 
     "Not found" and "found but will not run" are different problems with different fixes,
     and the operator sees this text at the checkpoint. The snap case is the second one.
     """
-    path = binary()
+    path = binary(repo_root)
     if not path:
-        return ("Blender not found -- put it on PATH or set BLENDER_PATH; a .blend is "
-                "only a candidate when it can be converted to glTF")
+        return (f"Blender not found -- set BLENDER_PATH, or put BLENDER_PATH=<path> in "
+                f"{CONFIG_NAME} at the repo root, or put blender on PATH. A .blend is "
+                f"only a candidate when it can be converted to glTF.")
     return (f"Blender at {path} could not be launched -- it exists but did not run "
             f"(a snap build fails this way under a confined sandbox). Set BLENDER_PATH "
             f"to a working build.")
@@ -175,8 +221,8 @@ def export_gltf(blend: Path, dest_dir: Path, name: str) -> Path:
     exe = binary()
     if not exe:
         raise RuntimeError(
-            f"cannot convert {blend.name}: Blender not found. Put it on PATH, or set "
-            f"{BLENDER_ENV} to the executable."
+            f"cannot convert {blend.name}: Blender not found. Set {BLENDER_ENV}, or put "
+            f"{BLENDER_ENV}=<path> in {CONFIG_NAME} at the repo root."
         )
     dest_dir.mkdir(parents=True, exist_ok=True)
     out = dest_dir / f"{name}.gltf"
@@ -317,6 +363,41 @@ def selftest_cases(c) -> None:
                 os.environ.pop(BLENDER_ENV, None)
             else:
                 os.environ[BLENDER_ENV] = saved
+
+        # --- local config -------------------------------------------------------
+        # BLENDER_PATH has to be re-exported in every new shell, and forgetting it makes
+        # a .blend silently resolve to a worse format. A gitignored repo-local file fixes
+        # that per-checkout without putting a machine path into git.
+        cfg_root = d / "cfgroot"
+        (cfg_root / "scripts" / "definitions").mkdir(parents=True)
+        (cfg_root / "project").mkdir(exist_ok=True)
+        cfg = cfg_root / CONFIG_NAME
+        cfg.write_text(
+            "# a comment\n\n"
+            "BLENDER_PATH=/from/config/blender\n"
+            "SOMETHING_ELSE = ignored\n"
+            "malformed line with no equals\n"
+        )
+        c.eq(read_local_config(cfg_root).get("BLENDER_PATH"), "/from/config/blender",
+             "config supplies BLENDER_PATH")
+        c.check("SOMETHING_ELSE" in read_local_config(cfg_root),
+                "other keys are read too, whitespace trimmed")
+        c.eq(read_local_config(d / "no-such-root"), {},
+             "an absent config file is not an error")
+
+        _s4 = os.environ.get(BLENDER_ENV)
+        try:
+            os.environ[BLENDER_ENV] = "/from/env/blender"
+            c.eq(binary(cfg_root), "/from/env/blender",
+                 "an explicit env var still wins over the config file")
+            os.environ.pop(BLENDER_ENV)
+            c.eq(binary(cfg_root), "/from/config/blender",
+                 "with no env var, the config file supplies the path")
+        finally:
+            if _s4 is None:
+                os.environ.pop(BLENDER_ENV, None)
+            else:
+                os.environ[BLENDER_ENV] = _s4
 
         # available() must answer "can we RUN it", not "does the file exist". A snap
         # Blender exists on PATH and dies under a confined sandbox with a DBus error;

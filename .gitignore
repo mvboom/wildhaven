@@ -41,3 +41,5 @@ runs/
 
 personal-local-only/
 docs/superpowers/
+# Local pipeline settings (machine paths; never committed)
+.assetpipe.local

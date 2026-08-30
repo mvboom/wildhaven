@@ -34,7 +34,49 @@ def slug(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", name.casefold()).strip("_")
 
 
+def _resolution_report(asset, resolution) -> list:
+    """Lines describing what resolution chose AND what it turned down.
+
+    The rejection reasons used to reach review.json only -- and a gate failure aborts
+    before that file is written. So an operator who pointed at a .blend saw
+    "missing Walk" and never learnt that Blender could not be launched, which was the
+    one piece of text that said what to do. The rejections are the actionable half of a
+    resolution; they belong on stdout at the moment it happens.
+    """
+    lines = [f"[1/10] format...... {resolution.chosen or 'NONE'} -- {resolution.reason}"]
+    pointed = asset.suffix.lower().lstrip(".")
+    if resolution.chosen and pointed and pointed != resolution.chosen:
+        lines.append(
+            f"       note....... you pointed at {asset.name}, so this run uses the "
+            f"{resolution.chosen} instead of the {pointed}")
+    for ext, why in sorted(resolution.rejected.items()):
+        lines.append(f"       rejected... {ext}: {why}")
+    return lines
+
+
 def _selftest_cli(c) -> None:
+    # A rejected candidate's reason is the only actionable text in a resolution, and it
+    # used to reach review.json ONLY -- which a gate failure aborts before writing. An
+    # operator who pointed at a .blend then saw "missing Walk" and never learnt that
+    # Blender could not be launched. These assert the reasons reach stdout.
+    from assetpipe.formats import ModelProbe, Resolution
+    _res = Resolution("fbx", Path("/p/FBX/Pig.fbx"),
+                      ModelProbe(fmt="fbx", clips=["Idle"]), "fbx is highest-ranked",
+                      {"blend": "Blender could not be launched; set BLENDER_PATH",
+                       "obj": "no skeleton or animation"})
+    _lines = "\n".join(_resolution_report(Path("/p/Blends/Pig.blend"), _res))
+    c.check("Blender could not be launched" in _lines,
+            "a rejected candidate's reason reaches the operator, not just review.json")
+    c.check("no skeleton" in _lines, "every rejection is reported, not only the first")
+    c.check("Pig.blend" in _lines and "fbx" in _lines,
+            "the report says the resolved format differs from the file pointed at")
+
+    _same = Resolution("blend", Path("/p/Blends/Pig.blend"),
+                       ModelProbe(fmt="blend", clips=["Idle", "Walk"]), "blend wins", {})
+    _lines_same = "\n".join(_resolution_report(Path("/p/Blends/Pig.blend"), _same))
+    c.check("instead of" not in _lines_same,
+            "no substitution note when the chosen format is the one pointed at")
+
     c.eq(slug("Shiba Inu"), "shiba_inu", "display name to id")
     c.eq(slug("Common Tree 1"), "common_tree_1", "digits preserved")
     c.eq(slug("Pig"), "pig", "single word")
@@ -333,7 +375,8 @@ def run(asset: Path, adapter_name: str, repo: Path, notes: str = "",
         # usable sibling sat beside it.
         resolution = formats.resolve(asset, spec.needs_rig,
                                      required_clips=spec.required_clips)
-        print(f"[1/10] format...... {resolution.chosen or 'NONE'} -- {resolution.reason}")
+        for line in _resolution_report(asset, resolution):
+            print(line)
 
         gate = audit.gate(resolution, spec.required_clips, formats.pack_root(asset),
                           adapter_name=spec.name)
