@@ -21,7 +21,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from assetpipe.harness import Checks
-from assetpipe import audit, dedupe, formats, importer, llm, review, runlog, worktree
+from assetpipe import audit, dedupe, formats, importer, llm, review, runlog, worktree, godot
 from assetpipe.adapters import animal, building, terrain
 
 ADAPTERS = ("animal", "building", "terrain")
@@ -58,6 +58,7 @@ def selftest() -> int:
     building.selftest_cases(c)
     terrain.selftest_cases(c)
     llm.selftest_cases(c)
+    godot.selftest_cases(c)
     _selftest_cli(c)
     return c.report("SELFTEST")
 
@@ -124,7 +125,19 @@ def run(asset: Path, adapter_name: str, repo: Path, notes: str = "",
         print(f"[4/10] import...... {len(written)} file(s) -> "
               f"{importer.dest_dir(project, spec.category, ident)}")
 
-        print("[5/10] verify...... (godot --import + generated test; see Task 17)")
+        godot.import_project(tree)
+        scene_res = f"assets/{spec.category}/{ident}/{display}.tscn"
+        idx = godot.anim_index(tree, scene_res) if spec.required_clips else -1
+        if idx >= 0:
+            importer.write_wrapper(project, spec.category, ident, display,
+                                   f"{display}{resolution.chosen_path.suffix}", 0.2,
+                                   gate.evidence["license"], idx, spec.schema)
+            godot.import_project(tree)
+        godot.write_import_test(tree, ident, display, spec.category,
+                                resolution.probe.clips)
+        heuristic = set(resolution.probe.clips)
+        print(f"[5/10] verify...... AnimationPlayer index {idx}; "
+              f"{len(heuristic)} clips from the pre-gate")
 
         # cost's usd_known starts True: a dry run or a run whose only stage was free
         # made no unpriced spend, so there is nothing to warn about.
