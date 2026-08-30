@@ -549,13 +549,19 @@ def write_tres(species_id: str, accepted_fact_texts: list, target: str = "animal
     if not accepted_fact_texts:
         return "no accepted candidates -- .tres left untouched"
 
+    # Both patterns are STRICT -- they match the field only in the exact shape the real
+    # .tres files use (verified: every animal fact_text_pool is a single-line
+    # Array[String]([...]); every building fact_text is a single-line quoted string). A
+    # loose `^fact_text_pool = .*$` would let a malformed field be silently overwritten
+    # instead of refused, weakening a guard this production script already had.
     if target == "building_text":
         tres_path = REPO_ROOT / "project" / "data" / "buildings" / f"{species_id}.tres"
-        field_pattern = re.compile(r"^fact_text = .*$", re.MULTILINE)
-        replacement = f"fact_text = {json.dumps(accepted_fact_texts[0])}"
+        field_pattern = re.compile(r'^fact_text = ".*"$', re.MULTILINE)
+        replacement = f"fact_text = {json.dumps(accepted_fact_texts[0], ensure_ascii=False)}"
     else:
         tres_path = DATA_DIR / f"{species_id}.tres"
-        field_pattern = re.compile(r"^fact_text_pool = .*$", re.MULTILINE)
+        field_pattern = re.compile(r"^fact_text_pool = Array\[String\]\(\[.*\]\)$",
+                                   re.MULTILINE)
         inner = ", ".join(json.dumps(t, ensure_ascii=False) for t in accepted_fact_texts)
         replacement = f"fact_text_pool = Array[String]([{inner}])"
 
@@ -685,16 +691,44 @@ def selftest() -> int:
     print(f"[{'PASS' if dup_ok else 'FAIL'}] duplicate-in-run check")
     ok = ok and dup_ok
 
-    import tempfile as _tf
+    import tempfile as _tf, pathlib as _pl, sys as _sys
+    _mod = _sys.modules[__name__]
     with _tf.TemporaryDirectory() as _td:
-        _p = Path(_td) / "well.tres"
-        _p.write_text('id = "well"\nfact_text = "old"\n')
-        _pat = re.compile(r"^fact_text = .*$", re.MULTILINE)
-        _new = _pat.sub('fact_text = "new"', _p.read_text())
-        _target_ok = 'fact_text = "new"' in _new and "fact_text_pool" not in _new
-    print(f"[{'PASS' if _target_ok else 'FAIL'}] --target building_text patches the "
-          f"single fact_text field, not the pool")
-    ok = ok and _target_ok
+        _root = _pl.Path(_td)
+        (_root / "project" / "data" / "animals").mkdir(parents=True)
+        (_root / "project" / "data" / "buildings").mkdir(parents=True)
+        _animal = _root / "project" / "data" / "animals" / "pig.tres"
+        _animal.write_text('id = "pig"\nfact_text_pool = Array[String](["old"])\n')
+        _bldg = _root / "project" / "data" / "buildings" / "well.tres"
+        _bldg.write_text('id = "well"\nfact_text = "old"\n')
+        _bad = _root / "project" / "data" / "animals" / "broken.tres"
+        _bad.write_text('id = "broken"\nfact_text_pool = "not an array"\n')
+        _saved = (_mod.REPO_ROOT, _mod.DATA_DIR)
+        try:
+            _mod.REPO_ROOT = _root
+            _mod.DATA_DIR = _root / "project" / "data" / "animals"
+            write_tres("pig", ["new one", "new two"], target="animal_pool")
+            write_tres("well", ["a well fact"], target="building_text")
+            _missing = write_tres("nosuch", ["x"], target="animal_pool")
+            _refused = write_tres("broken", ["x"], target="animal_pool")
+        finally:
+            _mod.REPO_ROOT, _mod.DATA_DIR = _saved
+
+        _animal_ok = 'fact_text_pool = Array[String](["new one", "new two"])' in _animal.read_text()
+        print(f"[{'PASS' if _animal_ok else 'FAIL'}] animal pool written correctly")
+        ok = ok and _animal_ok
+
+        _bldg_ok = 'fact_text = "a well fact"' in _bldg.read_text() and "fact_text_pool" not in _bldg.read_text()
+        print(f"[{'PASS' if _bldg_ok else 'FAIL'}] building text written correctly")
+        ok = ok and _bldg_ok
+
+        _missing_ok = "WARNING" in _missing
+        print(f"[{'PASS' if _missing_ok else 'FAIL'}] missing file reported as warning")
+        ok = ok and _missing_ok
+
+        _refused_ok = "WARNING" in _refused and '"not an array"' in _bad.read_text()
+        print(f"[{'PASS' if _refused_ok else 'FAIL'}] malformed field refused (regression test for strict guard)")
+        ok = ok and _refused_ok
 
     print()
     print("SELFTEST " + ("PASSED" if ok else "FAILED"))
