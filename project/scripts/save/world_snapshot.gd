@@ -7,9 +7,9 @@ extends RefCounted
 ##
 ## WHAT IS SAVED, AND WHAT IS NOT (human ruling 3, 2026-08-01, AMENDED 2026-08-02, AMENDED
 ## AGAIN AT v3). The file holds committed state — terrain, buildings, Wood, home sites and
-## their residents' live positions, the all-time Species Hosted set, the header, the pending
-## arrival queue, **and now removal receipts**. It still holds no other in-flight state: no
-## open settlement gestures, no dirty queue, no fractional Wood.
+## their residents' live positions AND LOOKS (v5), the all-time Species Hosted set, the header,
+## the pending arrival queue, **and now removal receipts**. It still holds no other in-flight
+## state: no open settlement gestures, no dirty queue, no fractional Wood.
 ##
 ## REMOVAL RECEIPTS JOINED AT v3 (reported bug fix): the original ruling grouped them with the
 ## other excluded in-flight state above, but those all either don't matter after a reload or
@@ -66,8 +66,31 @@ extends RefCounted
 ## `WorldRoot.get_style_default()` (Task 3) already falls through an empty/stale entry to that
 ## category's first catalog entry — so a pre-v4 file just plays as if nobody had opened a picker
 ## yet, which is the truth. (This retires the "row 13 -> v4" placeholder note that used to sit at
-## the bottom of `migrate()` — row 13's mist extent takes v5 instead.)
-const SAVE_VERSION: int = 4
+## the bottom of `migrate()`.)
+##
+## v4 -> v5 (villager-variety bug fix): a `home_sites[].residents[]` entry grows a FOURTH
+## element — the `AnimalDefinition.model_scenes` index that resident is wearing. It went from
+## `[x, y, z]` to `[x, y, z, variant_index]`.
+##
+## WHY THE SCHEMA HAD TO CHANGE, given the previous design leaned hard on it not having to.
+## Before this, a resident's look was re-derived on load from its slot within its home site's
+## `residents` array — zero save state, stable across a reload. It was also the variety bug:
+## a slot index is not a global identity, so the first resident at EVERY home site derived the
+## same look. Replacing the derivation with a shuffle bag (`VariantBag`) means the look is now
+## a genuine random choice made once, at move-in — and a random choice that is not written down
+## is re-rolled on every load. The 4th element is what keeps look stability across save/load,
+## which was never optional.
+##
+## MIGRATION IS A VERSION BUMP AND NOTHING ELSE, for the same reason v3 -> v4 was. A 3-element
+## entry is legal input forever: `apply()` reads a missing 4th element as
+## `AnimalDefinition.NO_VARIANT`, and `HabitatSimulation.restore_site()` turns that into the
+## OLD slot-index derivation — so a pre-v5 world loads with exactly the looks it already had.
+## No error, no reshuffle, no worse than today. Nothing needs inventing at migration time, and
+## inventing looks there would be actively wrong: it would change how an existing village looks
+## the first time it is opened on the new build.
+##
+## (row 13's mist extent takes v6 — v5 is spent here.)
+const SAVE_VERSION: int = 5
 
 
 ## The live world as a JSON-native dictionary.
@@ -112,7 +135,13 @@ static func capture(
 			# A null resident is a content defect (no model_scene), recorded honestly rather
 			# than dropped — dropping it would silently change the population on reload.
 			var p: Vector3 = Vector3.ZERO if node == null else node.position
-			residents.append([p.x, p.y, p.z])
+			# FOURTH ELEMENT AT v5: which `model_scenes` entry this resident is wearing. Before
+			# v5 a resident was `[x, y, z]` and its look was RE-DERIVED on load from its slot
+			# index — which is the variety bug (`AnimalDefinition.legacy_variant_index()`), and
+			# which cannot be fixed without the look becoming real save state. A null resident,
+			# or one that predates tagging, writes `NO_VARIANT` (-1): "this file does not know",
+			# read on load exactly the same way a missing 4th element is.
+			residents.append([p.x, p.y, p.z, HomeSite.variant_of(node)])
 		home_sites.append({
 			"position": [site.position.x, site.position.y],
 			"species_id": site.species_id,
@@ -297,6 +326,18 @@ static func migrate(data: Dictionary) -> Dictionary:
 	if version < 4:
 		out["save_version"] = 4
 
+	# v4 -> v5 (villager-variety bug fix): pure version-bump bookkeeping, for the same reason
+	# the step above is. The new information — which look each resident wears — is one that an
+	# OLD FILE GENUINELY DOES NOT CONTAIN, and the only correct answer for a resident whose look
+	# is unrecorded is the derivation that produced what that world was already showing. That
+	# derivation lives at the read site (`apply()` -> `restore_site()` -> `legacy_variant_index`),
+	# where it can see the species' `model_scenes` — which a dictionary-to-dictionary migration
+	# cannot, having no roster. Writing looks in here would need the roster AND would freeze a
+	# guess into the file; leaving the entries at 3 elements keeps the fallback honest and keeps
+	# `migrate()` idempotent.
+	if version < 5:
+		out["save_version"] = 5
+
 	# THE SEED IS REPAIRED AT ANY VERSION, and the rule differs by version on purpose:
 	#
 	#   * **At v1**, `seed` was written as a constant 0 in every file that build ever saved, so
@@ -330,8 +371,8 @@ static func migrate(data: Dictionary) -> Dictionary:
 		# worse than deleting, which is the exact failure an earlier fix wave on this row closed.
 		out["seed"] = seed_from_name(text_or(out.get("name", ""), ""))
 
-	# (row 13 adds "mist" and its own migration step here — a v4 -> v5, now that v4 is taken by
-	# style_defaults, Task 4 of the style-picker sub-project)
+	# (row 13 adds "mist" and its own migration step here — a v5 -> v6, now that v4 is taken by
+	# style_defaults and v5 by the resident-look field of the villager-variety fix)
 	return out
 
 
@@ -486,6 +527,9 @@ static func apply(world: WorldRoot, data: Dictionary) -> bool:
 				continue
 			tags.append(t as String)
 		var positions: Array = []
+		# Parallel to `positions`, one entry each, appended in lockstep so a skipped malformed
+		# entry cannot shift the looks of every resident after it by one.
+		var variants: Array = []
 		for p: Variant in array_field(s, "residents"):
 			if typeof(p) != TYPE_ARRAY:
 				push_warning("Save holds a resident position that is not an array; skipped.")
@@ -494,13 +538,23 @@ static func apply(world: WorldRoot, data: Dictionary) -> bool:
 			if xyz.size() < 3 or not is_number(xyz[0]) or not is_number(xyz[1]) or not is_number(xyz[2]):
 				continue
 			positions.append(Vector3(float(xyz[0]), float(xyz[1]), float(xyz[2])))
+			# A 3-ELEMENT ENTRY IS A PRE-v5 SAVE and is legal forever: it reads as
+			# `NO_VARIANT`, which `restore_site()` turns into the old slot-index derivation, so
+			# an existing world keeps loading and keeps the looks it already had. A non-numeric
+			# 4th element (saves are hand-editable by design) degrades the same way rather than
+			# throwing on `int()` — the rule `wood` and `save_version` already follow.
+			var look: int = AnimalDefinition.NO_VARIANT
+			if xyz.size() >= 4 and is_number(xyz[3]):
+				look = int(xyz[3])
+			variants.append(look)
 		var radius_raw: Variant = s.get("radius", 0)
 		world.simulation.restore_site(
 			Vector2i(int(pos_raw[0]), int(pos_raw[1])),
 			text_or(s.get("species_id", ""), ""),
 			int(radius_raw) if is_number(radius_raw) else 0,
 			tags,
-			positions
+			positions,
+			variants
 		)
 
 	# 6. Species Hosted — including species with no surviving home, which sites alone would lose.

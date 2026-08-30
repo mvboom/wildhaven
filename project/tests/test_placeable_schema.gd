@@ -112,9 +112,38 @@ func _init() -> void:
 	check_eq(house.model_scenes.size(), 18, "18 house look variants")
 	check_eq(house.model_scenes[0].resource_path, MODEL_PATH,
 		"model_scenes[0] is STILL the shipped default (HousesFirstAge1Level1), unchanged by the 2026-08-29 growth")
+	var variant_paths: PackedStringArray = PackedStringArray()
 	for scene: PackedScene in house.model_scenes:
 		check(scene is PackedScene, "every model_scenes entry is a PackedScene")
 		check(scene.can_instantiate(), "every model_scenes entry can instantiate")
+		variant_paths.append(scene.resource_path)
+
+	# The ORDER is pinned for the same reason test_human_schema.gd pins human's: a count
+	# plus an [0] check lets a reorder of entries 1..17 -- or a swap of one wrapper for
+	# another at equal count -- land silently. Mirrors that file's existing pattern rather
+	# than inventing a second shape. Re-point deliberately; never relax to a prefix match.
+	var expected_paths: PackedStringArray = [
+		"res://assets/buildings/house/House.tscn",
+		"res://assets/buildings/house_firstage_1_level2/HouseFirstage1Level2.tscn",
+		"res://assets/buildings/house_firstage_1_level3/HouseFirstage1Level3.tscn",
+		"res://assets/buildings/house_firstage_2_level1/HouseFirstage2Level1.tscn",
+		"res://assets/buildings/house_firstage_2_level2/HouseFirstage2Level2.tscn",
+		"res://assets/buildings/house_firstage_2_level3/HouseFirstage2Level3.tscn",
+		"res://assets/buildings/house_firstage_3_level1/HouseFirstage3Level1.tscn",
+		"res://assets/buildings/house_firstage_3_level2/HouseFirstage3Level2.tscn",
+		"res://assets/buildings/house_firstage_3_level3/HouseFirstage3Level3.tscn",
+		"res://assets/buildings/house_tower_firstage/HouseTowerFirstage.tscn",
+		"res://assets/buildings/house_secondage_1_level1/HouseSecondage1Level1.tscn",
+		"res://assets/buildings/house_secondage_1_level2/HouseSecondage1Level2.tscn",
+		"res://assets/buildings/house_secondage_1_level3/HouseSecondage1Level3.tscn",
+		"res://assets/buildings/house_secondage_2_level1/HouseSecondage2Level1.tscn",
+		"res://assets/buildings/house_secondage_3_level1/HouseSecondage3Level1.tscn",
+		"res://assets/buildings/house_secondage_3_level2/HouseSecondage3Level2.tscn",
+		"res://assets/buildings/house_secondage_3_level3/HouseSecondage3Level3.tscn",
+		"res://assets/buildings/house_tower_secondage/HouseTowerSecondage.tscn",
+	]
+	check_eq(variant_paths, expected_paths,
+		"model_scenes lists exactly these 18 paths, in this order")
 
 	# --- validate(): must be clean, WITH the placeholder fact_text in place ----
 	# FIXED-COUNT: problems are printed, never iterated with check().

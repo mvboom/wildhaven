@@ -145,6 +145,17 @@ func _check_home_sites() -> void:
 		"a resident is captured at its LIVE position, not its home tile centre"
 	)
 
+	# THE v5 ADDITION (villager-variety fix): a resident entry is `[x, y, z, variant_index]`.
+	# Before v5 it was `[x, y, z]` and the look was re-derived from the resident's slot within
+	# its home site — which is exactly why every villager in the world came out identical.
+	# The round trip and the pre-v5 fallback are `test_human_variant_save_stability.gd`'s;
+	# what belongs here is the SHAPE on disk.
+	check_eq(saved.size(), 4, "a resident entry carries a 4th element — its look (v5)")
+	check_eq(
+		int(saved[3]), HomeSite.variant_of(site.residents[0]),
+		"...and that element is the model_scenes index the resident is actually wearing"
+	)
+
 	check(
 		(data["species_hosted"] as Array).has("rabbit"),
 		"the all-time Species Hosted set is captured"
@@ -329,7 +340,9 @@ func _check_the_removal_ledger_is_captured_json_native() -> void:
 func _check_style_defaults() -> void:
 	_world.set_style_default("forest", "birch_tree")
 	var data: Dictionary = WorldSnapshot.capture(_world, "W", "meadow_start", 0)
-	check_eq(int(data["save_version"]), 4, "save_version is now 4")
+	check_eq(int(data["save_version"]), WorldSnapshot.SAVE_VERSION,
+		"a capture is stamped at the current save_version (4 when style_defaults landed, 5 "
+		+ "since the resident-look field joined at the villager-variety fix)")
 	check(data.has("style_defaults"), "style_defaults is captured")
 	var captured: Dictionary = data["style_defaults"] as Dictionary
 	check_eq(captured.get("forest", ""), "birch_tree",
@@ -476,6 +489,7 @@ func _check_unknown_content_degrades_rather_than_crashes() -> void:
 	(data["terrain"] as Array)[0] = "terrain_that_does_not_exist"
 	(data["home_sites"] as Array).append({
 		"position": [15, 15], "species_id": "unicorn", "radius": 4,
+		# A 3-ELEMENT entry on purpose: that is the pre-v5 shape, and it must stay legal input.
 		"sequence": 999, "structure_tags": [], "residents": [[15.0, 0.0, 15.0]],
 	})
 	(data["buildings"] as Array).append({"origin": [17, 17], "id": "castle"})

@@ -94,6 +94,11 @@ const DEFAULT_TILES_PER_INDIVIDUAL: int = 12
 ## Resolve through `effective_capacity_radius()`; never read `capacity_radius` raw.
 const CAPACITY_RADIUS_FOLLOWS_SCOUT: int = 0
 
+## "This resident has no look on record" — a species with an empty `model_scenes`, or a save
+## entry written before looks were persisted. Mirrors `VariantBag.NO_VARIANT`; the two are
+## the same value on purpose so a bag result can be stored and read back without translation.
+const NO_VARIANT: int = -1
+
 ## PLACEHOLDER / roster.md baseline — human owns this (#23). roster.md -> Floor
 ## placeholders: "`max_individuals` ~6". gdd.md calls it "a hard per-home-site cap — a
 ## readability bound, never the normal-play limit", so a uniform value across the roster is
@@ -233,25 +238,60 @@ func unresolved_avoids(known_ids: PackedStringArray) -> Array[String]:
 	return out
 
 
-## Stably picks which of `model_scenes` a resident at `index` shows — the SAME pattern
-## `TerrainDefinition.pick_variant(x, z)` uses for tiles, keyed on a resident's index
-## within its home site's `residents` array instead of tile coordinates (see this
-## species's callers in `habitat_simulation.gd` for why that index is stable across a
-## resident's lifetime, including save/load).
+## The entry in `model_scenes` at `variant_index`, or `null` when there is no such entry.
+##
+## THE ONE WAY A SPAWNED RESIDENT GETS ITS SCENE. The index comes from `VariantBag` at
+## move-in, or from the save file at load — never from a derivation here. Out of range and
+## `NO_VARIANT` both return `null` rather than wrapping, so a caller holding a stale index
+## (a `.tres` that lost a look since the save was written) is forced to decide what to do
+## about it instead of silently being handed somebody else's outfit.
+func variant_scene(variant_index: int) -> PackedScene:
+	if variant_index < 0 or variant_index >= model_scenes.size():
+		return null
+	return model_scenes[variant_index]
+
+
+## THE PRE-FIX DERIVATION, kept alive for exactly one caller: restoring a save written before
+## looks were persisted per resident (`WorldSnapshot` save_version < 5, whose `residents`
+## entries are 3-element `[x, y, z]` arrays with no look in them).
+##
+## **Do not use this for anything else.** It is the bug: `index` is a resident's slot within
+## its OWN home site's `residents` array, not a global identity, so the first resident at every
+## home site in the world derives the same look. With 18 human looks the sequence is
+## `0->15, 1->4, 2->14, 3->10, 4->1, 5->9, 6->11, 7->17, 8->10, 9->14` — nearly every villager
+## in a world of one- and two-resident homes came out as variant 15, and only 8 of the 18 were
+## reachable in the first ten slots at all. `VariantBag` replaced it at the spawn site.
+##
+## It survives here because an OLD SAVE HAS NO OTHER ANSWER. Re-deriving with it reproduces
+## exactly the looks that world already had on screen, which is the only migration that does
+## not visibly reshuffle a child's village the first time they open it on the new build.
+func legacy_variant_index(index: int) -> int:
+	if model_scenes.is_empty():
+		return NO_VARIANT
+	if model_scenes.size() == 1:
+		return 0
+	return hash(index) % model_scenes.size()
+
+
+## Stably picks which of `model_scenes` a resident at `index` shows.
+##
+## STILL CORRECT, STILL USED, but its meaning narrowed with the variety fix: for a
+## single-variant species (most of the roster) it is the whole answer, and for a multi-variant
+## species it is now only the OLD-SAVE derivation — see `legacy_variant_index()` for why that
+## derivation must not be used at spawn time any more.
 ##
 ## Returns `null` if `model_scenes` is empty; returns the sole entry directly (no hashing)
-## if there is only one — same two guard clauses as the terrain sibling, for the same
-## reason (a single-variant species should never pay a hash for a foregone conclusion).
+## if there is only one — same two guard clauses as `TerrainDefinition.pick_variant(x, z)`,
+## for the same reason (a single-variant species should never pay a hash for a foregone
+## conclusion). `TerrainDefinition`'s per-tile hashing is untouched by this fix and remains
+## correct: a tile's coordinates ARE its global identity, which is precisely what a resident's
+## per-site slot was not.
 ##
 ## Placed here, immediately before `validate()`, to mirror `TerrainDefinition`'s own
 ## ordering exactly — and so this file keeps its fields-then-functions organization rather
 ## than interrupting the `@export` block mid-way.
 func pick_variant(index: int) -> PackedScene:
-	if model_scenes.is_empty():
-		return null
-	if model_scenes.size() == 1:
-		return model_scenes[0]
-	return model_scenes[hash(index) % model_scenes.size()]
+	return variant_scene(legacy_variant_index(index))
 
 
 ## Non-fatal schema check. Returns human-readable problems; an empty array means clean.

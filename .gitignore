@@ -22,6 +22,8 @@ mono_crash.*.json
 .claude/local/
 .worktrees/
 
+**/__pycache__/**
+
 godot/**
 
 # Secrets — never commit; the agent is also denied read access to these
