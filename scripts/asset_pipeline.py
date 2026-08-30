@@ -25,8 +25,9 @@ ADAPTERS = ("animal", "building", "terrain")
 
 
 def selftest() -> int:
+    from assetpipe import formats
     c = Checks()
-    c.check(True, "selftest harness reachable from the CLI")
+    formats.selftest_cases(c)
     return c.report("SELFTEST")
 
 
