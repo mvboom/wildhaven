@@ -49,6 +49,19 @@ def check_category(category: str) -> list[str]:
     ]
 
 
+def validate_values(values: dict) -> list[str]:
+    """The pass resume() runs before anything is written.
+
+    check_category existed and was tested, but nothing outside its own selftest called
+    it: resume() dispatches on hasattr(module, "validate_values") and only animal.py had
+    one, so an unknown hotbar_category went straight into the .tres. The spec's building
+    row says "Halts when: introduces an unknown hotbar_category" -- this is what makes
+    that true. A missing category is treated as unknown, deliberately: every SPEC field
+    reaches the checkpoint, so an absent one means the payload is malformed.
+    """
+    return check_category(values.get("hotbar_category", ""))
+
+
 def decisions(probe) -> list[Decision]:
     return [Decision(field=f.name, proposal=None, source=f.source_hint,
                      confidence="unproposed", value=None) for f in SPEC.fields]
@@ -83,6 +96,14 @@ def selftest_cases(c) -> None:
             "halt names the file that must be edited")
     c.check(any("ui-engineer" in p for p in problems),
             "halt names who owns that edit")
+
+    # REGRESSION, whole-branch review IMPORTANT 4/14: check_category was referenced only
+    # by this selftest, so resume() wrote an unknown category into the .tres unchecked.
+    c.eq(validate_values({"hotbar_category": "farm_building"}), [],
+         "a known category passes the pass resume() actually runs")
+    c.check(validate_values({"hotbar_category": "workshop"}),
+            "an unknown category is caught by validate_values, not just check_category")
+    c.check(validate_values({}), "an absent hotbar_category is treated as unknown")
 
     ds = decisions(ModelProbe(fmt="obj"))
     names = [d.field for d in ds]

@@ -18,8 +18,14 @@ from pathlib import Path
 from assetpipe.adapters.base import AdapterSpec, FieldSpec, render_tres
 from assetpipe.review import Decision
 
+# The id of the terrain untouched revealed land is made of. NOT "grass": the schema's own
+# load-bearing constant is project/scripts/definitions/terrain_definition.gd:31,
+# `const WILD_GRASS_ID: String = "wild_grass"`. derive_bare_tags() (:104) finds by that id
+# and validate() (:200) refuses `normalize_id(id) == WILD_GRASS_ID and not
+# emitted_tags.is_empty()`. A guard keyed on "grass" protected a terrain the invariant
+# does not cover, and left the one it does cover unguarded.
 # gdd.md -> World Structure; terrain.md -> Already-Defined Terrain.
-BASE_TERRAIN_ID = "grass"
+BASE_TERRAIN_ID = "wild_grass"
 
 MODE_VARIANT = "variant"
 MODE_NEW_TYPE = "new_type"
@@ -85,6 +91,23 @@ def selftest_cases(c) -> None:
     problems = check_new_type(BASE_TERRAIN_ID, {"emitted_tags": ["flowers"]})
     c.check(any("inert-land" in p for p in problems),
             "making the base terrain emit tags breaks the inert-land invariant")
+
+    # REGRESSION, whole-branch review IMPORTANT 6: the guard was keyed on "grass", but
+    # terrain_definition.gd:31 defines WILD_GRASS_ID = "wild_grass" and both
+    # derive_bare_tags() and validate() key off that. The guard protected the wrong id.
+    c.eq(BASE_TERRAIN_ID, "wild_grass", "base terrain id matches WILD_GRASS_ID")
+    c.check(any("inert-land" in p for p in
+                check_new_type("wild_grass", {"emitted_tags": ["forest"]})),
+            "wild_grass emitting tags is refused -- it is the id the invariant covers")
+    c.eq(check_new_type("grass", {"emitted_tags": ["forest"]}), [],
+         "plain grass emitting tags is allowed -- the invariant does not cover it")
+
+    schema = Path("project/scripts/definitions/terrain_definition.gd")
+    if schema.is_file():
+        c.check(f'const WILD_GRASS_ID: String = "{BASE_TERRAIN_ID}"' in schema.read_text(),
+                "BASE_TERRAIN_ID still matches the schema's own constant")
+    else:
+        c.check(True, "schema cross-check skipped, project/ not on this path")
 
     c.check([d.field for d in decisions(ModelProbe(fmt="obj"), "variant")] == ["model_scale"],
             "variant mode asks only for scale")
