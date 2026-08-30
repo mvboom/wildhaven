@@ -41,9 +41,11 @@ BLENDER_ENV = "BLENDER_PATH"
 # conversion is attempted, and the whole selftest stays offline.
 #
 # NAME LENGTH: 2 to 31 characters. The old floor of 3 silently dropped a two-character
-# action with no way to notice. Widening it was measured, not assumed: across 120 real
-# .blend files in source-content/assets it adds exactly zero names, so it costs no
-# precision here. A ONE-character name is still dropped, deliberately -- this is a
+# action with no way to notice. Widening it was measured across all 536 .blend files in
+# source-content/assets: it adds exactly ONE name -- a phantom "WK" in Textured Stylized
+# Trees' Tree_2.blend, a static prop whose clips are never consulted (needs_rig=False),
+# and which raw count could only move a tiebreak that required-clip coverage now outranks.
+# So it costs no precision that matters here. A ONE-character name is still dropped, deliberately -- this is a
 # heuristic scan over a megabyte of binary, and "AC" plus a single letter plus a NUL is
 # common enough as noise that the floor is worth keeping somewhere.
 _ACTION = re.compile(rb"AC([A-Za-z][A-Za-z0-9_.\- ]{1,30})\x00")
