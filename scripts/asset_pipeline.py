@@ -546,6 +546,12 @@ def _selftest_cli(c) -> None:
     c.check('payload.get("incomplete")' in inspect.getsource(resume),
             "resume refuses that stub -- its empty decisions list is not 'nothing to rule'")
 
+    _run_src = inspect.getsource(run)
+    c.check("write_fidelity_suite" in _run_src,
+            "stage 5 generates a fidelity suite alongside the import test")
+    c.check(_run_src.index("write_import_test") < _run_src.index("write_fidelity_suite"),
+            "the fidelity suite is generated AFTER the import test, so a model that "
+            "fails to import never reaches fingerprinting")
 
 def preflight_names(repo: Path) -> list[str]:
     return [p for p in worktree.preflight(repo) if "stale worktree" in p]
@@ -661,6 +667,28 @@ def _validate(module, adapter_name: str, ident: str, mode: str | None,
     return problems
 
 
+def write_fidelity_suite(tree: Path, ident: str, display: str, scene_res: str,
+                         source: Path) -> Path | None:
+    """Best-effort: a missing Blender must not fail an otherwise good import.
+
+    The import itself already succeeded by this point, and the asset is usable. A skipped
+    fidelity suite is a visible gap (content_fidelity.py will report UNKNOWN for it),
+    which is the honest outcome -- unlike a suite built from a manifest we could not
+    actually extract.
+    """
+    import content_fidelity
+    from assetpipe import fingerprint
+    try:
+        src = fingerprint.manifest_for_source(source)
+    except Exception as exc:                                          # noqa: BLE001
+        print(f"[5/10] fidelity.... SKIPPED -- {exc}")
+        return None
+    path = content_fidelity.write_suite(tree, ident, display, f"res://{scene_res}",
+                                        src, set())
+    print(f"[5/10] fidelity.... {path.relative_to(tree)}")
+    return path
+
+
 def run(asset: Path, adapter_name: str, repo: Path, notes: str = "",
         dry_run: bool = False, variant_of: str | None = None,
         interactive: bool = True, accept_all: bool = False) -> int:
@@ -743,6 +771,10 @@ def run(asset: Path, adapter_name: str, repo: Path, notes: str = "",
             godot.import_project(tree, repo)
         godot.write_import_test(tree, ident, display, spec.category,
                                 resolution.probe.clips, spec.required_clips)
+        # The fidelity suite, from the SAME resolved source stage 1 chose. Generated here
+        # so stage 10's run-tests.sh gates on it without a second entry point, and so a
+        # new asset is covered from its first run rather than by a later back-fill.
+        write_fidelity_suite(tree, ident, display, scene_res, resolution.chosen_path)
         heuristic = set(resolution.probe.clips)
         # Measured through AnimalClips, the resolver the GAME uses -- the pre-gate's clip
         # list cannot say which of the three naming conventions this model follows, and
