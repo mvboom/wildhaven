@@ -33,11 +33,14 @@ signal dismissed()
 ## not get talked over on the next card.
 const AUTO_SPEAK: bool = true
 
-## The glyphs spec.md's layout draws. Isolated here because the engine's default font almost
-## certainly has no 🔊 — see the build report; swapping these for icon textures is a
-## one-line change plus a tech-art asset, and nothing else in the file assumes text.
-const READ_ALOUD_GLYPH: String = "🔊"
-const MUTED_GLYPH: String = "🔇"
+## The glyphs spec.md's layout draws. The Read-Aloud speaker is NO LONGER TEXT: this file's
+## own header note above ("the engine's default font almost certainly has no 🔊") turned out
+## to be right, and the web build drew a tofu box (human-reported). It is now `SpeakerIcon`,
+## a vector Control on the button (`%Icon`), which cannot depend on font coverage on any
+## export target — the same fix `rotate_icon.gd` and `popup_indicator_glyph.gd` already
+## carry, and `test_font_glyph_coverage.gd` now guards for every surface at once.
+##
+## `×` (U+00D7) stays text: it IS in the bundled font's glyph set, so it is not at risk.
 const DISMISS_GLYPH: String = "×"
 
 
@@ -47,12 +50,12 @@ var _spoken_text: String = ""
 @onready var _species_name: Label = %SpeciesName
 @onready var _body: Label = %Body
 @onready var _read_aloud_button: Button = %ReadAloudButton
+@onready var _read_aloud_icon: SpeakerIcon = %Icon
 @onready var _close_button: Button = %CloseButton
 
 
 func _ready() -> void:
 	visible = false
-	_read_aloud_button.text = READ_ALOUD_GLYPH
 	_close_button.text = DISMISS_GLYPH
 	UiPalette.paint_button(_read_aloud_button, false)
 	UiPalette.paint_button(_close_button, false)
@@ -128,7 +131,7 @@ func toggle_speaking() -> bool:
 
 
 func _paint_speaking_toggle() -> void:
-	_read_aloud_button.text = READ_ALOUD_GLYPH if GameplaySettings.speaking_enabled() else MUTED_GLYPH
+	_read_aloud_icon.muted = not GameplaySettings.speaking_enabled()
 
 
 func _on_speaking_toggle_pressed() -> void:

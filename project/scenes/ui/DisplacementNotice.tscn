@@ -1,4 +1,4 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=5 format=3]
 
 ; Gentle Displacement's two surfaces, Tier 1 row 10. See scripts/ui/displacement_notice.gd.
 ;
@@ -20,6 +20,7 @@
 ; script re-applies them from `UiPalette` at runtime, which is the single authority.
 
 [ext_resource type="Script" path="res://scripts/ui/displacement_notice.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/ui/speaker_icon.gd" id="2"]
 
 [sub_resource type="StyleBoxFlat" id="NoticePanel"]
 content_margin_left = 32.0
@@ -122,7 +123,17 @@ custom_minimum_size = Vector2(88, 72)
 layout_mode = 2
 focus_mode = 0
 theme_override_font_sizes/font_size = 32
-text = "🔊"
+
+[node name="Icon" type="Control" parent="Warning/Stack/ButtonRow/ReadAloudButton"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("2")
 
 [node name="CloseButton" type="Button" parent="Warning/Stack/ButtonRow"]
 unique_name_in_owner = true
