@@ -35,7 +35,20 @@ var _world: WorldRoot = null
 var _materials_by_tile: Dictionary = {}       # Vector2i -> Array[Array[StandardMaterial3D]], outer per mesh instance, inner per surface
 var _faded_by_tile: Dictionary = {}           # Vector2i -> bool
 var _pending_frames_by_tile: Dictionary = {}  # Vector2i -> int
+var _aabb_by_tile: Dictionary = {}            # Vector2i -> AABB, see `_tile_aabb()`
 var _clock: float = 0.0
+
+## WORK COUNTERS, same shape and purpose as `HabitatSimulation.evaluations_run`: the two
+## quantities this sweep's cost is actually made of, counted exactly so a test can assert the
+## ALGORITHM rather than a wall-clock number (which would be machine-dependent, and which the
+## ground rules make the human's call anyway). Never reset by production code.
+##
+##   * `geometry_rebuilds` — how many times `_tile_aabb()` walked a tile's scene tree.
+##   * `occlusion_tests`   — how many tile-vs-resident ray tests phase 2 actually ran.
+##
+## `test_occlusion_fader_scaling.gd` pins both.
+var geometry_rebuilds: int = 0
+var occlusion_tests: int = 0
 
 
 func _ready() -> void:
@@ -92,6 +105,10 @@ func _on_grid_tile_changed(x: int, z: int) -> void:
 	_faded_by_tile.erase(tile)
 	_pending_frames_by_tile.erase(tile)
 	_materials_by_tile.erase(tile)
+	# The rebuilt visual can be a different model at a different height, so its bounds are
+	# stale for the same reason its materials are. Erased per tile, never wholesale: a single
+	# repaint must not throw away every other tile's cached geometry.
+	_aabb_by_tile.erase(tile)
 
 
 ## Every currently-settled resident node, read off `WorldRoot`'s own registry via
@@ -119,7 +136,15 @@ func refresh(residents: Array) -> void:
 		return
 	var forward: Vector3 = -camera.global_transform.basis.z.normalized()
 	var back: Vector3 = -forward
-	var candidate_tiles: Dictionary = {}  # Vector2i -> true, de-duplicated across residents
+	# THE VALUE IS THE POINT. This used to be a plain `Vector2i -> true` set, and phase 2 then
+	# paired every candidate with every resident in the world. But a tile only becomes a
+	# candidate BECAUSE some resident is within `RESIDENT_CHECK_RADIUS_TILES` of it — and that
+	# same bound is the reason nothing farther away can occlude that resident (see this file's
+	# header). So the residents gathered here are exactly the residents the tile could ever
+	# block, and testing it against anyone else is a ray test whose answer is already known.
+	# Keeping the contributors instead of discarding them turns phase 2 from
+	# O(candidates x residents) into O(candidates x nearby residents).
+	var candidate_tiles: Dictionary = {}  # Vector2i -> Array[Node3D], the residents it may block
 	for resident: Node3D in residents:
 		if not is_instance_valid(resident):
 			continue
@@ -127,17 +152,21 @@ func refresh(residents: Array) -> void:
 		for dx in range(-RESIDENT_CHECK_RADIUS_TILES, RESIDENT_CHECK_RADIUS_TILES + 1):
 			for dz in range(-RESIDENT_CHECK_RADIUS_TILES, RESIDENT_CHECK_RADIUS_TILES + 1):
 				var candidate := Vector2i(tile.x + dx, tile.y + dz)
-				if _world.grid.get_terrain_id(candidate.x, candidate.y) == "forest":
-					candidate_tiles[candidate] = true
+				if _world.grid.get_terrain_id(candidate.x, candidate.y) != "forest":
+					continue
+				if not candidate_tiles.has(candidate):
+					candidate_tiles[candidate] = [] as Array[Node3D]
+				(candidate_tiles[candidate] as Array[Node3D]).append(resident)
 
 	var blocked_tiles: Dictionary = {}  # Vector2i -> true
 	for tile: Vector2i in candidate_tiles.keys():
 		var aabb: AABB = _tile_aabb(tile)
-		for resident: Node3D in residents:
+		for resident: Node3D in (candidate_tiles[tile] as Array[Node3D]):
 			if not is_instance_valid(resident):
 				continue
 			var target: Vector3 = resident.global_position
 			var ray_origin: Vector3 = target + back * RAY_BACKOFF
+			occlusion_tests += 1
 			var hit = aabb.intersects_ray(ray_origin, forward)
 			if hit != null:
 				var t_hit: float = (hit as Vector3 - ray_origin).dot(forward)
@@ -189,7 +218,20 @@ func is_tracked_for_testing(tile: Vector2i) -> bool:
 	return _faded_by_tile.has(tile)
 
 
+## Cached in `_aabb_by_tile`, because a tile's world-space bounds only move when the tile
+## itself is repainted — and `_on_grid_tile_changed()` is already connected to exactly that
+## event, so the invalidation costs nothing new. Uncached, this walked the tile's whole
+## subtree and re-transformed eight corners per mesh on every sweep, ten times a second, for
+## every candidate: a measured 20-25% of the call (`probe_frame_cost.gd`).
+##
+## A MISSING TILE NODE IS NEVER CACHED. `TerrainView` frees and re-instantiates a tile's
+## visual on repaint, so a null lookup here means "not built yet", which is transient —
+## caching the empty AABB it produces would make that transient state permanent and the tile
+## would never fade again.
 func _tile_aabb(tile: Vector2i) -> AABB:
+	if _aabb_by_tile.has(tile):
+		return _aabb_by_tile[tile] as AABB
+	geometry_rebuilds += 1
 	var tile_node: Node = _world.view.get_node_or_null("Tile_%d_%d" % [tile.x, tile.y])
 	var result: AABB
 	var first: bool = true
@@ -215,6 +257,7 @@ func _tile_aabb(tile: Vector2i) -> AABB:
 				first = false
 			else:
 				result = result.expand(world_corner)
+	_aabb_by_tile[tile] = result
 	return result
 
 
