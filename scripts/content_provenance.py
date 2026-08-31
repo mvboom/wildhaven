@@ -147,10 +147,37 @@ def _collapse_to_origins(scored: list, assets_root: Path = SOURCE_ROOT) -> list:
     return origins
 
 
-def wrapper_res_for(tres_text: str) -> str:
-    """The model wrapper a .tres points at, read from its ext_resource line."""
-    m = re.search(r'\[ext_resource type="PackedScene" path="([^"]+)"', tres_text)
-    return m.group(1) if m else ""
+def wrapper_res_for(tres_text: str) -> list:
+    """EVERY distinct model wrapper a .tres points at, in file order.
+
+    A LIST, not a single path. Several .tres files declare many PackedScene
+    ext_resources -- measured: human 18, house 18, forest 8, cultivated_field 26 --
+    and the old re.search returned only the FIRST. The audit then probed 1 of N models
+    and reported OK for the whole asset: the exact false green this design exists to
+    prevent.
+
+    The header contract holds exactly one "; Source:" line, so a multi-wrapper asset
+    has no single honest origin to compare against. Callers must report MULTI-MODEL and
+    refuse to verdict rather than pick one -- see multi_model_note() and Ruling 17.
+
+    Repeated references to the same wrapper path collapse: that is one model, not two.
+    """
+    seen, out = set(), []
+    for path in re.findall(
+            r'\[ext_resource type="PackedScene" path="([^"]+)"', tres_text):
+        if path not in seen:
+            seen.add(path)
+            out.append(path)
+    return out
+
+
+def multi_model_note(wrappers: list) -> str:
+    """Why a multi-wrapper asset gets no Source line and no verdict; '' when it has one
+    model (or none, which callers report separately as NO-WRAPPER)."""
+    if len(wrappers) <= 1:
+        return ""
+    return (f"{len(wrappers)} model wrappers; a single '; Source:' line cannot "
+            f"describe them, so no origin is recorded and no verdict is given")
 
 
 def main(argv=None) -> int:
@@ -171,10 +198,18 @@ def main(argv=None) -> int:
             if decl["source"]:
                 rows.append((ident, "ALREADY-RECORDED", decl["source"], ""))
                 continue
-            wrapper = wrapper_res_for(text)
-            if not wrapper:
+            wrappers = wrapper_res_for(text)
+            if not wrappers:
                 rows.append((ident, "NO-WRAPPER", "", "no PackedScene ext_resource"))
                 continue
+            # The back-fill REFUSES to write a "; Source:" for a multi-model asset: one
+            # source line cannot describe 18 models, and writing one would make the
+            # audit compare a single arbitrary wrapper and call the whole asset OK.
+            note = multi_model_note(wrappers)
+            if note:
+                rows.append((ident, "MULTI-MODEL", "", note))
+                continue
+            wrapper = wrappers[0]
 
             print(f"  ...probing {ident} ({wrapper})", file=sys.stderr)
             run = runtime_manifest(REPO, wrapper)
@@ -279,6 +314,43 @@ def selftest_cases(c) -> None:
         tie2 = [(blend, 5), (gltf, 5)]
         c.eq(_collapse_to_origins(tie2, root2)[0][0], gltf,
              "equal score: format preference picks .gltf over .blend")
+
+    # --- wrapper_res_for returns EVERY wrapper, and multi-model assets get no verdict --
+    # The old re.search returned the FIRST PackedScene only, so an 18-model .tres was
+    # audited by probing one model and reported OK for the whole asset.
+    one = '[ext_resource type="PackedScene" path="res://a.tscn" id="1_a"]\n'
+    two = one + '[ext_resource type="PackedScene" path="res://b.tscn" id="2_b"]\n'
+    c.eq(wrapper_res_for(one), ["res://a.tscn"],
+         "a single-model .tres yields a one-element list")
+    c.eq(wrapper_res_for(two), ["res://a.tscn", "res://b.tscn"],
+         "EVERY PackedScene wrapper is returned, not just the first")
+    c.eq(wrapper_res_for(one + one), ["res://a.tscn"],
+         "the same wrapper referenced twice is one model, not two")
+    c.eq(wrapper_res_for('[ext_resource type="Texture2D" path="res://t.png" id="1"]\n'),
+         [], "a .tres with no PackedScene has no wrapper")
+    c.eq(wrapper_res_for(""), [], "empty text has no wrapper")
+
+    c.eq(multi_model_note(["res://a.tscn"]), "",
+         "one wrapper is not multi-model -- behaviour is unchanged for these")
+    c.eq(multi_model_note([]), "", "no wrapper is reported separately, not as multi-model")
+    c.check("2 model wrappers" in multi_model_note(["a", "b"]),
+            "the multi-model note states HOW MANY models the asset declares")
+    c.check("'; Source:'" in multi_model_note(["a", "b"]),
+            "the note says why no Source line is written")
+
+    # The live files that motivated this: measured 18 and 8 PackedScene refs.
+    _human = REPO / "project" / "data" / "animals" / "human.tres"
+    _forest = REPO / "project" / "data" / "terrain" / "forest.tres"
+    if _human.is_file() and _forest.is_file():
+        c.eq(len(wrapper_res_for(_human.read_text())), 18,
+             "human.tres really does declare 18 model wrappers")
+        c.eq(len(wrapper_res_for(_forest.read_text())), 8,
+             "forest.tres really does declare 8 model wrappers")
+        c.check(multi_model_note(wrapper_res_for(_human.read_text())),
+                "human.tres is MULTI-MODEL, so no Source is back-filled and no verdict "
+                "is given")
+    else:
+        c.check(True, "human/forest .tres absent, live multi-model case skipped")
 
     # --- FINDING 3: no silent continuation when the Godot binary cannot be resolved ---
     # godot.binary()'s main-checkout fallback resolves from ITS OWN __file__, which is

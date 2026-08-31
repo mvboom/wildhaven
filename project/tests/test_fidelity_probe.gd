@@ -20,6 +20,16 @@ extends QATestCase
 const WRAPPER: String = "res://assets/animals/sheep/Sheep.tscn"
 const COLOR_TOLERANCE: float = 0.001
 
+## Stag is the MATERIAL-REUSE fixture, and the only model in the project that has one.
+## Stag.gltf declares 5 materials across 6 primitives, refs [0,1,2,3,4,1] -- material 1
+## is used twice. `materials` means UNIQUE materials, so the probe must report 5 while
+## `surfaces` still reports 6. Appending one row per surface reported 6, which made a
+## correct import fail two FAIL-level rules (materials and base_colors) against a source
+## that counts 5.
+const REUSE_WRAPPER: String = "res://assets/animals/stag/Stag.tscn"
+const REUSE_MATERIALS: int = 5
+const REUSE_SURFACES: int = 6
+
 func _init() -> void:
 	begin("fidelity probe")
 	var m: Dictionary = FidelityProbe.probe(WRAPPER)
@@ -41,6 +51,18 @@ func _init() -> void:
 	check(colors.size() == 2 and _approx(colors[1], grey, COLOR_TOLERANCE),
 		"second base colour is linear grey (~0.8), matching the source manifest",
 		"got %s" % [colors[1] if colors.size() > 1 else null])
+
+	# A material used on two surfaces is ONE material. Deduplicated by resource
+	# instance id, so two genuinely distinct materials that happen to share a base
+	# colour are still two -- identity, not value.
+	var s: Dictionary = FidelityProbe.probe(REUSE_WRAPPER)
+	check(not s.is_empty(), "%s probes" % REUSE_WRAPPER)
+	check_eq(s.get("surfaces", -1), REUSE_SURFACES,
+		"Stag has six surfaces -- surfaces counts geometry and is NOT deduplicated")
+	check_eq(s.get("materials", -1), REUSE_MATERIALS,
+		"Stag's reused material counts ONCE: five unique materials over six surfaces")
+	check_eq(s.get("base_colors", []).size(), REUSE_MATERIALS,
+		"one base colour per UNIQUE material, not per surface")
 	finish()
 
 

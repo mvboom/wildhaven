@@ -42,16 +42,52 @@ def _gltf_doc(path: Path) -> dict:
     return json.loads(raw[20:20 + length])
 
 
+def _albedo_uri(doc: dict, mat: dict) -> str:
+    """The image filename behind this material's baseColorTexture, or ''.
+
+    ONLY baseColorTexture. See the `textures` note in manifest_from_gltf.
+    """
+    bct = mat.get("pbrMetallicRoughness", {}).get("baseColorTexture") or {}
+    ti = bct.get("index")
+    textures = doc.get("textures", [])
+    images = doc.get("images", [])
+    if ti is None or not isinstance(ti, int) or ti >= len(textures):
+        return ""
+    si = textures[ti].get("source")
+    if si is None or not isinstance(si, int) or si >= len(images):
+        return ""
+    return images[si].get("uri") or ""
+
+
 def manifest_from_gltf(path: Path) -> dict:
     doc = _gltf_doc(Path(path))
     m = empty_manifest()
 
     mats = doc.get("materials", [])
-    m["materials"] = len(mats)
+
+    prims = [p for mesh in doc.get("meshes", []) for p in mesh.get("primitives", [])]
+    m["surfaces"] = len(prims)
+    m["vertex_colors"] = any("COLOR_0" in p.get("attributes", {}) for p in prims)
+
+    # `materials` means the UNIQUE materials the rendered mesh actually USES -- the
+    # DISTINCT material indices referenced by primitives -- not len(doc["materials"]).
+    # Two reasons, both measured (Ruling 19):
+    #   * a table entry no primitive references is never imported as a surface material,
+    #     so the runtime probe (which walks surfaces) can never see it; counting it made
+    #     a healthy import FAIL;
+    #   * a material REUSED across primitives is one material, and the probe now dedupes
+    #     by material identity to agree. Stag.gltf is the live case: 5 materials, 6
+    #     primitives, refs [0,1,2,3,4,1].
+    # A primitive with no "material" key uses the glTF default material; none of this
+    # project's sources have one, and it is deliberately not counted here.
+    used = sorted({p["material"] for p in prims
+                   if isinstance(p.get("material"), int) and p["material"] < len(mats)})
+    m["materials"] = len(used)
+
     # Sort the three per-material lists TOGETHER, keyed on colour, so a row stays coherent.
     rows = []
-    for mat in mats:
-        pbr = mat.get("pbrMetallicRoughness", {})
+    for i in used:
+        pbr = mats[i].get("pbrMetallicRoughness", {})
         rows.append((
             [round4(v) for v in pbr.get("baseColorFactor", [1.0, 1.0, 1.0, 1.0])],
             round4(pbr.get("metallicFactor", 1.0)),
@@ -61,10 +97,6 @@ def manifest_from_gltf(path: Path) -> dict:
     m["base_colors"] = [r[0] for r in rows]
     m["metallic"] = [r[1] for r in rows]
     m["roughness"] = [r[2] for r in rows]
-
-    prims = [p for mesh in doc.get("meshes", []) for p in mesh.get("primitives", [])]
-    m["surfaces"] = len(prims)
-    m["vertex_colors"] = any("COLOR_0" in p.get("attributes", {}) for p in prims)
 
     accessors = doc.get("accessors", [])
     total = 0
@@ -87,8 +119,19 @@ def manifest_from_gltf(path: Path) -> dict:
 
     m["clips"] = sorted(a.get("name", "") for a in doc.get("animations", []))
     m["joints"] = max((len(s.get("joints", [])) for s in doc.get("skins", [])), default=0)
-    m["textures"] = sorted(
-        Path(i["uri"]).name for i in doc.get("images", []) if i.get("uri"))
+
+    # `textures` covers ALBEDO textures ONLY -- the images reachable through a used
+    # material's pbrMetallicRoughness.baseColorTexture -- NOT every entry in the glTF
+    # images[] array. fidelity_probe.gd reads BaseMaterial3D.albedo_texture and has no
+    # equivalent readback for the other slots, so collecting the whole images[] array
+    # made `textures` (a FAIL-level rule) structurally impossible to satisfy: e.g.
+    # CommonTree_1.gltf lists Bark_NormalTree_Normal.png, reached only via
+    # normalTexture, so every textured asset FAILED on a perfectly healthy import.
+    # CONSEQUENCE, deliberately accepted (Ruling 18): a dropped or mis-imported NORMAL,
+    # roughness, occlusion or emission map is NOT detected by this audit. The manifest
+    # means "the textures the comparison can actually see", not "every texture".
+    m["textures"] = sorted({Path(uri).name for uri in
+                            (_albedo_uri(doc, mats[i]) for i in used) if uri})
     return m
 
 
@@ -106,8 +149,51 @@ elif low.endswith(".fbx"):
 else:
     raise SystemExit("unsupported: " + path)
 
+meshes = [o for o in bpy.data.objects if o.type == "MESH"]
+
+
+def albedo_images(bsdf):
+    """Images feeding the BSDF's Base Color input, following links back through any
+    intermediate nodes (mix, colour ramp, ...).
+
+    ONLY Base Color -- NOT every TEX_IMAGE node in the material. fidelity_probe.gd
+    reads BaseMaterial3D.albedo_texture and nothing else, so a normal or roughness map
+    can never appear on the runtime side; collecting every image node made `textures`
+    (a FAIL-level rule) impossible to satisfy on a healthy import. CONSEQUENCE,
+    deliberately accepted (Ruling 18): a dropped normal map is NOT detected.
+    """
+    found, seen = set(), set()
+    src = bsdf.inputs.get("Base Color")
+    stack = [l.from_node for l in src.links] if src is not None else []
+    while stack:
+        n = stack.pop()
+        if n.name in seen:
+            continue
+        seen.add(n.name)
+        if n.type == "TEX_IMAGE" and n.image:
+            found.add(n.image.name)
+        for inp in n.inputs:
+            for link in inp.links:
+                stack.append(link.from_node)
+    return found
+
+
+# UNIQUE materials actually USED by the mesh objects, via their material_slots -- NOT
+# file-wide bpy.data.materials, which also holds datablocks no object references and
+# which the runtime probe (walking mesh surfaces) could never see. Deduplicated by
+# material NAME, which is unique per datablock in Blender, so two genuinely different
+# materials that happen to share a base colour still count as two. Ruling 19.
+used_mats, seen_mats = [], set()
+for o in meshes:
+    for slot in o.material_slots:
+        mat = slot.material
+        if mat is None or mat.name in seen_mats:
+            continue
+        seen_mats.add(mat.name)
+        used_mats.append(mat)
+
 rows, textures = [], set()
-for mat in bpy.data.materials:
+for mat in used_mats:
     if not mat.use_nodes:
         continue
     bsdf = next((n for n in mat.node_tree.nodes if n.type == "BSDF_PRINCIPLED"), None)
@@ -117,11 +203,9 @@ for mat in bpy.data.materials:
     rows.append([[round(float(v), 4) for v in col],
                  round(float(bsdf.inputs["Metallic"].default_value), 4),
                  round(float(bsdf.inputs["Roughness"].default_value), 4)])
-    for img in (n.image for n in mat.node_tree.nodes if n.type == "TEX_IMAGE" and n.image):
-        textures.add(img.name)
+    textures |= albedo_images(bsdf)
 rows.sort(key=lambda r: r[0])
 
-meshes = [o for o in bpy.data.objects if o.type == "MESH"]
 verts = sum(len(o.data.vertices) for o in meshes)
 surfaces = sum(max(1, len(o.material_slots)) for o in meshes)
 vcol = any(len(o.data.color_attributes) > 0 for o in meshes)
@@ -141,6 +225,12 @@ print("<<<MANIFEST>>>" + json.dumps({
     "textures": sorted(textures),
     "surfaces": surfaces,
     "vertices": verts,
+    # KNOWN GAP, deliberately left (Ruling 20): bpy.data.actions is FILE-WIDE, the same
+    # class of over-report that `materials` was just fixed for -- an action no object
+    # uses is still counted. Not changed here because no asset diverges on clips today
+    # (sheep, pig and pug all match), and an unproven change in the final fix wave has
+    # no second review behind it. If a .blend with orphan actions ever over-reports,
+    # the failure is loud and diagnosable: `clips` missing/extra names the actions.
     "clips": sorted(a.name for a in bpy.data.actions),
     "joints": joints,
     "aabb": dims,
@@ -239,6 +329,79 @@ def selftest_cases(c) -> None:
         c.eq(sorted(empty_manifest().keys()), sorted(MANIFEST_FIELDS),
              "empty_manifest covers exactly MANIFEST_FIELDS")
 
+        # --- Ruling 19 (materials = UNIQUE materials the mesh USES) and Ruling 18
+        # (textures = ALBEDO only). One fixture exercises both, because both defects
+        # made a healthy import FAIL on a FAIL-level rule.
+        #   * "Unused" sits in the material table but no primitive references it.
+        #   * "Body" is referenced by TWO primitives -- Stag.gltf's real shape
+        #     (5 materials, 6 primitives, refs [0,1,2,3,4,1]).
+        #   * Bark_Normal.png is in images[] but reachable ONLY via normalTexture,
+        #     exactly like CommonTree_1.gltf's Bark_NormalTree_Normal.png.
+        used_doc = {
+            "materials": [
+                {"name": "Body", "pbrMetallicRoughness": {
+                    "baseColorFactor": [0.2, 0.2, 0.2, 1], "metallicFactor": 0.0,
+                    "roughnessFactor": 0.5, "baseColorTexture": {"index": 0}},
+                 "normalTexture": {"index": 1}},
+                {"name": "Eyes", "pbrMetallicRoughness": {
+                    "baseColorFactor": [0.9, 0.9, 0.9, 1], "metallicFactor": 1.0,
+                    "roughnessFactor": 0.4}},
+                {"name": "Unused", "pbrMetallicRoughness": {
+                    "baseColorFactor": [0.5, 0.1, 0.1, 1], "metallicFactor": 0.25,
+                    "roughnessFactor": 0.75, "baseColorTexture": {"index": 2}}},
+            ],
+            "meshes": [{"primitives": [
+                {"material": 0, "attributes": {"POSITION": 0}},
+                {"material": 1, "attributes": {"POSITION": 0}},
+                {"material": 0, "attributes": {"POSITION": 0}},
+            ]}],
+            "accessors": [{"count": 100, "min": [0.0, 0.0, 0.0], "max": [1.0, 1.0, 1.0]}],
+            "textures": [{"source": 0}, {"source": 1}, {"source": 2}],
+            "images": [{"uri": "Bark.png"}, {"uri": "Bark_Normal.png"},
+                       {"uri": "Never_Used.png"}],
+        }
+        (d / "used.gltf").write_text(_json.dumps(used_doc))
+        u = manifest_from_gltf(d / "used.gltf")
+        c.eq(u["materials"], 2,
+             "gltf: materials counts DISTINCT materials USED by primitives -- an unused "
+             "table entry is not counted and a material reused by two primitives is one")
+        c.eq(u["surfaces"], 3, "gltf: surfaces still counts every primitive, not materials")
+        c.eq(u["base_colors"], [[0.2, 0.2, 0.2, 1.0], [0.9, 0.9, 0.9, 1.0]],
+             "gltf: base_colors comes from the USED materials only -- the unused "
+             "material's colour is absent")
+        c.eq(u["metallic"], [0.0, 1.0],
+             "gltf: metallic follows the same used-material set, still paired by colour")
+        c.eq(u["roughness"], [0.5, 0.4],
+             "gltf: roughness follows the same used-material set")
+        c.eq(u["textures"], ["Bark.png"],
+             "gltf: textures is ALBEDO only -- a normal map in images[] is excluded, and "
+             "so is an unused material's albedo")
+
+        # Dedup is by material IDENTITY, never by value: two DIFFERENT materials that
+        # happen to share a base colour must still count as two. (The runtime probe
+        # keys on the material resource's instance id for the same reason; the Blender
+        # reader keys on the material datablock's unique name.)
+        twins_doc = {
+            "materials": [
+                {"name": "LeftEye", "pbrMetallicRoughness": {
+                    "baseColorFactor": [0.3, 0.3, 0.3, 1], "roughnessFactor": 0.1}},
+                {"name": "RightEye", "pbrMetallicRoughness": {
+                    "baseColorFactor": [0.3, 0.3, 0.3, 1], "roughnessFactor": 0.9}},
+            ],
+            "meshes": [{"primitives": [
+                {"material": 0, "attributes": {"POSITION": 0}},
+                {"material": 1, "attributes": {"POSITION": 0}},
+            ]}],
+            "accessors": [{"count": 10}],
+        }
+        (d / "twins.gltf").write_text(_json.dumps(twins_doc))
+        tw = manifest_from_gltf(d / "twins.gltf")
+        c.eq(tw["materials"], 2,
+             "gltf: two distinct materials sharing a base colour still count as TWO -- "
+             "uniqueness is by material identity, not by colour value")
+        c.eq(tw["roughness"], [0.1, 0.9],
+             "gltf: both same-coloured materials keep their own roughness row")
+
         # .glb: same JSON, wrapped in the binary container -- the two paths must agree.
         # This now also exercises a LIVE aabb (accessor min/max carried the whole doc
         # over), not the [0,0,0] default the field used to be stuck at.
@@ -310,6 +473,24 @@ def selftest_cases(c) -> None:
     c.eq(compare(base, flat, {"vertex_colors"}), [],
          "a sanctioned field is exempt")
 
+    # joints is a FAIL rule; its SEVERITY was asserted nowhere until now.
+    c.eq([f.level for f in compare(base, dict(base, joints=30), set())], ["FAIL"],
+         "a joint-count mismatch is a FAIL, not a warning")
+
+    # base_colors carries the SAME one-step tolerance the generated suite uses, so
+    # --report cannot exit 1 on an asset whose own suite is green.
+    near = dict(base, base_colors=[[0.1, 0.1, 0.1, 1.0], [0.80005, 0.8, 0.8, 1.0]])
+    c.eq(compare(base, near, set()), [],
+         "base_colors tolerates one 4dp quantisation step, matching the suite's "
+         "_colors_match")
+    drift = dict(base, base_colors=[[0.1, 0.1, 0.1, 1.0], [0.81, 0.8, 0.8, 1.0]])
+    c.eq([f.level for f in compare(base, drift, set())], ["FAIL"],
+         "a real colour drift beyond one step is still a FAIL -- the tolerance is a "
+         "guard, not a loosening")
+    dropped = dict(base, base_colors=[[0.1, 0.1, 0.1, 1.0]])
+    c.eq([f.field for f in compare(base, dropped, set())], ["base_colors"],
+         "a base_colors list of the wrong LENGTH is still a mismatch under tolerance")
+
     # Seam splitting is normal; a near-empty mesh is not.
     c.eq(compare(base, dict(base, vertices=2412), set()), [],
          "2.4x vertices is inside the seam-splitting band")
@@ -356,6 +537,23 @@ Finding = namedtuple("Finding", "field level detail")
 VERTEX_BAND = (0.5, 3.0)
 AABB_TOLERANCE = 0.05
 
+# One 4dp quantisation step -- the SAME slack the generated suite's _colors_match uses.
+# Not a tuning value: exact list equality here meant --report could exit 1 (base_colors
+# is FAIL-level) on an asset whose own generated suite was green, i.e. the two comparison
+# paths disagreeing about identical numbers. Deliberately not loosened beyond one step.
+COLOR_TOLERANCE = 0.0001
+
+
+def _colors_match(src: list, run: list) -> bool:
+    if len(src) != len(run):
+        return False
+    for a, b in zip(src, run):
+        if len(a) != len(b):
+            return False
+        if any(abs(float(x) - float(y)) > COLOR_TOLERANCE for x, y in zip(a, b)):
+            return False
+    return True
+
 
 def _suffix_kind(path: Path) -> str:
     s = path.suffix.lower()
@@ -394,7 +592,7 @@ def compare(src: dict, run: dict, sanctioned: set) -> list:
         if src[field] != run[field]:
             add(field, "FAIL", f"source {src[field]} vs runtime {run[field]}")
 
-    if src["base_colors"] != run["base_colors"]:
+    if not _colors_match(src["base_colors"], run["base_colors"]):
         add("base_colors", "FAIL",
             f"source {src['base_colors']} vs runtime {run['base_colors']}")
 

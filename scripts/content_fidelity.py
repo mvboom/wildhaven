@@ -17,7 +17,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from assetpipe import declared, fingerprint  # noqa: E402
-from content_provenance import DATA_DIRS, REPO, wrapper_res_for  # noqa: E402
+from content_provenance import (  # noqa: E402
+    DATA_DIRS, REPO, multi_model_note, wrapper_res_for)
 
 
 def _gd_colors(colors: list) -> str:
@@ -37,6 +38,12 @@ def suite_text(ident: str, display: str, wrapper_res: str,
 ## Every SRC_ value below was extracted from the source file named in
 ## project/data/.../{ident}.tres, and is baked in as a literal so this suite's assertion
 ## count is fixed. Regenerate rather than edit.
+##
+## SRC_MATERIALS counts the UNIQUE materials the source mesh actually USES (a material
+## reused across two surfaces is one material). SRC_TEXTURES lists ALBEDO textures only
+## -- a normal or roughness map is deliberately outside what this comparison can see.
+## Every asserted field can be exempted by a "; Sanctioned-delta:" line in the .tres
+## header, which turns its assertion into a PEND rather than leaving it permanently red.
 ##
 ## Run:
 ##   $GODOT_PATH --headless --path project --import
@@ -76,9 +83,20 @@ func _init() -> void:
 		check_eq(m["vertex_colors"], SRC_VERTEX_COLORS,
 			"vertex-colour-as-albedo matches the source")
 
-	check(_covers(m["textures"], SRC_TEXTURES), "every source texture arrived")
-	check(_covers(m["clips"], SRC_CLIPS), "every source clip arrived")
-	check_eq(m["joints"], SRC_JOINTS, "skeleton joint count matches the source")
+	if SANCTIONED.has("textures"):
+		note_expected_pending("textures sanctioned", "declared in the .tres header")
+	else:
+		check(_covers(m["textures"], SRC_TEXTURES), "every source texture arrived")
+
+	if SANCTIONED.has("clips"):
+		note_expected_pending("clips sanctioned", "declared in the .tres header")
+	else:
+		check(_covers(m["clips"], SRC_CLIPS), "every source clip arrived")
+
+	if SANCTIONED.has("joints"):
+		note_expected_pending("joints sanctioned", "declared in the .tres header")
+	else:
+		check_eq(m["joints"], SRC_JOINTS, "skeleton joint count matches the source")
 	finish()
 
 
@@ -111,17 +129,60 @@ def write_suite(repo: Path, ident: str, display: str, wrapper_res: str,
     return path
 
 
-def _format_row(ident: str, state: str, findings: list) -> str:
+# States in which an asset was ACTUALLY compared against its source. Everything else is
+# a reason no comparison happened -- see _summary().
+COMPARED_STATES = ("OK", "WARN", "FAIL")
+
+
+def _format_row(ident: str, state: str, findings: list, note: str = "") -> str:
     head = f"  {ident:<20} {state}"
-    if not findings:
-        return head
-    detail = "; ".join(f"{f.field} [{f.level}] {f.detail}" for f in findings)
-    return f"{head}  {detail}"
+    if findings:
+        detail = "; ".join(f"{f.field} [{f.level}] {f.detail}" for f in findings)
+        return f"{head}  {detail}"
+    if note:
+        return f"{head}  {note}"
+    return head
 
 
 def _exit_code(verdicts: list) -> int:
     """Warnings never fail the command -- the bands they use are unruled proposals."""
     return 1 if any(v == "FAIL" for v in verdicts) else 0
+
+
+def _summary(rows: list) -> list:
+    """The summary block, as lines.
+
+    The count that matters is how many assets were NOT compared at all. A run that says
+    "0 FAIL" while two thirds of the content carries no source is a green light nobody
+    earned, and run-tests.sh's "114 passed" says nothing about it either. So the
+    unverified total is stated first, loudly, and broken down by reason.
+    """
+    counts: dict = {}
+    for row in rows:
+        counts[row[1]] = counts.get(row[1], 0) + 1
+    compared = sum(v for k, v in counts.items() if k in COMPARED_STATES)
+    unverified = len(rows) - compared
+    reasons = ", ".join(f"{v} {k}" for k, v in sorted(counts.items())
+                        if k not in COMPARED_STATES)
+
+    lines = [""]
+    if unverified:
+        lines.append(f"*** {unverified} of {len(rows)} ASSET(S) NOT VERIFIED -- no "
+                     f"comparison was made against any source.")
+        lines.append(f"    Reasons: {reasons}")
+        lines.append("    A clean verdict list below covers the "
+                     f"{compared} compared asset(s) ONLY. It is NOT a statement about "
+                     "the other "
+                     f"{unverified}.")
+    else:
+        lines.append(f"All {len(rows)} asset(s) were compared against a declared source.")
+    lines.append("")
+    lines.append(f"{compared} compared: "
+                 + (", ".join(f"{counts[k]} {k}" for k in COMPARED_STATES if k in counts)
+                    or "none"))
+    if reasons:
+        lines.append(f"{unverified} not compared: {reasons}")
+    return lines
 
 
 def report(repo: Path, filt: str = "") -> tuple:
@@ -136,23 +197,37 @@ def report(repo: Path, filt: str = "") -> tuple:
             text = tres.read_text()
             decl = declared.parse(text)
             if decl["placeholder"]:
-                rows.append((ident, "KNOWN-PLACEHOLDER", []))
+                rows.append((ident, "KNOWN-PLACEHOLDER", [], ""))
                 verdicts.append("KNOWN-PLACEHOLDER")
                 continue
+            wrappers = wrapper_res_for(text)
+            # MULTI-MODEL is a STATE, not a verdict: not OK, not FAIL. An asset that
+            # bundles N models has no single "; Source:" to compare against, and
+            # probing one of them and calling the asset OK is precisely the false
+            # green this audit exists to prevent (Ruling 17).
+            note = multi_model_note(wrappers)
+            if note:
+                rows.append((ident, "MULTI-MODEL", [], note))
+                verdicts.append("MULTI-MODEL")
+                continue
+            if not wrappers:
+                rows.append((ident, "NO-WRAPPER", [], "no PackedScene ext_resource"))
+                verdicts.append("NO-WRAPPER")
+                continue
             if not decl["source"]:
-                rows.append((ident, "UNKNOWN-SOURCE", []))
+                rows.append((ident, "UNKNOWN-SOURCE", [], ""))
                 verdicts.append("UNKNOWN-SOURCE")
                 continue
             source = repo / decl["source"]
             if not source.is_file():
-                rows.append((ident, "SOURCE-MISSING", []))
-                verdicts.append("UNKNOWN-SOURCE")
+                rows.append((ident, "SOURCE-MISSING", [], decl["source"]))
+                verdicts.append("SOURCE-MISSING")
                 continue
             src = fingerprint.manifest_for_source(source)
-            run = runtime_manifest(repo, wrapper_res_for(text))
+            run = runtime_manifest(repo, wrappers[0])
             findings = fingerprint.compare(src, run, decl["sanctioned"])
             state = fingerprint.verdict(findings)
-            rows.append((ident, state, findings))
+            rows.append((ident, state, findings, ""))
             verdicts.append(state)
     return rows, _exit_code(verdicts)
 
@@ -167,12 +242,10 @@ def main(argv=None) -> int:
 
     if args.report:
         rows, code = report(REPO, args.filter)
-        for ident, state, findings in rows:
-            print(_format_row(ident, state, findings))
-        counts = {}
-        for _, state, _ in rows:
-            counts[state] = counts.get(state, 0) + 1
-        print("\n" + ", ".join(f"{v} {k}" for k, v in sorted(counts.items())))
+        for ident, state, findings, note in rows:
+            print(_format_row(ident, state, findings, note))
+        for line in _summary(rows):
+            print(line)
         return code
 
     made, skipped = [], []
@@ -188,6 +261,17 @@ def main(argv=None) -> int:
             if decl["placeholder"]:
                 skipped.append((ident, "KNOWN-PLACEHOLDER"))
                 continue
+            wrappers = wrapper_res_for(text)
+            # No suite is generated for a multi-model asset. A suite bakes ONE wrapper
+            # path and one source manifest; for an 18-model .tres that would assert
+            # about a single arbitrary model and go green for the other 17 (Ruling 17).
+            note = multi_model_note(wrappers)
+            if note:
+                skipped.append((ident, f"MULTI-MODEL -- {note}"))
+                continue
+            if not wrappers:
+                skipped.append((ident, "no PackedScene ext_resource"))
+                continue
             if not decl["source"]:
                 skipped.append((ident, "UNKNOWN-SOURCE -- run content_provenance.py"))
                 continue
@@ -195,7 +279,7 @@ def main(argv=None) -> int:
             if not source.is_file():
                 skipped.append((ident, f"declared source missing: {decl['source']}"))
                 continue
-            wrapper = wrapper_res_for(text)
+            wrapper = wrappers[0]
             display = wrapper.rsplit("/", 1)[-1].removesuffix(".tscn") or ident
             src = fingerprint.manifest_for_source(source)
             path = write_suite(REPO, ident, display, wrapper, src, decl["sanctioned"])
@@ -240,6 +324,26 @@ def selftest_cases(c) -> None:
     c.check("SANCTIONED" in sanctioned and "vertex_colors" in sanctioned,
             "sanctioned fields are recorded in the suite")
 
+    # EVERY asserted field must have a sanctioned branch. declared.parse accepts a
+    # Sanctioned-delta for any field and --report honours it, so a field the generated
+    # suite does not branch on is one an operator can never clear: permanently red with
+    # a recorded, accepted reason sitting right there in the .tres header.
+    for field in ("materials", "base_colors", "vertex_colors", "textures", "clips",
+                  "joints"):
+        c.check(f'SANCTIONED.has("{field}")' in text
+                and f'note_expected_pending("{field} sanctioned"' in text,
+                f"{field} has a sanctioned branch -- a declared delta for it turns the "
+                f"assertion into a PEND instead of leaving it permanently red")
+
+    # The branch is a RUNTIME check against the baked SANCTIONED array, so no asserted
+    # field may be asserted outside one. Every `check` in the body sits under an else.
+    body = text.split("func _init", 1)[1].split("\n\n\n", 1)[0]
+    stray = [ln for ln in body.splitlines()
+             if ln.lstrip().startswith(("check(", "check_eq("))
+             and not ln.startswith("\t\t")]
+    c.eq(stray, [],
+         f"every field assertion sits inside its sanctioned else-branch, got {stray}")
+
     from assetpipe.fingerprint import Finding
 
     ok_row = _format_row("sheep", "OK", [])
@@ -257,3 +361,33 @@ def selftest_cases(c) -> None:
     c.eq(_exit_code(["KNOWN-PLACEHOLDER", "UNKNOWN-SOURCE"]), 0,
          "declared placeholders and unknown sources are states, not failures")
     c.eq(_exit_code([]), 0, "nothing to check exits 0")
+    c.eq(_exit_code(["MULTI-MODEL", "NO-WRAPPER"]), 0,
+         "MULTI-MODEL is a state, not a verdict -- it neither passes nor fails the run")
+
+    # --- the unverified count must be impossible to miss ----------------------------
+    # 19 of 31 assets carried no source while run-tests.sh printed "114 passed". A
+    # summary that only lists verdicts lets a green report read as "all content
+    # verified", which is the one claim this tool must never make falsely.
+    mixed = [("a", "OK", [], ""), ("b", "WARN", [], ""),
+             ("c", "UNKNOWN-SOURCE", [], ""), ("d", "UNKNOWN-SOURCE", [], ""),
+             ("e", "MULTI-MODEL", [], "18 model wrappers")]
+    text_summary = "\n".join(_summary(mixed))
+    c.check("3 of 5 ASSET(S) NOT VERIFIED" in text_summary,
+            f"the summary leads with the unverified count, got:\n{text_summary}")
+    c.check("2 UNKNOWN-SOURCE" in text_summary and "1 MULTI-MODEL" in text_summary,
+            "the unverified count is broken down by reason")
+    c.check("2 compared" in text_summary,
+            "the summary states how many assets were actually compared")
+    c.check("NOT a statement about the other 3" in text_summary,
+            "the summary explicitly refuses to let a clean verdict list stand in for "
+            "the assets it did not check")
+
+    clean = [("a", "OK", [], ""), ("b", "OK", [], "")]
+    clean_summary = "\n".join(_summary(clean))
+    c.check("NOT VERIFIED" not in clean_summary
+            and "All 2 asset(s) were compared" in clean_summary,
+            f"with nothing unverified the warning is absent, got:\n{clean_summary}")
+
+    c.check("18 model wrappers" in _format_row("human", "MULTI-MODEL", [],
+                                               "18 model wrappers"),
+            "a MULTI-MODEL row carries the reason it got no verdict")

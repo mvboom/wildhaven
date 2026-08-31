@@ -24,6 +24,9 @@ static func probe(wrapper_path: String) -> Dictionary:
 	_collect_meshes(root, meshes)
 
 	var rows: Array = []
+	# Materials already counted, keyed by resource INSTANCE ID -- see the dedup note in
+	# the surface loop below.
+	var seen_mats: Dictionary = {}
 	var textures: Dictionary = {}
 	var surfaces: int = 0
 	var vertices: int = 0
@@ -54,6 +57,21 @@ static func probe(wrapper_path: String) -> Dictionary:
 				continue
 			if base.vertex_color_use_as_albedo:
 				vcol = true
+			# UNIQUE materials only. A glTF material reused across two primitives arrives
+			# as ONE Material resource assigned to two surfaces, and appending a row per
+			# surface counted it twice -- so a correct import of e.g. Stag (5 materials,
+			# 6 primitives, refs [0,1,2,3,4,1]) produced two red assertions, on
+			# `materials` and `base_colors`, both FAIL-level rules. Both source readers
+			# now report unique USED materials too; this is the runtime half of that.
+			#
+			# The dedup key is the material's INSTANCE ID -- resource identity, not
+			# value. Two genuinely different materials that happen to share a base colour
+			# are two distinct resources and still count as two. `surfaces` and
+			# `vertices` above are deliberately NOT deduplicated: they measure geometry,
+			# not materials. See Ruling 19.
+			if seen_mats.has(base.get_instance_id()):
+				continue
+			seen_mats[base.get_instance_id()] = true
 			# BaseMaterial3D.albedo_color reads back gamma-encoded (sRGB) relative to the
 			# glTF/Blender source, which is linear -- glTF's baseColorFactor and Blender's
 			# BSDF Base Color are both natively linear. Convert back to linear here so the
@@ -63,6 +81,10 @@ static func probe(wrapper_path: String) -> Dictionary:
 			var c: Color = base.albedo_color.srgb_to_linear()
 			rows.append([[_r4(c.r), _r4(c.g), _r4(c.b), _r4(c.a)],
 				_r4(base.metallic), _r4(base.roughness)])
+			# ALBEDO texture only -- there is no readback here for normal, roughness or
+			# emission maps, which is why both Python source readers now collect only
+			# baseColorTexture / the BSDF's Base Color input. A dropped normal map is
+			# outside what this audit detects (Ruling 18).
 			var tex: Texture2D = base.albedo_texture
 			if tex != null and not tex.resource_path.is_empty():
 				textures[tex.resource_path.get_file()] = true

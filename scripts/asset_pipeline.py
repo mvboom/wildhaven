@@ -669,12 +669,19 @@ def _validate(module, adapter_name: str, ident: str, mode: str | None,
 
 def write_fidelity_suite(tree: Path, ident: str, display: str, scene_res: str,
                          source: Path) -> Path | None:
-    """Best-effort: a missing Blender must not fail an otherwise good import.
+    """Guards MANIFEST EXTRACTION only: a missing or failing Blender must not fail an
+    otherwise good import.
 
     The import itself already succeeded by this point, and the asset is usable. A skipped
     fidelity suite is a visible gap (content_fidelity.py will report UNKNOWN for it),
     which is the honest outcome -- unlike a suite built from a manifest we could not
     actually extract.
+
+    NOT guarded, deliberately: write_suite() itself. A bug there is a bug in this
+    repository's own code, not an environment gap, and it propagates to run()'s top-level
+    handler with a traceback rather than being swallowed as a quiet "SKIPPED". So this
+    helper does NOT guarantee "never fails an otherwise good import" in general -- only
+    that the source-file read cannot.
     """
     import content_fidelity
     from assetpipe import fingerprint
