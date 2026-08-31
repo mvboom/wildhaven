@@ -1,5 +1,6 @@
 ; Fox — AnimalDefinition data entry (gdd.md -> Data Schemas / Content Architecture).
 ; Roster row: gdd.md:329 | Asset: Quaternius "Ultimate Animated Animal Pack", CC0 1.0.
+; Source: source-content/assets/Ultimate Animated Animals - July 2021/glTF/Fox.gltf
 ;
 ; fact_text is content-writer option B2 — a post-verification rewrite of the original
 ; option B, which shipped briefly and then FAILED source verification: ADW states the
