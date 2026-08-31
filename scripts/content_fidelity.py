@@ -111,11 +111,69 @@ def write_suite(repo: Path, ident: str, display: str, wrapper_res: str,
     return path
 
 
+def _format_row(ident: str, state: str, findings: list) -> str:
+    head = f"  {ident:<20} {state}"
+    if not findings:
+        return head
+    detail = "; ".join(f"{f.field} [{f.level}] {f.detail}" for f in findings)
+    return f"{head}  {detail}"
+
+
+def _exit_code(verdicts: list) -> int:
+    """Warnings never fail the command -- the bands they use are unruled proposals."""
+    return 1 if any(v == "FAIL" for v in verdicts) else 0
+
+
+def report(repo: Path, filt: str = "") -> tuple:
+    from content_provenance import runtime_manifest
+
+    rows, verdicts = [], []
+    for sub in DATA_DIRS:
+        for tres in sorted((repo / "project" / "data" / sub).glob("*.tres")):
+            ident = tres.stem
+            if filt and filt not in ident:
+                continue
+            text = tres.read_text()
+            decl = declared.parse(text)
+            if decl["placeholder"]:
+                rows.append((ident, "KNOWN-PLACEHOLDER", []))
+                verdicts.append("KNOWN-PLACEHOLDER")
+                continue
+            if not decl["source"]:
+                rows.append((ident, "UNKNOWN-SOURCE", []))
+                verdicts.append("UNKNOWN-SOURCE")
+                continue
+            source = repo / decl["source"]
+            if not source.is_file():
+                rows.append((ident, "SOURCE-MISSING", []))
+                verdicts.append("UNKNOWN-SOURCE")
+                continue
+            src = fingerprint.manifest_for_source(source)
+            run = runtime_manifest(repo, wrapper_res_for(text))
+            findings = fingerprint.compare(src, run, decl["sanctioned"])
+            state = fingerprint.verdict(findings)
+            rows.append((ident, state, findings))
+            verdicts.append(state)
+    return rows, _exit_code(verdicts)
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("filter", nargs="?", default="",
                     help="only assets whose id contains this")
+    ap.add_argument("--report", action="store_true",
+                    help="audit declared sources against runtime; do not generate suites")
     args = ap.parse_args(argv)
+
+    if args.report:
+        rows, code = report(REPO, args.filter)
+        for ident, state, findings in rows:
+            print(_format_row(ident, state, findings))
+        counts = {}
+        for _, state, _ in rows:
+            counts[state] = counts.get(state, 0) + 1
+        print("\n" + ", ".join(f"{v} {k}" for k, v in sorted(counts.items())))
+        return code
 
     made, skipped = [], []
     for sub in DATA_DIRS:
@@ -181,3 +239,21 @@ def selftest_cases(c) -> None:
     sanctioned = suite_text("sheep", "Sheep", "res://x.tscn", m, {"vertex_colors"})
     c.check("SANCTIONED" in sanctioned and "vertex_colors" in sanctioned,
             "sanctioned fields are recorded in the suite")
+
+    from assetpipe.fingerprint import Finding
+
+    ok_row = _format_row("sheep", "OK", [])
+    c.check(ok_row.strip() == "sheep                OK".replace("  ", " ").strip()
+            or ok_row.split() == ["sheep", "OK"],
+            f"an OK row is just the asset and its state, got {ok_row!r}")
+    row = _format_row("pug", "FAIL", [Finding("materials", "FAIL", "source 2 vs runtime 1")])
+    c.check("FAIL" in row and "materials" in row and "source 2 vs runtime 1" in row,
+            f"a failing row carries the field and the numbers, got {row!r}")
+    warn = _format_row("stag", "WARN", [Finding("vertices", "WARN", "outside band")])
+    c.check("WARN" in warn and "vertices" in warn, "a warning row names its field")
+
+    c.eq(_exit_code(["OK", "WARN", "OK"]), 0, "warnings alone exit 0")
+    c.eq(_exit_code(["OK", "FAIL"]), 1, "any FAIL exits 1")
+    c.eq(_exit_code(["KNOWN-PLACEHOLDER", "UNKNOWN-SOURCE"]), 0,
+         "declared placeholders and unknown sources are states, not failures")
+    c.eq(_exit_code([]), 0, "nothing to check exits 0")
