@@ -94,7 +94,7 @@ def selftest_cases(c) -> None:
                     "metallicFactor": 0, "roughnessFactor": 0.5}},
                 {"name": "White", "pbrMetallicRoughness": {
                     "baseColorFactor": [0.8, 0.8, 0.8, 1],
-                    "metallicFactor": 0, "roughnessFactor": 0.5}},
+                    "metallicFactor": 1, "roughnessFactor": 0.2}},
             ],
             "meshes": [{"primitives": [
                 {"material": 0, "attributes": {"POSITION": 0, "COLOR_0": 1}},
@@ -112,6 +112,8 @@ def selftest_cases(c) -> None:
         c.eq(m["base_colors"][0], [0.0374, 0.0374, 0.0374, 1.0],
              "gltf: base colours sorted ascending, rounded to 4dp")
         c.eq(m["base_colors"][1], [0.8, 0.8, 0.8, 1.0], "gltf: second base colour")
+        c.eq(m["metallic"], [0.0, 1.0], "gltf: metallic paired with its material row")
+        c.eq(m["roughness"], [0.5, 0.2], "gltf: roughness paired with its material row")
         c.eq(m["vertex_colors"], True, "gltf: COLOR_0 detected")
         c.eq(m["clips"], ["Idle", "Walk"], "gltf: clips sorted")
         c.eq(m["joints"], 31, "gltf: skin joint count")
@@ -119,12 +121,30 @@ def selftest_cases(c) -> None:
         c.eq(m["surfaces"], 2, "gltf: primitive count")
 
         # Material ORDER must not change the manifest -- exporters do not guarantee it.
+        # Black/White carry DIFFERENT metallic/roughness values (see fixture above)
+        # specifically so a desync between base_colors and metallic/roughness after
+        # the reversal would be visible here rather than silently passing.
         doc["materials"].reverse()
         for i, prim in enumerate(doc["meshes"][0]["primitives"]):
             prim["material"] = 1 - i
         (d / "rev.gltf").write_text(_json.dumps(doc))
-        c.eq(manifest_from_gltf(d / "rev.gltf")["base_colors"], m["base_colors"],
+        rev = manifest_from_gltf(d / "rev.gltf")
+        c.eq(rev["base_colors"], m["base_colors"],
              "gltf: reordered materials produce an identical manifest")
+        c.eq(rev["metallic"], m["metallic"],
+             "gltf: reordered materials -- metallic stays paired with its colour")
+        c.eq(rev["roughness"], m["roughness"],
+             "gltf: reordered materials -- roughness stays paired with its colour")
 
         c.eq(sorted(empty_manifest().keys()), sorted(MANIFEST_FIELDS),
              "empty_manifest covers exactly MANIFEST_FIELDS")
+
+        # .glb: same JSON, wrapped in the binary container -- the two paths must agree.
+        json_bytes = _json.dumps(doc).encode("utf-8")
+        pad = (-len(json_bytes)) % 4
+        json_bytes += b" " * pad
+        header = struct.pack("<4sII", b"glTF", 2, 12 + 8 + len(json_bytes))
+        chunk_header = struct.pack("<II", len(json_bytes), 0x4E4F534A)
+        (d / "m.glb").write_bytes(header + chunk_header + json_bytes)
+        c.eq(manifest_from_gltf(d / "m.glb"), rev,
+             "glb: binary container parses to the same manifest as the equivalent .gltf")
