@@ -1,0 +1,80 @@
+{
+  "species_id": "pug",
+  "species_display_name": "Pug",
+  "generator_model": "claude-haiku-4-5-20251001",
+  "evaluator_model": "claude-opus-5",
+  "max_refine": 3,
+  "requested_count": 2,
+  "accepted_fact_texts": [
+    "Pugs were first bred in ancient China as companions for emperors and are called 'shadows' because they love to follow their owners around. These small dogs have the motto 'much in little,' meaning they have big personalities in a tiny package.",
+    "A pug's tail naturally curls into a tight spiral that loops right over its back, making the breed instantly recognizable."
+  ],
+  "candidates": [
+    {
+      "status": "accepted",
+      "fact_text": "Pugs were first bred in ancient China as companions for emperors and are called 'shadows' because they love to follow their owners around. These small dogs have the motto 'much in little,' meaning they have big personalities in a tiny package.",
+      "attempts": [
+        {
+          "attempt": 1,
+          "fact_text": "Pugs were first bred in ancient China as companions for emperors and are called 'shadows' because they love to follow their owners around. These small dogs have the motto 'much in little,' meaning they have big personalities in a tiny package.",
+          "source_note": "Wikipedia - Pug (https://en.wikipedia.org/wiki/Pug)",
+          "deterministic": {
+            "passed": true,
+            "problems": []
+          },
+          "llm_judge": {
+            "passed": true,
+            "problems": [],
+            "skipped": false
+          },
+          "passed": true
+        }
+      ]
+    },
+    {
+      "status": "accepted",
+      "fact_text": "A pug's tail naturally curls into a tight spiral that loops right over its back, making the breed instantly recognizable.",
+      "attempts": [
+        {
+          "attempt": 1,
+          "fact_text": "Common pugs are small moths with wings that show colors ranging from soft brown to pale whitish shades with hints of red. These night-flying moths flutter through gardens, forests, and parks across Europe, Asia, and Africa!",
+          "source_note": "en.wikipedia.org - Common pug (Eupithecia vulgata) article",
+          "deterministic": {
+            "passed": true,
+            "problems": []
+          },
+          "llm_judge": {
+            "passed": false,
+            "problems": [
+              "Species mismatch / not source-grounded for this card set: the draft describes the Common Pug MOTH (Eupithecia vulgata) \u2014 a night-flying insect found across Europe, Asia and Africa \u2014 while the species slot is the Pug DOG, as confirmed by the already-accepted card about ancient China, emperors and 'much in little'. A child reading both cards would be told the same animal is a small companion dog and a brown-and-whitish winged moth. The underlying facts are 'different' only because they are about two unrelated animals that share a name; this is a name-collision error, not a valid second fact.",
+              "Plausibility: presenting a moth's wing coloration and flight range as a fact about a pug is not defensible as a children's educational claim in a wildlife game where the pug is a dog; it cannot be reconciled with the accepted card and should be rewritten as a genuine second dog fact (e.g. curly tail, wrinkly face, love of naps)."
+            ],
+            "skipped": false
+          },
+          "passed": false
+        },
+        {
+          "attempt": 2,
+          "fact_text": "A pug's tail naturally curls into a tight spiral that loops right over its back, making the breed instantly recognizable.",
+          "source_note": "Wikipedia (en.wikipedia.org/wiki/Pug) \u2014 physical characteristic describing the breed's distinctive curled tail that loops over the hip.",
+          "deterministic": {
+            "passed": true,
+            "problems": []
+          },
+          "llm_judge": {
+            "passed": true,
+            "problems": [],
+            "skipped": false
+          },
+          "passed": true
+        }
+      ]
+    }
+  ],
+  "cost": {
+    "in": 114,
+    "out": 7126,
+    "usd": 0.494407,
+    "usd_known": true
+  }
+}

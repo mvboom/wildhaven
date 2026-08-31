@@ -98,6 +98,7 @@ const WARN_HUMAN_HOUSE: String = (
 )
 const WARN_HUMAN: String = "The farm family will look for a house with good soil around it."
 const WARN_GENERIC: String = "The {display_name} family will look for a new home of their own."
+const WARN_PUG: String = "The Pug family will need a building and an open field to make their home."  # pipeline-generated (2026-08-30, scripts/style_guide_pipeline.py) -- AWAITING CONTENT-WRITER SIGN-OFF
 const WARN_SHEEP: String = "The Sheep family makes its home in grassy fields and farmland."  # pipeline-generated (2026-08-30, scripts/style_guide_pipeline.py) -- AWAITING CONTENT-WRITER SIGN-OFF
 const WARN_PIG: String = "The Pig family's home is open ground with crops."  # pipeline-generated (2026-08-30, scripts/style_guide_pipeline.py) -- AWAITING CONTENT-WRITER SIGN-OFF
 const WARN_HORSE: String = "The Horse family lives in grassy fields and gardens."  # pipeline-generated (2026-08-17, scripts/style_guide_pipeline.py) -- AWAITING CONTENT-WRITER SIGN-OFF
@@ -163,6 +164,7 @@ const _WARN_STRUCTURE: Dictionary = {
 	"horse": WARN_HORSE,
 	"pig": WARN_PIG,
 	"sheep": WARN_SHEEP,
+	"pug": WARN_PUG,
 }
 
 ## The ordinary-home register: a den, a warren, a patch of ground.
@@ -176,6 +178,7 @@ const _WARN_HOME: Dictionary = {
 	"horse": WARN_HORSE,
 	"pig": WARN_PIG,
 	"sheep": WARN_SHEEP,
+	"pug": WARN_PUG,
 }
 
 ## The refinement that only becomes reachable when the payload names the binding need. Keyed
@@ -197,6 +200,7 @@ const DEPART_FOX: String = "The fox family moved away to find a new den in the w
 const DEPART_RABBIT: String = "The rabbit family moved away to find open grass of their own."
 const DEPART_HUMAN: String = "The farm family went off to farm somewhere sunnier."
 const DEPART_GENERIC: String = "The {display_name} family moved away to find a new home."
+const DEPART_PUG: String = "The Pug family found a new home with plenty of room to play and a cozy shelter."  # pipeline-generated (2026-08-30, scripts/style_guide_pipeline.py) -- AWAITING CONTENT-WRITER SIGN-OFF
 const DEPART_SHEEP: String = "The Sheep family found a home in the pasture."  # pipeline-generated (2026-08-30, scripts/style_guide_pipeline.py) -- AWAITING CONTENT-WRITER SIGN-OFF
 const DEPART_PIG: String = "The Pig family found a home with plenty of space and soft ground to explore."  # pipeline-generated (2026-08-30, scripts/style_guide_pipeline.py) -- AWAITING CONTENT-WRITER SIGN-OFF
 const DEPART_HORSE: String = "The Horse family found a new home where the grasslands and farmland meet."  # pipeline-generated (2026-08-17, scripts/style_guide_pipeline.py) -- AWAITING CONTENT-WRITER SIGN-OFF
@@ -214,6 +218,7 @@ const _DEPART: Dictionary = {
 	"horse": DEPART_HORSE,
 	"pig": DEPART_PIG,
 	"sheep": DEPART_SHEEP,
+	"pug": DEPART_PUG,
 }
 
 
@@ -234,6 +239,7 @@ const MOVE_FOX: String = "The fox family moved their den to a new spot in the wo
 const MOVE_RABBIT: String = "The rabbit family moved their warren to a new patch of grass."
 const MOVE_HUMAN: String = "The farm family moved into a house with more room to grow."
 const MOVE_GENERIC: String = "The {display_name} family moved their home to a new spot."
+const MOVE_PUG: String = "The Pug family has moved to a home with a spacious yard."  # pipeline-generated (2026-08-30, scripts/style_guide_pipeline.py) -- AWAITING CONTENT-WRITER SIGN-OFF
 const MOVE_SHEEP: String = "The Sheep family found a new home in a pasture."  # pipeline-generated (2026-08-30, scripts/style_guide_pipeline.py) -- AWAITING CONTENT-WRITER SIGN-OFF
 const MOVE_PIG: String = "The Pig family found a new home in an open field."  # pipeline-generated (2026-08-30, scripts/style_guide_pipeline.py) -- AWAITING CONTENT-WRITER SIGN-OFF
 const MOVE_HORSE: String = "The horse family found a new pasture with plenty of room to roam."  # pipeline-generated (2026-08-17, scripts/style_guide_pipeline.py) -- AWAITING CONTENT-WRITER SIGN-OFF
@@ -251,6 +257,7 @@ const _MOVE: Dictionary = {
 	"horse": MOVE_HORSE,
 	"pig": MOVE_PIG,
 	"sheep": MOVE_SHEEP,
+	"pug": MOVE_PUG,
 }
 
 

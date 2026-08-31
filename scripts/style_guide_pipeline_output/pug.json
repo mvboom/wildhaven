@@ -1,0 +1,131 @@
+{
+  "species_id": "pug",
+  "species_display_name": "Pug",
+  "generator_model": "claude-haiku-4-5-20251001",
+  "evaluator_model": "claude-opus-5",
+  "refiner_model": "claude-haiku-4-5-20251001",
+  "max_refine": 3,
+  "line_results": {
+    "warn": {
+      "status": "escalated",
+      "text": "The Pug family will need a building and an open field to make their home.",
+      "score": 9,
+      "attempts": [
+        {
+          "attempt": 1,
+          "text": "The Pug family will need a building and an open field to make their home.",
+          "deterministic": {
+            "passed": true,
+            "problems": []
+          },
+          "score": 9,
+          "reason": "Constraint 3 (Formatting/Read-Aloud): clean pass. Exactly one complete sentence, subject-verb-object, terminal period, no em dashes, no parentheses, no fragment. The affected home is named by family (\"The Pug family\"), not \"they\" or \"it\". Vocabulary is concrete and within reach of a pre-fluent reader; \"building\" is the one mildly abstract noun but it is decodable and not a stumbling block for a screen reader.\n\nConstraint 2 (Vocabulary/Framing): passes. No loss-coded lexemes (lose/lost/losing/nowhere/kicked out/vanish/gone/homeless) and, more importantly, no oblique loss either -- the sentence contains no departure, no shrinking, no \"anymore\", no \"still\". It names the HABITAT (a building, an open field) and nothing else, which is exactly what a warn line is supposed to carry. The player's action is entirely absent from the sentence, so there is no adjacency of player-cause and family-hardship. \"To make their home\" lands on the FINDING side of the villager doctrine rather than the losing side. No other Wildhaven species is named or used adjectivally. On the closed-graph rule: \"building\" and \"an open field\" are natural-language paraphrases, not the literal tag identifiers `house` and `open_grass` -- the rule forbids surfacing the identifier strings, and paraphrase is the only way to name a habitat at all, so this is compliant. \"Open\" appearing inside the phrase is incidental English, not the token.\n\nConstraint 1 (Tone/Voice): substantially passes -- plain game voice, no \"please\", no \"poor\"/\"sadly\", no \"are you sure\", no pleading, no second-person judgment, no urgency marker, no bulletin cadence, nothing that could echo back later as residue. The one thing keeping this off a 10 is the modal \"will need.\" Future-tense need, unanchored to any stated cause, quietly presupposes that the family's present arrangement is about to stop working -- an implied displacement carried by tense alone, which is precisely the class of thing a keyword sweep cannot see. It is very mild and arguably the intended oblique disclosure, but it does two small disservices: it leaves the player without a clear signal that this is a consent moment at all (it reads as a neutral requirements statement more than a warning), while still smuggling in a faint before/after. A present-tense framing of the same habitat facts would disclose the same information with no presupposition and no ambiguity of function. Minor, single-word issue on an otherwise correct and shippable-adjacent line."
+        },
+        {
+          "attempt": 2,
+          "text": "The Pug family makes their home in a building and an open field.",
+          "deterministic": {
+            "passed": true,
+            "problems": []
+          },
+          "score": 9,
+          "reason": "TONE/VOICE (pass): The line is flatly factual and present-tense, pure disclosure with no deterrence pressure. No 'please', no 'poor'/'sadly', no 'are you sure', no urgency verbs, no judgment of the player, no pleading. It reads in the plain game voice rather than the News Report bulletin voice \u2014 it simply states a fact about where a family lives, and it leaves no hook for later residue.\n\nVOCABULARY/FRAMING (pass): It names the habitat and only the habitat. There is no mention of the player's action at all, so the forbidden adjacency of player-action and family-hardship cannot occur, and no loss is stated or implied \u2014 no 'lose/lost/nowhere/gone/homeless', and no oblique loss coding either (nothing like 'still', 'for now', 'right where you're standing', or any phrasing that hints the habitat is about to stop being theirs). No other Wildhaven species is named, not even adjectivally. On the closed-graph tag rule, 'a building' and 'an open field' are correctly paraphrased surface prose rather than the raw identifiers 'house' and 'open_grass'; 'open field' sits closest to the line but is ordinary English description, not the tag token, so it stays inside the rule.\n\nFORMATTING/STRUCTURE (near-pass, one blemish): Exactly one complete sentence, no em dashes, no parentheses, no fragment, and the affected home is named by family as 'The Pug family' rather than 'they' or 'it'. The single defect is agreement: 'The Pug family makes their home' pairs a singular verb ('makes') with a plural possessive ('their') in the same clause. This is an internal inconsistency rather than a stylistic preference \u2014 either 'makes its home' or 'make their home' would be clean. Under the Read-Aloud constraint, which is explicitly scoped to a pre-fluent 6-year-old and to screen-reader delivery, a mid-clause number switch is exactly the kind of snag that costs a beginning reader a beat, and a screen reader gives no prosodic cover for it. Everything else ships; this one word is the fix.\n\nDocked one point for the agreement mismatch only. Recommended revision: 'The Pug family makes its home in a building and an open field.'"
+        },
+        {
+          "attempt": 3,
+          "text": "The Pug family makes its home in a building and an open field.",
+          "deterministic": {
+            "passed": true,
+            "problems": []
+          },
+          "score": 9,
+          "reason": "TONE/VOICE (pass): The line is flat, factual disclosure with no pleading, no 'please/sadly/poor', no 'are you sure', no urgency verb, no judgment of the player, and no reference to any consequence. It reads as the plain game voice, not a bulletin \u2014 there is no headline cadence, no dramatic verb, no editorializing adjective. It also correctly stops at disclosure rather than deterrence: nothing in it asks the player to reconsider.\n\nVOCABULARY/FRAMING (pass): It names the habitat and only the habitat \u2014 'a building and an open field' \u2014 and never gestures at the loss, not even obliquely; there is no implied displacement smuggled in via tense, contrast, or a 'currently/still/for now' hedge, which is the usual way an implied loss sneaks past a keyword sweep. No loss-coded vocabulary. The player's action is entirely absent, so there is no sentence putting that action beside the family's hardship. No other Wildhaven species is named, and no habitat-tag identifier appears verbatim: 'building' is used in place of the banned 'house' token, which is exactly the right paraphrase move.\n\nFORMATTING/STRUCTURE (pass): Exactly one complete sentence, subject-verb-object, terminal period, no em dashes, no parentheses, no fragment. The affected home is named by family ('The Pug family'), not by pronoun.\n\nWhy not a 10 \u2014 two minor, non-fatal issues, both in the zone a mechanical sweep cannot see. First, 'an open field' sits uncomfortably close to the surface form of the open_grass tag identifier; it is not the identifier and does not violate the letter of the closed-graph rule, but it is the least-disguised possible rendering of that tag, and a paraphrase with more distance ('a wide grassy stretch', 'a sunny clearing') would remove all doubt. Second, the compound 'makes its home in A and B' is slightly muddy for a pre-fluent 6-year-old: it reads as one home occupying two places at once rather than a family that lives across two kinds of ground. That is a comprehension wobble against the Read-Aloud bar, not a structural break. Ships with a small copy pass; does not need a rewrite."
+        }
+      ]
+    },
+    "depart": {
+      "status": "escalated",
+      "text": "The Pug family found a new home with plenty of room to play and a cozy shelter.",
+      "score": 9,
+      "attempts": [
+        {
+          "attempt": 1,
+          "text": "The Pug family found a new home with plenty of room to play and a cozy shelter.",
+          "deterministic": {
+            "passed": true,
+            "problems": []
+          },
+          "score": 9,
+          "reason": "TONE/VOICE (pass): The line is factual and upbeat, with no pleading, no urgency, no 'please/sadly/poor', no second-person address, no judgment of the player, and no residue \u2014 nothing in it refers back to the warning or to any action the player took. It reads in the plain game voice, not the News Report bulletin voice.\n\nVOCABULARY/FRAMING (minor issue): The doctrine is satisfied in its core: the family is described as finding a home, never losing one; the player's action and the family's situation never share a sentence; no loss-coded words appear; no other Wildhaven species is named, and no habitat-tag identifier (water/forest/open_grass/quiet/cover/flowers/sand/rocks/cultivated/house) is used \u2014 'room to play' and 'cozy shelter' are descriptive paraphrase, not tag leakage, and 'shelter' stays clear of the literal 'cover'/'house' tokens. The one soft spot: a depart line is supposed to carry the DESTINATION, and this carries only amenities of an unspecified 'new home.' The family is not left with nowhere to go, but the place they went is characterized rather than actually named, so the line does slightly less destination work than the doctrine asks for. 'Room to play' also drifts a step closer to an open-ground tag concept than a strictly neutral descriptor would.\n\nFORMATTING/STRUCTURE (pass): Exactly one complete declarative sentence, no em dashes, no parentheses, no fragments, and the affected home is named by family as 'The Pug family' rather than 'they' or 'it.' The two-part 'with...and...' tail is slightly listy for a pre-fluent reader but stays comfortably inside one clean, screen-reader-safe sentence.\n\nDeducting one point only for the generic, unnamed destination; everything else ships as-is."
+        },
+        {
+          "attempt": 2,
+          "text": "The Pug family found a home in the meadows with a cozy shelter and plenty of space.",
+          "deterministic": {
+            "passed": false,
+            "problems": [
+              "no destination phrase found -- departure/relocation lines must name somewhere the family is going, not just that they left."
+            ]
+          },
+          "score": 8,
+          "reason": "FORMATTING/STRUCTURE (pass): Exactly one complete sentence, subject-verb-object, no em dashes, no parentheses, no fragments. Names the affected home by family ('The Pug family'), never 'they' or 'it'. Read-aloud clean at a 6-year-old level \u2014 short words, single clause chain, no clause the screen reader has to disambiguate. VOCABULARY/FRAMING (mostly pass): The doctrine verb is correct \u2014 the family 'found a home,' the exact framing the GDD mandates, with no loss-coded token ('lose/lost/nowhere/gone/vanish/homeless' all absent) and no implied loss smuggled in via structure. The player's action is entirely absent from the sentence, so there is no adjacency between cause and hardship. No other Wildhaven species is named, and no habitat-tag identifier appears \u2014 'meadows' is descriptive landscape language, not the 'open_grass' tag string, so it stays outside the closed-graph rule. I disagree with the deterministic sweep here: 'in the meadows' IS a destination, it names somewhere the family is going, and the line does not merely report that they left. The sweep appears to be matching a canonical destination-phrase list rather than reading the sentence, and I decline to penalize on that basis. TONE/VOICE (the real deduction): The trailing 'with a cozy shelter and plenty of space' is the problem. The destination clause has already done its job by the word 'meadows'; the two added comforts are not disclosure, they are reassurance, and stacked reassurance is what consolation sounds like. Copy only itemizes how nice the new place is when something is being compensated for \u2014 the abundance framing ('plenty of') quietly presupposes a deficit the player caused, which is residue of the warning by implication even though nothing refers back to it explicitly. This is also the 'flavor' failure mode the GDD names directly: consent-adjacent copy drifting into scene-setting adjectives. 'Cozy' in particular is a warmth-coded word doing emotional work rather than informational work. Not a hard violation \u2014 no banned token, no judgment of the player, no urgency, no pleading \u2014 but it is a genuine tonal softening that a keyword sweep cannot catch, and it keeps this from shipping as-is. Tightening to the destination alone, or to one concrete neutral detail instead of two evaluative ones, would take it to 10."
+        },
+        {
+          "attempt": 3,
+          "text": "The Pug family found a home in the meadows.",
+          "deterministic": {
+            "passed": false,
+            "problems": [
+              "no destination phrase found -- departure/relocation lines must name somewhere the family is going, not just that they left."
+            ]
+          },
+          "score": 9,
+          "reason": "TONE/VOICE \u2014 passes cleanly. This is the plain game voice, not the bulletin voice: a flat, quietly upbeat statement of outcome with no 'please', no 'poor'/'sadly', no 'are you sure', no plea, no urgency marker, no second-person address and no judgment of the player. Crucially there is zero residue \u2014 the sentence contains no 'now', 'instead', 'after', 'had to', or any other backward glance at the warning, and would read identically to a player who never saw a warning at all. It discloses an outcome rather than scolding about a cause.\n\nVOCABULARY/FRAMING \u2014 passes, and is a textbook execution of the villager doctrine. The family is described purely as *finding* a home, never as leaving or losing one ('a displaced villager family is never described as losing a home, only as finding one'). The player's action is entirely absent from the sentence, so the player's act and the family's hardship are nowhere near each other \u2014 indeed no hardship is stated at all, and there is no implied-loss construction smuggled in without a banned word (no 'new home' presupposing a prior one, no 'at last', no 'somewhere else', no 'safe'). No loss-coded vocabulary appears. The only species named is the subject's own display name; no other Wildhaven species is named, even adjectivally. No habitat-tag identifier is used \u2014 'meadows' is ordinary player-facing prose, not the literal closed-graph token 'open_grass', so the tag-leak rule holds (it is tag-adjacent in referent, but the same latitude has been granted to prior shipped lines and the rule bars the identifier, not the concept).\n\nFORMATTING/STRUCTURE \u2014 passes. Exactly one complete declarative sentence with subject and finite verb, terminal period, no em dashes, no parentheses, no fragment, no subordinate clause. The affected home is named by family ('The Pug family'), never by a bare pronoun. Every word is short and concrete; a screen reader hits nothing it would mangle and a pre-fluent six-year-old can carry the whole sentence in one breath.\n\nON THE DETERMINISTIC SWEEP \u2014 I largely disagree; 'no destination phrase found' is a false positive as stated. 'in the meadows' is a locative destination phrase and does name somewhere the family has gone, so the line does not leave the family with nowhere named to go and does not merely assert that they left. The sweep appears to be pattern-matching on directional constructions ('moved away to', 'went off to', 'to the') and missing a destination attached to 'found a home'.\n\nWHY NOT 10 \u2014 two small things a keyword sweep cannot see, both polish rather than blockers. First, the destination is real but thin: 'the meadows' uses a definite article and a bare plural, pointing at a specific place the player has no referent for, which reads as generic scenery rather than a place the family actually went; the shipped comparables ('a wide meadow', 'the woods' attached to a den) are more concrete without being more complex. Second, as a *depart* line it carries no departure signal at all, so it is not distinguishable from the relocation line for the same family \u2014 every canonical departure string marks the move itself ('moved away to find\u2026', 'went off to\u2026') while keeping the destination in the sentence and the cause out of it. Reporting only the arrival is doctrinally safe but leaves the player without the one fact the depart event exists to convey. A phrasing such as 'The Pug family moved away to find a home in a wide meadow.' would keep the finding-frame, sharpen the destination, and read unambiguously as a departure to both the player and the checker."
+        }
+      ]
+    },
+    "move": {
+      "status": "accepted",
+      "text": "The Pug family has moved to a home with a spacious yard.",
+      "score": 10,
+      "attempts": [
+        {
+          "attempt": 1,
+          "text": "The Pug family is now living happily in their new home with space to explore.",
+          "deterministic": {
+            "passed": true,
+            "problems": []
+          },
+          "score": 8,
+          "reason": "FORMATTING/STRUCTURE (constraint 3): clean pass. Exactly one complete sentence, no em dashes, no parentheses, no fragment, and the affected home is named by family (\"The Pug family\") rather than a pronoun. Read-Aloud safe for a pre-fluent reader: short words, single clause plus a simple prepositional tail.\n\nVOCABULARY/FRAMING (constraint 2): substantially clean but slightly soft. No loss-coded words, no other Wildhaven species named, and no habitat-tag identifier leaks (\"home\" is not the tag \"house\"; \"space to explore\" gestures at openness without touching open_grass). The player's action and the family's circumstance are not co-located in the sentence. The one weakness is that the destination is carried only as a generic \"new home\" with an attribute attached, not as an actual named or concretely characterized place. The doctrine requires the family always have somewhere named to go; \"a new home with space to explore\" is a description of a destination rather than a destination, and it is the weakest possible satisfaction of that rule. It clears the bar without clearing it comfortably.\n\nTONE/VOICE (constraint 1): the real deduction. Two oblique problems a keyword sweep cannot see. First, \"happily\" asserts the family's emotional state as reassurance rather than reporting a fact. Disclosure copy states what is true; \"living happily\" states that everything is fine, and copy only insists everything is fine when there is something to be fine about. That reassurance is itself residue: it answers a worry the warning raised, which is exactly the backward reference the no-residue rule forbids. A neutral \"is settling into\" or \"has moved to\" carries the same information without the emotional underwriting. Second, \"is now living\" builds an implicit before/after: \"now\" only means something against a prior state, and the prior state here is the home the player's action affected. The sentence therefore points back at the displacement without ever naming it, which is precisely the implied-loss-without-an-explicit-loss-word failure mode. Neither issue is severe and the line is close to shippable, but between them the copy reads a shade more like consoling flavor than plain-voice disclosure, so it does not ship as-is."
+        },
+        {
+          "attempt": 2,
+          "text": "The Pug family has moved to a home with a grassy yard.",
+          "deterministic": {
+            "passed": true,
+            "problems": []
+          },
+          "score": 9,
+          "reason": "TONE/VOICE: clean. The line is flat, factual, and upbeat-neutral; it reports an outcome rather than pleading or warning. No 'please', no 'sadly', no second-person judgment, no urgency markers, and critically no residue \u2014 nothing in it gestures back at the warning or at any prior player decision. It reads as ambient world-state, not as a bulletin or a guilt beat.\n\nVOCABULARY/FRAMING: essentially compliant, with one reservation. The line carries a DESTINATION ('a home with a grassy yard') and no cause whatsoever \u2014 the player's action is absent from the sentence entirely, so there is no adjacency of action and hardship, not even obliquely. The family is explicitly given somewhere to go, satisfying the 'never leave a family with nowhere named' rule, and 'has moved to' is a finding-a-home construction rather than a leaving-a-home one. No loss-coded lexicon, no implied loss (the sentence would read identically if no displacement had occurred, which is exactly the doctrine's intent). No other Wildhaven species is named. My one reservation: 'grassy' sits adjacent to the closed-graph tag 'open_grass', and 'home ... yard' sits adjacent to 'house'. Neither is the literal identifier token, so this is not a hard violation \u2014 the copy has to render a destination in ordinary English somehow \u2014 but 'grassy' is close enough to the tag string that a stricter reading of the closed-graph rule could flag it, and a destination phrased without the near-token (e.g. a warm porch, a soft blanket by the door) would be unambiguously safe. That residual ambiguity is the only thing keeping this off a 10.\n\nFORMATTING/STRUCTURE: fully compliant. Exactly one complete declarative sentence with a single main clause, no em dashes, no parentheses, no fragment. The affected home is named by family \u2014 'The Pug family' \u2014 never reduced to 'they' or 'it'. Vocabulary and syntax are well within pre-fluent six-year-old range, and the sentence has no read-aloud hazards for a screen reader: no abbreviations, no punctuation that would be voiced oddly, and a natural single intonation contour."
+        },
+        {
+          "attempt": 3,
+          "text": "The Pug family has moved to a home with a spacious yard.",
+          "deterministic": {
+            "passed": true,
+            "problems": []
+          },
+          "score": 10,
+          "reason": "Passes all three constraint types.\n\nTONE/VOICE: Reads in the plain game voice \u2014 a flat, upbeat statement of fact. No 'please', no 'sadly'/'poor', no confirmation-seeking, no urgency markers, no pleading, and nothing that positions the player as responsible or asks them to feel anything. It is disclosure, not deterrence, and it carries no residue: nothing in the wording points back at a prior warning or implies a preceding event the player must recall. There is no bulletin/News-Report cadence (no dateline rhythm, no 'reports', no headline compression).\n\nVOCABULARY/FRAMING: This is a relocation line and it correctly carries only the DESTINATION ('a home with a spacious yard'), never the cause. The family is described as having found a home, exactly per the villager doctrine, and a concrete place is named, so the family is never left with nowhere to go. The player's action is entirely absent, so there is no sentence that pairs the action with hardship \u2014 not even obliquely, since 'has moved to' is stated as a completed arrival rather than a departure-from. No loss-coded vocabulary and, importantly, no implied loss either: the sentence contains no comparative or diminishing frame ('smaller', 'quieter', 'farther', 'new' as contrast) that would smuggle in a downgrade without a banned word. No other Wildhaven species is named or used adjectivally. I specifically checked the habitat-tag closed graph \u2014 'home' is the doctrine's own sanctioned noun and is distinct from the tag identifier 'house'; 'yard' is not a tag identifier, and 'spacious' is an evaluative adjective rather than a restatement of open_grass or cultivated, so the closed-graph rule holds.\n\nFORMATTING/STRUCTURE: Exactly one complete sentence with subject and finite verb, terminal period, no em dashes, no parentheses, no fragment. It names the affected home by family as 'the Pug family' rather than a pronoun. Vocabulary and clause structure are within reach of a pre-fluent six-year-old and the line contains nothing that would read awkwardly aloud via screen reader."
+        }
+      ]
+    }
+  },
+  "cost": {
+    "in": 116,
+    "out": 44928,
+    "usd": 1.459314,
+    "usd_known": true
+  }
+}
