@@ -54,7 +54,13 @@ static func probe(wrapper_path: String) -> Dictionary:
 				continue
 			if base.vertex_color_use_as_albedo:
 				vcol = true
-			var c: Color = base.albedo_color
+			# BaseMaterial3D.albedo_color reads back gamma-encoded (sRGB) relative to the
+			# glTF/Blender source, which is linear -- glTF's baseColorFactor and Blender's
+			# BSDF Base Color are both natively linear. Convert back to linear here so the
+			# manifest matches the Python source readers; metallic/roughness are scalar
+			# material properties, not colours, and are NOT gamma-encoded, so they are left
+			# untouched. See task-5 fix round 1.
+			var c: Color = base.albedo_color.srgb_to_linear()
 			rows.append([[_r4(c.r), _r4(c.g), _r4(c.b), _r4(c.a)],
 				_r4(base.metallic), _r4(base.roughness)])
 			var tex: Texture2D = base.albedo_texture
