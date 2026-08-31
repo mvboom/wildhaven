@@ -24,6 +24,16 @@ var _region: RID
 var _den_tiles: Dictionary = {}  # Vector2i -> true
 var _grid: WorldGrid = null
 
+## How many full navmesh rebuilds have actually run. Same shape and purpose as
+## `HabitatSimulation.evaluations_run` — an exact work counter, so
+## `test_navigation_rebuild_coalescing.gd` can assert that a burst of edits collapses into
+## one rebuild without asserting a wall-clock number. Never reset by production code.
+var rebuilds_run: int = 0
+
+## Set by `mark_dirty()`, cleared by `rebuild_from_grid()`. See `mark_dirty()`'s own doc.
+var _dirty: bool = false
+var _flush_scheduled: bool = false
+
 
 func _init() -> void:
 	_map = NavigationServer3D.map_create()
@@ -39,6 +49,8 @@ func _init() -> void:
 ## 128x128 cap (see the design doc's Risks section).
 func rebuild_from_grid(grid: WorldGrid) -> void:
 	_grid = grid
+	_dirty = false
+	rebuilds_run += 1
 	var half: float = WorldGrid.TILE_SIZE * 0.5
 	var verts := PackedVector3Array()
 	var polygons: Array[PackedInt32Array] = []
@@ -72,11 +84,50 @@ func set_den_tile_blocked(tile: Vector2i, blocked: bool) -> void:
 		_den_tiles[tile] = true
 	else:
 		_den_tiles.erase(tile)
-	if _grid != null:
+	mark_dirty()
+
+
+## THE COALESCING ENTRY POINT. Records that the navmesh no longer matches the world, without
+## paying for a rebuild here. Every world edit calls this instead of `rebuild_from_grid()`.
+##
+## A rebuild is a full re-scan of every tile (2.4ms of a 2.8ms `paint_tile()` call —
+## `probe_frame_cost.gd`), and it was previously run once per edit: once per tile of a dragged
+## stroke, and once per resident arrival via the den reservation above. Nothing observes the
+## navmesh between two edits, so every rebuild but the last was thrown away unlooked-at.
+##
+## THE PENDING REBUILD IS SETTLED TWO WAYS, AND EITHER IS SUFFICIENT:
+##   * `call_deferred` flushes it at the end of the current frame, so in normal play the
+##     rebuild still happens on the same frame as the edit that caused it — the timing the
+##     synchronous version had, minus the duplicates. `NavigationServer3D` then gets its usual
+##     several frames to sync before anything paths (this file's header).
+##   * `find_path()` flushes it first, so a reader can never observe stale geometry even if
+##     no frame boundary has passed — which is also what makes this deterministic under
+##     `--headless --script`, where a test drives calls directly rather than pumping frames.
+##
+## Safe before the first `rebuild_from_grid()`: `_ensure_fresh()` no-ops while `_grid` is
+## null, exactly as `set_den_tile_blocked()`'s old guard did.
+func mark_dirty() -> void:
+	_dirty = true
+	if _flush_scheduled:
+		return
+	_flush_scheduled = true
+	call_deferred("_flush_pending")
+
+
+func _flush_pending() -> void:
+	_flush_scheduled = false
+	_ensure_fresh()
+
+
+## Rebuilds only if an edit is actually outstanding. Idempotent, so the deferred flush and a
+## reader racing to settle the same edit cost one rebuild between them, not two.
+func _ensure_fresh() -> void:
+	if _dirty and _grid != null:
 		rebuild_from_grid(_grid)
 
 
 func find_path(start: Vector3, goal: Vector3) -> PackedVector3Array:
+	_ensure_fresh()
 	return NavigationServer3D.map_get_path(_map, start, goal, true)
 
 

@@ -12,11 +12,17 @@ extends RefCounted
 ## tallying counters" (spec.md -> Shared Patterns, implementation note) instead of a nested
 ## loop over tiles x sites.
 ##
-## The map is rebuilt whole whenever the registry changes. That is deliberately the dumb
-## option: registry changes are placements, arrivals and departures — rare, player-visible
-## events — and a full rebuild is obviously correct where an incremental patch is a class of
-## bug (a stale claim silently deflates a neighbourhood's capacity, which the player would
-## experience as an animal that inexplicably will not move in).
+## The map is rebuilt from scratch whenever the registry changes — never patched in place.
+## That is deliberate: a stale claim silently deflates a neighbourhood's capacity, which the
+## player experiences as an animal that inexplicably will not move in, so an incremental
+## patch is a whole class of bug this design refuses to have.
+##
+## What IS narrowed is which SCOPES get recomputed (`rebuild_ownership(scopes)`). That is not
+## an incremental patch: each named scope is still rebuilt whole, from `_sites`, by the same
+## code path a full rebuild uses. Scopes are independent by construction, so a mutation
+## cannot affect one it does not belong to. The narrowing exists because a full rebuild is
+## O(sites x radius^2) and fires on every arrival — 7ms with 110 residents, a dropped frame
+## per move-in in the WASM build (`probe_frame_cost.gd`).
 
 var _sites: Array[HomeSite] = []
 var _next_sequence: int = 0
@@ -50,6 +56,17 @@ static func _scope_key(site: HomeSite) -> String:
 ## unclaimed IN THAT SCOPE — a tile can be simultaneously owned by a structure site and, in a
 ## different scope, by a same-species wild den; the two maps never interact.
 var _owner: Dictionary = {}
+
+## Vector2i -> HomeSite, for structure sites only, keyed by the site's OWN position. Pure
+## derived state: `_refresh_structure_index()` rebuilds it from `_sites` and nothing else
+## writes it, so it cannot drift (`test_ownership_index_integrity.gd`).
+##
+## WHY IT EXISTS. `structure_site_at()` used to scan `_sites`, and
+## `CapacityEvaluator._tile_counts_for()` calls it once per tile per species inside every
+## evaluation — measured at 80% of an evaluation's total cost with 110 residents, and one
+## tile paint runs 27 evaluations (`probe_frame_cost.gd`). Indexing made that lookup flat
+## with population instead of linear in it: 16,326us -> 221us at 110 residents.
+var _structure_by_position: Dictionary = {}
 
 ## **SPECIES HOSTED, AND IT IS PERMANENT.** gdd.md -> Gentle Displacement: "Species Hosted and
 ## the Field Guide entry stay permanent" — "a departure never erases the record that the
@@ -115,10 +132,7 @@ func any_site_at(position: Vector2i) -> bool:
 ## the structure's OWN, otherwise-unbeatable (distance 0) ownership of that tile — which the
 ## old, unscoped map enforced for free. See `capacity_evaluator.gd`'s caller note.
 func structure_site_at(position: Vector2i) -> HomeSite:
-	for site: HomeSite in _sites:
-		if site.position == position and site.is_structure():
-			return site
-	return null
+	return _structure_by_position.get(position, null) as HomeSite
 
 
 ## `population(h, S)` in the capacity formula — 0 where no settled site exists yet.
@@ -139,7 +153,7 @@ func register(position: Vector2i, species_id: String, radius: int) -> HomeSite:
 	_next_sequence += 1
 	_sites.append(site)
 	_ever_hosted[site.species_id] = true
-	rebuild_ownership()
+	rebuild_ownership([_scope_key(site)])
 	return site
 
 
@@ -152,7 +166,7 @@ func register_structure(position: Vector2i, emitted_tags: Array[String], radius:
 	var site := HomeSite.new(position, "", radius, _next_sequence, emitted_tags)
 	_next_sequence += 1
 	_sites.append(site)
-	rebuild_ownership()
+	rebuild_ownership([_scope_key(site)])
 	return site
 
 
@@ -177,7 +191,7 @@ func restore_site(
 	# A vacant structure site has no species, and "" must never enter the hosted record.
 	if normalized != "":
 		_ever_hosted[normalized] = true
-	rebuild_ownership()
+	rebuild_ownership([_scope_key(site)])
 	return site
 
 
@@ -199,17 +213,23 @@ func restore_hosted(species_ids: Array[String]) -> void:
 func claim(site: HomeSite, species_id: String, radius: int) -> void:
 	if site == null or not site.is_vacant():
 		return
+	# CAPTURED BEFORE THE MUTATION. `_scope_key()` reads `species_id`, so a non-structure
+	# site claimed by a species moves between scopes and BOTH ends need recomputing — the
+	# one it left (to drop its tiles) and the one it joined. A structure site's key is
+	# `STRUCTURE_SCOPE` either way, so the two collapse to one and this costs nothing.
+	var previous_scope: String = _scope_key(site)
 	site.species_id = AnimalDefinition.normalize_id(species_id)
 	site.radius = radius
 	_ever_hosted[site.species_id] = true
-	rebuild_ownership()
+	rebuild_ownership(_scopes_of(previous_scope, _scope_key(site)))
 
 
 func unregister(site: HomeSite) -> void:
 	if site == null:
 		return
+	var scope: String = _scope_key(site)
 	_sites.erase(site)
-	rebuild_ownership()
+	rebuild_ownership([scope])
 
 
 ## THE DEPARTURE HALF of Gentle Displacement (row 10): an emptied home leaves the registry.
@@ -225,8 +245,9 @@ func release(site: HomeSite, structure_remains: bool) -> void:
 	if site == null:
 		return
 	if site.is_structure() and structure_remains:
+		var previous_scope: String = _scope_key(site)
 		site.species_id = ""
-		rebuild_ownership()
+		rebuild_ownership(_scopes_of(previous_scope, _scope_key(site)))
 		return
 	unregister(site)
 
@@ -241,7 +262,7 @@ func relocate(site: HomeSite, destination: Vector2i) -> void:
 	if site == null or site.position == destination:
 		return
 	site.position = destination
-	rebuild_ownership()
+	rebuild_ownership([_scope_key(site)])
 
 
 ## The site that owns a tile WITHIN `scope_key`'s scope, or null when no site in that scope
@@ -261,14 +282,43 @@ func owner_at(tile: Vector2i, scope_key: String) -> HomeSite:
 ## simultaneously be owned by a structure site in the structure scope AND by an unrelated
 ## same-species wild den in that species' own scope; the two scopes never contest each other.
 ## Only tiles inside some site's radius are claimed at all.
-func rebuild_ownership() -> void:
-	_owner = {}
+##
+## `scopes` NARROWS THE WORK, IT NEVER CHANGES THE RESULT. Because the groups are computed
+## independently, a mutation can only ever affect the scope(s) the mutated site belongs to —
+## registering a rabbit cannot move a badger's tile. Passing the affected scope(s) therefore
+## produces byte-identical maps to rebuilding everything, which is what
+## `test_ownership_index_integrity.gd` asserts after all seven mutation paths. An EMPTY
+## `scopes` still means "rebuild everything", so save-load and any future caller that is not
+## sure which scopes it touched stay correct by default.
+##
+## WHY IT MATTERS: this runs on every register/claim/release/relocate — i.e. on every single
+## resident arrival — and a full rebuild is O(sites x radius^2). Measured at 7ms per arrival
+## with 110 residents (`probe_frame_cost.gd`), which in the single-threaded WASM build is a
+## dropped frame every time an animal moves in.
+##
+## The structure index is refreshed unconditionally and in full: it is O(sites) with no
+## radius term, far cheaper than one scope's ownership pass, and keeping it outside the
+## narrowing is what makes it impossible for a scoped call to leave it stale.
+func rebuild_ownership(scopes: Array[String] = []) -> void:
+	_refresh_structure_index()
+
 	var groups: Dictionary = {}  # scope key -> Array[HomeSite]
 	for site: HomeSite in _sites:
 		var key: String = _scope_key(site)
+		if not scopes.is_empty() and not scopes.has(key):
+			continue
 		if not groups.has(key):
 			groups[key] = [] as Array[HomeSite]
 		(groups[key] as Array[HomeSite]).append(site)
+
+	if scopes.is_empty():
+		_owner = {}
+	else:
+		# A named scope whose last site just left has no group above, so clearing here (rather
+		# than relying on the loop) is what actually empties it. Without this, unregistering
+		# the final rabbit would leave every tile still owned by the freed site.
+		for key: String in scopes:
+			_owner.erase(key)
 
 	for key: Variant in groups.keys():
 		var scoped: Dictionary = {}
@@ -288,6 +338,23 @@ func rebuild_ownership() -> void:
 					if mine < theirs or (mine == theirs and site.sequence < current.sequence):
 						scoped[tile] = site
 		_owner[key] = scoped
+
+
+## Rebuilds `_structure_by_position` from `_sites`. The ONLY writer of that dictionary —
+## every mutation path already routes through `rebuild_ownership()`, so there is no second
+## place for the index to be updated from and therefore no second place for it to go stale.
+## The scopes touched by a mutation that may have moved a site between two of them,
+## de-duplicated — `rebuild_ownership()` treats a repeated key as extra work, not as an
+## error, but a single-element array is the common case and worth keeping single.
+static func _scopes_of(before: String, after: String) -> Array[String]:
+	return [before] as Array[String] if before == after else [before, after] as Array[String]
+
+
+func _refresh_structure_index() -> void:
+	_structure_by_position = {}
+	for site: HomeSite in _sites:
+		if site.is_structure():
+			_structure_by_position[site.position] = site
 
 
 ## Every site whose radius covers `tile` — the "affected neighbourhood" of an edit at that
