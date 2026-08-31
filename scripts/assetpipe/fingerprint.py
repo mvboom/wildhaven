@@ -68,11 +68,22 @@ def manifest_from_gltf(path: Path) -> dict:
 
     accessors = doc.get("accessors", [])
     total = 0
+    mins, maxs = [], []
     for p in prims:
         idx = p.get("attributes", {}).get("POSITION")
         if idx is not None and idx < len(accessors):
-            total += accessors[idx].get("count", 0)
+            acc = accessors[idx]
+            total += acc.get("count", 0)
+            if "min" in acc and "max" in acc:
+                mins.append(acc["min"])
+                maxs.append(acc["max"])
     m["vertices"] = total
+    # Overall bounding box across ALL primitives, as an EXTENT (max - min per axis) rather
+    # than a corner pair, so it is comparable to the Blender side's object `dimensions`.
+    if mins:
+        lo = [min(v[i] for v in mins) for i in range(3)]
+        hi = [max(v[i] for v in maxs) for i in range(3)]
+        m["aabb"] = [round4(hi[i] - lo[i]) for i in range(3)]
 
     m["clips"] = sorted(a.get("name", "") for a in doc.get("animations", []))
     m["joints"] = max((len(s.get("joints", [])) for s in doc.get("skins", [])), default=0)
@@ -181,7 +192,10 @@ def selftest_cases(c) -> None:
                 {"material": 0, "attributes": {"POSITION": 0, "COLOR_0": 1}},
                 {"material": 1, "attributes": {"POSITION": 0, "COLOR_0": 1}},
             ]}],
-            "accessors": [{"count": 1108}, {"count": 1108}],
+            "accessors": [
+                {"count": 1108, "min": [-1.0, -2.0, -3.0], "max": [4.0, 5.0, 6.0]},
+                {"count": 1108},
+            ],
             "animations": [{"name": "Walk"}, {"name": "Idle"}],
             "skins": [{"joints": list(range(31))}],
             "images": [],
@@ -200,6 +214,9 @@ def selftest_cases(c) -> None:
         c.eq(m["joints"], 31, "gltf: skin joint count")
         c.eq(m["textures"], [], "gltf: no images means no textures")
         c.eq(m["surfaces"], 2, "gltf: primitive count")
+        c.eq(m["aabb"], [5.0, 7.0, 9.0],
+             "gltf: aabb is the per-axis extent (max - min) from accessor min/max, "
+             "across all primitives")
 
         # Material ORDER must not change the manifest -- exporters do not guarantee it.
         # Black/White carry DIFFERENT metallic/roughness values (see fixture above)
@@ -216,11 +233,15 @@ def selftest_cases(c) -> None:
              "gltf: reordered materials -- metallic stays paired with its colour")
         c.eq(rev["roughness"], m["roughness"],
              "gltf: reordered materials -- roughness stays paired with its colour")
+        c.eq(rev["aabb"], m["aabb"],
+             "gltf: reordered materials -- aabb unaffected (geometry unchanged)")
 
         c.eq(sorted(empty_manifest().keys()), sorted(MANIFEST_FIELDS),
              "empty_manifest covers exactly MANIFEST_FIELDS")
 
         # .glb: same JSON, wrapped in the binary container -- the two paths must agree.
+        # This now also exercises a LIVE aabb (accessor min/max carried the whole doc
+        # over), not the [0,0,0] default the field used to be stuck at.
         json_bytes = _json.dumps(doc).encode("utf-8")
         pad = (-len(json_bytes)) % 4
         json_bytes += b" " * pad
@@ -245,3 +266,24 @@ def selftest_cases(c) -> None:
             c.check(bm["joints"] > 0, "blend: Sheep is rigged")
         else:
             c.check(True, "blend: Sheep.blend absent, extraction case skipped")
+
+        # .fbx path -- manifest_from_blender exists partly to AVOID formats.probe_fbx's
+        # over-reporting heuristic, so the fbx branch needs its own live exercise, not
+        # just the .blend one above. Most of this project's imported models are
+        # FBX-derived, so a broken branch here would otherwise surface as a failure in
+        # unrelated, later code.
+        _pig_fbx = _P("source-content/assets/Farm Animals by @Quaternius/FBX/Pig.fbx")
+        if _pig_fbx.is_file():
+            fm = manifest_from_blender(_pig_fbx)
+            c.eq(sorted(fm.keys()), sorted(MANIFEST_FIELDS),
+                 "fbx: manifest carries exactly MANIFEST_FIELDS")
+            c.check(fm["materials"] > 0, "fbx: Pig has at least one material")
+            c.check(fm["vertices"] > 0, "fbx: Pig has vertices")
+            c.check(len(fm["clips"]) > 0, "fbx: Pig has at least one clip")
+            # Measured this run: Pig.fbx carries only 2 of the 6 actions Pig.blend
+            # holds (see assetpipe/blender.py's module docstring) -- pin that specific,
+            # verified fact rather than just echoing whatever the call returned.
+            c.eq(len(fm["clips"]), 2,
+                 f"fbx: Pig.fbx carries 2 of its .blend's 6 actions, got {fm['clips']}")
+        else:
+            c.check(True, "fbx: Pig.fbx absent, extraction case skipped")
