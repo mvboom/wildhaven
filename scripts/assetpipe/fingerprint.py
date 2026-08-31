@@ -333,6 +333,19 @@ def selftest_cases(c) -> None:
             "blend and fbx dispatch to Blender")
     c.eq(_suffix_kind(_P("a.obj")), "", "obj has no manifest path")
 
+    # aabb is compared as a sorted multiset of extents, not axis-for-axis -- measured
+    # evidence: sheep's Blender dimensions matched Godot's runtime AABB with no swap,
+    # while pig's and pug's needed Y and Z exchanged to match, so no fixed axis swap
+    # is correct either.
+    aabb_src = dict(base, aabb=[3.0, 9.0, 4.5])
+    aabb_perm = dict(base, aabb=[3.0, 4.5, 9.0])  # same three extents, Y/Z exchanged
+    c.eq([f.field for f in compare(aabb_src, aabb_perm, set())], [],
+         "a permutation of the same extents is not an aabb mismatch")
+
+    aabb_off = dict(base, aabb=[3.0, 9.0, 6.0])  # sorted magnitudes genuinely differ
+    c.eq([f.field for f in compare(aabb_src, aabb_off, set())], ["aabb"],
+         "a genuine magnitude mismatch still warns even sorted")
+
 
 from collections import namedtuple
 
@@ -408,8 +421,17 @@ def compare(src: dict, run: dict, sanctioned: set) -> list:
         if src[field] != run[field]:
             add(field, "WARN", f"source {src[field]} vs runtime {run[field]}")
 
+    # Compared as a SORTED multiset of extents, not axis-for-axis. Measured directly:
+    # sheep's Blender (Z-up) dimensions matched Godot's (Y-up) runtime AABB with no
+    # swap, while pig's and pug's needed Y and Z exchanged to match -- these .blend
+    # files are not authored on a consistent up-axis, so there is no fixed swap to
+    # apply. Sorting keeps the field's real job (catch a mis-scaled import) while
+    # giving up detecting an import that came in rotated -- a capability that was
+    # never real here, since this extraction can't tell authored orientation apart
+    # from an actual rotation.
     lo, hi = 1.0 - AABB_TOLERANCE, 1.0 + AABB_TOLERANCE
-    if not all(_ratio_ok(s, r, lo, hi) for s, r in zip(src["aabb"], run["aabb"])):
+    if not all(_ratio_ok(s, r, lo, hi)
+               for s, r in zip(sorted(src["aabb"]), sorted(run["aabb"]))):
         add("aabb", "WARN", f"source {src['aabb']} vs runtime {run['aabb']}")
 
     return out
