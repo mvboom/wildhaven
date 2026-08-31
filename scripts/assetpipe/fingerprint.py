@@ -11,6 +11,7 @@ stable material order, and an order-sensitive diff reports failures that are not
 
 import json
 import struct
+import subprocess
 from pathlib import Path
 
 MANIFEST_FIELDS = (
@@ -78,6 +79,86 @@ def manifest_from_gltf(path: Path) -> dict:
     m["textures"] = sorted(
         Path(i["uri"]).name for i in doc.get("images", []) if i.get("uri"))
     return m
+
+
+# Runs INSIDE Blender. Emits the same dict shape manifest_from_gltf produces, fenced by
+# markers because Blender writes its own banner and addon chatter to stdout.
+BLENDER_DUMP = r'''
+import bpy, json, sys
+path = sys.argv[-1]
+bpy.ops.wm.read_factory_settings(use_empty=True)
+low = path.lower()
+if low.endswith(".blend"):
+    bpy.ops.wm.open_mainfile(filepath=path)
+elif low.endswith(".fbx"):
+    bpy.ops.import_scene.fbx(filepath=path)
+else:
+    raise SystemExit("unsupported: " + path)
+
+rows, textures = [], set()
+for mat in bpy.data.materials:
+    if not mat.use_nodes:
+        continue
+    bsdf = next((n for n in mat.node_tree.nodes if n.type == "BSDF_PRINCIPLED"), None)
+    if bsdf is None:
+        continue
+    col = list(bsdf.inputs["Base Color"].default_value)
+    rows.append([[round(float(v), 4) for v in col],
+                 round(float(bsdf.inputs["Metallic"].default_value), 4),
+                 round(float(bsdf.inputs["Roughness"].default_value), 4)])
+    for img in (n.image for n in mat.node_tree.nodes if n.type == "TEX_IMAGE" and n.image):
+        textures.add(img.name)
+rows.sort(key=lambda r: r[0])
+
+meshes = [o for o in bpy.data.objects if o.type == "MESH"]
+verts = sum(len(o.data.vertices) for o in meshes)
+surfaces = sum(max(1, len(o.material_slots)) for o in meshes)
+vcol = any(len(o.data.color_attributes) > 0 for o in meshes)
+joints = max([len(a.data.bones) for a in bpy.data.objects if a.type == "ARMATURE"] or [0])
+
+dims = [0.0, 0.0, 0.0]
+for o in meshes:
+    for i in range(3):
+        dims[i] = max(dims[i], round(float(o.dimensions[i]), 4))
+
+print("<<<MANIFEST>>>" + json.dumps({
+    "materials": len(rows),
+    "base_colors": [r[0] for r in rows],
+    "metallic": [r[1] for r in rows],
+    "roughness": [r[2] for r in rows],
+    "vertex_colors": vcol,
+    "textures": sorted(textures),
+    "surfaces": surfaces,
+    "vertices": verts,
+    "clips": sorted(a.name for a in bpy.data.actions),
+    "joints": joints,
+    "aabb": dims,
+}) + "<<<END>>>")
+'''
+
+
+def manifest_from_blender(path: Path) -> dict:
+    """Materials, colours, clips and counts read by Blender itself.
+
+    No heuristic fallback when Blender is missing: a manifest built from a parser known
+    to over-report would bake wrong literals into a generated suite, which is worse than
+    having no suite at all.
+    """
+    from assetpipe import blender
+    if not blender.available():
+        raise RuntimeError(
+            f"cannot fingerprint {path.name}: {blender.unavailable_reason()}")
+    proc = subprocess.run(
+        [blender.binary(), "--background", "--factory-startup",
+         "--python-expr", BLENDER_DUMP, "--", str(path)],
+        capture_output=True, text=True, timeout=300)
+    out = proc.stdout
+    if "<<<MANIFEST>>>" not in out:
+        raise RuntimeError(
+            f"blender produced no manifest for {path}\n"
+            f"--- stdout ---\n{out[-2000:]}\n--- stderr ---\n{proc.stderr[-2000:]}")
+    body = out.split("<<<MANIFEST>>>", 1)[1].split("<<<END>>>", 1)[0]
+    return json.loads(body)
 
 
 def selftest_cases(c) -> None:
@@ -148,3 +229,19 @@ def selftest_cases(c) -> None:
         (d / "m.glb").write_bytes(header + chunk_header + json_bytes)
         c.eq(manifest_from_gltf(d / "m.glb"), rev,
              "glb: binary container parses to the same manifest as the equivalent .gltf")
+
+    # Blender path. Skipped with a VISIBLE note when Blender is absent, never silently:
+    # a skipped extraction that looks like a pass is how wrong literals reach a suite.
+    from assetpipe import blender as _b
+    if not _b.available():
+        c.check(True, f"blender extraction SKIPPED -- {_b.unavailable_reason()}")
+    else:
+        _sheep = _P("source-content/assets/Farm Animals by @Quaternius/Blends/Sheep.blend")
+        if _sheep.is_file():
+            bm = manifest_from_blender(_sheep)
+            c.eq(bm["materials"], 2, "blend: Sheep has two materials")
+            c.eq(bm["vertex_colors"], True, "blend: Sheep carries a colour attribute")
+            c.check(len(bm["clips"]) == 6, f"blend: Sheep has 6 clips, got {bm['clips']}")
+            c.check(bm["joints"] > 0, "blend: Sheep is rigged")
+        else:
+            c.check(True, "blend: Sheep.blend absent, extraction case skipped")
