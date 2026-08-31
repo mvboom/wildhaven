@@ -575,6 +575,8 @@ def selftest() -> int:
     llm.selftest_cases(c)
     godot.selftest_cases(c)
     _selftest_cli(c)
+    import content_provenance
+    content_provenance.selftest_cases(c)
     return c.report("SELFTEST")
 
 
