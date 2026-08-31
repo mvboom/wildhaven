@@ -287,3 +287,135 @@ def selftest_cases(c) -> None:
                  f"fbx: Pig.fbx carries 2 of its .blend's 6 actions, got {fm['clips']}")
         else:
             c.check(True, "fbx: Pig.fbx absent, extraction case skipped")
+
+    base = empty_manifest() | {
+        "materials": 2, "base_colors": [[0.1, 0.1, 0.1, 1.0], [0.8, 0.8, 0.8, 1.0]],
+        "metallic": [0.0, 0.0], "roughness": [0.5, 0.5], "vertex_colors": True,
+        "textures": ["Bark.png"], "surfaces": 2, "vertices": 1000,
+        "clips": ["Idle", "Walk"], "joints": 31, "aabb": [1.0, 1.0, 1.0]}
+
+    c.eq(compare(base, dict(base), set()), [], "identical manifests produce no findings")
+    c.eq(verdict([]), "OK", "no findings is OK")
+
+    lost = dict(base, materials=1, base_colors=[[0.8, 0.8, 0.8, 1.0]])
+    fields = {f.field for f in compare(base, lost, set())}
+    c.check("materials" in fields and "base_colors" in fields,
+            f"a dropped material fails on both counts, got {fields}")
+    c.eq(verdict(compare(base, lost, set())), "FAIL", "a dropped material is a FAIL")
+
+    flat = dict(base, vertex_colors=False)
+    c.eq([f.level for f in compare(base, flat, set())], ["FAIL"],
+         "vertex colours turned off is a FAIL -- this is the flat-grey-model bug")
+
+    c.eq(compare(base, flat, {"vertex_colors"}), [],
+         "a sanctioned field is exempt")
+
+    # Seam splitting is normal; a near-empty mesh is not.
+    c.eq(compare(base, dict(base, vertices=2412), set()), [],
+         "2.4x vertices is inside the seam-splitting band")
+    c.eq([f.level for f in compare(base, dict(base, vertices=50), set())], ["WARN"],
+         "a near-empty mesh warns")
+    c.eq(verdict(compare(base, dict(base, vertices=50), set())), "WARN",
+         "warnings alone are WARN, not FAIL")
+
+    c.eq([f.field for f in compare(base, dict(base, textures=[]), set())], ["textures"],
+         "a texture that did not arrive is reported")
+    c.eq([f.level for f in compare(base, dict(base, textures=[]), set())], ["FAIL"],
+         "a missing texture is a FAIL")
+    c.eq([f.level for f in compare(base, dict(base, textures=["Bark.png", "X.png"]),
+                                   set())], ["WARN"],
+         "an EXTRA texture only warns")
+
+    c.check(_suffix_kind(_P("a.gltf")) == "gltf" and _suffix_kind(_P("a.glb")) == "gltf",
+            "gltf and glb dispatch to the JSON reader")
+    c.check(_suffix_kind(_P("a.blend")) == "blender"
+            and _suffix_kind(_P("a.fbx")) == "blender",
+            "blend and fbx dispatch to Blender")
+    c.eq(_suffix_kind(_P("a.obj")), "", "obj has no manifest path")
+
+
+from collections import namedtuple
+
+Finding = namedtuple("Finding", "field level detail")
+
+# PROPOSALS, not rulings. Real ratios across all 31 assets come out of Phase 1; the human
+# rules these once that data exists (project rule: all tuning values are the human's).
+VERTEX_BAND = (0.5, 3.0)
+AABB_TOLERANCE = 0.05
+
+
+def _suffix_kind(path: Path) -> str:
+    s = path.suffix.lower()
+    if s in (".gltf", ".glb"):
+        return "gltf"
+    if s in (".blend", ".fbx"):
+        return "blender"
+    return ""
+
+
+def manifest_for_source(path: Path) -> dict:
+    path = Path(path)
+    kind = _suffix_kind(path)
+    if kind == "gltf":
+        return manifest_from_gltf(path)
+    if kind == "blender":
+        return manifest_from_blender(path)
+    raise ValueError(f"no manifest path for {path.suffix!r} ({path})")
+
+
+def _ratio_ok(src: float, run: float, lo: float, hi: float) -> bool:
+    if src == 0:
+        return run == 0
+    return lo <= (run / src) <= hi
+
+
+def compare(src: dict, run: dict, sanctioned: set) -> list:
+    """Findings where runtime diverges from source, minus fields the artifact sanctions."""
+    out = []
+
+    def add(field, level, detail):
+        if field not in sanctioned:
+            out.append(Finding(field, level, detail))
+
+    for field in ("materials", "vertex_colors"):
+        if src[field] != run[field]:
+            add(field, "FAIL", f"source {src[field]} vs runtime {run[field]}")
+
+    if src["base_colors"] != run["base_colors"]:
+        add("base_colors", "FAIL",
+            f"source {src['base_colors']} vs runtime {run['base_colors']}")
+
+    for field in ("textures", "clips"):
+        missing = sorted(set(src[field]) - set(run[field]))
+        extra = sorted(set(run[field]) - set(src[field]))
+        if missing:
+            add(field, "FAIL", f"missing {missing}")
+        if extra:
+            add(field, "WARN", f"extra {extra}")
+
+    if src["joints"] > 0 and src["joints"] != run["joints"]:
+        add("joints", "FAIL", f"source {src['joints']} vs runtime {run['joints']}")
+
+    if src["surfaces"] != run["surfaces"]:
+        add("surfaces", "WARN", f"source {src['surfaces']} vs runtime {run['surfaces']}")
+
+    if not _ratio_ok(src["vertices"], run["vertices"], *VERTEX_BAND):
+        add("vertices", "WARN",
+            f"source {src['vertices']} vs runtime {run['vertices']} "
+            f"(outside {VERTEX_BAND[0]}x-{VERTEX_BAND[1]}x)")
+
+    for field in ("metallic", "roughness"):
+        if src[field] != run[field]:
+            add(field, "WARN", f"source {src[field]} vs runtime {run[field]}")
+
+    lo, hi = 1.0 - AABB_TOLERANCE, 1.0 + AABB_TOLERANCE
+    if not all(_ratio_ok(s, r, lo, hi) for s, r in zip(src["aabb"], run["aabb"])):
+        add("aabb", "WARN", f"source {src['aabb']} vs runtime {run['aabb']}")
+
+    return out
+
+
+def verdict(findings: list) -> str:
+    if any(f.level == "FAIL" for f in findings):
+        return "FAIL"
+    return "WARN" if findings else "OK"
