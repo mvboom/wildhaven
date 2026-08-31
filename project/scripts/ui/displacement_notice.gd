@@ -88,8 +88,11 @@ const MIN_LINES_HEIGHT: float = 72.0
 const SCROLLBAR_WIDTH_ALLOWANCE: float = 24.0
 
 ## The glyphs. Deliberately the same two `FactCard` already uses, so the player meets one
-## dismiss control and one Read-Aloud control in the whole game rather than two dialects.
-const READ_ALOUD_GLYPH: String = "🔊"
+## dismiss control and one Read-Aloud control in the whole game rather than two dialects —
+## which is why the Read-Aloud speaker moved to `SpeakerIcon` (a vector Control on the
+## button, `%Icon`) here at the same time it did there: it was text "🔊", a codepoint the
+## bundled font lacks, so the web build drew a tofu box. `test_font_glyph_coverage.gd`
+## guards both surfaces now. `×` (U+00D7) IS in the bundled font, so it stays text.
 const DISMISS_GLYPH: String = "×"
 
 ## Marker shapes. PROPOSED — human owns these. Pixels.
@@ -131,7 +134,6 @@ func _ready() -> void:
 	_banner_label.add_theme_font_size_override("font_size", UiPalette.FONT_BANNER)
 	_banner_label.add_theme_color_override("font_color", UiPalette.BARK)
 
-	_read_aloud_button.text = READ_ALOUD_GLYPH
 	_close_button.text = DISMISS_GLYPH
 	UiPalette.paint_button(_read_aloud_button, false)
 	UiPalette.paint_button(_close_button, false)

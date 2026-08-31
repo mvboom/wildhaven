@@ -430,23 +430,23 @@ func _check_speaking_toggle_is_global_and_persists() -> void:
 	check_eq(GameplaySettings.speaking_enabled(), true, "speaking defaults ON")
 
 	_card.show_species(_world.roster.by_id("fox"))
-	check_eq(_toggle_glyph(), FactCard.READ_ALOUD_GLYPH,
-		"the toggle shows the speaker glyph while speaking is enabled")
+	check_eq(_toggle_is_muted(), false,
+		"the toggle shows the speaking speaker while speaking is enabled")
 
 	check_eq(_card.toggle_speaking(), false, "toggling flips the setting off, returning the new state")
 	check_eq(GameplaySettings.speaking_enabled(), false,
 		"...and GameplaySettings — the ONE source of truth — reads it back off")
-	check_eq(_toggle_glyph(), FactCard.MUTED_GLYPH, "...and the button repaints muted")
+	check_eq(_toggle_is_muted(), true, "...and the button repaints muted")
 
 	# GLOBAL, NOT PER-CARD: a second, independently-opened card starts muted too.
 	_card.dismiss()
 	_card.show_species(_world.roster.by_id("rabbit"))
-	check_eq(_toggle_glyph(), FactCard.MUTED_GLYPH,
+	check_eq(_toggle_is_muted(), true,
 		"a freshly-opened card reads the shared setting, not a fresh per-card default")
 
 	check_eq(_card.toggle_speaking(), true, "toggling again flips it back on")
 	check_eq(GameplaySettings.speaking_enabled(), true, "...and GameplaySettings reads it back on")
-	check_eq(_toggle_glyph(), FactCard.READ_ALOUD_GLYPH, "...and the button repaints speaking")
+	check_eq(_toggle_is_muted(), false, "...and the button repaints speaking")
 	_card.dismiss()
 
 	# PERSISTS ACROSS A RELOAD — the same `user://settings.cfg` round-trip
@@ -464,8 +464,13 @@ func _check_speaking_toggle_is_global_and_persists() -> void:
 # Read through the scene's unique names rather than the script's private @onready refs, so
 # these assert what a player would actually see rendered.
 
-func _toggle_glyph() -> String:
-	return (_card.get_node("%ReadAloudButton") as Button).text
+## The toggle's painted state. It reads the `SpeakerIcon` on the button rather than the
+## button's `text`, because the speaker is no longer a font glyph — U+1F50A/U+1F507 are not in
+## the bundled font, so the web export drew tofu boxes and both were replaced by a vector
+## Control (`scripts/ui/speaker_icon.gd`; `test_font_glyph_coverage.gd` guards the class of
+## bug). What is pinned below is unchanged: the button repaints between speaking and muted.
+func _toggle_is_muted() -> bool:
+	return (_card.get_node("%Icon") as SpeakerIcon).muted
 
 
 func _species_name() -> String:
