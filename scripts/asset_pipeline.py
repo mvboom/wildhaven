@@ -577,6 +577,8 @@ def selftest() -> int:
     _selftest_cli(c)
     import content_provenance
     content_provenance.selftest_cases(c)
+    import content_fidelity
+    content_fidelity.selftest_cases(c)
     return c.report("SELFTEST")
 
 
