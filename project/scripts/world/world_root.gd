@@ -417,7 +417,7 @@ func _on_tile_changed(x: int, z: int) -> void:
 
 func _on_grid_grown(new_tiles: Array[Vector2i]) -> void:
 	if navigation != null:
-		navigation.rebuild_from_grid(grid)
+		navigation.mark_dirty()
 	mist_revealed.emit(new_tiles)
 
 
@@ -473,7 +473,7 @@ func paint_tile(x: int, z: int, terrain_id: String) -> bool:
 		removals.record_paint(tile, previous, def.cost)
 	simulation.on_terraform(tile)  # trigger 1
 	if navigation != null:
-		navigation.rebuild_from_grid(grid)
+		navigation.mark_dirty()
 	if displacement != null:
 		displacement.on_edit(tile)  # arms the settlement window; arithmetic already ran
 	_maybe_unfurl_mist(tile)  # Tier 1 row 13
@@ -510,7 +510,7 @@ func place_building(x: int, z: int, placeable_id: String) -> bool:
 		removals.record_placement(origin, placeable_id, cost)
 	simulation.on_building_changed(origin)  # trigger 2
 	if navigation != null:
-		navigation.rebuild_from_grid(grid)
+		navigation.mark_dirty()
 	if displacement != null:
 		displacement.on_edit(origin)
 	_maybe_unfurl_mist(origin)  # Tier 1 row 13
@@ -592,7 +592,7 @@ func remove_at(x: int, z: int) -> bool:
 			removals.forget_placement(origin)
 		simulation.on_building_changed(origin)  # trigger 2
 		if navigation != null:
-			navigation.rebuild_from_grid(grid)
+			navigation.mark_dirty()
 		if displacement != null:
 			displacement.on_edit(origin)
 		_maybe_unfurl_mist(origin)  # Tier 1 row 13
@@ -608,7 +608,7 @@ func remove_at(x: int, z: int) -> bool:
 	removals.forget_paint(tile)
 	simulation.on_terraform(tile)  # trigger 1
 	if navigation != null:
-		navigation.rebuild_from_grid(grid)
+		navigation.mark_dirty()
 	if displacement != null:
 		displacement.on_edit(tile)
 	_maybe_unfurl_mist(tile)  # Tier 1 row 13
