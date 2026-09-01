@@ -6,8 +6,9 @@
 #   bash scripts/habitat-report.sh
 #
 # Prints tag sources, sourced-but-unwanted tags, inert buildables, and recipe collisions.
-# ALWAYS exits 0: this is a report, never a gate. The hard gate is
+# Exits 0 regardless of what it finds: this is a report, never a gate. The hard gate is
 # project/tests/test_field_guide_reachability.gd, run by scripts/run-tests.sh.
+# Exits 2 only when the engine binary cannot be run (environment misconfiguration).
 #
 # `--import` runs first for the same reason run-tests.sh does it: a bare --script run cannot
 # resolve a newly added `class_name` and reports false green.

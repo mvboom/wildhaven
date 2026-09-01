@@ -12,7 +12,7 @@ extends QATestCase
 const WORLD_PATH: String = "res://scenes/Main.tscn"
 
 ## Inert by design (-> D-22/D-25), never a finding.
-const DELIBERATELY_INERT: Array[String] = ["wild_grass"]
+const DELIBERATELY_INERT: Array[String] = [TerrainDefinition.WILD_GRASS_ID]
 
 var _world: WorldRoot = null
 var _frames: int = 0
