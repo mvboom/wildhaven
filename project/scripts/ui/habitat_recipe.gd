@@ -21,7 +21,7 @@ extends RefCounted
 ## Final review finding #3 ruling: these are NOT independently marked with the `[COPY]`
 ## literal prefix, even though they are content-writer's and player-facing. Each value here is
 ## a FRAGMENT composed into `DESCRIBE_LEAD + _join_and(phrases) + "."` below, never rendered on
-## its own — `DESCRIBE_LEAD` now carries the `[COPY]` marker for the whole assembled sentence,
+## its own — `DESCRIBE_LEAD` carries the approved lead-in for the whole assembled sentence,
 ## so marking the fragments too would put the literal `[COPY]` text once per source in the
 ## middle of a rendered line ("[COPY] Likes [COPY] woods and [COPY] rocky cover.") instead of
 ## once at the front of it. One marker per rendered sentence, not one per ingredient.
@@ -178,12 +178,12 @@ const DESCRIBE_UNKNOWN: String = "[COPY] We don't know how to invite these yet."
 ## prefix (final review finding #3) so the rendered sentence — lead-in plus the `SOURCE_PHRASES`
 ## fragments joined onto it — reads as an obvious stub rather than finished prose; see the
 ## `SOURCE_PHRASES` header comment for why the fragments themselves stay unmarked.
-const DESCRIBE_LEAD: String = "[COPY] Likes "
+const DESCRIBE_LEAD: String = "Likes "
 
 ## [COPY] — content-writer's. `%s` is a comma-joined list of species display names. Two full
 ## sentences, not composed fragments (unlike `DESCRIBE_LEAD`), so each carries its own `[COPY]`
 ## marker directly.
-const AVOIDS_TEMPLATE: String = "[COPY] Keeps away from %s."
+const AVOIDS_TEMPLATE: String = "Keeps away from %s."
 
 
 ## "Likes woods and rocky cover." — composed over the DEDUPED recipe entries, so a source
@@ -200,7 +200,7 @@ static func describe(species: AnimalDefinition, world: WorldRoot) -> String:
 			# A source with no authored phrase yet (a newly-woken building) degrades to its
 			# own display name rather than dropping the requirement out of the sentence. This
 			# emits unmarked player-facing text on its own ("barn"), but it sits inside the
-			# sentence `DESCRIBE_LEAD` already marks ("[COPY] Likes barn."), so the rendered
+			# sentence `DESCRIBE_LEAD` leads ("Likes barn."), so the rendered
 			# line still reads as an obvious stub as a whole — final review finding #3, folded
 			# into the same ruling as `SOURCE_PHRASES` above: one marker per sentence.
 			phrase = (entry["display_name"] as String).to_lower()

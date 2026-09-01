@@ -46,9 +46,9 @@ const EMPTY_STATE_TEXT: String = "[COPY] No animals are configured yet."
 ## just make that assertion uncompilable instead of meaningful.
 const UNDISCOVERED_GLYPH: String = "???"
 
-## [COPY] — content-writer's. `%d` is how many of this species are living in the world.
-## Rendered only when that count is >= 1.
-const HERE_TEMPLATE: String = "[COPY] here · %d"
+## APPROVED 2026-09-01 by the human, replacing the `[COPY] here · %d` stub. `%d` is how many
+## of this species are living in the world. Rendered only when that count is >= 1.
+const HERE_TEMPLATE: String = "Resident · %d"
 
 ## Final review finding #3 ruling: NOT `[COPY]`-marked, and deliberately so, despite being
 ## player-facing. `"Forest ×5"` is a DATA FORMAT — a source's name and a target tile count —
@@ -58,9 +58,18 @@ const HERE_TEMPLATE: String = "[COPY] here · %d"
 ## `%s` is a source's display name, `%d` its target tile count.
 const CHIP_TEMPLATE: String = "%s ×%d"
 
+## PROPOSED — human owns this. This screen's own type scale, deliberately NOT UiPalette's
+## shared FONT_CARD_BODY/FONT_NOTICE_LINE/FONT_HUD_SECONDARY: those are also read by FactCard,
+## NotificationFeed and DisplacementNotice, so shrinking them here would resize screens this
+## change never touched. Human direction 2026-09-01: the list reads smaller; the window title
+## and the Species Hosted header keep their existing size.
+const FONT_SPECIES_NAME: int = 22
+const FONT_SPECIES_BODY: int = 18
+const FONT_SPECIES_COUNT: int = 16
+
 ## PROPOSED — human owns this. Pixels, pre-scale. Small enough to read as inline punctuation
 ## in a sentence rather than as a second hotbar.
-const CHIP_ICON_SIZE: float = 28.0
+const CHIP_ICON_SIZE: float = 22.0
 
 @onready var _species_hosted_value: Label = %SpeciesHostedValue
 @onready var _resident_list: VBoxContainer = %ResidentList
@@ -158,15 +167,22 @@ func is_empty_state_visible() -> bool:
 
 func _make_species_card(species: AnimalDefinition, world: WorldRoot) -> VBoxContainer:
 	var card := VBoxContainer.new()
+	# Every node in a card ignores the mouse so a wheel tick lands on `ListScroll` instead of
+	# being swallowed by whichever Label happens to be under the cursor. Without this the
+	# event falls through to `CameraRig._unhandled_input()` and zooms the world while the
+	# player is trying to scroll the list (human report, 2026-09-01).
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	# Named after the species id (final review finding #5) so `recipe_chip_texts_for()` below
 	# can find THIS card in the live scene tree by id, rather than by position — every authored
 	# id so far is a bare snake_case word, which Godot accepts as a node name outright.
 	card.name = species.id
 
 	var header := HBoxContainer.new()
+	header.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var name_label := Label.new()
+	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	name_label.text = species.display_name
-	name_label.add_theme_font_size_override("font_size", UiPalette.FONT_CARD_BODY)
+	name_label.add_theme_font_size_override("font_size", FONT_SPECIES_NAME)
 	name_label.add_theme_color_override("font_color", UiPalette.BARK)
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(name_label)
@@ -177,16 +193,18 @@ func _make_species_card(species: AnimalDefinition, world: WorldRoot) -> VBoxCont
 	var population: int = world.population_of(species.id)
 	if population >= 1:
 		var count_label := Label.new()
+		count_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		count_label.text = HERE_TEMPLATE % population
-		count_label.add_theme_font_size_override("font_size", UiPalette.FONT_HUD_SECONDARY)
+		count_label.add_theme_font_size_override("font_size", FONT_SPECIES_COUNT)
 		count_label.add_theme_color_override("font_color", UiPalette.FIELD_GUIDE_SILHOUETTE_INK)
 		header.add_child(count_label)
 	card.add_child(header)
 
 	var description := Label.new()
+	description.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	description.text = HabitatRecipe.describe(species, world)
 	description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	description.add_theme_font_size_override("font_size", UiPalette.FONT_NOTICE_LINE)
+	description.add_theme_font_size_override("font_size", FONT_SPECIES_BODY)
 	description.add_theme_color_override("font_color", UiPalette.BARK)
 	card.add_child(description)
 
@@ -194,6 +212,7 @@ func _make_species_card(species: AnimalDefinition, world: WorldRoot) -> VBoxCont
 	var ids: Array[String] = []
 	if recipe["satisfiable"] as bool:
 		var chips := HFlowContainer.new()
+		chips.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		for entry: Dictionary in (recipe["entries"] as Array):
 			chips.add_child(_make_chip(entry))
 			ids.append(entry["id"] as String)
@@ -205,11 +224,21 @@ func _make_species_card(species: AnimalDefinition, world: WorldRoot) -> VBoxCont
 	var avoided: Array[String] = HabitatRecipe.avoids_for(species, world)
 	if not avoided.is_empty():
 		var avoids_label := Label.new()
+		avoids_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		avoids_label.text = HabitatRecipe.AVOIDS_TEMPLATE % ", ".join(avoided)
 		avoids_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		avoids_label.add_theme_font_size_override("font_size", UiPalette.FONT_NOTICE_LINE)
+		avoids_label.add_theme_font_size_override("font_size", FONT_SPECIES_BODY)
 		avoids_label.add_theme_color_override("font_color", UiPalette.FIELD_GUIDE_SILHOUETTE_INK)
 		card.add_child(avoids_label)
+
+	# Human direction 2026-09-01: one rule per species, so the cards read as distinct
+	# entries rather than one run-on column. Deliberately the LAST child of the card rather
+	# than a sibling in `_resident_list`: a sibling would make the list's children alternate
+	# card/rule, and both `species_row_texts()` and `recipe_chip_texts_for()` index
+	# `_resident_list`'s children as one-node-per-species.
+	var rule := HSeparator.new()
+	rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(rule)
 
 	return card
 
@@ -222,6 +251,7 @@ func _make_species_card(species: AnimalDefinition, world: WorldRoot) -> VBoxCont
 ## correctly, needs no art — and looks like the hotbar the player is being pointed at.
 func _make_chip(entry: Dictionary) -> HBoxContainer:
 	var chip := HBoxContainer.new()
+	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	var icon_kind: Variant = entry["icon_kind"]
 	if icon_kind != null:
@@ -233,8 +263,9 @@ func _make_chip(entry: Dictionary) -> HBoxContainer:
 		chip.add_child(icon)
 
 	var label := Label.new()
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	label.text = CHIP_TEMPLATE % [entry["display_name"], entry["count"]]
-	label.add_theme_font_size_override("font_size", UiPalette.FONT_NOTICE_LINE)
+	label.add_theme_font_size_override("font_size", FONT_SPECIES_BODY)
 	label.add_theme_color_override("font_color", UiPalette.BARK)
 	chip.add_child(label)
 

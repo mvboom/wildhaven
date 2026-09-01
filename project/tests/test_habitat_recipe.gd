@@ -121,8 +121,9 @@ func _check_description_never_repeats_a_shared_source() -> void:
 	# Rock supplies both of stag's rock-ish needs; its phrase must appear ONCE.
 	var phrase: String = HabitatRecipe.SOURCE_PHRASES["rock"] as String
 	check_eq(text.count(phrase), 1, "the Rock phrase appears once, not once per tag")
-	# Final review finding #3: DESCRIBE_LEAD now carries the `[COPY]` stub marker.
-	check(text.begins_with("[COPY] Likes "), "description leads with the marked 'Likes '")
+	# The `[COPY]` stub marker was retired 2026-09-01 when the human approved this wording.
+	# Still asserted, because the lead-in is what `describe()` composes every sentence from.
+	check(text.begins_with("Likes "), "description leads with the approved 'Likes '")
 	check(not text.contains(stag.display_name), "description omits the species name")
 
 
