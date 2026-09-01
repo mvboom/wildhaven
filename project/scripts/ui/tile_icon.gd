@@ -12,7 +12,7 @@ extends Control
 ## like the button's own label text does, so it stays legible in both states without a
 ## second palette of icon-specific colors.
 
-enum Kind { WILD_GRASS, GRASS, WATER, FOREST, ROCK, FARM, HOUSE, ERASER, EXIT, LOOK }
+enum Kind { WILD_GRASS, GRASS, WATER, FOREST, ROCK, FARM, HOUSE, ERASER, EXIT, LOOK, HELP }
 
 ## Palette option id -> glyph. Lives here rather than on `GameHud` because `HabitatRecipe`
 ## needs the same mapping to render a recipe chip, and two copies would silently diverge the
@@ -79,6 +79,8 @@ func _draw() -> void:
 			_draw_exit(ink, c)
 		Kind.LOOK:
 			_draw_look(ink, c)
+		Kind.HELP:
+			_draw_help(ink, c)
 
 
 ## `blade_count` blades fanned evenly across a baseline, each a short bent line. Wild grass
@@ -196,3 +198,12 @@ func _draw_look(ink: Color, c: Vector2) -> void:
 	var wing_b: Vector2 = tip + back.rotated(-wing_angle) * 8.0
 	draw_line(tip, wing_a, ink, THICKNESS, true)
 	draw_line(tip, wing_b, ink, THICKNESS, true)
+
+
+## A question mark — the hook, then the dot. Same vector technique as EXIT and LOOK, so this
+## costs no art import and follows the same ink flip as every other glyph.
+func _draw_help(ink: Color, c: Vector2) -> void:
+	var r: float = minf(size.x, size.y) * 0.18
+	draw_arc(c + Vector2(0.0, -r * 1.4), r, PI, TAU + PI * 0.35, 24, ink, THICKNESS, true)
+	draw_line(c + Vector2(0.0, -r * 0.1), c + Vector2(0.0, r * 0.8), ink, THICKNESS, true)
+	draw_circle(c + Vector2(0.0, r * 1.8), THICKNESS * 0.7, ink)

@@ -68,6 +68,12 @@ signal mode_changed(mode: Mode)
 signal rotate_cw_pressed()
 signal rotate_ccw_pressed()
 
+## The `[?]` button. Tab already opens the Field Guide (Task 4) — this signal is the second,
+## discoverable door to that same room, for a 6-10-year-old who has never used a keyboard
+## shortcut. `GameUI` is the one that knows how to open `MenuWindow`, so this file only ever
+## announces the press.
+signal help_pressed()
+
 ## DECIDED 2026-08-02 (playtest gate). How long the Inspect tile readout stays up, in seconds.
 const READOUT_SECONDS: float = 4.0
 
@@ -234,6 +240,7 @@ var _readout_timer: Timer = null
 @onready var _inspect_button: Button = %InspectButton
 @onready var _rotate_ccw_button: Button = %RotateCcwButton
 @onready var _rotate_cw_button: Button = %RotateCwButton
+@onready var _help_button: Button = %HelpButton
 @onready var _palette_row: HBoxContainer = %PaletteRow
 @onready var _tile_readout: PanelContainer = %TileReadout
 @onready var _tile_readout_label: Label = %TileReadoutLabel
@@ -247,12 +254,14 @@ func _ready() -> void:
 	# FINAL REVIEW FIX (ported forward): these are declared directly in GameUI.tscn with a
 	# hardcoded `custom_minimum_size = Vector2(72, 72)` — unlike the dynamically-built palette
 	# buttons below (which already read `UiPalette.scaled(...)`). Without this loop,
-	# `UI_SCALE_FACTOR` moves every OTHER piece of HUD chrome and leaves these two fixed,
-	# producing a visibly mismatched HUD the moment the dial is set to anything but 1.0.
+	# `UI_SCALE_FACTOR` moves every OTHER piece of HUD chrome and leaves these fixed, producing
+	# a visibly mismatched HUD the moment the dial is set to anything but 1.0. `_help_button`
+	# (Task 5) is declared the same hardcoded way, so it joins this same loop rather than
+	# getting its own sizing line — that is the whole reason this loop exists at all.
 	var toggle_size := Vector2(
 		UiPalette.scaled(UiPalette.MODE_TOGGLE_SIZE), UiPalette.scaled(UiPalette.MODE_TOGGLE_SIZE)
 	)
-	for button: Button in [_inspect_button, _rotate_ccw_button, _rotate_cw_button]:
+	for button: Button in [_inspect_button, _rotate_ccw_button, _rotate_cw_button, _help_button]:
 		button.custom_minimum_size = toggle_size
 
 	_inspect_button.pressed.connect(toggle_inspect)
@@ -268,6 +277,10 @@ func _ready() -> void:
 	UiPalette.paint_button(_rotate_cw_button, false)
 	_rotate_ccw_button.pressed.connect(func() -> void: rotate_ccw_pressed.emit())
 	_rotate_cw_button.pressed.connect(func() -> void: rotate_cw_pressed.emit())
+	# `[?]` is never a "selected" toggle either, same reasoning as Rotate immediately above —
+	# painted once here, not re-painted by `_refresh_palette_rendering()`.
+	UiPalette.paint_button(_help_button, false)
+	_help_button.pressed.connect(func() -> void: help_pressed.emit())
 	palette_changed.connect(_refresh_palette_rendering)
 	mode_changed.connect(func(_m: Mode) -> void: _refresh_palette_rendering())
 	_build_remove_button()
@@ -1024,6 +1037,11 @@ func catalog_rows(mode: Mode) -> Array[Dictionary]:
 			"cost": entry["cost"] as int,
 		})
 	return out
+
+
+## The `[?]` button — Task 7's coach anchors its first chip to this.
+func help_button() -> Button:
+	return _help_button
 
 
 ## The button for `id`, or null if `build_palettes()` hasn't run or `id` isn't in the catalog.

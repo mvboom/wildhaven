@@ -70,6 +70,18 @@ func open(world: WorldRoot) -> void:
 	move_to_front()
 
 
+## Opens the window with `tab_index` selected. `_on_tab_changed` refreshes the Field Guide
+## tab's content, so this needs no refresh call of its own.
+##
+## ADAPTED FROM THE PLAN (Task 5): the brief's own sketch of this function took no `world`
+## argument, but `open()` above has always required one — `MenuWindow` cannot refresh a tab
+## against a world it was never handed. Taking `world` here, exactly as `open()` does, keeps
+## this a thin wrapper rather than a second, divergent way to bind one.
+func open_at_tab(world: WorldRoot, tab_index: int) -> void:
+	open(world)
+	_tabs.current_tab = tab_index
+
+
 ## Closes the window, if it was open, and emits `closed` — guarded on `visible` so a `close()`
 ## call against an already-closed window (e.g. `CameraRig`'s own toggle, which calls this
 ## unconditionally on every capture-side flip) is a no-op rather than a spurious signal.

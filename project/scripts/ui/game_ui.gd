@@ -66,6 +66,9 @@ func _ready() -> void:
 	# → D-44, 90°-step camera rotation.
 	hud.rotate_cw_pressed.connect(_on_rotate_cw_pressed)
 	hud.rotate_ccw_pressed.connect(_on_rotate_ccw_pressed)
+	# Tab and [?] are two doors to one room — the `[?]` button exists because Tab is not
+	# discoverable to a 6-10-year-old who has never used a keyboard shortcut.
+	hud.help_pressed.connect(_on_help_pressed)
 	# Leaving a mode leaves its preview behind with it: the next poll re-reads from scratch
 	# rather than showing a band computed under the other mode's cursor.
 	hud.mode_changed.connect(func(_mode: GameHud.Mode) -> void: tap_router.invalidate_preview())
@@ -247,6 +250,16 @@ func _on_resident_departed(
 func _display_name_of(species_id: String) -> String:
 	var species: AnimalDefinition = tap_router.species_definition(species_id)
 	return species_id if species == null else species.display_name
+
+
+## The `[?]` button's whole job: open the same window Tab already opens, on the same tab.
+## `menu_window.open_at_tab()` needs a world to refresh the Field Guide against — `_world` may
+## still be null the instant before the first `bind_world()` deferred call runs, in which case
+## this is a harmless no-op tap rather than a crash.
+func _on_help_pressed() -> void:
+	if _world == null:
+		return
+	menu_window.open_at_tab(_world, MenuWindow.FIELD_GUIDE_TAB_INDEX)
 
 
 ## → D-44, 90°-step camera rotation.
