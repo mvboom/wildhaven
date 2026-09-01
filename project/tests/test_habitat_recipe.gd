@@ -45,6 +45,10 @@ func _process(_delta: float) -> bool:
 	_check_stag_dedupes_to_two_chips_at_single_count()
 	_check_fox_reads_forest_and_rock()
 	_check_unsourced_need_is_unsatisfiable()
+	_check_description_never_repeats_a_shared_source()
+	_check_avoids_unions_both_directions()
+	_check_starter_prefers_free_terrain()
+	_check_unsatisfiable_species_describes_honestly()
 
 	finish()
 	return true
@@ -94,3 +98,47 @@ func _check_unsourced_need_is_unsatisfiable() -> void:
 	var recipe: Dictionary = HabitatRecipe.recipe_for(ghost, _world)
 	check(not (recipe["satisfiable"] as bool), "a need with no source is unsatisfiable")
 	check_eq((recipe["entries"] as Array).size(), 0, "an unsatisfiable species shows no partial recipe")
+
+
+func _check_description_never_repeats_a_shared_source() -> void:
+	var stag: AnimalDefinition = load(STAG_PATH) as AnimalDefinition
+	if not check(stag != null, "stag.tres loads"):
+		return
+	var text: String = HabitatRecipe.describe(stag, _world)
+	# Rock supplies both of stag's rock-ish needs; its phrase must appear ONCE.
+	var phrase: String = HabitatRecipe.SOURCE_PHRASES["rock"] as String
+	check_eq(text.count(phrase), 1, "the Rock phrase appears once, not once per tag")
+	check(text.begins_with("Likes "), "description leads with 'Likes '")
+	check(not text.contains(stag.display_name), "description omits the species name")
+
+
+func _check_avoids_unions_both_directions() -> void:
+	var fox: AnimalDefinition = load(FOX_PATH) as AnimalDefinition
+	if not check(fox != null and _world.roster != null, "fox.tres and the roster load"):
+		return
+	var rabbit: AnimalDefinition = _world.roster.by_id("rabbit")
+	if not check(rabbit != null, "the roster carries rabbit"):
+		return
+	check(HabitatRecipe.avoids_for(fox, _world).has(rabbit.display_name),
+		"fox's avoids names Rabbit")
+	check(HabitatRecipe.avoids_for(rabbit, _world).has(fox.display_name),
+		"rabbit's avoids names Fox from the OTHER direction of the relation")
+
+
+func _check_starter_prefers_free_terrain() -> void:
+	var starter: AnimalDefinition = HabitatRecipe.easiest_species(_world)
+	if not check(starter != null, "a starter species is derivable"):
+		return
+	var recipe: Dictionary = HabitatRecipe.recipe_for(starter, _world)
+	for entry: Dictionary in (recipe["entries"] as Array):
+		check_eq(entry["cost"], 0,
+			"the starter's recipe is entirely free terrain (chip '%s')" % entry["id"])
+
+
+func _check_unsatisfiable_species_describes_honestly() -> void:
+	var ghost := AnimalDefinition.new()
+	ghost.id = "ghost"
+	ghost.display_name = "Ghost"
+	ghost.habitat_needs = ["quiet"] as Array[String]
+	check_eq(HabitatRecipe.describe(ghost, _world), HabitatRecipe.DESCRIBE_UNKNOWN,
+		"an unsatisfiable species says so rather than describing a partial habitat")
