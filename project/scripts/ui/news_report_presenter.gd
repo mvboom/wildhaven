@@ -4,19 +4,12 @@ extends Node
 ## `NewsReportToast`. Owns no visible node of its own; `GameUI` instances one alongside the
 ## toast, the same shape it already uses for every other single-purpose behaviour file
 ## (`TapRouter`, `TapCue`, …).
-##
-## [COPY] — the first-time nudge's own text. gdd.md gives an illustrative example ("This
-## meadow is just waiting for a garden — or a few mossy boulders…") but spec.md's Open
-## Question #12 keeps the EXACT wording open, deferred to the same content pass as fact cards
-## — so this is a placeholder in the GDD's shape, not approved copy, exactly the distinction
-## `FieldGuide.EMPTY_STATE_TEXT` already draws for an unwritten player-facing word elsewhere in
-## this layer.
-const NUDGE_TEXT: String = "[COPY] This meadow is just waiting for a garden — or a few mossy boulders…"
 
 var _scheduler: NewsReportScheduler = null
 var _toast: NewsReportToast = null
 var _world: WorldRoot = null
 var _content_rng := RandomNumberGenerator.new()
+var _coach: OnboardingCoach = null
 
 ## Species a News Report has named this session, newest last. SESSION-ONLY — nothing here is
 ## saved or restored (see Proposals): a reload starts this empty again, which is honest given
@@ -66,12 +59,20 @@ func hinted_species_ids() -> Array[String]:
 	return out
 
 
+## `GameUI` hands the live coach over so the 3-second nudge beat (D-37, unchanged) starts the
+## coach rather than firing a toast. ONE HINT AT A TIME: the coach's beat 1 replaces the old
+## placeholder nudge toast, it does not accompany it.
+func set_coach(coach: OnboardingCoach) -> void:
+	_coach = coach
+
+
 func _process(delta: float) -> void:
 	if _scheduler == null or _toast == null:
 		return
 	match _scheduler.advance(delta):
 		NewsReportScheduler.EVENT_NUDGE:
-			_toast.show_text(NUDGE_TEXT)
+			if _coach != null:
+				_coach.notice_nudge_due()
 		NewsReportScheduler.EVENT_REPORT:
 			_fire_report()
 

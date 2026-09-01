@@ -50,9 +50,21 @@ const VILLAGER_SPECIES_ID: String = "human"
 @onready var crosshair: Crosshair = %Crosshair
 @onready var news_report_presenter: NewsReportPresenter = %NewsReportPresenter
 @onready var notification_feed: NotificationFeed = %NotificationFeed
+@onready var coach_chip: CoachChip = %CoachChip
 
 var _world: WorldRoot = null
 var _camera: Camera3D = null
+
+## Task 7's first-run coach. Built exactly once, in `bind_world()`, guarded by `_coach == null`
+## — `bind_world()` itself is re-entrant (called every frame from `_process()` until both a
+## camera AND a world resolve, and again by anyone who wants to force a rebind), so anything
+## unguarded in that block runs once per frame rather than once per session: a fresh
+## `OnboardingCoach` every tick (which would never accumulate enough idle time to show anything)
+## and, far worse, a duplicate signal connection stacked on top of the last one every frame
+## (so a single tap, mode change or arrival would fire its handler N times over). See
+## `tests/test_news_report.gd`'s `_check_coach_wiring_is_idempotent()`, which asserts this
+## directly.
+var _coach: OnboardingCoach = null
 
 ## Snapshotted once, the first time `bind_world()` binds a world — everything hosted BEFORE
 ## this session (or earlier in it, appended below) is in here. `species_hosted_ids()` cannot
@@ -82,7 +94,7 @@ func _ready() -> void:
 	call_deferred("bind_world")
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if _camera == null or _world == null:
 		bind_world()
 	# Finding #2 of the 2026-08-09 final review: `Crosshair`'s own docstring names every
@@ -92,6 +104,20 @@ func _process(_delta: float) -> void:
 	# folded Field Guide/Settings/Catalog into the single MenuWindow, so one check now covers
 	# all three.
 	crosshair.set_suppressed(fact_card.is_open() or menu_window.is_open())
+
+	if _coach != null:
+		_coach.advance(delta)
+		if _coach.is_showing() and not coach_chip.visible:
+			_coach.bind_content(_world)
+			var target: Control = hud.help_button()
+			var target_id: String = _coach.current_target_id()
+			if not target_id.is_empty():
+				target = hud.palette_button_for(target_id)
+			# Never over a modal — the same overlays `Crosshair` already suppresses for, above.
+			if not menu_window.is_open() and not fact_card.is_open():
+				coach_chip.show_chip(_coach.current_text(), target)
+		elif not _coach.is_showing() and coach_chip.visible:
+			coach_chip.hide_chip()
 
 
 ## Connects to the live world and camera. Idempotent, and public so a headless test can call
@@ -133,6 +159,28 @@ func bind_world() -> void:
 		var rig := camera as CameraRig
 		if rig != null:
 			rig.menu_window = menu_window
+
+	# TASK 7's COACH, BUILT EXACTLY ONCE. `bind_world()` is re-entrant (called every frame from
+	# `_process()` until both `_camera` and `_world` resolve, and it stays safe to call again
+	# after that), so `_coach == null` — not "the world just bound" above, which is its own,
+	# separate one-shot — is the guard that actually keeps this to a single construction and a
+	# single set of signal connections. Skipped literally: a coach rebuilt every frame would
+	# never accumulate the idle seconds needed to show anything, and every connection below
+	# would stack a fresh duplicate on top of the last one, firing its handler once per frame
+	# per prior call rather than once per event.
+	if _world != null and _coach == null:
+		_coach = OnboardingCoach.new()
+		_coach.configure(_world.is_new_world, GameplaySettings.hints_enabled())
+		news_report_presenter.set_coach(_coach)
+		coach_chip.dismissed.connect(func() -> void: _coach.dismiss(); coach_chip.hide_chip())
+		tap_router.tile_painted.connect(func() -> void: _coach.notice_painted())
+		hud.mode_changed.connect(func(_m: GameHud.Mode) -> void: _coach.notice_activity())
+		hud.palette_changed.connect(func() -> void: _coach.notice_activity())
+		hud.help_pressed.connect(func() -> void: _coach.notice_guide_opened())
+		menu_window.closed.connect(func() -> void: _coach.notice_guide_closed())
+		_world.resident_arrived.connect(
+			func(_id: String, _p: Vector3) -> void: _coach.notice_arrival()
+		)
 
 	tap_router.attach(_world, hud, fact_card, notification_feed, tap_cue, crosshair)
 
