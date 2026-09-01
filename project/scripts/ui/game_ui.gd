@@ -50,9 +50,21 @@ const VILLAGER_SPECIES_ID: String = "human"
 @onready var crosshair: Crosshair = %Crosshair
 @onready var news_report_presenter: NewsReportPresenter = %NewsReportPresenter
 @onready var notification_feed: NotificationFeed = %NotificationFeed
+@onready var coach_chip: CoachChip = %CoachChip
 
 var _world: WorldRoot = null
 var _camera: Camera3D = null
+
+## Task 7's first-run coach. Built exactly once, in `bind_world()`, guarded by `_coach == null`
+## — `bind_world()` itself is re-entrant (called every frame from `_process()` until both a
+## camera AND a world resolve, and again by anyone who wants to force a rebind), so anything
+## unguarded in that block runs once per frame rather than once per session: a fresh
+## `OnboardingCoach` every tick (which would never accumulate enough idle time to show anything)
+## and, far worse, a duplicate signal connection stacked on top of the last one every frame
+## (so a single tap, mode change or arrival would fire its handler N times over). See
+## `tests/test_news_report.gd`'s `_check_coach_wiring_is_idempotent()`, which asserts this
+## directly.
+var _coach: OnboardingCoach = null
 
 ## Snapshotted once, the first time `bind_world()` binds a world — everything hosted BEFORE
 ## this session (or earlier in it, appended below) is in here. `species_hosted_ids()` cannot
@@ -66,6 +78,9 @@ func _ready() -> void:
 	# → D-44, 90°-step camera rotation.
 	hud.rotate_cw_pressed.connect(_on_rotate_cw_pressed)
 	hud.rotate_ccw_pressed.connect(_on_rotate_ccw_pressed)
+	# Tab and [?] are two doors to one room — the `[?]` button exists because Tab is not
+	# discoverable to a 6-10-year-old who has never used a keyboard shortcut.
+	hud.help_pressed.connect(_on_help_pressed)
 	# Leaving a mode leaves its preview behind with it: the next poll re-reads from scratch
 	# rather than showing a band computed under the other mode's cursor.
 	hud.mode_changed.connect(func(_mode: GameHud.Mode) -> void: tap_router.invalidate_preview())
@@ -79,7 +94,7 @@ func _ready() -> void:
 	call_deferred("bind_world")
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if _camera == null or _world == null:
 		bind_world()
 	# Finding #2 of the 2026-08-09 final review: `Crosshair`'s own docstring names every
@@ -88,7 +103,32 @@ func _process(_delta: float) -> void:
 	# addition (Task 4 review, same bug reproduced once already fixed for FieldGuide). Task 5
 	# folded Field Guide/Settings/Catalog into the single MenuWindow, so one check now covers
 	# all three.
-	crosshair.set_suppressed(fact_card.is_open() or menu_window.is_open())
+	var modal_open: bool = fact_card.is_open() or menu_window.is_open()
+	crosshair.set_suppressed(modal_open)
+
+	if _coach != null:
+		_coach.advance(delta)
+		# Finding #1 of the final review: the old gate only checked `modal_open` on the branch
+		# that SHOWS the chip, never on the branch that keeps it shown — so a chip already on
+		# screen survived a modal opening over it (tap an animal in Inspect mode -> FactCard
+		# opens on top of the still-visible, still-pulsing chip; same shape via Tab -> MenuWindow,
+		# which fires no signal the coach hears). `modal_open` is computed once, above, and both
+		# branches below key off the identical value: show only when nothing modal is up, hide
+		# the instant something modal is, regardless of what the state machine thinks.
+		if _coach.is_showing() and not modal_open and not coach_chip.visible:
+			# Moved inside the show branch (was unconditional above): `bind_content()` re-derives
+			# `easiest_species()` across the whole roster (15 species x the full catalog, twice
+			# over, in fresh dictionaries) and was previously re-running every single frame a chip
+			# was pending behind a modal. It only needs to run once, right before the chip
+			# actually renders.
+			_coach.bind_content(_world)
+			var target: Control = hud.help_button()
+			var target_id: String = _coach.current_target_id()
+			if not target_id.is_empty():
+				target = hud.palette_button_for(target_id)
+			coach_chip.show_chip(_coach.current_text(), target)
+		elif (not _coach.is_showing() or modal_open) and coach_chip.visible:
+			coach_chip.hide_chip()
 
 
 ## Connects to the live world and camera. Idempotent, and public so a headless test can call
@@ -130,6 +170,33 @@ func bind_world() -> void:
 		var rig := camera as CameraRig
 		if rig != null:
 			rig.menu_window = menu_window
+
+	# TASK 7's COACH, BUILT EXACTLY ONCE. `bind_world()` is re-entrant (called every frame from
+	# `_process()` until both `_camera` and `_world` resolve, and it stays safe to call again
+	# after that), so `_coach == null` — not "the world just bound" above, which is its own,
+	# separate one-shot — is the guard that actually keeps this to a single construction and a
+	# single set of signal connections. Skipped literally: a coach rebuilt every frame would
+	# never accumulate the idle seconds needed to show anything, and every connection below
+	# would stack a fresh duplicate on top of the last one, firing its handler once per frame
+	# per prior call rather than once per event.
+	if _world != null and _coach == null:
+		_coach = OnboardingCoach.new()
+		_coach.configure(_world.is_new_world, GameplaySettings.hints_enabled())
+		news_report_presenter.set_coach(_coach)
+		coach_chip.dismissed.connect(func() -> void: _coach.dismiss(); coach_chip.hide_chip())
+		tap_router.tile_painted.connect(func() -> void: _coach.notice_painted())
+		hud.mode_changed.connect(func(_m: GameHud.Mode) -> void: _coach.notice_activity())
+		hud.palette_changed.connect(func() -> void: _coach.notice_activity())
+		hud.help_pressed.connect(func() -> void: _coach.notice_guide_opened())
+		# Final review minor: this fires on `closed` regardless of which tab was open when it
+		# closed. Correct today — `FIELD_GUIDE_TAB_INDEX` is the only tab `MenuWindow` has — but
+		# would silently advance beat 1 off a second tab's close too, the day one lands.
+		# `MenuWindow` exposes no current-tab getter to check against yet; when it does, guard
+		# this on `menu_window.current_tab() == MenuWindow.FIELD_GUIDE_TAB_INDEX`.
+		menu_window.closed.connect(func() -> void: _coach.notice_guide_closed())
+		_world.resident_arrived.connect(
+			func(_id: String, _p: Vector3) -> void: _coach.notice_arrival()
+		)
 
 	tap_router.attach(_world, hud, fact_card, notification_feed, tap_cue, crosshair)
 
@@ -247,6 +314,16 @@ func _on_resident_departed(
 func _display_name_of(species_id: String) -> String:
 	var species: AnimalDefinition = tap_router.species_definition(species_id)
 	return species_id if species == null else species.display_name
+
+
+## The `[?]` button's whole job: open the same window Tab already opens, on the same tab.
+## `menu_window.open_at_tab()` needs a world to refresh the Field Guide against — `_world` may
+## still be null the instant before the first `bind_world()` deferred call runs, in which case
+## this is a harmless no-op tap rather than a crash.
+func _on_help_pressed() -> void:
+	if _world == null:
+		return
+	menu_window.open_at_tab(_world, MenuWindow.FIELD_GUIDE_TAB_INDEX)
 
 
 ## → D-44, 90°-step camera rotation.

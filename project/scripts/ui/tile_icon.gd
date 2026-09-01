@@ -12,7 +12,27 @@ extends Control
 ## like the button's own label text does, so it stays legible in both states without a
 ## second palette of icon-specific colors.
 
-enum Kind { WILD_GRASS, GRASS, WATER, FOREST, ROCK, FARM, HOUSE, ERASER, EXIT, LOOK }
+enum Kind { WILD_GRASS, GRASS, WATER, FOREST, ROCK, FARM, HOUSE, ERASER, EXIT, LOOK, HELP }
+
+## Palette option id -> glyph. Lives here rather than on `GameHud` because `HabitatRecipe`
+## needs the same mapping to render a recipe chip, and two copies would silently diverge the
+## first time a terrain is added.
+const KIND_BY_ID: Dictionary = {
+	"wild_grass": Kind.WILD_GRASS,
+	"grass": Kind.GRASS,
+	"water": Kind.WATER,
+	"forest": Kind.FOREST,
+	"rock": Kind.ROCK,
+	"cultivated_field": Kind.FARM,
+	"house": Kind.HOUSE,
+}
+
+
+## The glyph for `id`, or `null` when nothing is mapped — callers decide whether a missing
+## glyph is a chip without an icon or a skipped row.
+static func kind_for_id(id: String) -> Variant:
+	return KIND_BY_ID.get(id, null)
+
 
 @export var kind: Kind = Kind.GRASS
 
@@ -59,6 +79,8 @@ func _draw() -> void:
 			_draw_exit(ink, c)
 		Kind.LOOK:
 			_draw_look(ink, c)
+		Kind.HELP:
+			_draw_help(ink, c)
 
 
 ## `blade_count` blades fanned evenly across a baseline, each a short bent line. Wild grass
@@ -176,3 +198,12 @@ func _draw_look(ink: Color, c: Vector2) -> void:
 	var wing_b: Vector2 = tip + back.rotated(-wing_angle) * 8.0
 	draw_line(tip, wing_a, ink, THICKNESS, true)
 	draw_line(tip, wing_b, ink, THICKNESS, true)
+
+
+## A question mark — the hook, then the dot. Same vector technique as EXIT and LOOK, so this
+## costs no art import and follows the same ink flip as every other glyph.
+func _draw_help(ink: Color, c: Vector2) -> void:
+	var r: float = minf(size.x, size.y) * 0.18
+	draw_arc(c + Vector2(0.0, -r * 1.4), r, PI, TAU + PI * 0.35, 24, ink, THICKNESS, true)
+	draw_line(c + Vector2(0.0, -r * 0.1), c + Vector2(0.0, r * 0.8), ink, THICKNESS, true)
+	draw_circle(c + Vector2(0.0, r * 1.8), THICKNESS * 0.7, ink)

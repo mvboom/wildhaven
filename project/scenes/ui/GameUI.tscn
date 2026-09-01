@@ -1,4 +1,4 @@
-[gd_scene load_steps=15 format=3]
+[gd_scene load_steps=16 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/game_ui.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/ui/game_hud.gd" id="2"]
@@ -6,12 +6,14 @@
 [ext_resource type="Script" path="res://scripts/ui/tap_router.gd" id="4"]
 [ext_resource type="Script" path="res://scripts/ui/crosshair.gd" id="11"]
 [ext_resource type="Script" path="res://scripts/ui/rotate_icon.gd" id="15"]
+[ext_resource type="Script" path="res://scripts/ui/tile_icon.gd" id="16"]
 [ext_resource type="PackedScene" path="res://scenes/ui/FactCard.tscn" id="5"]
 [ext_resource type="PackedScene" path="res://scenes/ui/DisplacementNotice.tscn" id="6"]
 [ext_resource type="PackedScene" path="res://scenes/ui/NewsReportToast.tscn" id="8"]
 [ext_resource type="Script" path="res://scripts/ui/news_report_presenter.gd" id="10"]
 [ext_resource type="PackedScene" path="res://scenes/ui/MenuWindow.tscn" id="13"]
 [ext_resource type="PackedScene" path="res://scenes/ui/NotificationFeed.tscn" id="14"]
+[ext_resource type="PackedScene" path="res://scenes/ui/CoachChip.tscn" id="17"]
 
 [sub_resource type="StyleBoxFlat" id="HudPanel"]
 content_margin_left = 24.0
@@ -266,6 +268,38 @@ layout_mode = 2
 focus_mode = 0
 theme_override_styles/normal = SubResource("ButtonCream")
 
+; Bottom-left corner (Task 5) — the only free corner: WoodPanel already owns top-left,
+; PaletteRow owns bottom-center, BottomRight/Exit own bottom-right. Declared directly on HUD,
+; not inside PaletteRow, so it can never be mistaken for catalog content or shift a palette
+; index — Tab already opens the Field Guide (Task 4); this is the second, discoverable door to
+; the same room for a player who has never used a keyboard shortcut. `offset_left = 24.0`
+; matches WoodPanel's own top-left inset, so the two read as a matched pair of corner buttons.
+[node name="HelpButton" type="Button" parent="HUD"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(72, 72)
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = -96.0
+offset_right = 96.0
+offset_bottom = -24.0
+grow_vertical = 0
+focus_mode = 0
+theme_override_styles/normal = SubResource("ButtonCream")
+
+[node name="Icon" type="Control" parent="HUD/HelpButton"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("16")
+kind = 10
+
 ; Bottom-right corner, positioned to sit immediately left of `LeaveOverlay`'s Exit button (its
 ; own separate CanvasLayer/scene — see that file's header for why it stays a sibling rather
 ; than folding in here) so the two read as one cluster despite being different scenes. Exit
@@ -338,6 +372,15 @@ unique_name_in_owner = true
 unique_name_in_owner = true
 
 [node name="NotificationFeed" parent="." instance=ExtResource("14")]
+unique_name_in_owner = true
+
+; Task 7 — the onboarding coach's chip. Added AFTER NotificationFeed so it draws above the HUD
+; (and above NotificationFeed's own entries, which never compete for the same screen real
+; estate the coach points at), but BEFORE MenuWindow below: `GameUI._process()` already refuses
+; to show a new chip while a modal is open (the same suppression `Crosshair` applies), and this
+; draw order means even a chip already on screen the instant a modal opens is covered by it
+; rather than floating on top, belt-and-suspenders with that script-side check.
+[node name="CoachChip" parent="." instance=ExtResource("17")]
 unique_name_in_owner = true
 
 ; Added LAST, on top of everything else — the player opened this deliberately (a HUD tap),

@@ -89,7 +89,9 @@ func _process(_delta: float) -> bool:
 	_check_settings_overlay_reads_and_writes_the_one_source_of_truth()
 	_check_toast_behaviour()
 	_check_wiring_on_the_real_scene()
+	_check_coach_wiring_is_idempotent()
 	_check_is_new_world()
+	_check_help_button_opens_field_guide()
 
 	GameplaySettings.reset_for_test()
 	finish()
@@ -449,6 +451,76 @@ func _check_wiring_on_the_real_scene() -> void:
 	fresh_presenter.free()
 	fresh_world.free()
 	GameplaySettings.reset_for_test()
+
+
+## TASK 7's RE-ENTRANCY GUARD. `GameUI._process()` calls `bind_world()` every frame until both
+## `_camera` and `_world` resolve — the setup at the top of this suite already made ONE such
+## call (line `_ui.bind_world()` above). `OnboardingCoach` construction and every signal
+## connection built alongside it in `bind_world()` sit behind a single `_coach == null` guard;
+## that guard is what stands between "built once per session" and "a fresh coach every frame,
+## with a fresh duplicate connection stacked onto every wired signal on top of the last one" —
+## the literal brief sketch's bug, done as `bind_world()` calling out to build the coach
+## unconditionally.
+##
+## Snapshots each signal's connection count BEFORE two further `bind_world()` calls, then
+## checks it is UNCHANGED afterward, rather than asserting a hardcoded "1" — several of these
+## signals (`mode_changed`, `help_pressed`) already carry an unrelated permanent connection
+## from `GameUI._ready()`, so the coach's own contribution to the count is "stays flat", not
+## "is exactly one". A guard-less `bind_world()` would grow every count by one per extra call;
+## this fails immediately if that happens.
+func _check_coach_wiring_is_idempotent() -> void:
+	var coach_after_first_bind: OnboardingCoach = _ui._coach
+	if not check(coach_after_first_bind != null,
+		"bind_world() constructs a coach the first time it sees a bound world"):
+		return
+
+	var wires: Array = [
+		[_ui.coach_chip.dismissed, "CoachChip.dismissed"],
+		[_ui.tap_router.tile_painted, "TapRouter.tile_painted"],
+		[_ui.hud.mode_changed, "GameHud.mode_changed"],
+		[_ui.hud.palette_changed, "GameHud.palette_changed"],
+		[_ui.hud.help_pressed, "GameHud.help_pressed"],
+		[_ui.menu_window.closed, "MenuWindow.closed"],
+		[_world.resident_arrived, "WorldRoot.resident_arrived"],
+	]
+	var before: Array[int] = []
+	for wire: Array in wires:
+		before.append((wire[0] as Signal).get_connections().size())
+
+	# Two further calls, mirroring the repeated-frame case `_process()` actually drives while
+	# `_camera`/`_world` are still resolving — one call alone would not distinguish "guarded"
+	# from "happened to run exactly twice already".
+	_ui.bind_world()
+	_ui.bind_world()
+
+	check(_ui._coach == coach_after_first_bind,
+		"two further bind_world() calls do not replace the coach — same instance throughout")
+
+	for i: int in range(wires.size()):
+		var sig: Signal = wires[i][0]
+		var label: String = wires[i][1]
+		var message: String = (
+			"%s's connection count is unchanged after two more bind_world() calls" % label
+		)
+		check_eq(sig.get_connections().size(), before[i], message)
+
+
+## Final review finding #6: `GameHud.help_pressed`, `GameHud.help_button()`,
+## `MenuWindow.open_at_tab()` and `GameUI._on_help_pressed()`'s null-world guard all shipped
+## with Task 5 unasserted end to end — nothing proved the `[?]` button actually opens the Field
+## Guide tab. This suite already has `_ui`, `_world`, and a bound `MenuWindow` in scope from the
+## setup above, so wiring the real button's `pressed` signal (rather than calling
+## `_on_help_pressed()` directly) exercises the exact path a player's tap drives.
+func _check_help_button_opens_field_guide() -> void:
+	check(not _ui.menu_window.is_open(), "fixture: the menu window starts closed")
+	_ui.hud.help_button().pressed.emit()
+	check(_ui.menu_window.is_open(), "the [?] button opens MenuWindow")
+	# `%Tabs`, the same unique-name path `test_menu_window.gd::_check_defaults_to_field_guide_tab()`
+	# already reads, rather than reaching into `MenuWindow`'s private `_tabs`.
+	var tabs: TabContainer = _ui.menu_window.get_node("%Tabs") as TabContainer
+	check_eq(tabs.current_tab, MenuWindow.FIELD_GUIDE_TAB_INDEX,
+		"...on the Field Guide tab specifically, not just whichever tab was last open")
+	_ui.menu_window.close()
 
 
 func _check_is_new_world() -> void:
