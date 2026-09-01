@@ -1,11 +1,23 @@
 extends QATestCase
-## THE DERIVATION LAYER — habitat_needs -> emitted_tags -> palette button -> glyph.
+## THE DERIVATION LAYER — habitat_needs -> emitted_tags -> palette button -> glyph, plus the
+## copy, avoids, and starter-species selection built on top of it.
 ##
 ## The two arithmetic traps this suite exists to pin:
 ##   * Rock emits BOTH `cover` and `rocks`, so Stag's three needs must collapse to TWO
 ##     chips, not three;
 ##   * and a rock tile qualifies for both tags independently, so the merged chip's count is
 ##     `tiles_per_individual` (8), NOT double it.
+##
+## It also pins three more traps once `describe()`, `avoids_for()` and `easiest_species()`
+## landed on top of `recipe_for()`:
+##   * `describe()` must compose over the DEDUPED entries, not raw tags, or a shared source
+##     like Rock gets named twice;
+##   * `avoids_for()` must union BOTH directions of the relation even when the real roster's
+##     authored pairs are all symmetric today, which is why one check below swaps in a
+##     deliberately one-sided fixture roster rather than trusting fox.tres/rabbit.tres alone;
+##   * and `easiest_species()` must rank by total weighted effort, not raw tile count, so a
+##     cheap-looking `tiles_per_individual = 1` species that costs wood still loses to free
+##     terrain.
 ##
 ## Run:
 ##   bash scripts/run-tests.sh habitat_recipe
@@ -123,6 +135,32 @@ func _check_avoids_unions_both_directions() -> void:
 		"fox's avoids names Rabbit")
 	check(HabitatRecipe.avoids_for(rabbit, _world).has(fox.display_name),
 		"rabbit's avoids names Fox from the OTHER direction of the relation")
+
+	# The two checks above prove nothing about the reverse-direction SCAN: every avoids pair
+	# authored in the real roster today is declared symmetrically on both sides (fox/rabbit,
+	# husky/shiba_inu — see roster.md), so they'd pass identically against a broken
+	# `avoids_for()` that only ever reads `species.avoids` directly and never scans the roster
+	# for who names IT. `animal_definition.gd` explicitly permits declaring the relation on
+	# either side alone, so swap in a deliberately ONE-SIDED fixture roster: only Hawk
+	# declares `avoids`; Mouse stays silent. A one-directional implementation fails the
+	# second assertion below, because it would never discover that Hawk named it.
+	var hawk := AnimalDefinition.new()
+	hawk.id = "hawk"
+	hawk.display_name = "Hawk"
+	hawk.avoids = ["mouse"] as Array[String]
+	var mouse := AnimalDefinition.new()
+	mouse.id = "mouse"
+	mouse.display_name = "Mouse"
+	# mouse.avoids is left empty on purpose — the one-sided half of the fixture.
+
+	var real_roster: SpeciesRoster = _world.roster
+	_world.roster = SpeciesRoster.new([hawk, mouse])
+	check(HabitatRecipe.avoids_for(hawk, _world).has(mouse.display_name),
+		"the declaring side (Hawk) names its target (Mouse)")
+	check(HabitatRecipe.avoids_for(mouse, _world).has(hawk.display_name),
+		"the SILENT side (Mouse) still names the declarer (Hawk) — fails if avoids_for() skips the reverse scan")
+	# Restore the real roster: every check dispatched after this one in _process() expects it.
+	_world.roster = real_roster
 
 
 func _check_starter_prefers_free_terrain() -> void:
