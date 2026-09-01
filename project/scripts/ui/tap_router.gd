@@ -63,6 +63,12 @@ extends Node
 ## reaches after every Control has had its turn — so a press on a palette button cannot also
 ## paint the tile behind it, without this file knowing anything about the HUD's geometry.
 
+## Emitted only on a tap that actually changed the world — `WorldRoot.paint_tile()` /
+## `place_building()` already refuse silently, so a refused tap emits nothing. Added for the
+## onboarding coach rather than a new `WorldRoot` signal, keeping that schema untouched.
+signal tile_painted()
+signal building_placed()
+
 ## What a tap resolved to. Returned by `handle_tap()` purely so a headless test can assert
 ## the routing; nothing in the game branches on it.
 const RESULT_NONE: String = "none"
@@ -248,6 +254,7 @@ func _tap_terraform(tile: Vector2i, screen_position: Vector2) -> String:
 	var terrain_id: String = _hud.selected_terrain_id()
 	if terrain_id != "" and _world.paint_tile(tile.x, tile.y, terrain_id):
 		_accept(screen_position)
+		tile_painted.emit()
 		return RESULT_PAINTED
 	_refuse(screen_position)
 	return RESULT_REFUSED
@@ -257,6 +264,7 @@ func _tap_build(tile: Vector2i, screen_position: Vector2) -> String:
 	var placeable_id: String = _hud.selected_placeable_id()
 	if placeable_id != "" and _world.place_building(tile.x, tile.y, placeable_id):
 		_accept(screen_position)
+		building_placed.emit()
 		return RESULT_PLACED
 	_refuse(screen_position)
 	return RESULT_REFUSED

@@ -261,6 +261,16 @@ func _check_ineligible_build_refuses_silently() -> void:
 	var wood_before: int = _world.get_wood()
 	var cues_before: int = _cue.active_cues()
 
+	# TapRouter declares two signals now (added for the onboarding coach; see the header
+	# comment beside their declaration) but they are strictly success signals, emitted only
+	# from the already-guarded success branches `paint_tile()` / `place_building()` return true
+	# from. Connecting both here and proving neither fires below is what keeps this test's
+	# original point true in spirit: a refusal still has no channel to speak through.
+	var painted_fired := false
+	var placed_fired := false
+	_router.tile_painted.connect(func() -> void: painted_fired = true)
+	_router.building_placed.connect(func() -> void: placed_fired = true)
+
 	check_eq(_tap(tile), TapRouter.RESULT_REFUSED, "the tap is REFUSED")
 	check(not _world.grid.is_occupied(tile.x, tile.y), "...nothing was placed")
 	check_eq(_world.get_tile_terrain(tile.x, tile.y), "rock", "...the tile is unchanged")
@@ -271,12 +281,14 @@ func _check_ineligible_build_refuses_silently() -> void:
 	# the ONLY thing that fires.
 	check_eq(_cue.active_cues(), cues_before + 1,
 		"...exactly one soft cue was drawn — proof the tap landed, and the whole 'no' vocabulary")
+	check(not painted_fired and not placed_fired,
+		"...and neither success signal fired — a refusal still has no error channel to speak through")
 
 	var router_signals: Array[String] = []
 	for entry: Dictionary in _router.get_script().get_script_signal_list():
 		router_signals.append(entry["name"])
-	check_eq(router_signals, [] as Array[String],
-		"TapRouter declares NO signals at all — there is no error channel to refuse into")
+	check_eq(router_signals, ["tile_painted", "building_placed"] as Array[String],
+		"TapRouter declares exactly its two success signals, added for the onboarding coach")
 
 
 # --- The priority rule, in all three modes ---------------------------------------------------------------
