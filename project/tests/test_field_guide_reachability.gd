@@ -43,6 +43,16 @@ func _process(_delta: float) -> bool:
 	if not check(_world.roster != null, "the roster loaded"):
 		finish()
 		return true
+	# Final review finding #4: `roster != null` alone is a vacuous gate — an empty-but-non-null
+	# roster (a load that "succeeds" onto zero entries) passes that check and then the loop
+	# below iterates zero times, silently dropping all ~80 assertions this suite exists to make
+	# while still reporting one clean green check. This suite carries the ENTIRE safety property
+	# of the successor decision to D-40 (every shown species must be reachable) — it must not be
+	# able to go green having verified nothing, so a non-empty roster is asserted explicitly and
+	# the run bails on failure exactly like the null check above.
+	if not check(not _world.roster.species().is_empty(), "the roster is non-empty"):
+		finish()
+		return true
 
 	var sources: Dictionary = HabitatRecipe.tag_sources(_world)
 	for species: AnimalDefinition in _world.roster.species():

@@ -61,6 +61,7 @@ func _process(_delta: float) -> bool:
 	_check_avoids_unions_both_directions()
 	_check_starter_prefers_free_terrain()
 	_check_unsatisfiable_species_describes_honestly()
+	_check_grouped_button_names_the_resolved_member()
 
 	finish()
 	return true
@@ -120,7 +121,8 @@ func _check_description_never_repeats_a_shared_source() -> void:
 	# Rock supplies both of stag's rock-ish needs; its phrase must appear ONCE.
 	var phrase: String = HabitatRecipe.SOURCE_PHRASES["rock"] as String
 	check_eq(text.count(phrase), 1, "the Rock phrase appears once, not once per tag")
-	check(text.begins_with("Likes "), "description leads with 'Likes '")
+	# Final review finding #3: DESCRIBE_LEAD now carries the `[COPY]` stub marker.
+	check(text.begins_with("[COPY] Likes "), "description leads with the marked 'Likes '")
 	check(not text.contains(stag.display_name), "description omits the species name")
 
 
@@ -180,3 +182,66 @@ func _check_unsatisfiable_species_describes_honestly() -> void:
 	ghost.habitat_needs = ["quiet"] as Array[String]
 	check_eq(HabitatRecipe.describe(ghost, _world), HabitatRecipe.DESCRIBE_UNKNOWN,
 		"an unsatisfiable species says so rather than describing a partial habitat")
+
+
+## Final review finding #7: `tag_sources()` used to take a grouped placeable's `display_name`
+## and `cost` from whichever MEMBER happened to emit the tag being looked up, rather than from
+## the member `world.get_style_default(group_key)` says the player currently has selected —
+## the same member `game_hud.gd::_placeable_group_row()` actually renders on the button and
+## `TapRouter` actually places on a tap. LATENT with the real roster today (every
+## `farm_building` member ships `emitted_tags = []`), so this is a fixture: Barn (cost 30,
+## carrying the tag) and Silo (cost 15, carrying nothing) both share
+## `hotbar_category = "farm_building"`, with "silo" set as the resolved default — the exact
+## shape the header comment above predicts for "the day barn.tres gains an emitted_tags".
+##
+## Verified by mutation (see the final fix report): reverted `tag_sources()` to read
+## `placeable.display_name`/`placeable.cost` directly instead of resolving through
+## `_resolve_group_member()`, reran this suite, watched `display_name`/`cost` fail (both read
+## back as Barn's), then restored the fix and reran to confirm green.
+func _check_grouped_button_names_the_resolved_member() -> void:
+	var barn := PlaceableDefinition.new()
+	barn.id = "barn"
+	barn.display_name = "Barn"
+	barn.cost = 30
+	barn.hotbar_category = "farm_building"
+	barn.emitted_tags = ["farm_supply"] as Array[String]
+
+	var silo := PlaceableDefinition.new()
+	silo.id = "silo"
+	silo.display_name = "Silo"
+	silo.cost = 15
+	silo.hotbar_category = "farm_building"
+	silo.emitted_tags = [] as Array[String]
+
+	var real_buildings: BuildingPlacement = _world.buildings
+	var fixture_buildings := BuildingPlacement.new()
+	fixture_buildings.attach(_world.grid, _world.wood, [barn, silo])
+	_world.buildings = fixture_buildings
+
+	var had_real_default: bool = _world.style_defaults.has("farm_building")
+	var real_default: Variant = _world.style_defaults.get("farm_building", null)
+	_world.style_defaults["farm_building"] = "silo"
+
+	var sources: Dictionary = HabitatRecipe.tag_sources(_world)
+	var entries: Array = sources.get("farm_supply", []) as Array
+	if check(not entries.is_empty(), "the fixture farm_supply tag has a source"):
+		var entry: Dictionary = entries[0] as Dictionary
+		check_eq(entry["id"], "farm_building",
+			"the source is keyed by the shared button, not by whichever member emitted the tag")
+		check_eq(entry["display_name"], "Silo",
+			"the chip names Silo — the player's CURRENT default — not Barn, whose emitted_tags "
+			+ "happened to match")
+		check_eq(entry["cost"], 15,
+			"...and prices it at Silo's cost, not Barn's more expensive one")
+
+	# Restore the real fixtures — every check dispatched after this one expects them.
+	_world.buildings = real_buildings
+	if had_real_default:
+		_world.style_defaults["farm_building"] = real_default
+	else:
+		_world.style_defaults.erase("farm_building")
+	# `BuildingPlacement extends Node`, never added to the tree here — `free()`, not
+	# `queue_free()`, matching this suite's own `grid.free()` precedent elsewhere in this file
+	# (this whole suite runs inside one `_process()` call, so a queued free would never run
+	# before `finish()` quits the tree).
+	fixture_buildings.free()

@@ -18,6 +18,14 @@ extends RefCounted
 ## `min over t ( floor(count_t / tiles_per_individual) )`, so one individual needs
 ## `tiles_per_individual` tiles of EACH need. The copy says "about" for warmth.
 
+## Final review finding #3 ruling: these are NOT independently marked with the `[COPY]`
+## literal prefix, even though they are content-writer's and player-facing. Each value here is
+## a FRAGMENT composed into `DESCRIBE_LEAD + _join_and(phrases) + "."` below, never rendered on
+## its own — `DESCRIBE_LEAD` now carries the `[COPY]` marker for the whole assembled sentence,
+## so marking the fragments too would put the literal `[COPY]` text once per source in the
+## middle of a rendered line ("[COPY] Likes [COPY] woods and [COPY] rocky cover.") instead of
+## once at the front of it. One marker per rendered sentence, not one per ingredient.
+##
 ## [COPY] — content-writer's, one phrase per PALETTE BUTTON (not per tag; see the header).
 ## Keying by button is what keeps this sentence and the chips under it from ever disagreeing,
 ## and means waking a currently-inert building costs exactly one new entry here.
@@ -52,18 +60,52 @@ static func tag_sources(world: WorldRoot) -> Dictionary:
 				"display_name": terrain.display_name,
 				"cost": terrain.cost,
 			})
+	# Final review finding #7: a grouped button's `display_name`/`cost` must come from the SAME
+	# resolution `game_hud.gd::_placeable_group_row()` uses to paint the actual button — the
+	# style the player currently has selected via `world.get_style_default(group_key)` — not
+	# from whichever group member happened to emit the tag being looked up. Barn and Silo can
+	# both carry `hotbar_category = "farm_building"`; if Silo is the resolved default, the
+	# button reads "Silo" and places a silo, so the recipe chip must say "Silo ×5", never
+	# "Barn ×5", regardless of which member's `emitted_tags` matched. Indexed by id once, up
+	# front, so every placeable in this loop can resolve its group's CURRENT member in O(1)
+	# rather than re-scanning `placeable_options()` per tag.
+	var placeables_by_id: Dictionary = {}
+	for placeable: PlaceableDefinition in world.placeable_options():
+		placeables_by_id[placeable.id] = placeable
+
 	for placeable: PlaceableDefinition in world.placeable_options():
 		var button_id: String = placeable.hotbar_category
 		if button_id.is_empty():
 			button_id = placeable.id
+		var shown: PlaceableDefinition = _resolve_group_member(
+			world, button_id, placeables_by_id, placeable
+		)
 		for tag: String in placeable.emitted_tags:
 			_add_source(out, tag, {
 				"id": button_id,
 				"kind": "placeable",
-				"display_name": placeable.display_name,
-				"cost": placeable.cost,
+				"display_name": shown.display_name,
+				"cost": shown.cost,
 			})
 	return out
+
+
+## The placeable a grouped button actually shows/places right now — mirrors
+## `game_hud.gd::_placeable_group_row()`'s own rule exactly (see that function's header):
+## `button_id` is either a real placeable's own id (a single-member "group" — House today,
+## `hotbar_category` left blank) or a true shared `hotbar_category` (Farm Building), and the
+## two are told apart the identical way: a real id is a key in `placeables_by_id` directly, a
+## true category is not, and resolves through `world.get_style_default(button_id)` instead.
+## Falls back to `member` itself if resolution somehow lands on nothing (a category with no
+## style default yet) rather than returning null into a caller that assumes a display name.
+static func _resolve_group_member(
+	world: WorldRoot, button_id: String, placeables_by_id: Dictionary, member: PlaceableDefinition = null
+) -> PlaceableDefinition:
+	var resolved_id: String = button_id
+	if not placeables_by_id.has(button_id):
+		resolved_id = world.get_style_default(button_id)
+	var resolved: Variant = placeables_by_id.get(resolved_id, null)
+	return (resolved as PlaceableDefinition) if resolved != null else member
 
 
 ## `{"satisfiable": bool, "entries": Array[Dictionary]}`, one entry per distinct palette
@@ -132,11 +174,16 @@ const DESCRIBE_UNKNOWN: String = "[COPY] We don't know how to invite these yet."
 
 ## [COPY] — content-writer's. `describe()`'s lead-in. The species name is deliberately absent:
 ## the card heading already says "Fox", and omitting it means `AnimalDefinition` needs no
-## `plural_name` field purely so this sentence can conjugate.
-const DESCRIBE_LEAD: String = "Likes "
+## `plural_name` field purely so this sentence can conjugate. Carries the literal `[COPY]`
+## prefix (final review finding #3) so the rendered sentence — lead-in plus the `SOURCE_PHRASES`
+## fragments joined onto it — reads as an obvious stub rather than finished prose; see the
+## `SOURCE_PHRASES` header comment for why the fragments themselves stay unmarked.
+const DESCRIBE_LEAD: String = "[COPY] Likes "
 
-## [COPY] — content-writer's. `%s` is a comma-joined list of species display names.
-const AVOIDS_TEMPLATE: String = "Keeps away from %s."
+## [COPY] — content-writer's. `%s` is a comma-joined list of species display names. Two full
+## sentences, not composed fragments (unlike `DESCRIBE_LEAD`), so each carries its own `[COPY]`
+## marker directly.
+const AVOIDS_TEMPLATE: String = "[COPY] Keeps away from %s."
 
 
 ## "Likes woods and rocky cover." — composed over the DEDUPED recipe entries, so a source
@@ -151,7 +198,11 @@ static func describe(species: AnimalDefinition, world: WorldRoot) -> String:
 		var phrase: String = SOURCE_PHRASES.get(id, "") as String
 		if phrase.is_empty():
 			# A source with no authored phrase yet (a newly-woken building) degrades to its
-			# own display name rather than dropping the requirement out of the sentence.
+			# own display name rather than dropping the requirement out of the sentence. This
+			# emits unmarked player-facing text on its own ("barn"), but it sits inside the
+			# sentence `DESCRIBE_LEAD` already marks ("[COPY] Likes barn."), so the rendered
+			# line still reads as an obvious stub as a whole — final review finding #3, folded
+			# into the same ruling as `SOURCE_PHRASES` above: one marker per sentence.
 			phrase = (entry["display_name"] as String).to_lower()
 		phrases.append(phrase)
 	return DESCRIBE_LEAD + _join_and(phrases) + "."

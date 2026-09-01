@@ -103,20 +103,31 @@ func _process(delta: float) -> void:
 	# addition (Task 4 review, same bug reproduced once already fixed for FieldGuide). Task 5
 	# folded Field Guide/Settings/Catalog into the single MenuWindow, so one check now covers
 	# all three.
-	crosshair.set_suppressed(fact_card.is_open() or menu_window.is_open())
+	var modal_open: bool = fact_card.is_open() or menu_window.is_open()
+	crosshair.set_suppressed(modal_open)
 
 	if _coach != null:
 		_coach.advance(delta)
-		if _coach.is_showing() and not coach_chip.visible:
+		# Finding #1 of the final review: the old gate only checked `modal_open` on the branch
+		# that SHOWS the chip, never on the branch that keeps it shown — so a chip already on
+		# screen survived a modal opening over it (tap an animal in Inspect mode -> FactCard
+		# opens on top of the still-visible, still-pulsing chip; same shape via Tab -> MenuWindow,
+		# which fires no signal the coach hears). `modal_open` is computed once, above, and both
+		# branches below key off the identical value: show only when nothing modal is up, hide
+		# the instant something modal is, regardless of what the state machine thinks.
+		if _coach.is_showing() and not modal_open and not coach_chip.visible:
+			# Moved inside the show branch (was unconditional above): `bind_content()` re-derives
+			# `easiest_species()` across the whole roster (15 species x the full catalog, twice
+			# over, in fresh dictionaries) and was previously re-running every single frame a chip
+			# was pending behind a modal. It only needs to run once, right before the chip
+			# actually renders.
 			_coach.bind_content(_world)
 			var target: Control = hud.help_button()
 			var target_id: String = _coach.current_target_id()
 			if not target_id.is_empty():
 				target = hud.palette_button_for(target_id)
-			# Never over a modal — the same overlays `Crosshair` already suppresses for, above.
-			if not menu_window.is_open() and not fact_card.is_open():
-				coach_chip.show_chip(_coach.current_text(), target)
-		elif not _coach.is_showing() and coach_chip.visible:
+			coach_chip.show_chip(_coach.current_text(), target)
+		elif (not _coach.is_showing() or modal_open) and coach_chip.visible:
 			coach_chip.hide_chip()
 
 
@@ -177,6 +188,11 @@ func bind_world() -> void:
 		hud.mode_changed.connect(func(_m: GameHud.Mode) -> void: _coach.notice_activity())
 		hud.palette_changed.connect(func() -> void: _coach.notice_activity())
 		hud.help_pressed.connect(func() -> void: _coach.notice_guide_opened())
+		# Final review minor: this fires on `closed` regardless of which tab was open when it
+		# closed. Correct today — `FIELD_GUIDE_TAB_INDEX` is the only tab `MenuWindow` has — but
+		# would silently advance beat 1 off a second tab's close too, the day one lands.
+		# `MenuWindow` exposes no current-tab getter to check against yet; when it does, guard
+		# this on `menu_window.current_tab() == MenuWindow.FIELD_GUIDE_TAB_INDEX`.
 		menu_window.closed.connect(func() -> void: _coach.notice_guide_closed())
 		_world.resident_arrived.connect(
 			func(_id: String, _p: Vector3) -> void: _coach.notice_arrival()

@@ -91,6 +91,7 @@ func _process(_delta: float) -> bool:
 	_check_wiring_on_the_real_scene()
 	_check_coach_wiring_is_idempotent()
 	_check_is_new_world()
+	_check_help_button_opens_field_guide()
 
 	GameplaySettings.reset_for_test()
 	finish()
@@ -502,6 +503,24 @@ func _check_coach_wiring_is_idempotent() -> void:
 			"%s's connection count is unchanged after two more bind_world() calls" % label
 		)
 		check_eq(sig.get_connections().size(), before[i], message)
+
+
+## Final review finding #6: `GameHud.help_pressed`, `GameHud.help_button()`,
+## `MenuWindow.open_at_tab()` and `GameUI._on_help_pressed()`'s null-world guard all shipped
+## with Task 5 unasserted end to end — nothing proved the `[?]` button actually opens the Field
+## Guide tab. This suite already has `_ui`, `_world`, and a bound `MenuWindow` in scope from the
+## setup above, so wiring the real button's `pressed` signal (rather than calling
+## `_on_help_pressed()` directly) exercises the exact path a player's tap drives.
+func _check_help_button_opens_field_guide() -> void:
+	check(not _ui.menu_window.is_open(), "fixture: the menu window starts closed")
+	_ui.hud.help_button().pressed.emit()
+	check(_ui.menu_window.is_open(), "the [?] button opens MenuWindow")
+	# `%Tabs`, the same unique-name path `test_menu_window.gd::_check_defaults_to_field_guide_tab()`
+	# already reads, rather than reaching into `MenuWindow`'s private `_tabs`.
+	var tabs: TabContainer = _ui.menu_window.get_node("%Tabs") as TabContainer
+	check_eq(tabs.current_tab, MenuWindow.FIELD_GUIDE_TAB_INDEX,
+		"...on the Field Guide tab specifically, not just whichever tab was last open")
+	_ui.menu_window.close()
 
 
 func _check_is_new_world() -> void:

@@ -50,7 +50,12 @@ const UNDISCOVERED_GLYPH: String = "???"
 ## Rendered only when that count is >= 1.
 const HERE_TEMPLATE: String = "[COPY] here · %d"
 
-## [COPY] — content-writer's. `%s` is a source's display name, `%d` its target tile count.
+## Final review finding #3 ruling: NOT `[COPY]`-marked, and deliberately so, despite being
+## player-facing. `"Forest ×5"` is a DATA FORMAT — a source's name and a target tile count —
+## not prose awaiting a content-writer's approval. There is no alternate wording for a
+## reviewer to sign off on; marking it as a stub would be marking a number format as
+## unfinished copy, which it structurally cannot become.
+## `%s` is a source's display name, `%d` its target tile count.
 const CHIP_TEMPLATE: String = "%s ×%d"
 
 ## PROPOSED — human owns this. Pixels, pre-scale. Small enough to read as inline punctuation
@@ -73,14 +78,18 @@ var _recipe_ids: Dictionary = {}
 ## continues" reads as a live document, not a snapshot).
 func refresh_from(world: WorldRoot) -> void:
 	_clear_list()
+	# Final review minor: both cleared/set UNCONDITIONALLY, above the empty-roster guard below.
+	# The old order returned early on an empty/null roster before either ran, so a screen that
+	# had shown real data and then lost its roster (or the very first refresh against a
+	# config problem) kept showing the LAST non-empty count and the last recipe's chip ids —
+	# stale in both directions, for as long as the guard kept tripping.
+	_recipe_ids.clear()
+	_species_hosted_value.text = str(0 if world == null else world.species_hosted_count())
 	if world == null or world.roster == null or world.roster.species().is_empty():
 		_set_empty_state(true)
 		return
 
-	_species_hosted_value.text = str(world.species_hosted_count())
-
 	_set_empty_state(false)
-	_recipe_ids.clear()
 	for species: AnimalDefinition in world.roster.species():
 		_resident_list.add_child(_make_species_card(species, world))
 
@@ -118,12 +127,41 @@ func recipe_button_ids_for(species_id: String) -> Array[String]:
 	return out
 
 
+## Final review finding #5: `recipe_button_ids_for()` above mirrors `recipe_for()`'s entries by
+## construction — `_recipe_ids` is written from the SAME loop that builds the chips, so a test
+## comparing one against the other proves nothing about whether the chips actually rendered
+## (delete the `chips.add_child()` call below and that comparison still passes). This accessor
+## instead reads the chip `Label` TEXT back OUT OF THE LIVE SCENE TREE — the same discipline
+## `species_row_texts()` already uses for the header — so a rendering regression (a chip that
+## silently stops being added, or renders the wrong text) actually turns this red. TEST ACCESSOR
+## ONLY, same as `recipe_button_ids_for()` above.
+func recipe_chip_texts_for(species_id: String) -> Array[String]:
+	var out: Array[String] = []
+	if _resident_list == null:
+		return out
+	var card: Node = _resident_list.get_node_or_null(species_id)
+	if card == null:
+		return out
+	for section: Node in card.get_children():
+		if not (section is HFlowContainer):
+			continue
+		for chip: Node in section.get_children():
+			for piece: Node in chip.get_children():
+				if piece is Label:
+					out.append((piece as Label).text)
+	return out
+
+
 func is_empty_state_visible() -> bool:
 	return _empty_label != null and _empty_label.visible
 
 
 func _make_species_card(species: AnimalDefinition, world: WorldRoot) -> VBoxContainer:
 	var card := VBoxContainer.new()
+	# Named after the species id (final review finding #5) so `recipe_chip_texts_for()` below
+	# can find THIS card in the live scene tree by id, rather than by position — every authored
+	# id so far is a bare snake_case word, which Godot accepts as a node name outright.
+	card.name = species.id
 
 	var header := HBoxContainer.new()
 	var name_label := Label.new()

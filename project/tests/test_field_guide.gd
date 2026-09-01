@@ -97,11 +97,23 @@ func _check_whole_roster_shows_real_names() -> void:
 ## The successor to `_check_field_guide_never_shows_a_habitat_preference()` — the line
 ## `field_guide.gd`'s old header called "the line that must never move". Moving it IS the
 ## change; the safety property it protected now lives in test_field_guide_reachability.gd.
+## Final review finding #5: the old version of this check compared `FieldGuide.recipe_button_ids_for()`
+## against `HabitatRecipe.recipe_for()` — but `_recipe_ids` is written FROM the same loop that
+## builds the chips, so the two sides were guaranteed to agree regardless of whether a chip
+## actually rendered (`card.add_child(chips)` could be deleted outright and this still passed).
+## This version reads the chip `Label` text back out of the LIVE SCENE TREE
+## (`recipe_chip_texts_for()`) and compares that against text independently rendered from
+## `recipe_for()`'s entries via the same `CHIP_TEMPLATE`, so an actual rendering regression
+## (a chip silently not added, or naming the wrong button — see finding #7) turns this red.
+## Verified by mutation: temporarily commented out `card.add_child(chips)` in field_guide.gd
+## and reran this suite — every one of these checks failed as expected (see the final fix
+## report), then the line was restored and the suite went green again.
 func _check_every_species_shows_its_recipe() -> void:
 	for species: AnimalDefinition in _world.roster.species():
-		var ids: Array[String] = _guide.recipe_button_ids_for(species.id)
-		check(not ids.is_empty(), "%s's card shows at least one recipe chip" % species.id)
+		var rendered: Array[String] = _guide.recipe_chip_texts_for(species.id)
+		check(not rendered.is_empty(), "%s's card shows at least one recipe chip" % species.id)
 		var expected: Array[String] = []
 		for entry: Dictionary in (HabitatRecipe.recipe_for(species, _world)["entries"] as Array):
-			expected.append(entry["id"] as String)
-		check_eq(ids, expected, "%s's chips match its derived recipe exactly" % species.id)
+			expected.append(FieldGuide.CHIP_TEMPLATE % [entry["display_name"], entry["count"]])
+		check_eq(rendered, expected,
+			"%s's rendered chip text matches its derived recipe exactly" % species.id)
