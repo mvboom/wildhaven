@@ -50,8 +50,8 @@ func _process(_delta: float) -> bool:
 	_guide = _ui.menu_window.get_node("%FieldGuide") as FieldGuide
 
 	_check_departed_species_still_shows()
-	_check_whole_roster_shows_with_silhouettes()
-	_check_field_guide_never_shows_a_habitat_preference()
+	_check_whole_roster_shows_real_names()
+	_check_every_species_shows_its_recipe()
 
 	finish()
 	return true
@@ -82,62 +82,26 @@ func _check_departed_species_still_shows() -> void:
 		"got %s" % str(_guide.species_row_texts()))
 
 
-func _check_whole_roster_shows_with_silhouettes() -> void:
-	var roster_species: Array[AnimalDefinition] = _world.roster.species()
-	if not check(roster_species.size() >= 2, "the roster has at least two species to test with"):
-		return
-
-	# A roster id nothing in this suite has hosted yet.
-	var undiscovered: AnimalDefinition = null
-	for species: AnimalDefinition in roster_species:
-		if not _world.species_hosted_ids().has(species.id):
-			undiscovered = species
-			break
-	if not check(undiscovered != null,
-		"at least one roster species is still undiscovered at this point in the suite"):
-		return
-
-	_guide.refresh_from(_world)
-	var rows: Array[String] = _guide.species_row_texts()
-
-	check_eq(rows.size(), roster_species.size(),
-		"THE EXCEPTION: the guide lists EVERY roster species, discovered or not")
-	check(rows.has(FieldGuide.UNDISCOVERED_GLYPH),
-		"an undiscovered species renders as the silhouette glyph, never its name",
-		"got %s" % str(rows))
-	check(not rows.has(undiscovered.display_name),
-		"...specifically, %s's own name does not appear anywhere" % undiscovered.display_name)
-
-	# Discover it, and its row switches from silhouette to its real name.
-	_world.registry.register(Vector2i(22, 22), undiscovered.id, undiscovered.scout_radius)
-	_guide.refresh_from(_world)
-	var rows_after: Array[String] = _guide.species_row_texts()
-	check(rows_after.has(undiscovered.display_name),
-		"once hosted, the same species' row shows its real name")
-
-
-func _check_field_guide_never_shows_a_habitat_preference() -> void:
-	# THE SCOPE LIMIT (spec section 3): existence only. STRUCTURAL CHECK (the one that
-	# actually has to hold): every rendered row's text is EXACTLY a roster species'
-	# `display_name` or `UNDISCOVERED_GLYPH` — nothing appended, nothing substituted. A
-	# substring scan against `HABITAT_TAGS` alone can't tell "leaks a tag word" apart from
-	# "a species is legitimately named e.g. 'Forest Fox'", and would false-fail the day the
-	# roster gains a display name that happens to contain a tag word; asserting exact set
-	# membership can't be fooled either way.
-	_guide.refresh_from(_world)
-	var allowed_texts: Dictionary = {FieldGuide.UNDISCOVERED_GLYPH: true}
+## The successor to `_check_whole_roster_shows_with_silhouettes()`. The `???` silhouette is
+## retired: a player cannot decide "I want a Fox" if the guide will not say the word "Fox".
+func _check_whole_roster_shows_real_names() -> void:
+	var texts: Array[String] = _guide.species_row_texts()
+	check_eq(texts.size(), _world.roster.species().size(), "one card per roster species")
+	check(not texts.has(FieldGuide.UNDISCOVERED_GLYPH),
+		"no card renders the retired '???' silhouette")
 	for species: AnimalDefinition in _world.roster.species():
-		allowed_texts[species.display_name] = true
-	for row_text: String in _guide.species_row_texts():
-		check(allowed_texts.has(row_text),
-			("row '%s' is exactly a roster species' display_name or the undiscovered glyph, "
-			+ "nothing else appended") % row_text)
+		check(texts.has(species.display_name),
+			"%s is named outright, discovered or not" % species.id)
 
-	# Kept as a second, weaker signal alongside the structural check above: still catches a
-	# tag word smuggled directly into a row's text (e.g. via a future format string), just
-	# not one that arrives coincidentally inside a real display name.
-	var tag_words: PackedStringArray = AnimalDefinition.HABITAT_TAGS
-	for row_text: String in _guide.species_row_texts():
-		for tag: String in tag_words:
-			check(not row_text.contains(tag),
-				"row '%s' does not leak the habitat tag word '%s'" % [row_text, tag])
+
+## The successor to `_check_field_guide_never_shows_a_habitat_preference()` — the line
+## `field_guide.gd`'s old header called "the line that must never move". Moving it IS the
+## change; the safety property it protected now lives in test_field_guide_reachability.gd.
+func _check_every_species_shows_its_recipe() -> void:
+	for species: AnimalDefinition in _world.roster.species():
+		var ids: Array[String] = _guide.recipe_button_ids_for(species.id)
+		check(not ids.is_empty(), "%s's card shows at least one recipe chip" % species.id)
+		var expected: Array[String] = []
+		for entry: Dictionary in (HabitatRecipe.recipe_for(species, _world)["entries"] as Array):
+			expected.append(entry["id"] as String)
+		check_eq(ids, expected, "%s's chips match its derived recipe exactly" % species.id)
