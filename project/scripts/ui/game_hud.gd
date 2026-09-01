@@ -27,7 +27,7 @@ extends Control
 ## THE ROW IS STILL DATA-DRIVEN. `build_palettes()` reads `WorldRoot.terrain_options()` and
 ## `placeable_options()` and builds one button per catalog entry, in catalog order — nothing
 ## here hardcodes a terrain or placeable count. Adding a terrain is still a `.tres`; it just
-## also needs an `_ICON_KIND_BY_ID` entry below or it renders with no glyph (name label and
+## also needs a `TileIcon.KIND_BY_ID` entry or it renders with no glyph (name label and
 ## number still show).
 ##
 ## PLACEABLES BUTTON-GROUP BY `hotbar_category` (style-picker sub-project B2, Task 6). B1
@@ -152,20 +152,6 @@ const PREVIEW_TEXT_WILD: String = "this land is wild"
 const PREVIEW_TEXT_HOME: String = "this spot is somebody's home"
 
 
-## Catalog id -> `TileIcon.Kind`. The one place a new terrain/building's glyph is wired up —
-## an id missing here still gets a real button (`display_name` as its tooltip), just no
-## picture, so a content addition degrades gracefully instead of failing to load.
-const _ICON_KIND_BY_ID: Dictionary = {
-	"wild_grass": TileIcon.Kind.WILD_GRASS,
-	"grass": TileIcon.Kind.GRASS,
-	"water": TileIcon.Kind.WATER,
-	"forest": TileIcon.Kind.FOREST,
-	"rock": TileIcon.Kind.ROCK,
-	"cultivated_field": TileIcon.Kind.FARM,
-	"house": TileIcon.Kind.HOUSE,
-}
-
-
 ## Set by `build_palettes()`. Needed at button-build time (and by `refresh_palette_button()`,
 ## called later by Task 7's popup) to resolve a grouped placeable button — e.g. Farm
 ## Building — to whichever real member id is currently the player's chosen default.
@@ -181,7 +167,7 @@ var _world: WorldRoot = null
 ## (against this list) — not a second wiring path split by `kind` — covers all 4: the other 5
 ## terrain ids (grass, water, rock, cultivated_field... whichever ship) and Erase are excluded
 ## simply by not appearing in this list, the same "absence is the answer" shape
-## `_ICON_KIND_BY_ID` already uses for an unmapped id.
+## `TileIcon.KIND_BY_ID` already uses for an unmapped id.
 const _PICKER_CATEGORIES: Array[String] = ["forest", "wild_grass", "house", "farm_building"]
 
 ## PLACEHOLDER / TUNABLE — human's call, matching every other timing constant in this project
@@ -420,7 +406,7 @@ var _inspect_icon: TileIcon = null
 
 
 ## Attaches the icon/number/name-label chrome every palette-row button shares. `icon_kind` is
-## `null` for a catalog id `_ICON_KIND_BY_ID` has no entry for — the button still gets a real
+## `null` for a catalog id `TileIcon.KIND_BY_ID` has no entry for — the button still gets a real
 ## name label and number (so it stays usable), just no picture, the same graceful-degradation
 ## shape `catalog_rows()`'s own docs already promise for an unmapped id. `number_text` is ""
 ## for a button with no keyboard shortcut (Erase). `has_popup_indicator` adds a small
@@ -628,7 +614,7 @@ func _add_palette_button(kind: String, row: Dictionary) -> void:
 	button.owner = _palette_row.owner
 	_palette_row.move_child(button, _remove_button.get_index())
 
-	var icon_kind: Variant = _ICON_KIND_BY_ID[icon_id] if _ICON_KIND_BY_ID.has(icon_id) else null
+	var icon_kind: Variant = TileIcon.kind_for_id(icon_id)
 	_decorate_button(
 		button, icon_kind, str(_palette_order.size() + 1), display_name, _has_style_choice(id)
 	)
@@ -680,8 +666,9 @@ func refresh_palette_button(category_or_id: String) -> void:
 	if name_label != null:
 		name_label.text = display_name
 	var icon: TileIcon = _icon_child_of(button)
-	if icon != null and _ICON_KIND_BY_ID.has(icon_id):
-		icon.kind = _ICON_KIND_BY_ID[icon_id] as TileIcon.Kind
+	var icon_kind: Variant = TileIcon.kind_for_id(icon_id)
+	if icon != null and icon_kind != null:
+		icon.kind = icon_kind as TileIcon.Kind
 
 	_refresh_palette_rendering()
 

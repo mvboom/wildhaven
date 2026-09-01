@@ -14,6 +14,26 @@ extends Control
 
 enum Kind { WILD_GRASS, GRASS, WATER, FOREST, ROCK, FARM, HOUSE, ERASER, EXIT, LOOK }
 
+## Palette option id -> glyph. Lives here rather than on `GameHud` because `HabitatRecipe`
+## needs the same mapping to render a recipe chip, and two copies would silently diverge the
+## first time a terrain is added.
+const KIND_BY_ID: Dictionary = {
+	"wild_grass": Kind.WILD_GRASS,
+	"grass": Kind.GRASS,
+	"water": Kind.WATER,
+	"forest": Kind.FOREST,
+	"rock": Kind.ROCK,
+	"cultivated_field": Kind.FARM,
+	"house": Kind.HOUSE,
+}
+
+
+## The glyph for `id`, or `null` when nothing is mapped — callers decide whether a missing
+## glyph is a chip without an icon or a skipped row.
+static func kind_for_id(id: String) -> Variant:
+	return KIND_BY_ID.get(id, null)
+
+
 @export var kind: Kind = Kind.GRASS
 
 ## Mirrors the parent button's selected state (`GameHud._refresh_palette_rendering()` sets
