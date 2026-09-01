@@ -21,8 +21,7 @@ extends Control
 ## NO PORTRAITS. `AnimalDefinition` carries no portrait texture (only `model_scenes`, a 3D
 ## asset) — `FactCard`'s own "portrait" is an empty coloured frame, not an image, and this
 ## screen matches that precedent rather than inventing an art asset this dispatch was not
-## given. A silhouette row is text (`UNDISCOVERED_GLYPH`), not a greyed-out image, for the
-## same reason.
+## given. Every card is text and the real palette glyphs on its recipe chips, nothing more.
 ##
 ## NOT READ-ALOUD. spec.md -> Screen Layouts: "wider coverage (News Reports, Field Guide) is
 ## deferred (future.md)" — no 🔊 button here, by design, not omission.
@@ -106,8 +105,11 @@ func species_row_texts() -> Array[String]:
 	return out
 
 
-## Palette option ids of the chips on `species_id`'s card, in rendered order. Test-driving
-## entry point, and Task 7's coach reads it to learn which button to point at.
+## Palette option ids of the chips on `species_id`'s card, in rendered order. TEST ACCESSOR
+## ONLY: populated by `_make_species_card()` alongside the chips it describes, purely so this
+## file's own suite can assert against the derived recipe without re-deriving it or walking
+## the scene tree. No other caller — Task 7's coach targets buttons through its own
+## `current_target_id()` plus `GameHud.palette_button_for()` and never reaches this method.
 func recipe_button_ids_for(species_id: String) -> Array[String]:
 	var out: Array[String] = []
 	var ids: Variant = _recipe_ids.get(species_id, null)
