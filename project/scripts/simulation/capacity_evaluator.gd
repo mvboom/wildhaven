@@ -1,29 +1,60 @@
 class_name CapacityEvaluator
 extends RefCounted
-## The capacity formula, exactly as gdd.md -> Habitat Suitability states it:
+## The tiered capacity formula (habitat-tiers, 2026-09-04):
 ##
-##   capacity(h, S) = min( min over t ( floor(count_t / S.tiles_per_individual) ),
-##                         S.max_individuals )
+##   capacity(h, S) = max over tiers T of tier_capacity(h, S, T)
 ##
-## The scarcest need caps the population — **Liebig's law of the minimum**. **There is no
-## lower clamp: capacity can be 0, and 0 means unsuitable.**
+##   tier_capacity(h, S, T): T's limits GATE first (a violated limit zeroes the whole
+##   tier, never scales it); T's GATE_ONLY needs GATE next (absent -> 0, present ->
+##   contributes nothing to the min); then Liebig's min over T's remaining SCALING needs,
+##   each against its OWN divisor and its OWN radius, capped by T.max_individuals.
 ##
-## `count_t` is a plain count of tiles within the species' radius whose OWN terrain (or
-## building) emits `t` (spec.md -> Shared Patterns, the v1 tag model -> D-25). Tags do not
-## spread, carry no emission radius, and have no distance weighting, so one pass over the
-## tiles in radius tallying a small fixed set of counters is the whole computation.
+## **There is no lower clamp: capacity can be 0, and 0 means unsuitable.**
 ##
-## **BOTH `S.` TERMS ARE READ FROM THE `AnimalDefinition`** — `S.max_individuals` and
-## `S.capacity_radius` are real exported fields as of D-27 #1, and this file holds no
-## tuning constant of its own. The two spec/code contradictions this header used to carry
-## are closed: spec.md is the field-level build contract, and code does not overrule it.
-## Note the radius: the tile walk uses `S.effective_capacity_radius()`, which is what the
-## field is FOR — `scout_radius` scores a home site, `capacity_radius` counts its acreage.
-## v1's default makes them equal; the code no longer assumes they are.
+## `count_t` is a plain count of tiles within a need's or limit's own radius whose OWN
+## terrain (or building) emits its tag (spec.md -> Shared Patterns, the v1 tag model ->
+## D-25). Tags do not spread, carry no emission radius beyond what the need/limit states,
+## and have no distance weighting.
+##
+## ONE TIER, ONE WALK: `tag_counts()` walks the grid once per (site, tier) pair, out to
+## that tier's `max_radius()`, and buckets each tile into every `(tag, radius)` pair the
+## tier reads. This keeps the cost shape at `radius^2 * roster * tiers`, independent of
+## world size — re-walking per need would be a Critical defect even though it computes the
+## same answer.
+##
+## `S.max_individuals` moved to `HabitatTier.max_individuals` (per tier, not per species) —
+## see `HabitatTier`. This file holds no tuning constant of its own.
 
 
-## `count_t` for every tag in `species.habitat_needs`, over the tiles this candidate site
-## may count.
+## The counts-Dictionary key. Counts are per (tag, radius) pair, not per tag, because two
+## needs in one tier may read the same tag over different distances — Horse's pair tier
+## counts `open_grass` at 8 while its herd tier counts it at 14.
+static func count_key(tag: String, radius: int) -> String:
+	return "%s@%d" % [tag, radius]
+
+
+## `count_t` for every (tag, radius) pair this TIER reads, over the tiles this candidate
+## site may count.
+##
+## ONE WALK, NOT ONE PER NEED. The walk runs to `tier.max_radius()` and buckets each tile
+## into every pair whose squared radius contains it. Radii per tier are few, so the inner
+## bucket loop is cheaper than re-walking, and the cost shape stays `radius^2 * roster *
+## tiers` — independent of world size, which is the property that matters.
+##
+## `tier` defaults to `null`, resolving to `_uncached_legacy_tier(species)` — DEVIATION FROM
+## THE TASK BRIEF'S REFERENCE SNIPPET, which shows `tier` as a required positional. A
+## required `tier` would break `test_capacity_formula.gd`'s own direct 4-arg
+## `tag_counts(grid, registry, origin, species)` calls (its
+## `_check_capacity_radius_is_consumed()` and `_check_sentinel_follows_scout_radius()`),
+## which that 409-line pinned suite is not to be edited. NOTE it is `_uncached_legacy_tier()`
+## and NOT `species.legacy_tier()`: the latter is cached and bakes a concrete radius, which
+## silently stops tracking a live `scout_radius` retune — exactly the failure
+## `_check_sentinel_follows_scout_radius()`'s retune assertion catches. When `tier` resolves
+## via the legacy fallback, each bucket ALSO seeds a bare-tag alias key (no `@radius` suffix)
+## alongside its `count_key()` entry, so that suite's `.get("cover", ...)` reads keep
+## returning exactly what they did before tiers existed. Every other caller in this codebase
+## (this file's own `capacity()`/`best_tier()`, and every external caller updated for this
+## task) always passes a real `HabitatTier` and never touches the alias path.
 ##
 ## `self_site` is the already-registered site being re-evaluated, or null for a PROSPECTIVE
 ## candidate (a tile the player just edited, which no one lives on yet).
@@ -32,15 +63,56 @@ static func tag_counts(
 	registry: HomeSiteRegistry,
 	origin: Vector2i,
 	species: AnimalDefinition,
+	tier: HabitatTier = null,
 	self_site: HomeSite = null
 ) -> Dictionary:
 	var counts: Dictionary = {}
 	if grid == null or species == null:
 		return counts
-	for tag: String in species.habitat_needs:
-		counts[tag] = 0
 
-	var r: int = species.effective_capacity_radius()
+	var use_tier: HabitatTier = tier
+	var legacy_mode: bool = false
+	if use_tier == null:
+		# NOT `species.legacy_tier()` — that tier is CACHED, and its synthesised needs bake a
+		# CONCRETE radius (`effective_capacity_radius()` at first-call time), not the
+		# `RADIUS_FOLLOWS_SCOUT` sentinel. `test_capacity_formula.gd`'s
+		# `_check_sentinel_follows_scout_radius()` retunes `scout_radius` on a live species
+		# object between two direct `tag_counts()` calls and expects the walk to follow —
+		# which a baked, cached radius cannot do. `_uncached_legacy_tier()` mirrors
+		# `legacy_tier()`'s construction but leaves the sentinel in place and is never cached,
+		# so the fallback radius is re-resolved fresh on every call, exactly like the pre-tier
+		# `tag_counts()` did.
+		use_tier = _uncached_legacy_tier(species)
+		legacy_mode = true
+	if use_tier == null:
+		return counts
+
+	var fallback: int = species.effective_capacity_radius()
+	# Each bucket: the keys to accumulate into (radius-keyed, plus a bare-tag alias when
+	# resolved via the legacy fallback above), the tag to match, and its squared radius.
+	var buckets: Array[Dictionary] = []
+	for need: HabitatNeed in use_tier.needs:
+		var nr: int = need.effective_radius(fallback)
+		var nkey: String = count_key(need.tag, nr)
+		var nkeys: Array[String] = [nkey]
+		counts[nkey] = 0
+		if legacy_mode:
+			counts[need.tag] = 0
+			nkeys.append(need.tag)
+		buckets.append({"keys": nkeys, "tag": need.tag, "r_squared": nr * nr})
+	for limit: HabitatLimit in use_tier.limits:
+		var lr: int = limit.effective_radius(fallback)
+		var lkey: String = count_key(limit.tag, lr)
+		var lkeys: Array[String] = [lkey]
+		counts[lkey] = 0
+		if legacy_mode:
+			counts[limit.tag] = 0
+			lkeys.append(limit.tag)
+		buckets.append({"keys": lkeys, "tag": limit.tag, "r_squared": lr * lr})
+	if buckets.is_empty():
+		return counts
+
+	var r: int = use_tier.max_radius(fallback)
 	var r_squared: int = r * r
 	for dx in range(-r, r + 1):
 		for dz in range(-r, r + 1):
@@ -52,10 +124,38 @@ static func tag_counts(
 				continue
 			if not _tile_counts_for(registry, tile, origin, d_squared, self_site, species):
 				continue
-			for tag: String in grid.get_tile_tags(tile.x, tile.y):
-				if counts.has(tag):
-					counts[tag] = int(counts[tag]) + 1
+			var tile_tags: Array = grid.get_tile_tags(tile.x, tile.y)
+			for bucket: Dictionary in buckets:
+				if d_squared > int(bucket["r_squared"]):
+					continue
+				if tile_tags.has(bucket["tag"]):
+					for key: String in (bucket["keys"] as Array[String]):
+						counts[key] = int(counts[key]) + 1
 	return counts
+
+
+## An UNCACHED mirror of `AnimalDefinition.legacy_tier()`, built fresh on every call and
+## leaving each synthesised need's radius at `HabitatNeed.RADIUS_FOLLOWS_SCOUT` (the
+## sentinel) rather than baking in a concrete radius. Exists only for `tag_counts()`'s
+## legacy fallback (`tier == null`) — see the deviation note there.
+##
+## Returns null under the same condition `legacy_tier()` does: `tiles_per_individual < 1`.
+static func _uncached_legacy_tier(species: AnimalDefinition) -> HabitatTier:
+	if species.tiles_per_individual < 1:
+		return null
+	var tier := HabitatTier.new()
+	tier.id = "legacy"
+	tier.max_individuals = species.max_individuals
+	tier.arrival_group_size = 1
+	var built: Array[HabitatNeed] = []
+	for tag: String in species.habitat_needs:
+		var need := HabitatNeed.new()
+		need.tag = tag
+		need.radius = HabitatNeed.RADIUS_FOLLOWS_SCOUT
+		need.tiles_per_individual = species.tiles_per_individual
+		built.append(need)
+	tier.needs = built
+	return tier
 
 
 ## The exclusivity test, O(1) per tile against the registry's ownership index.
@@ -110,7 +210,41 @@ static func _tile_counts_for(
 	return distance_squared < owner.distance_squared_to(tile)
 
 
-## `capacity(h, S)`. Returns 0 for an unsuitable site — that is a real value, not a failure.
+## `tier_capacity(h, S, T)` — the formula for ONE tier, separated from the tile walk so it
+## can be checked line by line without a world.
+##
+## Order is deliberate: limits gate first (cheapest rejection), then GATE_ONLY needs, then
+## Liebig's min over the scaling needs against the TIER's cap.
+static func tier_capacity_from_counts(
+	counts: Dictionary, species: AnimalDefinition, tier: HabitatTier
+) -> int:
+	if species == null or tier == null or tier.needs.is_empty():
+		return 0
+	var fallback: int = species.effective_capacity_radius()
+
+	for limit: HabitatLimit in tier.limits:
+		var lr: int = limit.effective_radius(fallback)
+		if int(counts.get(count_key(limit.tag, lr), 0)) > limit.max_count:
+			return 0
+
+	var result: int = tier.max_individuals
+	for need: HabitatNeed in tier.needs:
+		var nr: int = need.effective_radius(fallback)
+		var count: int = int(counts.get(count_key(need.tag, nr), 0))
+		if need.is_gate_only():
+			if count < 1:
+				return 0
+			continue
+		# Integer division floors for non-negative operands; counts are never negative.
+		var supported: int = count / need.tiles_per_individual
+		if supported < result:
+			result = supported
+	# NO LOWER CLAMP. `capacity == 0` is the unsuitable state and must survive to the caller.
+	return max(result, 0)
+
+
+## `capacity(h, S) = max over tiers of tier_capacity(h, S, T)`. Returns 0 for an unsuitable
+## site — that is a real value, not a failure.
 static func capacity(
 	grid: WorldGrid,
 	registry: HomeSiteRegistry,
@@ -118,32 +252,59 @@ static func capacity(
 	species: AnimalDefinition,
 	self_site: HomeSite = null
 ) -> int:
-	if species == null or species.habitat_needs.is_empty():
+	if species == null:
 		return 0
-	if species.tiles_per_individual < 1:
-		return 0
-	var counts: Dictionary = tag_counts(grid, registry, origin, species, self_site)
-	return capacity_from_counts(counts, species)
+	var best: int = 0
+	for tier: HabitatTier in species.effective_tiers():
+		var counts: Dictionary = tag_counts(grid, registry, origin, species, tier, self_site)
+		var value: int = tier_capacity_from_counts(counts, species, tier)
+		if value > best:
+			best = value
+	return best
 
 
-## The formula itself, separated from the tile walk so it can be checked against gdd.md
-## line by line without a world.
+## The tier that produced `capacity()`'s value, or null when nothing qualifies.
+##
+## Needed by two callers that must know WHICH tier won, not just the number:
+## `HabitatSimulation` reads `arrival_group_size` off it, and `HabitatRecipe` shows the
+## player which tier they are on.
+static func best_tier(
+	grid: WorldGrid,
+	registry: HomeSiteRegistry,
+	origin: Vector2i,
+	species: AnimalDefinition,
+	self_site: HomeSite = null
+) -> HabitatTier:
+	if species == null:
+		return null
+	var best: int = 0
+	var winner: HabitatTier = null
+	for tier: HabitatTier in species.effective_tiers():
+		var counts: Dictionary = tag_counts(grid, registry, origin, species, tier, self_site)
+		var value: int = tier_capacity_from_counts(counts, species, tier)
+		if value > best:
+			best = value
+			winner = tier
+	return winner
+
+
+## THE PRE-TIER ENTRY POINT, kept because `test_capacity_formula.gd` pins gdd.md's stated
+## formula against it and takes bare-tag keys. It is now a thin adapter onto the tiered
+## formula rather than a second copy of it — one formula, two key shapes.
+##
+## The re-key is exact: `legacy_tier()` sets every synthesised need's radius to
+## `effective_capacity_radius()`, which is the radius used here.
 static func capacity_from_counts(counts: Dictionary, species: AnimalDefinition) -> int:
-	if species == null or species.habitat_needs.is_empty():
+	if species == null:
 		return 0
-	var divisor: int = species.tiles_per_individual
-	if divisor < 1:
+	var tier: HabitatTier = species.legacy_tier()
+	if tier == null:
 		return 0
-	# The formula's outer `min`, straight off the species' own data.
-	var result: int = species.max_individuals
-	for tag: String in species.habitat_needs:
-		var count: int = int(counts.get(tag, 0))
-		# Integer division floors for non-negative operands; counts are never negative.
-		var supported: int = count / divisor
-		if supported < result:
-			result = supported
-	# NO LOWER CLAMP. `capacity == 0` is the unsuitable state and must survive to the caller.
-	return max(result, 0)
+	var r: int = species.effective_capacity_radius()
+	var rekeyed: Dictionary = {}
+	for tag: String in counts:
+		rekeyed[count_key(tag, r)] = counts[tag]
+	return tier_capacity_from_counts(rekeyed, species, tier)
 
 
 ## `qualifies(h, S) === capacity(h, S) >= 1` — the same function, not a second system.

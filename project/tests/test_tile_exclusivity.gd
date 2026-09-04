@@ -158,8 +158,8 @@ func _check_overlapping_sites_split_the_tiles() -> void:
 	# Divisor 1 so the counts are readable directly as capacity too.
 	var species: AnimalDefinition = _species("splitter", ["cover"] as Array[String], 1, RADIUS)
 
-	var count_a: int = int(CapacityEvaluator.tag_counts(grid, registry, SITE_A, species, a).get("cover", -1))
-	var count_b: int = int(CapacityEvaluator.tag_counts(grid, registry, SITE_B, species, b).get("cover", -1))
+	var count_a: int = _cover_count(grid, registry, SITE_A, species, a)
+	var count_b: int = _cover_count(grid, registry, SITE_B, species, b)
 
 	# The conservation law: every tile in the union belongs to exactly one of them.
 	check_eq(count_a + count_b, union.size(),
@@ -177,7 +177,7 @@ func _check_overlapping_sites_split_the_tiles() -> void:
 	# with a same-species neighbour present. That is the land-allocation tradeoff, measured.
 	var solo := HomeSiteRegistry.new()
 	var solo_a: HomeSite = solo.register(SITE_A, "splitter", RADIUS)
-	var solo_count: int = int(CapacityEvaluator.tag_counts(grid, solo, SITE_A, species, solo_a).get("cover", -1))
+	var solo_count: int = _cover_count(grid, solo, SITE_A, species, solo_a)
 	check(solo_count > count_a,
 		"crowding costs: A counts %d alone but only %d beside B — the radius is a real tradeoff"
 			% [solo_count, count_a])
@@ -206,21 +206,17 @@ func _check_different_species_do_not_split_tiles() -> void:
 	var cow: AnimalDefinition = _species("cow", ["cover"] as Array[String], 1, RADIUS)
 	var horse: AnimalDefinition = _species("horse", ["cover"] as Array[String], 1, RADIUS)
 
-	var count_a: int = int(CapacityEvaluator.tag_counts(grid, registry, SITE_A, cow, a).get("cover", -1))
-	var count_b: int = int(CapacityEvaluator.tag_counts(grid, registry, SITE_B, horse, b).get("cover", -1))
+	var count_a: int = _cover_count(grid, registry, SITE_A, cow, a)
+	var count_b: int = _cover_count(grid, registry, SITE_B, horse, b)
 
 	# Reference: what each site counts entirely alone, with no other site registered at all.
 	var solo_registry_a := HomeSiteRegistry.new()
 	var solo_a: HomeSite = solo_registry_a.register(SITE_A, "cow", RADIUS)
-	var solo_count_a: int = int(
-		CapacityEvaluator.tag_counts(grid, solo_registry_a, SITE_A, cow, solo_a).get("cover", -1)
-	)
+	var solo_count_a: int = _cover_count(grid, solo_registry_a, SITE_A, cow, solo_a)
 
 	var solo_registry_b := HomeSiteRegistry.new()
 	var solo_b: HomeSite = solo_registry_b.register(SITE_B, "horse", RADIUS)
-	var solo_count_b: int = int(
-		CapacityEvaluator.tag_counts(grid, solo_registry_b, SITE_B, horse, solo_b).get("cover", -1)
-	)
+	var solo_count_b: int = _cover_count(grid, solo_registry_b, SITE_B, horse, solo_b)
 
 	check_eq(count_a, solo_count_a,
 		"a Cow site counts exactly as much land beside a Horse site as it would completely "
@@ -262,12 +258,12 @@ func _check_prospective_candidate_loses_ties() -> void:
 	var a: HomeSite = registry.register(SITE_A, "prospect", RADIUS)
 	var species: AnimalDefinition = _species("prospect", ["cover"] as Array[String], 1, RADIUS)
 
-	var registered: Dictionary = CapacityEvaluator.tag_counts(grid, registry, SITE_A, species, a)
-	var prospective: Dictionary = CapacityEvaluator.tag_counts(grid, registry, SITE_B, species, null)
+	var registered: int = _cover_count(grid, registry, SITE_A, species, a)
+	var prospective: int = _cover_count(grid, registry, SITE_B, species, null)
 
-	check_eq(int(registered.get("cover", -1)), 2,
+	check_eq(registered, 2,
 		"the registered site counts both rock tiles — it owns them")
-	check_eq(int(prospective.get("cover", -1)), 1,
+	check_eq(prospective, 1,
 		"the prospective candidate counts ONLY the tile it is strictly nearer to")
 	check_eq(registry.owner_at(TIE_TILE, "prospect"), a,
 		"the contested tile is still owned by the registered site")
@@ -283,10 +279,8 @@ func _check_prospective_candidate_loses_ties() -> void:
 
 	# Sanity in the other direction: with no registry at all, the candidate counts everything
 	# in radius. Without this, the check above could pass because the counter is simply broken.
-	var unclaimed: Dictionary = CapacityEvaluator.tag_counts(
-		grid, HomeSiteRegistry.new(), SITE_B, species, null
-	)
-	check_eq(int(unclaimed.get("cover", -1)), 2,
+	var unclaimed: int = _cover_count(grid, HomeSiteRegistry.new(), SITE_B, species, null)
+	check_eq(unclaimed, 2,
 		"with no sites registered the same candidate counts BOTH tiles (the counter works)")
 
 	grid.free()
@@ -388,6 +382,21 @@ func _overlap_owned_by(registry: HomeSiteRegistry, site: HomeSite) -> int:
 func _covers(centre: Vector2i, tile: Vector2i) -> bool:
 	var d: Vector2i = tile - centre
 	return d.x * d.x + d.y * d.y <= RADIUS * RADIUS
+
+
+## `cover`'s tile count for a legacy-fielded species (habitat-tiers, task 4): `tag_counts()`
+## gained a `tier` parameter, so every call site here resolves the species' own
+## `legacy_tier()` and reads back the radius-keyed `count_key()` entry it produces.
+## Centralises that boilerplate so the exclusivity assertions below read the same as before.
+func _cover_count(
+	grid: WorldGrid, registry: HomeSiteRegistry, origin: Vector2i,
+	species: AnimalDefinition, self_site: HomeSite
+) -> int:
+	var counts: Dictionary = CapacityEvaluator.tag_counts(
+		grid, registry, origin, species, species.legacy_tier(), self_site
+	)
+	var key: String = CapacityEvaluator.count_key("cover", species.effective_capacity_radius())
+	return int(counts.get(key, -1))
 
 
 func _species(id: String, needs: Array[String], divisor: int, radius: int) -> AnimalDefinition:
