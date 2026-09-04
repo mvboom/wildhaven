@@ -17,7 +17,7 @@ license_file = "res://assets/licenses/Quaternius_UltimateAnimatedAnimals_License
 attribution_required = false
 required_notice = ""
 conditions = ""
-assets_used = PackedStringArray("CommonTree_1", "CommonTree_2", "Grass_Common_Short", "Grass_Common_Tall")
+assets_used = PackedStringArray("CommonTree_1", "CommonTree_2", "Grass_Common_Short", "Grass_Common_Tall", "Flower_3_Group", "Flower_4_Group", "Bush_Common_Flowers", "Fern_1", "Grass_Wispy_Short")
 per_file_licensing = false
 notes = "CC0 — crediting is courtesy, not compliance. Reuses the generic Quaternius CC0
 license text already in-repo (`License_Standard.txt` in this pack is the same generic
@@ -33,6 +33,18 @@ footprint. Flagged for human eyeball sign-off in each wrapper scene's own header
 Each imported glTF references external PNG textures (Bark_NormalTree*, Leaves_NormalTree_C,
 Grass) copied alongside it into its own asset folder — self-contained per the pipeline's
 one-folder-per-asset convention, at the cost of duplicating shared textures across folders.
+
+Second use (2026-09-04, habitat-tiers Task 8): 5 new pieces imported for the Meadow and
+Scrub terrains (task-8-brief.md) — Flower_3_Group.gltf and Flower_4_Group.gltf composed
+into project/assets/terrain/meadow/Meadow.tscn (the new `flowers` habitat tag's first
+source); Bush_Common_Flowers.gltf, Fern_1.gltf, and Grass_Wispy_Short.gltf composed into
+project/assets/terrain/scrub/Scrub.tscn (the new `browse` habitat tag's source). Each
+imported into its own asset folder under project/assets/terrain/ with its referenced PNG
+textures copied alongside (Leaves.png/Flowers.png for the flower groups and Fern_1;
+Leaves_NormalTree_C.png/Flowers.png for Bush_Common_Flowers; Grass.png for
+Grass_Wispy_Short) — same self-contained-per-folder convention as the first use, at the
+same cost of duplicating shared textures across folders. See each terrain wrapper scene's
+own header for full sourcing/scale detail.
 
 Pack ships many more trees/rocks/grass/flowers not evaluated here; append to assets_used
 as more are imported, do NOT create a second entry for this pack (same convention as the

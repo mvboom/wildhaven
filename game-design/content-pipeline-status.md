@@ -419,6 +419,9 @@ copy edit invalidates the assertions that pinned the placeholder) and 8 (sign-of
 | `rock` | 🚧 |
 | `cultivated_field` | 🚧 |
 | `wild_grass` | 🚧 |
+| `meadow` | 🚧 |
+| `scrub` | 🚧 |
+| `snowfield` | 🚧 |
 | `sand` | 🚧 |
 
 **2026-08-16 look-pass (→ D-42):** all six v1 floor terrains now have REAL art wired as
@@ -470,6 +473,20 @@ tag-source mapping — *"untouched revealed land … nothing, tag-inert"* — bu
 here because it had no asset and no data entry. It has a data entry now, and it is the
 one this project's inert-land invariant is derived from
 (`TerrainDefinition.derive_bare_tags()`), so it needs to be trackable.
+
+**`meadow`, `scrub`, and `snowfield` are new to this table** (added 2026-09-04, tech-art
+Task 8 of the habitat-tiers plan, per task-8-brief.md and the "adding an item" procedure
+above). All 3 are the habitat-tiers ruling's new terrain additions: Meadow (`open_grass`
++ `flowers` — the first real source of the long-dormant `flowers` tag), Scrub (`browse`
++ `rocks` — the browser/grazer split from Grass/Meadow's `open_grass`), and Snowfield
+(`snow` — Husky habitat). All 3 are natural terrain, free to paint ("nature is free").
+**PLAYER-VISIBLE CONSEQUENCE:** all 3 are new, real entries in the Terraform palette —
+this pushed the palette row's button count from 8 to 11 (9 terrain + House + Farm
+Building), which now overflows the fixed band between the HelpButton and the Rotate/Erase
+corner cluster (`test_hud_hotbar.gd`'s `_check_palette_row_never_overlaps_the_corner_
+clusters()` now fails, correctly — this is a real, new layout defect this task's data
+change exposes, not a stale test pin; flagged for the human/HUD owner, not fixed here —
+out of tech-art's lane).
 
 ### `grass` — Grass (emits `open_grass`)
 
@@ -560,6 +577,51 @@ one this project's inert-land invariant is derived from
 | `validation_status` | **pass (2026-08-16)** — schema unchanged (`test_terrain_schema.gd`/`test_bare_tags_derivation.gd`, both still clean — `emitted_tags` stays empty, the derivation-source assertion is untouched by this pass). `test_occlusion_fader.gd` (unrelated suite) caught a real transient-visual bug from this scene's initial structure: wild grass is the world's default untouched-land terrain, so it is the "old" visual sitting under nearly every tile a player ever repaints to Forest, and `TerrainView`'s `queue_free()` on that old visual is deferred, not immediate — for one frame both visuals coexist, and this scene's ground box + 6 decorative pieces were initially plain top-level siblings rather than exempted, so `OcclusionFader` picked them up as fadeable. Fixed by nesting everything under one wrapper node named `Slab` (the fader's exemption mechanism) — preserved through the same-day MultiMesh rebuild (still one `Slab`-named wrapper holding the ground box, all 3 bare-dirt patches, and the multimesh). Full suite (`bash scripts/run-tests.sh`) reconfirmed green (70/71, the 1 pre-existing `test_placeable_schema` gap unrelated) after both fixes. **2026-08-26 (Task 9):** `--headless --path project --import` clean (no errors); `test_terrain_schema.gd` PASS (85/85, including `wild_grass: emitted_tags matches terrain.md's tag-source mapping` still empty); `test_bare_tags_derivation.gd` PASS (11/11 + 1 pre-existing PEND unrelated) — the inert-land invariant survived this task untouched; `test_attribution.gd` PASS (36/36); all 3 new scenes independently instantiate cleanly (one-off SceneTree verification script, deleted after use) |
 | `human_signoff` | not started — and this item's look pass is **Open Question #29** (must read as "something to claim" without reading as broken); the treatment above is tech-art's PROPOSAL, not a closure of #29 — that reading is the human's eyeball call. NEW from the same-day follow-up: the 0.065 height baseline, 32-instance/uneven-clustering density choice, and whether the widened 1.0 slab reads as intended (no visible cross-tile gap) all await the same eyeball pass. **2026-08-26, SAME-DAY human eyeball pass on Task 9's 4-variant rotation — RULED, not just flagged**: (1) Coconut_Half rejected outright ("does not look good at all") — asset deleted entirely, not deferred; (2) the equal-weight-across-N-variants question is now CLOSED for this terrain specifically: plain Wild grass must stay the default, and Cactus/Palm must NOT be part of the automatic random pick at all — they're reserved exclusively for sub-project B's player-facing style picker. `model_scenes` reverted to its original single entry (`WildGrass.tscn`) accordingly; `WildGrassCactus.tscn`/`WildGrassPalm.tscn` stay imported on disk for that future picker. Open Question #29's core question (does plain Wild grass itself read as "something to claim, not broken") is unaffected by this and remains open |
 | `status` | 🚧 — first real asset landed and wired (2026-08-16), proposing a treatment for #29; REBUILT same-day (MultiMesh, shorter/denser-but-still-patchy) per explicit human density/height feedback; human eyeball sign-off (and #29's actual closure) still open. **2026-08-26:** briefly extended to 4 `model_scenes` variants (content-variety pass Task 9), then REVERTED THE SAME DAY to 1 entry per human eyeball ruling (Coconut deleted; Cactus/Palm deferred to sub-project B, not randomized). **2026-08-27:** sub-project B2 re-added Cactus/Palm to `model_scenes` for its style picker, then the human ruled them out of the picker too — back to 1 entry (`WildGrass.tscn`) again, `WildGrassCactus.tscn`/`WildGrassPalm.tscn` still on disk unused — plain Wild grass's own #29 look-pass sign-off is still the only open item on this row |
+
+### `meadow` — Meadow (emits `open_grass`, `flowers`)
+
+| Field | Value |
+|---|---|
+| `category_attributes` | emits `open_grass` + `flowers` (first real source of the `flowers` tag); free to paint — habitat-tiers ruling, task-8-brief.md |
+| `source` | Stylized Nature MegaKit (Standard/free), Quaternius, CC0 1.0 Universal — 2 new pieces this pass, `Flower_3_Group.gltf` + `Flower_4_Group.gltf` — [`quaternius_stylized_nature_megakit.tres`](../project/attribution/sources/quaternius_stylized_nature_megakit.tres) (extends the existing entry's "Second use" note) |
+| `pre_import_audit` | done — CC0 1.0 Universal re-confirmed against the pack's own `License.txt` before import, per asset-import-pipeline.md's audit gate; style fit not yet eyeball-confirmed |
+| `project_location` | `project/assets/terrain/flower_3_group/Flower_3_Group.gltf`, `project/assets/terrain/flower_4_group/Flower_4_Group.gltf` (raw, + referenced PNG textures alongside each), composed into `project/assets/terrain/meadow/Meadow.tscn` (single `model_scenes` variant — a grass-green slab, 2 blotchy floor patches, and 4 scattered flower-clump instances) |
+| `data_entry_location` | `project/data/terrain/meadow.tres` — `TerrainDefinition`, `emitted_tags` `["open_grass", "flowers"]`, `cost` 0, `model_scenes` = `[Meadow.tscn]`. Values are a PROPOSAL awaiting human sign-off (header comment, same convention as `barn.tres`) |
+| `copy_content_location` | not started — no `fact_text` copy yet, Content Pipeline step 5 (Content Writer), explicitly out of scope for this task |
+| `attribution_status` | not required (CC0) — courtesy entry recorded, `quaternius_stylized_nature_megakit.tres`'s `assets_used` extended with `Flower_3_Group`/`Flower_4_Group`; `CREDITS.md` regenerated |
+| `validation_status` | **pass (2026-09-04)** — `test_new_terrains.gd` (new suite) PASS; `test_terrain_schema.gd` updated (6 → 9 terrain ids, all new fields added) PASS; `test_bare_tags_derivation.gd` (`EXPECTED_TERRAIN_COUNT` 6 → 9) PASS; `test_economy_rules.gd` (`EXPECTED_FREE_TERRAINS` extended) PASS; `test_attribution.gd` PASS |
+| `human_signoff` | not started — flower-clump scale (0.146 / 0.1206, target ~0.30 tile-units) and grass-plus-flower slab composition are first-pass judgment calls, no GDD number exists; single-variant only, a multi-variant look-pass is out of scope here |
+| `status` | 🚧 — real art imported and wired, single `model_scenes` variant; human eyeball sign-off not started |
+
+### `scrub` — Scrub (emits `browse`, `rocks`)
+
+| Field | Value |
+|---|---|
+| `category_attributes` | emits `browse` + `rocks`; the browser/grazer split from Grass/Meadow's `open_grass`; free to paint — habitat-tiers ruling, task-8-brief.md |
+| `source` | Rock_1.fbx REUSED (no new download — already imported, Ultimate Nature Pack, CC0, already in [`quaternius_ultimate_nature_pack.tres`](../project/attribution/sources/quaternius_ultimate_nature_pack.tres)'s `assets_used`). 3 new pieces, Stylized Nature MegaKit (Standard/free), Quaternius, CC0 1.0 Universal — `Bush_Common_Flowers.gltf`, `Fern_1.gltf`, `Grass_Wispy_Short.gltf` — [`quaternius_stylized_nature_megakit.tres`](../project/attribution/sources/quaternius_stylized_nature_megakit.tres) (extends the existing entry's "Second use" note) |
+| `pre_import_audit` | done — CC0 1.0 Universal re-confirmed for both packs against their own `License.txt` before import, per asset-import-pipeline.md's audit gate; style fit not yet eyeball-confirmed |
+| `project_location` | `project/assets/terrain/bush_common_flowers/Bush_Common_Flowers.gltf`, `project/assets/terrain/fern_1/Fern_1.gltf`, `project/assets/terrain/grass_wispy_short/Grass_Wispy_Short.gltf` (raw, + referenced PNG textures alongside each), composed with the already-imported `project/assets/terrain/rock_1/Rock_1.fbx` into `project/assets/terrain/scrub/Scrub.tscn` (single `model_scenes` variant — a dry olive/tan slab, 1 rock, 1 bush, 1 fern, 2 wispy-grass instances) |
+| `data_entry_location` | `project/data/terrain/scrub.tres` — `TerrainDefinition`, `emitted_tags` `["browse", "rocks"]`, `cost` 0, `model_scenes` = `[Scrub.tscn]`. Values are a PROPOSAL awaiting human sign-off (header comment, same convention as `barn.tres`). `wild_grass.tres` itself is unchanged — the inert-land invariant is untouched (see `test_bare_tags_derivation.gd`/`test_new_terrains.gd`) |
+| `copy_content_location` | not started — no `fact_text` copy yet, Content Pipeline step 5 (Content Writer), explicitly out of scope for this task |
+| `attribution_status` | not required (CC0) — courtesy entries recorded, `quaternius_stylized_nature_megakit.tres`'s `assets_used` extended with `Bush_Common_Flowers`/`Fern_1`/`Grass_Wispy_Short`; `CREDITS.md` regenerated. `Rock_1` was already recorded, no new entry needed for the reuse |
+| `validation_status` | **pass (2026-09-04)** — `test_new_terrains.gd` (new suite) PASS; `test_terrain_schema.gd` updated PASS; `test_bare_tags_derivation.gd` PASS; `test_economy_rules.gd` PASS; `test_attribution.gd` PASS |
+| `human_signoff` | not started — every prop scale (rock 0.25, bush 0.3793, fern 0.4165, wispy grass 0.14) is a first-pass judgment call, no GDD number exists; the dry olive/tan slab tint (distinct from Grass/Meadow's green and Forest's dark green) is a first look-pass choice; single-variant only, a multi-variant look-pass is out of scope here |
+| `status` | 🚧 — real art imported and wired, single `model_scenes` variant; human eyeball sign-off not started |
+
+### `snowfield` — Snowfield (emits `snow`)
+
+| Field | Value |
+|---|---|
+| `category_attributes` | emits `snow`; Husky habitat; free to paint. May border grass with no placement restriction (human ruling, spec OQ-E) — habitat-tiers ruling, task-8-brief.md |
+| `source` | Ultimate Nature Pack, Quaternius, CC0 1.0 Universal — the pack's dedicated snow variant set, 2 new pieces this pass, `BirchTree_Snow_3.fbx` + `Bush_Snow_1.fbx` — [`quaternius_ultimate_nature_pack.tres`](../project/attribution/sources/quaternius_ultimate_nature_pack.tres) (extends the existing entry's "Seventh use" note) |
+| `pre_import_audit` | done — CC0 1.0 Universal re-confirmed against the pack's own `License.txt` before import, per asset-import-pipeline.md's audit gate; style fit not yet eyeball-confirmed |
+| `project_location` | `project/assets/terrain/birch_tree_snow/BirchTree_Snow_3.fbx`, `project/assets/terrain/bush_snow/Bush_Snow_1.fbx` (raw), composed into `project/assets/terrain/snowfield/Snowfield.tscn` (single `model_scenes` variant — a pale snow-white slab, 2 drift-tint floor patches, 1 tree, 1 bush) |
+| `data_entry_location` | `project/data/terrain/snowfield.tres` — `TerrainDefinition`, `emitted_tags` `["snow"]`, `cost` 0, `model_scenes` = `[Snowfield.tscn]`. Values are a PROPOSAL awaiting human sign-off (header comment, same convention as `barn.tres`). Deliberately carries no placement restriction, allowed-neighbour list, or climate gate — the human's OQ-E ruling |
+| `copy_content_location` | not started — no `fact_text` copy yet, Content Pipeline step 5 (Content Writer), explicitly out of scope for this task |
+| `attribution_status` | not required (CC0) — courtesy entry recorded, `quaternius_ultimate_nature_pack.tres`'s `assets_used` extended with `BirchTree_Snow_3`/`Bush_Snow_1`; `CREDITS.md` regenerated |
+| `validation_status` | **pass (2026-09-04)** — `test_new_terrains.gd` (new suite) PASS; `test_terrain_schema.gd` updated PASS; `test_bare_tags_derivation.gd` PASS; `test_economy_rules.gd` PASS; `test_attribution.gd` PASS |
+| `human_signoff` | not started — canopy-tree scale (0.602, matched to the same 2.5 tile-unit target every other tree pick uses) and bush scale (0.4672, matched to Bush.tscn's 0.6 tile-unit target) are first-pass judgment calls carried over from those established targets, no independent GDD number for the snow variants specifically; single-variant only, a multi-variant look-pass (e.g. the pack's PineTree_Snow_*/BirchTree_Dead_Snow_* siblings) is out of scope here |
+| `status` | 🚧 — real art imported and wired, single `model_scenes` variant; human eyeball sign-off not started |
 
 ### `sand` — Sand (emits `sand`; depth, not v1 floor)
 

@@ -1,0 +1,40 @@
+; Meadow — NEW TerrainDefinition (habitat-tiers ruling, 2026-09-04 -> task-8-brief.md).
+; VALUES BELOW ARE A PROPOSAL AWAITING HUMAN SIGN-OFF (same posture as every other
+; terrain's cost/scale/model choices in this codebase; see barn.tres for the same
+; convention on the buildings side).
+;
+; WHY IT EXISTS: rich grazing terrain, and the first real SOURCE for the long-dormant
+; `flowers` habitat tag (AnimalDefinition.HABITAT_TAGS has carried `flowers` with no
+; emitter since it was added — this closes that gap). Paired with Scrub as the second half
+; of the new grazing-terrain split: Meadow is the `open_grass`-family pick (same emission
+; as plain Grass, plus `flowers`), Scrub is the `browse`-family pick.
+;
+; emitted_tags = ["open_grass", "flowers"] is DECIDED by the habitat-tiers ruling
+; (task-8-brief.md's table). No radius, no weight, no threshold — the v1 tag model
+; (-> D-25) applies unchanged.
+;
+; cost = 0 — natural terrain, "nature is free" (terrain.md's one pricing rule, unchanged by
+; this task).
+;
+; MODEL_SCENE: Meadow.tscn (CC0, Stylized Nature MegaKit) — see that scene's own header for
+; full sourcing/scale detail. Single variant; a multi-variant look-pass is out of scope
+; here, same posture Grass/Rock/Wild grass all started with before their own later passes.
+;
+; PLAYER-VISIBLE CONSEQUENCE: Meadow is a new, free-to-paint entry in the Terraform
+; palette — flagged prominently per this task's brief, not buried in a count bump.
+;
+; No `fact_text` copy yet — Content Pipeline step 5 (Content Writer), explicitly out of
+; scope for this task.
+[gd_resource type="Resource" script_class="TerrainDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/terrain_definition.gd" id="1_schema"]
+[ext_resource type="PackedScene" path="res://assets/terrain/meadow/Meadow.tscn" id="2_model"]
+
+[resource]
+script = ExtResource("1_schema")
+id = "meadow"
+display_name = "Meadow"
+emitted_tags = Array[String](["open_grass", "flowers"])
+cost = 0
+model_scenes = Array[PackedScene]([ExtResource("2_model")])
+harvestable = null

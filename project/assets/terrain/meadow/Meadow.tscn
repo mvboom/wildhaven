@@ -1,0 +1,85 @@
+; Meadow — 1st Meadow terrain visual (habitat-tiers ruling, 2026-09-04 -> task-8-brief.md).
+; Emits `open_grass` + `flowers` (project/data/terrain/meadow.tres). This is the FIRST real
+; source of the long-dormant `flowers` habitat tag.
+;
+; Source: Stylized Nature MegaKit (Standard/free), Quaternius, CC0 1.0 Universal — same
+; pack already recorded in project/attribution/sources/quaternius_stylized_nature_megakit.tres
+; (2 new pieces this pass: Flower_3_Group.gltf, Flower_4_Group.gltf; License.txt re-checked
+; per asset-import-pipeline.md's audit gate, same boilerplate CC0 1.0 text as every other
+; use of this pack).
+;
+; COMPOSITION: an `open_grass` slab (same green as grass.tres, Color(0.42, 0.68, 0.3, 1))
+; carries 2 blotchy floor patches (light-green + pale-yellow, same "no tileable ground
+; texture exists" technique GrassCommonShort/PineTree already use) plus 4 scattered flower
+; clumps (2x Flower_3_Group, 2x Flower_4_Group) — the grass base plus flower dressing is a
+; deliberate visual match to the two tags this terrain actually emits, not an arbitrary
+; prop pick.
+;
+; SCALE: both raw meshes measured via a one-off SceneTree AABB probe (same procedure prior
+; passes used — see e.g. WaterLilypad1.tscn's header): Flower_3_Group raw height 2.054835
+; -> scaled 0.146 (target ~0.30 tile-units); Flower_4_Group raw height 2.486768 -> scaled
+; 0.1206 (same ~0.30 target). FIRST-PASS PROPOSAL, no GDD number exists for flower-clump
+; height — FLAG FOR HUMAN SIGN-OFF, same open posture as every prior prop-scale call in
+; this codebase.
+;
+; SINGLE VARIANT: this terrain ships with exactly one `model_scenes` entry, matching how
+; every other terrain first shipped (grass.tres/rock.tres/wild_grass.tres all started with
+; 1 variant before a later look-pass added more) — a multi-variant richness pass is
+; explicitly out of scope for this task.
+;
+; EVERYTHING GROUND-LEVEL NESTED UNDER ONE NODE NAMED "Slab" (OcclusionFader exemption
+; convention — see CommonTree1.tscn's header for the full mechanism); the 4 flower
+; instances sit as plain siblings of Slab, same as PineTree.tscn's/Bush.tscn's Model node.
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="PackedScene" uid="uid://bobuoftna3h2x" path="res://assets/terrain/flower_3_group/Flower_3_Group.gltf" id="1_flower3"]
+[ext_resource type="PackedScene" uid="uid://co1ny37s7hliw" path="res://assets/terrain/flower_4_group/Flower_4_Group.gltf" id="2_flower4"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_slab"]
+size = Vector3(1.0, 0.2, 1.0)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_slab"]
+albedo_color = Color(0.42, 0.68, 0.3, 1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_patch1"]
+size = Vector2(0.4, 0.34)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_patch_light"]
+albedo_color = Color(0.56, 0.78, 0.32, 1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_patch2"]
+size = Vector2(0.3, 0.32)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_patch_yellow"]
+albedo_color = Color(0.72, 0.72, 0.36, 1)
+
+[node name="Meadow" type="Node3D"]
+
+[node name="Slab" type="Node3D" parent="."]
+
+[node name="Ground" type="MeshInstance3D" parent="Slab"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+mesh = SubResource("BoxMesh_slab")
+material_override = SubResource("StandardMaterial3D_slab")
+
+[node name="FloorPatch_1_Light" type="MeshInstance3D" parent="Slab"]
+transform = Transform3D(0.965926, 0, -0.258819, 0, 1, 0, 0.258819, 0, 0.965926, -0.16, 0.001, -0.1)
+mesh = SubResource("PlaneMesh_patch1")
+material_override = SubResource("StandardMaterial3D_patch_light")
+
+[node name="FloorPatch_2_Yellow" type="MeshInstance3D" parent="Slab"]
+transform = Transform3D(0.642788, 0, -0.766044, 0, 1, 0, 0.766044, 0, 0.642788, 0.18, 0.001, 0.15)
+mesh = SubResource("PlaneMesh_patch2")
+material_override = SubResource("StandardMaterial3D_patch_yellow")
+
+[node name="Flower3_A" parent="." instance=ExtResource("1_flower3")]
+transform = Transform3D(0.132018, 0, -0.06579, 0, 0.146, 0, 0.06579, 0, 0.132018, -0.22, 0, -0.18)
+
+[node name="Flower4_A" parent="." instance=ExtResource("2_flower4")]
+transform = Transform3D(0.113301, 0, 0.038028, 0, 0.1206, 0, -0.038028, 0, 0.113301, 0.2, 0, -0.22)
+
+[node name="Flower3_B" parent="." instance=ExtResource("1_flower3")]
+transform = Transform3D(0.0827, 0, 0.114607, 0, 0.146, 0, -0.114607, 0, 0.0827, 0.2, 0, 0.2)
+
+[node name="Flower4_B" parent="." instance=ExtResource("2_flower4")]
+transform = Transform3D(-0.0603, 0, 0.104458, 0, 0.1206, 0, -0.104458, 0, -0.0603, -0.2, 0, 0.18)

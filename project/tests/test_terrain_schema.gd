@@ -1,7 +1,8 @@
 extends QATestCase
-## Schema validation of all six v1 terrain `.tres` entries against the
+## Schema validation of all nine terrain `.tres` entries against the
 ## TerrainDefinition contract (spec.md -> Data Schemas) and the human-decided values in
-## terrain.md (-> Already-Defined Terrain: the v1 tag-source mapping and the cost table).
+## terrain.md (-> Already-Defined Terrain: the v1 tag-source mapping and the cost table) plus
+## the habitat-tiers ruling's 3 additions (Meadow, Scrub, Snowfield — task-8-brief.md).
 ##
 ## Run:
 ##   $GODOT_PATH --headless --path project --import
@@ -14,8 +15,10 @@ extends QATestCase
 
 const DATA_DIR: String = "res://data/terrain"
 
-## The six v1 terrains, in filename order. `sand` is depth, not floor (terrain.md), and
-## has no `.tres`; it is deliberately absent rather than expected-and-missing.
+## The six v1 terrains plus the habitat-tiers ruling's 3 additions (Meadow, Scrub,
+## Snowfield — task-8-brief.md), in filename order. `sand` is depth, not floor
+## (terrain.md), and has no `.tres`; it is deliberately absent rather than
+## expected-and-missing.
 ##
 ## This list is a FIXED LITERAL, which is what keeps this suite's assertion count fixed:
 ## the count is a function of this constant and never of what happens to be on disk.
@@ -23,7 +26,10 @@ const TERRAIN_IDS: PackedStringArray = [
 	"cultivated_field",
 	"forest",
 	"grass",
+	"meadow",
 	"rock",
+	"scrub",
+	"snowfield",
 	"water",
 	"wild_grass",
 ]
@@ -35,11 +41,19 @@ const TERRAIN_IDS: PackedStringArray = [
 ##
 ## Wild grass's EMPTY entry is a decided value, not an unfinished row (spec.md -> Shared
 ## Patterns, the inert-land invariant).
+##
+## Meadow/Scrub/Snowfield rows are the habitat-tiers ruling's additions
+## (task-8-brief.md's table) — Meadow is the first real source of the long-dormant
+## `flowers` tag; Scrub's `browse` is the browser/grazer split from Grass/Meadow's
+## `open_grass`; Snowfield's `snow` is Husky habitat.
 const EXPECTED_TAGS: Dictionary = {
 	"cultivated_field": ["cultivated"],
 	"forest": ["forest"],
 	"grass": ["open_grass"],
+	"meadow": ["open_grass", "flowers"],
 	"rock": ["cover", "rocks"],
+	"scrub": ["browse", "rocks"],
+	"snowfield": ["snow"],
 	"water": ["water"],
 	"wild_grass": [],
 }
@@ -52,7 +66,10 @@ const EXPECTED_COST: Dictionary = {
 	"cultivated_field": 2,
 	"forest": 0,
 	"grass": 0,
+	"meadow": 0,
 	"rock": 0,
+	"scrub": 0,
+	"snowfield": 0,
 	"water": 0,
 	"wild_grass": 0,
 }
@@ -64,7 +81,10 @@ const EXPECTED_BLOCKS_MOVEMENT: Dictionary = {
 	"cultivated_field": false,
 	"forest": true,
 	"grass": false,
+	"meadow": false,
 	"rock": false,
+	"scrub": false,
+	"snowfield": false,
 	"water": false,
 	"wild_grass": false,
 }
@@ -76,7 +96,10 @@ const EXPECTED_HARVESTABLE: Dictionary = {
 	"cultivated_field": false,
 	"forest": true,
 	"grass": false,
+	"meadow": false,
 	"rock": false,
+	"scrub": false,
+	"snowfield": false,
 	"water": false,
 	"wild_grass": false,
 }
@@ -87,7 +110,10 @@ const EXPECTED_DISPLAY_NAMES: Dictionary = {
 	"cultivated_field": "Farm",
 	"forest": "Forest",
 	"grass": "Grass",
+	"meadow": "Meadow",
 	"rock": "Rock",
+	"scrub": "Scrub",
+	"snowfield": "Snowfield",
 	"water": "Water",
 	"wild_grass": "Wild grass",
 }
@@ -192,9 +218,9 @@ func _init() -> void:
 			"%s: validate() is CLEAN (zero problems)" % terrain_id,
 			"unexpected: %s" % str(problems))
 
-	# --- the set on disk is exactly the six expected ---------------------------
+	# --- the set on disk is exactly the nine expected ---------------------------
 	# Guards the loop above against being vacuous in the other direction: it proves each
-	# EXPECTED id exists, not that no SEVENTH terrain quietly appeared.
+	# EXPECTED id exists, not that no TENTH terrain quietly appeared.
 	var loaded: Array[TerrainDefinition] = TerrainDefinition.load_all()
 	var loaded_ids: PackedStringArray = PackedStringArray()
 	for d: TerrainDefinition in loaded:
@@ -203,6 +229,6 @@ func _init() -> void:
 	var expected_ids: PackedStringArray = TERRAIN_IDS.duplicate()
 	expected_ids.sort()
 	check_eq(loaded_ids, expected_ids,
-		"load_all() finds exactly the six expected terrain ids and no others")
+		"load_all() finds exactly the nine expected terrain ids and no others")
 
 	finish()

@@ -1,0 +1,43 @@
+; Scrub — NEW TerrainDefinition (habitat-tiers ruling, 2026-09-04 -> task-8-brief.md).
+; VALUES BELOW ARE A PROPOSAL AWAITING HUMAN SIGN-OFF (same posture as every other
+; terrain's cost/scale/model choices in this codebase; see barn.tres for the same
+; convention on the buildings side).
+;
+; WHY IT EXISTS: the second grazing terrain. `browse` vs `open_grass` is the real
+; ecological browser/grazer split, which is what separates Donkey and the Deer herd tier
+; from every grass-eater. It is also the "wild grass with tags" the human described —
+; wild_grass.tres itself stays deliberately inert and is NOT changed by this task; the
+; inert-land invariant (spec.md -> Shared Patterns) is untouched.
+;
+; emitted_tags = ["browse", "rocks"] is DECIDED by the habitat-tiers ruling
+; (task-8-brief.md's table). No radius, no weight, no threshold — the v1 tag model
+; (-> D-25) applies unchanged. `rocks` reuses the same tag Rock already emits (terrain.md);
+; Scrub is a second, distinct source for it, not a duplicate declaration in the schema
+; sense — each terrain still just lists what it emits.
+;
+; cost = 0 — natural terrain, "nature is free" (terrain.md's one pricing rule, unchanged by
+; this task).
+;
+; MODEL_SCENE: Scrub.tscn (CC0, Ultimate Nature Pack + Stylized Nature MegaKit) — see that
+; scene's own header for full sourcing/scale detail. Single variant; a multi-variant
+; look-pass is out of scope here, same posture Grass/Rock/Wild grass all started with
+; before their own later passes.
+;
+; PLAYER-VISIBLE CONSEQUENCE: Scrub is a new, free-to-paint entry in the Terraform
+; palette — flagged prominently per this task's brief, not buried in a count bump.
+;
+; No `fact_text` copy yet — Content Pipeline step 5 (Content Writer), explicitly out of
+; scope for this task.
+[gd_resource type="Resource" script_class="TerrainDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/terrain_definition.gd" id="1_schema"]
+[ext_resource type="PackedScene" path="res://assets/terrain/scrub/Scrub.tscn" id="2_model"]
+
+[resource]
+script = ExtResource("1_schema")
+id = "scrub"
+display_name = "Scrub"
+emitted_tags = Array[String](["browse", "rocks"])
+cost = 0
+model_scenes = Array[PackedScene]([ExtResource("2_model")])
+harvestable = null

@@ -1,0 +1,80 @@
+; Scrub — 1st Scrub terrain visual (habitat-tiers ruling, 2026-09-04 -> task-8-brief.md).
+; Emits `browse` + `rocks` (project/data/terrain/scrub.tres). `browse` vs Grass/Meadow's
+; `open_grass` is the real ecological browser/grazer split; this is the "wild grass with
+; tags" the human described, distinct from — and NOT a change to — wild_grass.tres itself,
+; which stays deliberately inert.
+;
+; Sources:
+;   - Rock_1.fbx — REUSED, no new download. Already imported at
+;     res://assets/terrain/rock_1/Rock_1.fbx (Ultimate Nature Pack, Quaternius, CC0) and
+;     already recorded in quaternius_ultimate_nature_pack.tres's assets_used — referenced
+;     here directly by uid rather than instancing Rock1.tscn's own wrapper, same "reuse the
+;     raw piece, not the sibling terrain's full wrapper" convention RockCluster1.tscn
+;     already established for this exact file.
+;   - Bush_Common_Flowers.gltf, Fern_1.gltf, Grass_Wispy_Short.gltf — NEWLY imported this
+;     pass, Stylized Nature MegaKit (Standard/free), Quaternius, CC0 1.0 Universal.
+;     License.txt re-checked per asset-import-pipeline.md's audit gate before import (same
+;     boilerplate CC0 1.0 text as every other use of this pack). Recorded in
+;     project/attribution/sources/quaternius_stylized_nature_megakit.tres.
+;
+; COMPOSITION: a dry olive/tan slab (Color(0.58, 0.52, 0.34, 1) — deliberately distinct from
+; Grass/Meadow's green and Forest's dark green, reading as rough/dry ground rather than
+; lawn) carries 1x Rock_1 (the `rocks` visual source) + 1x Bush_Common_Flowers + 1x Fern_1
+; (the woody/browse-able foliage a browser eats, as opposed to Meadow/Grass's open grass
+; blades) + 2x Grass_Wispy_Short (sparse, scrubby ground texture, distinct from the denser
+; MultiMesh lawn treatment Grass/Meadow use).
+;
+; SCALE: all 4 raw meshes measured via a one-off SceneTree AABB probe (same procedure prior
+; passes used). Rock_1 uses the same 0.25 scale RockCluster1.tscn's Rock_A piece uses (raw
+; height 0.87775, well-established "small scattered rock" target). Bush_Common_Flowers raw
+; height 1.581786 -> scaled 0.3793 (target ~0.6 tile-units, matching Bush.tscn's established
+; "ground-level shrub" class). Fern_1 raw height 0.840243 (footprint a wide 2.83x2.65,
+; already a pre-clustered clump in the source file, not a single frond) -> scaled 0.4165
+; (target ~0.35 tile-units height; footprint at this scale ~1.18x1.10, comparable overhang
+; to a canopy tree's). Grass_Wispy_Short raw height 1.071847 -> scaled 0.14 (target ~0.15
+; tile-units, a hair taller than Grass's ~0.10 lawn baseline to read as coarser/wispier).
+; FIRST-PASS PROPOSAL, no GDD number exists for any of these — FLAG FOR HUMAN SIGN-OFF, same
+; open posture as every prior prop-scale call in this codebase.
+;
+; SINGLE VARIANT: ships with exactly one `model_scenes` entry — same posture as Meadow.tscn
+; and every terrain's first pass; a multi-variant richness pass is out of scope here.
+;
+; EVERYTHING GROUND-LEVEL NESTED UNDER ONE NODE NAMED "Slab" (OcclusionFader exemption
+; convention, see CommonTree1.tscn's header); the 4 prop instances sit as plain siblings of
+; Slab, same as every other terrain wrapper in this codebase.
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="PackedScene" uid="uid://blkwv726k6y3a" path="res://assets/terrain/rock_1/Rock_1.fbx" id="1_rock"]
+[ext_resource type="PackedScene" uid="uid://cn8vmiiuaywux" path="res://assets/terrain/bush_common_flowers/Bush_Common_Flowers.gltf" id="2_bush"]
+[ext_resource type="PackedScene" uid="uid://btyfnu0qiygsv" path="res://assets/terrain/fern_1/Fern_1.gltf" id="3_fern"]
+[ext_resource type="PackedScene" uid="uid://dj8bdtdgo74m1" path="res://assets/terrain/grass_wispy_short/Grass_Wispy_Short.gltf" id="4_grass"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_slab"]
+size = Vector3(1.0, 0.2, 1.0)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_slab"]
+albedo_color = Color(0.58, 0.52, 0.34, 1)
+
+[node name="Scrub" type="Node3D"]
+
+[node name="Slab" type="Node3D" parent="."]
+
+[node name="Ground" type="MeshInstance3D" parent="Slab"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+mesh = SubResource("BoxMesh_slab")
+material_override = SubResource("StandardMaterial3D_slab")
+
+[node name="Rock" parent="." instance=ExtResource("1_rock")]
+transform = Transform3D(0.246202, 0, -0.0895, 0, 0.25, 0, 0.0895, 0, 0.246202, -0.24, 0, 0.2)
+
+[node name="Bush" parent="." instance=ExtResource("2_bush")]
+transform = Transform3D(0.290812, 0, 0.2417, 0, 0.3793, 0, -0.2417, 0, 0.290812, 0.22, 0, -0.2)
+
+[node name="Fern" parent="." instance=ExtResource("3_fern")]
+transform = Transform3D(0.354436, 0, -0.221399, 0, 0.4165, 0, 0.221399, 0, 0.354436, 0.18, 0, 0.22)
+
+[node name="Grass_A" parent="." instance=ExtResource("4_grass")]
+transform = Transform3D(0.135113, 0, -0.024346, 0, 0.14, 0, 0.024346, 0, 0.135113, -0.2, 0, -0.16)
+
+[node name="Grass_B" parent="." instance=ExtResource("4_grass")]
+transform = Transform3D(0.0977, 0, 0.099905, 0, 0.14, 0, -0.099905, 0, 0.0977, -0.02, 0, -0.28)

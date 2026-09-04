@@ -24,7 +24,9 @@ extends QATestCase
 ## suite is the TERRAIN side — the structural construction that makes the species-side
 ## check cheap.
 
-const EXPECTED_TERRAIN_COUNT: int = 6
+## 6 v1 terrains + the habitat-tiers ruling's 3 additions (Meadow, Scrub, Snowfield —
+## task-8-brief.md). None of the 3 touch wild_grass.tres or the derivation itself.
+const EXPECTED_TERRAIN_COUNT: int = 9
 
 
 ## True when `def.validate()` reports the inert-land invariant specifically.

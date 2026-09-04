@@ -132,7 +132,7 @@ retrieval date recorded, unlike quaternius_poly_pizza_characters.tres's undated 
 - License text in repo: `res://assets/licenses/Quaternius_UltimateAnimatedAnimals_License.txt`
 - Crediting: not required; shown as courtesy
 - Support the creator: [https://www.patreon.com/quaternius](https://www.patreon.com/quaternius)
-- Assets used: CommonTree_1, CommonTree_2, Grass_Common_Short, Grass_Common_Tall
+- Assets used: CommonTree_1, CommonTree_2, Grass_Common_Short, Grass_Common_Tall, Flower_3_Group, Flower_4_Group, Bush_Common_Flowers, Fern_1, Grass_Wispy_Short
 
 ### Quaternius — [Textured Stylized Trees](https://quaternius.com)
 
@@ -172,5 +172,5 @@ retrieval date recorded, unlike quaternius_poly_pizza_characters.tres's undated 
 - License text in repo: `res://assets/licenses/Quaternius_UltimateAnimatedAnimals_License.txt`
 - Crediting: not required; shown as courtesy
 - Support the creator: [https://www.patreon.com/quaternius](https://www.patreon.com/quaternius)
-- Assets used: WoodLog_Moss, Rock_Moss_3, Bush_1, Rock_1, BirchTree_1, BushBerries_1, Rock_Moss_2, Rock_Moss_5, Lilypad, Cactus_1, PalmTree_1
+- Assets used: WoodLog_Moss, Rock_Moss_3, Bush_1, Rock_1, BirchTree_1, BushBerries_1, Rock_Moss_2, Rock_Moss_5, Lilypad, Cactus_1, PalmTree_1, BirchTree_Snow_3, Bush_Snow_1
 

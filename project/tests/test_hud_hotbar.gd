@@ -484,17 +484,27 @@ func _check_farm_buildings_group_into_one_button() -> void:
 
 ## THE SPECIFIC REGRESSION THIS TASK FIXES: 15 buttons (6 terrain + 9 raw placeables, B1's
 ## shipped interim state) down to 8 (6 terrain + House + Farm Building).
+##
+## COUNT UPDATED (2026-09-04, habitat-tiers Task 8): 8 -> 11. The habitat-tiers ruling adds
+## 3 new terrain `.tres` entries — Meadow, Scrub, Snowfield (task-8-brief.md) — each a real,
+## player-visible new entry in the Terraform palette, so the row is now 9 terrain + House +
+## Farm Building = 11. Still nowhere near the 15-button regression this check exists to
+## guard against; the "not 15" framing stays true. See
+## `_check_palette_row_never_overlaps_the_corner_clusters()`'s own failures for the SEPARATE,
+## genuine consequence this count increase has on the row's fit within the fixed band —
+## that is a real layout defect this task's data change exposes, not something this count
+## assertion papers over.
 func _check_palette_row_totals_8_buttons_not_15() -> void:
-	check_eq(_hud._palette_order.size(), 8,
-		"the BUILD+TERRAFORM row totals 8 buttons — 6 terrain + House + Farm Building — not 15")
+	check_eq(_hud._palette_order.size(), 11,
+		"the BUILD+TERRAFORM row totals 11 buttons — 9 terrain + House + Farm Building — not 15")
 
 	var row: HBoxContainer = _hud.get_node_or_null("%PaletteRow") as HBoxContainer
 	if not check(row != null, "the palette row exists"):
 		return
-	# Info + 8 catalog buttons + Erase = 10 real children — the row's own scene tree, not just
+	# Info + 11 catalog buttons + Erase = 13 real children — the row's own scene tree, not just
 	# the bookkeeping array, so this catches a divergence between the two.
-	check_eq(row.get_child_count(), 10,
-		"the row's real child count matches: Info (1) + 8 catalog buttons + Erase (1)")
+	check_eq(row.get_child_count(), 13,
+		"the row's real child count matches: Info (1) + 11 catalog buttons + Erase (1)")
 
 
 ## Step 2's contract: tapping the Farm Building button resolves to whichever member is
