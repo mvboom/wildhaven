@@ -188,14 +188,22 @@ func _rebuild_rows() -> void:
 
 ## Forest/Wild Grass/House: humanize the derived style id (`"birch_tree"` -> `"Birch Tree"` —
 ## `String.capitalize()` is exactly this rule: underscores become spaces, each word's first
-## letter uppercases). Farm Building: the resolved `PlaceableDefinition.display_name` itself,
-## already real human-authored copy — no humanization applied or needed.
+## letter uppercases). Farm Building AND the grass-family terrain group (habitat-tiers Task
+## 8b): the resolved definition's own real `display_name` — already real human-authored copy,
+## no humanization needed (and, for the grass-family group specifically, correct where
+## `capitalize()` would not always be: `wild_grass`'s own `display_name` is "Wild grass",
+## lowercase `g`, which `"wild_grass".capitalize()` alone would get wrong).
 func _label_for(style_id: String) -> String:
 	if _category == "farm_building":
 		for placeable: PlaceableDefinition in _world.placeable_options():
 			if placeable.id == style_id:
 				return placeable.display_name
 		return style_id
+	if _category == GameHud.TERRAIN_GROUP_ID:
+		for terrain: TerrainDefinition in _world.terrain_options():
+			if terrain.id == style_id:
+				return terrain.display_name
+		return style_id.capitalize()
 	return style_id.capitalize()
 
 

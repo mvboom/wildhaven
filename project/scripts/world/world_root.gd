@@ -126,11 +126,20 @@ var removals: RemovalLedger = null
 var autosave: Autosave = null
 
 ## Player-chosen default style per picker category ("forest", "wild_grass", "house",
-## "farm_building"), saved per-world. A category with no entry here — or whose stored
-## value no longer resolves against the category's current catalog — reads through
-## get_style_default() as that category's first catalog entry, never a crash. See
-## get_style_default()'s own doc comment for the full contract.
+## "farm_building", "grass_family" — habitat-tiers Task 8b), saved per-world. A category
+## with no entry here — or whose stored value no longer resolves against the category's
+## current catalog — reads through get_style_default() as that category's first catalog
+## entry, never a crash. See get_style_default()'s own doc comment for the full contract.
 var style_defaults: Dictionary = {}
+
+## HABITAT-TIERS TASK 8b — the grass-family TERRAIN GROUP, mirroring "farm_building"'s own
+## bare-literal-string posture in this file (no shared owner between this constant and
+## `GameHud.TERRAIN_GROUP_ID`/`TERRAIN_GROUP_MEMBERS`, deliberately — see either file's own
+## header for why). Human ruling: grass, wild_grass, meadow and scrub collapse behind ONE
+## hotbar button; snowfield stays its own top-level button and is deliberately NOT a
+## member. `style_ids_for_category()` below is what actually resolves this.
+const TERRAIN_GROUP_ID: String = "grass_family"
+const TERRAIN_GROUP_MEMBERS: PackedStringArray = ["grass", "wild_grass", "meadow", "scrub"]
 
 ## SAVE IDENTITY (Tier 1 row 1). Set from `GameSession` at `_ready()`, and read by `Autosave`
 ## every time it writes. `save_path` empty means this world has no file — which happens only in
@@ -747,6 +756,16 @@ func style_ids_for_category(category: String) -> PackedStringArray:
 		for placeable: PlaceableDefinition in placeable_options():
 			if placeable.hotbar_category == "farm_building":
 				out.append(placeable.id)
+		return out
+	if category == TERRAIN_GROUP_ID:
+		# Real TerrainDefinition ids, not scene-derived slugs (the same "flavor" farm_building's
+		# ids already are, for the same reason: these members are separate `.tres` entries, not
+		# visual variants of one terrain). Filtered against the loaded roster rather than
+		# returned verbatim, so a world with no grid yet (or a terrain somehow missing) degrades
+		# to an empty/partial list instead of naming an id nothing backs.
+		for id: String in TERRAIN_GROUP_MEMBERS:
+			if grid != null and grid.terrain_definition(id) != null:
+				out.append(id)
 		return out
 	for scene: PackedScene in _model_scenes_for_category(category):
 		out.append(_style_id_from_scene_path(scene))

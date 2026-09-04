@@ -45,6 +45,46 @@ extends Control
 ## `refresh_palette_button()` is how Task 7's long-press popup repaints one grouped button
 ## after the player changes which member is the default, without rebuilding the whole row.
 ##
+## TERRAIN BUTTON-GROUP BY A HARDCODED ID LIST (habitat-tiers Task 8b). A prior task added
+## 3 terrains (Meadow, Scrub, Snowfield), taking the row to 9 terrain + House + Farm Building
+## = 11 buttons — genuinely too wide for the fixed band between the Help and Rotate corner
+## clusters (see `_fit_palette_row()`'s own header). Human ruling, closed here: `grass`,
+## `wild_grass`, `meadow` and `scrub` collapse behind ONE button (`TERRAIN_GROUP_ID`,
+## `_terrain_group_row()`); `snowfield` stays its own top-level button, explicitly excluded.
+## That is 6 terrain buttons (the 4 grouped + water/forest/rock/cultivated_field/snowfield
+## standalone) + House + Farm Building = 8 — the count the band was built for.
+##
+## MIRRORS FARM BUILDING'S MECHANISM, MEMBER FOR MEMBER: one button per group, resolved via
+## `WorldRoot.get_style_default(group_key)` at BUTTON-BUILD time and re-resolved at TAP time
+## (`activate_palette_entry()`), a long-press style picker to change which member is the
+## default (`_PICKER_CATEGORIES` below gains `TERRAIN_GROUP_ID`), `refresh_palette_button()`
+## repainting the one changed button. Same interaction pattern, same code paths, no second
+## grouping idiom in this bar.
+##
+## ONE DELIBERATE DIFFERENCE: `TerrainDefinition` carries no `hotbar_category` field the way
+## `PlaceableDefinition` does, and adding one would mean editing every affected `.tres` —
+## explicitly out of scope for a HUD-layout task ("do not touch project/data/terrain/*.tres").
+## The grouping is therefore a HARDCODED terrain-id list (`TERRAIN_GROUP_MEMBERS` below,
+## mirrored — not shared — in `WorldRoot.TERRAIN_GROUP_MEMBERS`) rather than a per-`.tres`
+## field. A future terrain joining or leaving this group is a code review here, not a data
+## edit, until/unless a real `hotbar_category`-style field is added to the schema.
+##
+## ANOTHER DELIBERATE DIFFERENCE: Farm Building's button label TRACKS whichever member is
+## currently the default ("Barn", then "Silo" after a pick) — sound there because each member
+## is a structurally distinct building. Doing the same here would make this button read
+## literally "Grass" whenever grass is the resolved default (it starts out being the default —
+## `TERRAIN_GROUP_MEMBERS[0]`), which the human ruling explicitly rejects: "the group cannot
+## just be 'Grass'". This button's label is therefore the FIXED `TERRAIN_GROUP_DISPLAY_NAME`
+## below, never the resolved member's own `display_name`; only its icon still swaps per member
+## (`_icon_kind_for()`, unchanged mechanism, `Kind.GRASS_FAMILY` the new shared fallback glyph
+## for a member — meadow, scrub — with no glyph of its own, mirroring `Kind.FARM_BUILDING`'s
+## own fallback role for that group).
+##
+## [COPY] PLACEHOLDER, AWAITING HUMAN/CONTENT-WRITER SIGN-OFF — naming is not the UI
+## engineer's call. "Grasslands" is proposed: it names what the 4 members share (open and
+## cultivated grass-family ground, ages 6-10 vocabulary) without colliding with "Grass", the
+## one member's own name. Flagged under this task's own report.
+
 ## THE COUNTERS NEVER FLASH. spec.md: "Resource counters are read-only indicators (Pillar 1).
 ## Never flash, never demand attention when low." `set_wood()` and row 11's three siblings
 ## below (`set_species_hosted()`, `set_currently_resident()`, `set_village_population()`) each
@@ -158,18 +198,53 @@ const PREVIEW_TEXT_HOME: String = "this spot is somebody's home"
 ## Building — to whichever real member id is currently the player's chosen default.
 var _world: WorldRoot = null
 
+## --- TERRAIN GROUPING (habitat-tiers Task 8b) — see this file's own header for the full
+## rationale. Declared here, ahead of `_PICKER_CATEGORIES`, so that const can reference
+## `TERRAIN_GROUP_ID` directly.
+
+## The internal id for the grass-family GROUP button — never a real terrain id itself (the
+## same "no literal entry with this key" shape `_placeable_group_row()`'s own `group_key`
+## already uses for "farm_building"). Public: tests reference it directly, the same way they
+## already reference `GameHud.LONG_PRESS_SECONDS`/`PALETTE_SEPARATION_MIN`.
+const TERRAIN_GROUP_ID: String = "grass_family"
+
+## The 4 terrain ids the group collapses behind that one button, in the order a fresh
+## world's "first entry" default should follow — human ruling (habitat-tiers Task 8b).
+## `snowfield` is deliberately ABSENT: it stays its own top-level button. Public for the
+## same reason `TERRAIN_GROUP_ID` is.
+const TERRAIN_GROUP_MEMBERS: Array[String] = ["grass", "wild_grass", "meadow", "scrub"]
+
+## [COPY] PLACEHOLDER — awaiting human/content-writer sign-off; see this file's own
+## "TERRAIN BUTTON-GROUP" header note near the top of this file for the full reasoning.
+## "Grasslands" is proposed.
+const TERRAIN_GROUP_DISPLAY_NAME: String = "Grasslands"
+
 ## --- LONG-PRESS STYLE PICKER (style-picker sub-project B2, Task 7) -------------------------
 ##
-## The 4 categories a long-press opens a style picker for. Forest and Wild Grass are TERRAIN
-## ids used as-is (`_add_palette_button("terrain", row)` gives a terrain button `id == row["id"]
-## == the terrain's own id — no group indirection); House and Farm Building are PLACEABLE
-## GROUP keys (`_placeable_group_row()`'s own `id`, see that function's header). Both flavors
-## flow through the SAME `_add_palette_button()` call, which is why one gating check here
-## (against this list) — not a second wiring path split by `kind` — covers all 4: the other 5
-## terrain ids (grass, water, rock, cultivated_field... whichever ship) and Erase are excluded
+## The 4 categories a long-press opens a style picker for. Forest is a TERRAIN id used as-is
+## (`_add_palette_button("terrain", row)` gives a terrain button `id == row["id"] == the
+## terrain's own id — no group indirection); House, Farm Building and the grass-family group
+## (`TERRAIN_GROUP_ID`) are GROUP keys (`_placeable_group_row()`/`_terrain_group_row()`'s own
+## `id`, see either function's own header). Both flavors flow through the SAME
+## `_add_palette_button()` call, which is why one gating check here (against this list) — not a
+## second wiring path split by `kind` — covers all 4: the other terrain ids not in
+## `TERRAIN_GROUP_MEMBERS` (water, rock, cultivated_field, snowfield) and Erase are excluded
 ## simply by not appearing in this list, the same "absence is the answer" shape
 ## `TileIcon.KIND_BY_ID` already uses for an unmapped id.
-const _PICKER_CATEGORIES: Array[String] = ["forest", "wild_grass", "house", "farm_building"]
+##
+## "wild_grass" WAS HERE AND ISN'T ANYMORE (habitat-tiers Task 8b). It used to be a 5th TERRAIN
+## id-used-as-is category (its OWN `model_scenes` style-variant picker — a different axis of
+## choice than "which terrain", currently sitting at exactly 1 variant post-revert, so its
+## indicator never showed). Grouping `wild_grass` into `TERRAIN_GROUP_ID` removes its own
+## top-level button, and with it the only anchor that picker ever had — nothing here rebuilds a
+## nested "long-press within a long-press" to preserve it (that would be the second grouping
+## idiom this task's brief explicitly warns against). `WorldRoot.style_ids_for_category(
+## "wild_grass")` / `resolve_style_scene("wild_grass")` are UNTOUCHED and still power how a
+## PLACED wild_grass tile renders (`TerrainChunkLod`'s own concern, orthogonal to this hotbar) —
+## only the HOTBAR long-press door to that catalog is gone. Flagged to the human under this
+## task's own report as a real, if currently inert (nothing had a second style to reach
+## through it anyway), loss of reachability for a future content pass.
+const _PICKER_CATEGORIES: Array[String] = ["forest", "house", "farm_building", TERRAIN_GROUP_ID]
 
 ## PLACEHOLDER / TUNABLE — human's call, matching every other timing constant in this project
 ## (e.g. `READOUT_SECONDS` above). How long a picker-enabled palette button must be held
@@ -676,13 +751,74 @@ func _build_palette_row() -> void:
 	_long_press_timers.clear()
 	_swallow_next_press.clear()
 
-	for row: Dictionary in catalog_rows(Mode.TERRAFORM):
-		_add_palette_button("terrain", row)
+	for group_key: String in _terrain_group_keys():
+		_add_palette_button("terrain", _terrain_group_row(group_key))
 	for group_key: String in _placeable_group_keys():
 		_add_palette_button("placeable", _placeable_group_row(group_key))
 
 	_refresh_palette_rendering()
 	_fit_palette_row()
+
+
+## `id`'s terrain group key: `TERRAIN_GROUP_ID` when `id` is one of `TERRAIN_GROUP_MEMBERS`,
+## `id` itself otherwise — mirrors `_placeable_group_key_for()`'s own fallback-to-own-id rule,
+## just sourced from a hardcoded id list (see this file's own "TERRAIN BUTTON-GROUP" header
+## note) instead of a per-entry data field.
+func _terrain_group_key_for(id: String) -> String:
+	return TERRAIN_GROUP_ID if id in TERRAIN_GROUP_MEMBERS else id
+
+
+## Every terrain button the row should build, in catalog order — every standalone terrain id
+## unchanged, and `TERRAIN_GROUP_ID` exactly once, at the position its first member would
+## otherwise have occupied (mirrors `_placeable_group_keys()`'s own "no index bookkeeping"
+## trick: `_terrain_entries` is a Dictionary, so its key order IS insertion order, which IS
+## catalog order).
+func _terrain_group_keys() -> Array[String]:
+	var seen: Dictionary = {}
+	var out: Array[String] = []
+	for id: String in _terrain_entries:
+		var group_key: String = _terrain_group_key_for(id)
+		if not seen.has(group_key):
+			seen[group_key] = true
+			out.append(group_key)
+	return out
+
+
+## The catalog row for one terrain button. `group_key` is either a real, standalone terrain
+## id (water, forest, rock, cultivated_field, snowfield, and — inside the style picker's own
+## logic, never here — forest/wild_grass's style-variant path) or `TERRAIN_GROUP_ID`, the
+## grass-family group's own synthetic id.
+##
+## FOR A STANDALONE ID: the catalog's own entry, unchanged — identical to what
+## `catalog_rows()` already reports for it.
+##
+## FOR `TERRAIN_GROUP_ID`: `icon_id` is whichever member is currently
+## `WorldRoot.get_style_default(TERRAIN_GROUP_ID)`'s answer (re-resolved on every call, same
+## "always live, never cached" contract `_placeable_group_row()` keeps) — that is what
+## `_icon_kind_for()` draws. `display_name` is deliberately NOT that member's own name (see
+## this file's own header for why "Grass" cannot be the label here); it is always the fixed
+## `TERRAIN_GROUP_DISPLAY_NAME`.
+func _terrain_group_row(group_key: String) -> Dictionary:
+	if group_key != TERRAIN_GROUP_ID:
+		var entry: Dictionary = _terrain_entries.get(group_key, {})
+		return {
+			"id": group_key,
+			"icon_id": group_key,
+			"display_name": entry.get("display_name", "") as String,
+			"cost": entry.get("cost", 0) as int,
+		}
+	var resolved_id: String = (
+		TERRAIN_GROUP_MEMBERS[0] if not TERRAIN_GROUP_MEMBERS.is_empty() else ""
+	)
+	if _world != null:
+		resolved_id = _world.get_style_default(TERRAIN_GROUP_ID)
+	var member_entry: Dictionary = _terrain_entries.get(resolved_id, {})
+	return {
+		"id": group_key,
+		"icon_id": resolved_id,
+		"display_name": TERRAIN_GROUP_DISPLAY_NAME,
+		"cost": member_entry.get("cost", 0) as int,
+	}
 
 
 ## Every distinct `hotbar_category` (falling back to the placeable's own id when that field is
@@ -790,22 +926,34 @@ func _has_style_choice(id: String) -> bool:
 ## text — against `WorldRoot.get_style_default()`'s CURRENT answer for `category_or_id`,
 ## without touching any other button or rebuilding the row. Exposed for Task 7's long-press
 ## popup: after it writes a new `style_defaults` entry (`WorldRoot.set_style_default()`), this
-## is how the Farm Building button's chrome catches up to the new selection. A no-op if
-## `category_or_id` names no currently-built placeable button (nothing to repaint) or `_world`
-## is unset (`build_palettes()` hasn't run).
+## is how the Farm Building (and, habitat-tiers Task 8b, the grass-family) button's chrome
+## catches up to the new selection. A no-op if `category_or_id` names no currently-built
+## button (nothing to repaint) or `_world` is unset (`build_palettes()` hasn't run).
+##
+## BOTH `kind`s ARE HANDLED (widened from placeable-only, Task 8b): the lookup below matches
+## on `id` alone, then dispatches to `_terrain_group_row()` or `_placeable_group_row()` by
+## whichever `kind` that button actually is. Calling this for "forest"/"wild_grass" (real
+## terrain ids, not true groups) is a harmless no-op write — `_terrain_group_row()`'s
+## standalone branch returns exactly the same entry those buttons already show, so this
+## widening changes no currently-observed behaviour for either.
 func refresh_palette_button(category_or_id: String) -> void:
 	if _world == null:
 		return
 	var index: int = -1
+	var kind: String = ""
 	for i in _palette_order.size():
 		var entry: Dictionary = _palette_order[i]
-		if (entry["kind"] as String) == "placeable" and (entry["id"] as String) == category_or_id:
+		if (entry["id"] as String) == category_or_id:
 			index = i
+			kind = entry["kind"] as String
 			break
 	if index < 0:
 		return
 
-	var row: Dictionary = _placeable_group_row(category_or_id)
+	var row: Dictionary = (
+		_terrain_group_row(category_or_id) if kind == "terrain"
+		else _placeable_group_row(category_or_id)
+	)
 	var display_name: String = row["display_name"] as String
 	var icon_id: String = row["icon_id"] as String
 	var button: Button = _palette_buttons[index]
@@ -945,10 +1093,19 @@ func _on_style_picker_style_selected(category: String, style_id: String) -> void
 
 
 ## `activate_palette_entry()`'s `kind` argument, derived from a picker category rather than
-## passed in — Forest/Wild Grass are TERRAIN ids used as-is, House/Farm Building are PLACEABLE
-## ids/group keys (see `_PICKER_CATEGORIES`'s own header for why those 4, and only those 4).
+## passed in — Forest/`TERRAIN_GROUP_ID` are TERRAIN ids or the terrain group key, House/Farm
+## Building are PLACEABLE ids/group keys (see `_PICKER_CATEGORIES`'s own header for why those
+## 4, and only those 4). "wild_grass" is kept in this OR defensively — it is no longer one of
+## `_PICKER_CATEGORIES` (habitat-tiers Task 8b: it groups behind `TERRAIN_GROUP_ID` and no
+## longer has a button of its own to route a real long-press through here), but it remains a
+## real terrain id, so this stays correct rather than silently wrong if anything ever does call
+## through with it.
 func _kind_for_category(category: String) -> String:
-	return "terrain" if (category == "forest" or category == "wild_grass") else "placeable"
+	return (
+		"terrain"
+		if (category == "forest" or category == "wild_grass" or category == TERRAIN_GROUP_ID)
+		else "placeable"
+	)
 
 
 func _refresh_palette_rendering() -> void:
@@ -978,7 +1135,16 @@ func _icon_child_of(button: Button) -> TileIcon:
 
 func _is_entry_active(entry: Dictionary) -> bool:
 	if entry["kind"] == "terrain":
-		return _mode == Mode.TERRAFORM and (entry["id"] as String) == _selected_terrain_id
+		# A grouped terrain button's `entry["id"]` is `TERRAIN_GROUP_ID`, never the real member
+		# id `_selected_terrain_id` holds (grass/wild_grass/meadow/scrub) — so the currently
+		# selected terrain's own group key is what has to match, mirroring the placeable branch
+		# below member for member (`_terrain_group_key_for()` is `_placeable_group_key_for()`'s
+		# same fallback-to-own-id rule, just sourced from the hardcoded member list instead of a
+		# data field — see this file's own "TERRAIN BUTTON-GROUP" header note).
+		return (
+			_mode == Mode.TERRAFORM
+			and _terrain_group_key_for(_selected_terrain_id) == (entry["id"] as String)
+		)
 	# A grouped button's `entry["id"]` is the GROUP key (e.g. "farm_building"), never the real
 	# member id `_selected_placeable_id` holds — so the currently-selected placeable's own group
 	# key is what has to match, the same fallback-to-own-id rule `_placeable_group_keys()` used
@@ -1002,17 +1168,24 @@ func _placeable_group_key_for(id: String) -> String:
 ## placeable -> BUILD) the same way the retired category buttons, and the slot model before
 ## this, both did.
 ##
-## A placeable `id` may be a GROUP KEY rather than a real placeable id — `_add_palette_button()`
-## binds a grouped button's `pressed` signal to its group key (e.g. "farm_building"), not to
-## whichever member happened to be the default when the row was last built, so a tap always
-## resolves against `WorldRoot.get_style_default()`'s answer AT TAP TIME. Everything downstream
-## of this function (`_placeable_entries` lookup, the cost check, `WorldRoot.place_building()`)
-## receives the real, resolved id — never the literal group key.
+## An `id` may be a GROUP KEY rather than a real terrain/placeable id — `_add_palette_button()`
+## binds a grouped button's `pressed` signal to its group key (e.g. "farm_building",
+## `TERRAIN_GROUP_ID`), not to whichever member happened to be the default when the row was
+## last built, so a tap always resolves against `WorldRoot.get_style_default()`'s answer AT TAP
+## TIME. Everything downstream of this function (`_terrain_entries`/`_placeable_entries`
+## lookup, the cost check, `WorldRoot.paint_tile()`/`place_building()`) receives the real,
+## resolved id — never the literal group key. Both branches below now resolve identically
+## (habitat-tiers Task 8b widened the terrain branch to match the placeable branch it always
+## mirrored); forest/wild_grass are unaffected, since they ARE their own entries in
+## `_terrain_entries` and so resolve to themselves, same as before this task.
 func activate_palette_entry(kind: String, id: String) -> void:
 	_remove_selected = false
 	if kind == "terrain":
 		set_mode(Mode.TERRAFORM)
-		_selected_terrain_id = id
+		var real_id: String = id
+		if not _terrain_entries.has(id) and _world != null:
+			real_id = _world.get_style_default(id)
+		_selected_terrain_id = real_id
 	else:
 		set_mode(Mode.BUILD)
 		var real_id: String = id

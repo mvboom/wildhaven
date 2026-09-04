@@ -81,6 +81,8 @@ func _process(delta: float) -> bool:
 	_check_hotbar_visible_in_every_mode()
 	_check_rotate_and_exit_buttons_hover_like_every_other_button()
 	_check_farm_buildings_group_into_one_button()
+	_check_grass_family_terrain_group_into_one_button()
+	_check_grass_family_members_remain_selectable_and_functional()
 	_check_palette_row_totals_8_buttons_not_15()
 	_check_farm_building_button_resolves_to_the_current_style_default()
 	_check_refresh_palette_button_repaints_farm_building_chrome()
@@ -172,6 +174,7 @@ func _check_serialised_icon_ordinals_still_point_at_their_glyphs() -> void:
 	var expected: Dictionary = {
 		"WILD_GRASS": 0, "GRASS": 1, "WATER": 2, "FOREST": 3, "ROCK": 4, "FARM": 5,
 		"HOUSE": 6, "ERASER": 7, "EXIT": 8, "LOOK": 9, "HELP": 10, "FARM_BUILDING": 11,
+		"GRASS_FAMILY": 12,
 	}
 	for name: String in expected:
 		check_eq(int(TileIcon.Kind[name]), expected[name] as int,
@@ -196,11 +199,12 @@ func _check_inspect_toggle_remembers_last_content_mode() -> void:
 
 
 ## THE CORE GUARANTEE THIS REWORK EXISTS FOR: every terrain the catalog reports gets a real
-## button, with no assignment step and no empty/unreachable slot. Placeables are the SAME
-## guarantee one level up — every placeable is reachable through its GROUP's button (see
-## `_check_farm_buildings_group_into_one_button()` below for the B2 Task 6 grouping itself) —
-## because a permanent button per raw `PlaceableDefinition` is exactly the interim state B2
-## Task 6 closes (8 farm buildings each had their own button).
+## button, OR is reachable through its GROUP's button — RE-POINTED habitat-tiers Task 8b: the
+## terrain half is now the SAME two-tier guarantee the placeable half already had (a permanent
+## button per raw entry is exactly the pre-Task-8b interim state for grass/wild_grass/meadow/
+## scrub that this task closes, mirroring B2 Task 6's own close of the 9 raw Farm Building
+## buttons — see `_check_farm_buildings_group_into_one_button()` below for that half, and
+## `_check_grass_family_terrain_group_into_one_button()` for this one).
 func _check_every_catalog_entry_has_a_button() -> void:
 	var terrain_ids: Array[String] = []
 	_hud.set_mode(GameHud.Mode.TERRAFORM)
@@ -208,8 +212,16 @@ func _check_every_catalog_entry_has_a_button() -> void:
 	if not check(terrain_ids.size() > 0, "the Terraform catalog has at least one entry"):
 		return
 	for id: String in terrain_ids:
-		check(_hud.palette_button_for(id) != null,
-			"terrain id '%s' has a permanent palette button" % id)
+		if id in GameHud.TERRAIN_GROUP_MEMBERS:
+			check(_hud.palette_button_for(id) == null,
+				"terrain id '%s' has NO permanent button of its own — it renders through the "
+				+ "grass-family GROUP button instead" % id)
+		else:
+			check(_hud.palette_button_for(id) != null,
+				"terrain id '%s' has a permanent palette button" % id)
+	check(_hud.palette_button_for(GameHud.TERRAIN_GROUP_ID) != null,
+		"...and the grass-family GROUP button exists, keyed by its own group id rather than by "
+		+ "any one of its 4 members' real ids")
 
 	var placeable_ids: Array[String] = []
 	_hud.set_mode(GameHud.Mode.BUILD)
@@ -264,17 +276,22 @@ func _check_look_button_has_icon_number_and_name() -> void:
 
 ## Item 3 of the rework: every palette-row button (not just Info/Erase) shows its name below
 ## its icon, small — an icon alone did not say what a button was.
+##
+## RE-POINTED (habitat-tiers Task 8b): was "grass" — `grass` no longer has a permanent button
+## of its own (it groups behind `grass_family`, see `_check_grass_family_terrain_group_into_
+## one_button()`), so this now checks "rock", a standalone terrain untouched by the grouping,
+## to keep proving the SAME chrome contract on a button that still has it.
 func _check_button_chrome_icon_number_name() -> void:
 	_hud.set_mode(GameHud.Mode.TERRAFORM)
-	var button: Button = _hud.palette_button_for("grass")
-	if not check(button != null, "the grass button exists"):
+	var button: Button = _hud.palette_button_for("rock")
+	if not check(button != null, "the rock button exists"):
 		return
 	check(button.get_node_or_null("Icon") is TileIcon, "...has an icon")
 	var number: Label = button.get_node_or_null("Number") as Label
 	check(number != null, "...a number badge")
 	var name_label: Label = button.get_node_or_null("NameLabel") as Label
 	if check(name_label != null, "...and a visible name label"):
-		check_eq(name_label.text, "Grass", "...reading the catalog's own display name")
+		check_eq(name_label.text, "Rock", "...reading the catalog's own display name")
 		check(
 			name_label.get_theme_font_size("font_size") < UiPalette.FONT_HOTBAR,
 			"...small, per the playtest ask — smaller than the HUD's ordinary chrome font"
@@ -482,29 +499,164 @@ func _check_farm_buildings_group_into_one_button() -> void:
 		"the Build half of the row totals 2 buttons — House and Farm Building — not 9")
 
 
+# --- habitat-tiers Task 8b: the grass-family TERRAIN GROUP ---------------------------------
+#
+# A prior task added 3 terrains (Meadow, Scrub, Snowfield), taking the row to 11 buttons —
+# genuinely too wide for the fixed band (`_check_palette_row_never_overlaps_the_corner_
+# clusters()` above was left failing on purpose to prove it). Human ruling, closed here:
+# grass/wild_grass/meadow/scrub group into ONE button, mirroring Farm Building's own grouping
+# mechanism exactly; snowfield stays its own top-level button.
+
+## THE SAME TWO-TIER GUARANTEE `_check_farm_buildings_group_into_one_button()` PROVES, ONE
+## LEVEL DOWN: none of the 4 grouped members has a button of its own, they render through
+## exactly one button keyed by the group id, and snowfield — explicitly excluded from the
+## grouping by the human ruling — is NOT swept in by accident.
+func _check_grass_family_terrain_group_into_one_button() -> void:
+	_hud.set_mode(GameHud.Mode.TERRAFORM)
+	if not check(GameHud.TERRAIN_GROUP_MEMBERS.size() == 4,
+		"setup: the grass-family group has exactly 4 members (got %d)"
+			% GameHud.TERRAIN_GROUP_MEMBERS.size()):
+		return
+	check_eq(GameHud.TERRAIN_GROUP_MEMBERS, ["grass", "wild_grass", "meadow", "scrub"],
+		"...and they are exactly grass/wild_grass/meadow/scrub — the human ruling's own list")
+
+	for id: String in GameHud.TERRAIN_GROUP_MEMBERS:
+		check(_hud.palette_button_for(id) == null,
+			"'%s' has NO permanent button of its own — it groups behind '%s'"
+				% [id, GameHud.TERRAIN_GROUP_ID])
+
+	check(_hud.palette_button_for(GameHud.TERRAIN_GROUP_ID) != null,
+		"...they render through exactly one button, keyed '%s'" % GameHud.TERRAIN_GROUP_ID)
+
+	check(_hud.palette_button_for("snowfield") != null,
+		"snowfield stays its OWN top-level button — the human ruling explicitly excludes it "
+		+ "from the group, and this is not an oversight")
+	check(not ("snowfield" in GameHud.TERRAIN_GROUP_MEMBERS),
+		"...proven against the group's own membership list too, not just the button's presence")
+
+	var terrain_button_count: int = 0
+	for entry: Dictionary in _hud._palette_order:
+		if (entry["kind"] as String) == "terrain":
+			terrain_button_count += 1
+	check_eq(terrain_button_count, 6,
+		"the Terraform half of the row totals 6 buttons — water, forest, rock, "
+		+ "cultivated_field, snowfield, and the grass-family group — not 9")
+
+	# The group button's own label is the FIXED group name, never a member's own name (human
+	# ruling: "the group cannot just be 'Grass'") — checked here as the setup this task's own
+	# naming proposal rests on; the exact string is [COPY], awaiting sign-off (this task's
+	# report), so this proves STABILITY (same label regardless of which member is default,
+	# checked again below) rather than pinning the literal words.
+	var group_button: Button = _hud.palette_button_for(GameHud.TERRAIN_GROUP_ID)
+	if check(group_button != null, "the grass-family button exists to check its label"):
+		check_eq(group_button.tooltip_text, GameHud.TERRAIN_GROUP_DISPLAY_NAME,
+			"...and its label is the fixed group name, not whichever member is default")
+		check(group_button.tooltip_text != "Grass",
+			"...specifically: never literally 'Grass' — the human ruling's own stated failure "
+			+ "mode")
+
+
+## THE CONSTRAINT'S OWN WORDS: "Selecting any of the four grouped terrains must still work end
+## to end — painting grass, wild_grass, meadow and scrub must all remain reachable and
+## functional." Each is still a REAL, independent catalog entry (`_terrain_entries` is
+## unchanged by grouping — only the HOTBAR BUTTON collapses); this proves each is reachable
+## through the grouped control specifically (long-press -> pick the row -> the pick becomes
+## the live, paintable selection AND the resolved default the button itself shows/paints on a
+## plain tap), the same round-trip `_check_style_picker_selection_immediately_activates_the_
+## choice()` already proves for Farm Building/House/Forest/Wild Grass.
+func _check_grass_family_members_remain_selectable_and_functional() -> void:
+	var group_button: Button = _hud.palette_button_for(GameHud.TERRAIN_GROUP_ID)
+	if not check(group_button != null, "the grass-family button exists"):
+		return
+
+	for member: String in GameHud.TERRAIN_GROUP_MEMBERS:
+		_hud.set_mode(GameHud.Mode.INSPECT)
+
+		# Reachable via the long-press sub-palette, the ONLY door a real player has to a
+		# non-default member once the hotbar is collapsed.
+		_hud.open_style_picker(GameHud.TERRAIN_GROUP_ID, group_button)
+		var popup: StylePickerPopup = _hud.style_picker()
+		if not check(popup != null and popup.is_open(),
+			"%s: the grass-family picker opens" % member):
+			continue
+		var index: int = -1
+		for i in popup.row_count():
+			if popup.row_style_id(i) == member:
+				index = i
+				break
+		if not check(index >= 0, "%s: appears as a row in the grass-family picker" % member):
+			popup.close()
+			continue
+
+		popup.select_row(index)
+		check(not popup.is_open(), "%s: selecting the row closes the popup" % member)
+		check_eq(_world.get_style_default(GameHud.TERRAIN_GROUP_ID), member,
+			"%s: becomes the group's style default" % member)
+		check_eq(_hud.mode(), GameHud.Mode.TERRAFORM,
+			"%s: picking it switches to TERRAFORM immediately" % member)
+		check_eq(_hud.selected_terrain_id(), member,
+			"%s: ...with itself as the live, paintable brush — ready to paint immediately, not "
+			+ "just written to a default nobody acts on" % member)
+
+		# The group button itself now resolves/paints this member on a PLAIN tap too — the
+		# button chrome and what the next tap paints can never disagree, same guarantee
+		# `_check_changing_a_group_default_retargets_the_live_selection()` proves for Farm
+		# Building.
+		_hud.set_mode(GameHud.Mode.INSPECT)
+		_hud.activate_palette_entry("terrain", GameHud.TERRAIN_GROUP_ID)
+		check_eq(_hud.mode(), GameHud.Mode.TERRAFORM,
+			"%s: tapping the grouped BUTTON (not the popup) also enters TERRAFORM" % member)
+		check_eq(_hud.selected_terrain_id(), member,
+			"%s: ...and resolves to the currently-default member, never the literal group id"
+				% member)
+
+		# What actually lands on a real tile, not just what the HUD reports selected — the same
+		# posture `_check_farm_building_button_resolves_to_the_current_style_default()` takes,
+		# proving the paint genuinely reaches `WorldRoot`, not only `GameHud`'s own bookkeeping.
+		var tile := Vector2i(30 + GameHud.TERRAIN_GROUP_MEMBERS.find(member), 30)
+		# `paint_tile()` is a no-op on a tile already that terrain (`WorldRoot.paint_tile()`'s own
+		# contract) — freshly-revealed land is wild_grass by default (`WorldGrid.START_TERRAIN_ID`),
+		# so the "wild_grass" member's own tile would otherwise start out ALREADY correct and the
+		# real paint below would report false for the wrong reason (a no-op, not a rejection).
+		# Painting a different terrain first guarantees a genuine transition for every member,
+		# wild_grass included.
+		_world.paint_tile(tile.x, tile.y, "water")
+		check(_world.paint_tile(tile.x, tile.y, _hud.selected_terrain_id()),
+			"%s: WorldRoot.paint_tile() accepts the resolved id" % member)
+		check_eq(_world.get_tile_terrain(tile.x, tile.y), member,
+			"%s: ...and the tile that actually changed is painted with the resolved member, "
+			+ "never the group key" % member)
+
+
 ## THE SPECIFIC REGRESSION THIS TASK FIXES: 15 buttons (6 terrain + 9 raw placeables, B1's
 ## shipped interim state) down to 8 (6 terrain + House + Farm Building).
 ##
 ## COUNT UPDATED (2026-09-04, habitat-tiers Task 8): 8 -> 11. The habitat-tiers ruling adds
 ## 3 new terrain `.tres` entries — Meadow, Scrub, Snowfield (task-8-brief.md) — each a real,
-## player-visible new entry in the Terraform palette, so the row is now 9 terrain + House +
-## Farm Building = 11. Still nowhere near the 15-button regression this check exists to
-## guard against; the "not 15" framing stays true. See
-## `_check_palette_row_never_overlaps_the_corner_clusters()`'s own failures for the SEPARATE,
-## genuine consequence this count increase has on the row's fit within the fixed band —
-## that is a real layout defect this task's data change exposes, not something this count
-## assertion papers over.
+## player-visible new entry in the Terraform palette, so the row grew to 9 terrain + House +
+## Farm Building = 11, overflowing the fixed band
+## (`_check_palette_row_never_overlaps_the_corner_clusters()` above).
+##
+## COUNT RE-POINTED AGAIN (habitat-tiers Task 8b): 11 -> 8. Task 8b's own grouping (this
+## file's "grass-family TERRAIN GROUP" section above) collapses grass/wild_grass/meadow/scrub
+## behind one button, bringing the terrain half back to 6 (water, forest, rock,
+## cultivated_field, snowfield, grass-family) and the row as a whole back to 8 — the exact
+## count the band was originally built for. Still nowhere near the 15-button regression this
+## check exists to guard against; the "not 15" framing stays true throughout every count this
+## check has ever pinned.
 func _check_palette_row_totals_8_buttons_not_15() -> void:
-	check_eq(_hud._palette_order.size(), 11,
-		"the BUILD+TERRAFORM row totals 11 buttons — 9 terrain + House + Farm Building — not 15")
+	check_eq(_hud._palette_order.size(), 8,
+		"the BUILD+TERRAFORM row totals 8 buttons — 6 terrain (grass/wild_grass/meadow/scrub "
+		+ "grouped behind one button, water/forest/rock/cultivated_field/snowfield standalone) "
+		+ "+ House + Farm Building — not 15")
 
 	var row: HBoxContainer = _hud.get_node_or_null("%PaletteRow") as HBoxContainer
 	if not check(row != null, "the palette row exists"):
 		return
-	# Info + 11 catalog buttons + Erase = 13 real children — the row's own scene tree, not just
+	# Info + 8 catalog buttons + Erase = 10 real children — the row's own scene tree, not just
 	# the bookkeeping array, so this catches a divergence between the two.
-	check_eq(row.get_child_count(), 13,
-		"the row's real child count matches: Info (1) + 11 catalog buttons + Erase (1)")
+	check_eq(row.get_child_count(), 10,
+		"the row's real child count matches: Info (1) + 8 catalog buttons + Erase (1)")
 
 
 ## Step 2's contract: tapping the Farm Building button resolves to whichever member is
@@ -594,7 +746,12 @@ func _check_refresh_palette_button_repaints_farm_building_chrome() -> void:
 # shortcut — this is the test that would have caught the original swallow-flag bug (a
 # long-press release with the pointer dragged off the button never emits Godot's own
 ## `pressed` signal at all, so nothing that only listens for `pressed` can ever notice).
-const _PICKER_CATEGORIES: Array[String] = ["forest", "wild_grass", "house", "farm_building"]
+## RE-POINTED habitat-tiers Task 8b: "wild_grass" is OUT (it groups behind the grass-family
+## TERRAIN GROUP below and no longer has a standalone button of its own to long-press),
+## `GameHud.TERRAIN_GROUP_ID` is IN — see that constant's own header for the full mechanism.
+const _PICKER_CATEGORIES: Array[String] = [
+	"forest", "house", "farm_building", GameHud.TERRAIN_GROUP_ID
+]
 
 
 ## Style-picker refinement round: a small `PopupIndicator` glyph (vector-drawn — see
@@ -619,19 +776,27 @@ func _check_popup_indicator_exists_only_on_multi_style_picker_buttons() -> void:
 			"%s: has %d style(s) — indicator should be %s"
 				% [category, style_count, "shown" if expects_indicator else "hidden"])
 
-	# The specific regression this fix closes, spelled out rather than only implied by the loop
-	# above: Wild Grass, today, has exactly one style and must not show the indicator.
-	var wild_grass_button: Button = _hud.palette_button_for("wild_grass")
-	if check(wild_grass_button != null, "wild_grass has a palette button"):
-		check_eq(_world.style_ids_for_category("wild_grass").size(), 1,
-			"setup: wild_grass currently has exactly one style (post-revert)")
-		check(wild_grass_button.get_node_or_null("PopupIndicator") == null,
-			"wild_grass: no popup indicator — its one-row popup would be a dead end")
+	# The specific regression this fix ORIGINALLY closed against "wild_grass" (a category with
+	# exactly one style must not show the indicator) no longer has that button to check against
+	# (habitat-tiers Task 8b: it groups behind the grass-family TERRAIN GROUP and no longer has
+	# a button of its own — see `_check_grass_family_terrain_group_into_one_button()`). The
+	# UNDERLYING RULE is still proven, twice over: the generic loop above (which would fail the
+	# instant ANY current `_PICKER_CATEGORIES` member's style count and indicator disagreed) and
+	# explicitly here, against `WorldRoot.style_ids_for_category("wild_grass")` directly — the
+	# terrain's OWN style catalog is untouched by the hotbar grouping (only its long-press DOOR
+	# to it is gone), so this still proves the data-level fact the original regression was about.
+	check_eq(_world.style_ids_for_category("wild_grass").size(), 1,
+		"setup: wild_grass currently has exactly one style (post-revert), unaffected by hotbar "
+		+ "grouping — only its own top-level button (and thus its long-press door) is gone")
+	check(_hud.palette_button_for("wild_grass") == null,
+		"wild_grass: no palette button of its own anymore (habitat-tiers Task 8b) — its "
+		+ "one-style catalog has no door to reach it through at all now, a STRICTER outcome "
+		+ "than 'reachable but no indicator'")
 
-	# The other 3 categories are expected to still have real choice today; spelled out the same
+	# The other 4 categories are expected to still have real choice today; spelled out the same
 	# way so a future content change that drops one of THEM to a single style is caught here too,
 	# not just silently accepted by the generic loop above.
-	for category: String in ["forest", "house", "farm_building"]:
+	for category: String in ["forest", "house", "farm_building", GameHud.TERRAIN_GROUP_ID]:
 		var button: Button = _hud.palette_button_for(category)
 		if check(button != null, "%s has a palette button" % category):
 			check(_world.style_ids_for_category(category).size() > 1,
@@ -651,7 +816,10 @@ func _check_popup_indicator_exists_only_on_multi_style_picker_buttons() -> void:
 
 	_hud.set_mode(GameHud.Mode.TERRAFORM)
 	for id: String in _hud.palette_option_ids():
-		if id in _PICKER_CATEGORIES:
+		# Grouped-terrain members (habitat-tiers Task 8b) have no button of their own at all —
+		# skipped for the same reason `_PICKER_CATEGORIES` ids are: neither has a standalone
+		# "non-picker terrain" button for this loop to find.
+		if id in _PICKER_CATEGORIES or id in GameHud.TERRAIN_GROUP_MEMBERS:
 			continue
 		var terrain_button: Button = _hud.palette_button_for(id)
 		if check(terrain_button != null, "the non-picker terrain '%s' has a palette button" % id):
@@ -660,7 +828,7 @@ func _check_popup_indicator_exists_only_on_multi_style_picker_buttons() -> void:
 
 
 ## THE REGRESSION BAR (Task 7's own words): a `button_up` before the long-press threshold
-## behaves identically to today for all 4 picker categories — no popup, normal paint/place.
+## behaves identically to today for all 5 picker categories — no popup, normal paint/place.
 func _check_quick_tap_on_picker_buttons_is_unaffected_by_long_press_wiring() -> void:
 	for category: String in _PICKER_CATEGORIES:
 		var button: Button = _hud.palette_button_for(category)
@@ -673,11 +841,15 @@ func _check_quick_tap_on_picker_buttons_is_unaffected_by_long_press_wiring() -> 
 		check(not _hud.is_style_picker_open(),
 			"%s: a quick tap (button_up before the threshold) never opens the style picker"
 				% category)
-		if category == "forest" or category == "wild_grass":
+		if category == "forest" or category == "wild_grass" or category == GameHud.TERRAIN_GROUP_ID:
 			check_eq(_hud.mode(), GameHud.Mode.TERRAFORM,
 				"%s: quick tap still enters TERRAFORM implicitly, exactly as before this task"
 					% category)
-			check_eq(_hud.selected_terrain_id(), category,
+			var expected_terrain_id: String = (
+				category if category != GameHud.TERRAIN_GROUP_ID
+				else _world.get_style_default(GameHud.TERRAIN_GROUP_ID)
+			)
+			check_eq(_hud.selected_terrain_id(), expected_terrain_id,
 				"%s: quick tap still selects the terrain brush" % category)
 		else:
 			check_eq(_hud.mode(), GameHud.Mode.BUILD,
@@ -796,6 +968,11 @@ func _expected_style_label(category: String, style_id: String) -> String:
 			if placeable.id == style_id:
 				return placeable.display_name
 		return style_id
+	if category == GameHud.TERRAIN_GROUP_ID:
+		for terrain: TerrainDefinition in _world.terrain_options():
+			if terrain.id == style_id:
+				return terrain.display_name
+		return style_id.capitalize()
 	return style_id.capitalize()
 
 
@@ -870,13 +1047,18 @@ func _check_style_picker_selection_updates_default_and_button_chrome() -> void:
 ## Refinement round: picking ANY popup row, on ALL 4 categories, immediately becomes the live
 ## selection — `GameHud.mode()` and `selected_terrain_id()`/`selected_placeable_id()`, exactly
 ## what `TapRouter` would read on the very next tap/placement — not just a `get_style_default()`
-## write nobody acts on until some later ordinary tap. Forest/Wild Grass: the terrain id itself
-## IS the category (styles are visual variants of one terrain, not separate terrain ids — see
+## write nobody acts on until some later ordinary tap. Forest: the terrain id itself IS the
+## category (styles are visual variants of one terrain, not separate terrain ids — see
 ## `_PICKER_CATEGORIES`'s own header), so picking any style there switches to TERRAFORM with that
 ## terrain already the active brush. House/Farm Building: switches to BUILD with the resolved
-## placeable already the active selection.
+## placeable already the active selection. The grass-family group (habitat-tiers Task 8b) is
+## Forest's shape (TERRAFORM) but House/Farm Building's RESOLUTION (a group key resolving to a
+## real, different member id) — proved on its own, exhaustively, by
+## `_check_grass_family_members_remain_selectable_and_functional()` rather than folded into
+## either loop below, since it fits neither one's assumption cleanly (was "wild_grass" here
+## before habitat-tiers Task 8b removed that button; see this file's own header for why).
 func _check_style_picker_selection_immediately_activates_the_choice() -> void:
-	for category: String in ["forest", "wild_grass"]:
+	for category: String in ["forest"]:
 		var button: Button = _hud.palette_button_for(category)
 		if not check(button != null, "%s has a palette button" % category):
 			continue
@@ -976,10 +1158,15 @@ func _check_style_picker_reselecting_current_still_activates_it() -> void:
 		check_eq(_world.get_style_default(category), current,
 			"%s: re-selecting the current default is a no-op write" % category)
 
-		if category == "forest" or category == "wild_grass":
+		if category == "forest" or category == "wild_grass" or category == GameHud.TERRAIN_GROUP_ID:
 			check_eq(_hud.mode(), GameHud.Mode.TERRAFORM,
 				"%s: re-selecting still activates TERRAFORM" % category)
-			check_eq(_hud.selected_terrain_id(), category,
+			# Forest/Wild Grass ARE their own selection; grass-family is a group key and
+			# resolves to whichever member `current` already named (same fallback-to-own-id
+			# shape "house" uses on the placeable side, just the other way around: here the
+			# NON-group categories are the ones that equal themselves).
+			var expected_terrain: String = category if category != GameHud.TERRAIN_GROUP_ID else current
+			check_eq(_hud.selected_terrain_id(), expected_terrain,
 				"%s: ...with the terrain correctly selected, no stale state" % category)
 		else:
 			check_eq(_hud.mode(), GameHud.Mode.BUILD,
@@ -1093,14 +1280,21 @@ func _check_changing_a_group_default_retargets_the_live_selection() -> void:
 ## tap: the catcher covering the popup's full rect is `MOUSE_FILTER_STOP`, not a Button, so
 ## Godot's own input routing (topmost STOP-filter Control wins) is what does the consuming —
 ## nothing here has to race a real click against the button below it.
+##
+## RE-POINTED (habitat-tiers Task 8b): was "wild_grass" — no longer a standalone button (it
+## groups behind `TERRAIN_GROUP_ID`, see `_PICKER_CATEGORIES`'s own header). `TERRAIN_GROUP_ID`
+## itself takes over here, which is a strict upgrade for this specific check: it doubles as
+## coverage that the grass-family group's OWN popup, not just Forest/House/Farm Building's,
+## dismisses cleanly on an outside tap.
 func _check_style_picker_outside_tap_dismisses_with_no_change_and_does_not_leak_through() -> void:
 	var before_mode: GameHud.Mode = _hud.mode()
 	var before_terrain: String = _hud.selected_terrain_id()
-	var before: String = _world.get_style_default("wild_grass")
+	var before: String = _world.get_style_default(GameHud.TERRAIN_GROUP_ID)
 
-	_hud.open_style_picker("wild_grass", _hud.palette_button_for("wild_grass"))
+	_hud.open_style_picker(GameHud.TERRAIN_GROUP_ID, _hud.palette_button_for(GameHud.TERRAIN_GROUP_ID))
 	var popup: StylePickerPopup = _hud.style_picker()
-	if not check(popup != null and popup.is_open(), "wild_grass: opens for the outside-tap check"):
+	if not check(popup != null and popup.is_open(),
+		"%s: opens for the outside-tap check" % GameHud.TERRAIN_GROUP_ID):
 		return
 
 	var catcher: Control = popup.find_child("OutsideCatcher", true, false) as Control
@@ -1111,7 +1305,7 @@ func _check_style_picker_outside_tap_dismisses_with_no_change_and_does_not_leak_
 
 	popup.simulate_outside_tap()
 	check(not popup.is_open(), "an outside tap closes the popup")
-	check_eq(_world.get_style_default("wild_grass"), before,
+	check_eq(_world.get_style_default(GameHud.TERRAIN_GROUP_ID), before,
 		"...with NO change to the style default")
 	check_eq(_hud.mode(), before_mode,
 		"...and no change to the HUD's mode either — an outside tap is consumed, not a "
@@ -1127,6 +1321,11 @@ func _check_style_picker_outside_tap_dismisses_with_no_change_and_does_not_leak_
 ## afterward, without `_panel.reset_size()`, left the panel stuck at House's larger size —
 ## misplaced and running off-screen. Proves the fix directly against `Panel`'s own `.size`,
 ## not just its (unaffected) minimum size.
+##
+## RE-POINTED (habitat-tiers Task 8b): the short list was "wild_grass" (2 rows at the time this
+## test was written, 1 today post-revert) — no longer a standalone button. `TERRAIN_GROUP_ID`
+## takes over as the short list (4 rows, still comfortably shorter than House's 18), which
+## keeps the SAME long-then-short shrink shape this check exists to prove.
 func _check_style_picker_panel_shrinks_back_down_after_a_longer_list() -> void:
 	_hud.open_style_picker("house", _hud.palette_button_for("house"))
 	var popup: StylePickerPopup = _hud.style_picker()
@@ -1139,12 +1338,13 @@ func _check_style_picker_panel_shrinks_back_down_after_a_longer_list() -> void:
 	var long_list_height: float = panel.size.y
 	popup.close()
 
-	_hud.open_style_picker("wild_grass", _hud.palette_button_for("wild_grass"))
+	_hud.open_style_picker(GameHud.TERRAIN_GROUP_ID, _hud.palette_button_for(GameHud.TERRAIN_GROUP_ID))
 	var short_list_height: float = panel.size.y
 	check(short_list_height < long_list_height,
-		"the panel shrinks back down for Wild Grass's short list after showing House's long "
-		+ "one, instead of staying stuck at the longer list's size",
-		"long(house)=%.1f short(wild_grass)=%.1f" % [long_list_height, short_list_height])
+		"the panel shrinks back down for the grass-family group's short list after showing "
+		+ "House's long one, instead of staying stuck at the longer list's size",
+		"long(house)=%.1f short(%s)=%.1f"
+			% [long_list_height, GameHud.TERRAIN_GROUP_ID, short_list_height])
 	popup.close()
 
 
@@ -1177,7 +1377,7 @@ func _routed_mouse_motion_event(pos: Vector2) -> InputEventMouseMotion:
 ## at all, and is exactly why the original bug shipped past every earlier signal-driven check
 ## in this file. The long-press RECOGNITION itself still uses `simulate_long_press()` (this
 ## test's job is the release path, not re-proving the Timer fires on its own — see
-## `_check_wild_grass_long_press_timer_fires_after_real_elapsed_time()` for that).
+## `_begin_real_long_press_timer_wait()`/`_finish_real_long_press_timer_wait()` for that).
 func _check_long_press_drag_off_release_via_real_routed_input_does_not_strand_the_swallow_flag() -> void:
 	var category: String = "forest"
 	var button: Button = _hud.palette_button_for(category)
@@ -1228,7 +1428,12 @@ func _check_long_press_drag_off_release_via_real_routed_input_does_not_strand_th
 var _pending_real_long_press: bool = false
 var _real_long_press_elapsed: float = 0.0
 var _real_long_press_deadline: float = 0.0
-const _REAL_LONG_PRESS_CATEGORY: String = "wild_grass"
+## RE-POINTED (habitat-tiers Task 8b): was "wild_grass" — no longer a standalone button (it
+## groups behind `GameHud.TERRAIN_GROUP_ID`, see `_PICKER_CATEGORIES`'s own header).
+## `TERRAIN_GROUP_ID` takes over, which doubles as coverage that the NEW group's long-press
+## `Timer` fires on its own too, not just its handler logic (every other check in this file
+## reaches the grass-family picker via `simulate_long_press()`, a direct handler call).
+const _REAL_LONG_PRESS_CATEGORY: String = GameHud.TERRAIN_GROUP_ID
 
 
 ## Returns `true` if `_process()` should now wait for the real Timer (`_pending_real_long_press`
