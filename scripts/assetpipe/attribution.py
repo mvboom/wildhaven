@@ -19,6 +19,8 @@ import re
 import shutil
 from pathlib import Path
 
+from assetpipe import audit
+
 _SNAKE = re.compile(r"[^a-z0-9]+")
 _ASSETS = re.compile(r"^assets_used = PackedStringArray\((.*)\)$", re.MULTILINE)
 
@@ -180,13 +182,15 @@ def copy_license_text(pack: Path, project: Path, filename: str) -> Path | None:
         raise ValueError(
             f"licence filename must be a bare name with no path separator, "
             f"got {filename!r}")
-    for name in ("License.txt", "LICENSE", "LICENSE.txt", "license.txt"):
-        src = pack / name
-        if src.is_file():
-            dest = project / "assets" / "licenses" / filename
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(src, dest)
-            return dest
+    # audit.license_files(), not a second hardcoded name list: this preserves the very file
+    # the audit gate cleared the pack on, and a private copy of the search would go stale the
+    # moment that one changed -- which it did, when nested Drive-export packs started being
+    # searched. (Its own list was already one name short of LICENSE_FILENAMES.)
+    for src in audit.license_files(pack):
+        dest = project / "assets" / "licenses" / filename
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dest)
+        return dest
     return None
 
 
