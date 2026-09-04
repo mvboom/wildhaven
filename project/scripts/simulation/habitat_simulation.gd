@@ -151,9 +151,25 @@ func _sync_structure_site(tile: Vector2i) -> void:
 	_registry.register_structure(origin, def.emitted_tags, radius)
 
 
-## The radius a building's home site allocates over: the widest `scout_radius` among the
-## species this building is actually a home for — that is, species with one of its
-## `emitted_tags` in `habitat_needs`.
+## The radius a building's home site allocates over.
+##
+## ## RULE: for every species this building is actually a home for — that is, every
+## `(species, tier)` pair where one of the tier's `needs` names one of this building's
+## `emitted_tags` (`HomeSite.serves()`'s own test) — take that TIER's `max_radius()`, which
+## spans every need's and limit's radius, falling back to the species' `scout_radius` where a
+## need or limit follows it. The site's radius is the widest of those across every matching
+## species and tier.
+##
+## Reads through `AnimalDefinition.effective_tiers()`, never raw `habitat_needs`, for the
+## same reason `HomeSite.serves()` does — see its header.
+##
+## WHY THE TIER'S FULL `max_radius()` AND NOT JUST `scout_radius`: the site's radius is what
+## `_mark_neighbourhood_dirty()` uses to decide which edits re-evaluate this site (via
+## `HomeSiteRegistry.sites_covering()`), so a tier whose OWN need or limit reaches wider than
+## the species' `scout_radius` (an authored radius, not the sentinel) needs the site to notice
+## an edit out at that distance too — a narrower site radius would silently miss it. Every
+## need/limit in the shipped roster today follows `scout_radius` via the sentinel, so this
+## degrades to `scout_radius` in practice, but nothing here special-cases that.
 ##
 ## Derived from data rather than declared as a constant, deliberately. A "building home-site
 ## radius" constant would be a fourth tuning number for the human to rule on, and it would
@@ -164,10 +180,14 @@ func _home_site_radius_for(def: PlaceableDefinition) -> int:
 	if _roster == null or def == null:
 		return best
 	for species: AnimalDefinition in _roster.species():
-		for tag: String in species.habitat_needs:
-			if def.emitted_tags.has(tag):
-				best = max(best, species.scout_radius)
-				break
+		for tier: HabitatTier in species.effective_tiers():
+			var matches: bool = false
+			for need: HabitatNeed in tier.needs:
+				if def.emitted_tags.has(need.tag):
+					matches = true
+					break
+			if matches:
+				best = max(best, tier.max_radius(species.scout_radius))
 	return best
 
 

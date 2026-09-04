@@ -19,10 +19,12 @@
 ; hardcoded copy — and TerrainDefinition.validate() additionally rejects any wild_grass
 ; entry with a non-empty emitted_tags, so the invariant cannot be broken by data edit.
 ;
-; NOTE: AnimalDefinition.BARE_TAGS is still the hardcoded ["open_grass", "quiet"] and was
+; NOTE: AnimalDefinition.BARE_TAGS is still the hardcoded ["open_grass"] and was
 ; deliberately NOT touched in this task. Wiring it to the derivation is row 6's work; the
 ; hardcoded set is strictly STRICTER than the derived empty set, so the invariant is
 ; over-enforced rather than under-enforced in the meantime — the safe direction to err.
+; (`quiet` was RETIRED from the shared vocabulary by the 2026-09-04 habitat-tiers ruling —
+; it had no source and no shipped need ever read it — so this list is now one tag, not two.)
 ;
 ; cost = 0 — one free Terraform tap converts wild grass to true grass (terrain.md).
 ;

@@ -97,12 +97,21 @@ func is_structure() -> bool:
 
 ## True when this structure's tags satisfy one of the species' habitat needs — i.e. this
 ## building is a home *for that species*.
+##
+## Reads through `AnimalDefinition.effective_tiers()` — authored tiers, or the synthesised
+## legacy tier, never the raw flat `habitat_needs` array. A species whose real requirements
+## moved into `tiers` (habitat-tiers) has a `habitat_needs` that may name no building tag at
+## all, so reading it directly here would make every one of that species' buildings "nobody's
+## habitat" — exactly the defect this fix closes. Any ONE tier naming a `need` tag this
+## structure emits is enough; a tier's OTHER needs (grass, water, a second building) are a
+## capacity question, not a "does this building count as this species' home" question.
 func serves(species: AnimalDefinition) -> bool:
 	if species == null or structure_tags.is_empty():
 		return false
-	for tag: String in species.habitat_needs:
-		if structure_tags.has(tag):
-			return true
+	for tier: HabitatTier in species.effective_tiers():
+		for need: HabitatNeed in tier.needs:
+			if structure_tags.has(need.tag):
+				return true
 	return false
 
 
