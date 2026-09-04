@@ -161,6 +161,28 @@ const DEFAULT_MAX_INDIVIDUALS: int = 6
 ## TUNING — the human owns the per-species value.
 @export_range(1, 64, 1) var max_individuals: int = DEFAULT_MAX_INDIVIDUALS
 
+## Ordered habitat tiers — the ways this species can qualify, each with its own needs,
+## limits, population cap and arrival group size. `capacity()` takes the MAX over them.
+##
+## EMPTY IS LEGAL AND IS THE MIGRATION PATH: a species with no tiers synthesises one from
+## the flat `habitat_needs` / `tiles_per_individual` / `max_individuals` fields above, so
+## the shipped roster converts one `.tres` at a time and a half-converted roster still runs.
+## Read through `effective_tiers()`; never read this array raw.
+@export var tiers: Array[HabitatTier] = []
+
+## Tags a RESIDENT of this species contributes to the tile it lives on.
+##
+## This is what makes `people` an ordinary habitat tag rather than a second mechanic: a
+## villager emits `people`, so a pug needing `people/5` is counted by the same formula as
+## a fox needing `forest/4`. Deer emit `deer`, which is what gates Stag.
+##
+## Tags are counted PER INDIVIDUAL, not per home tile — a house holding four villagers
+## reads as `people = 4`. See `CapacityEvaluator.tag_counts()`.
+##
+## Every entry here adds an edge to the graph `HabitatGraph.find_cycle()` checks: a cycle
+## would make capacity oscillate forever across the dirty queue.
+@export var emits_tags: Array[String] = []
+
 ## The 3D model scene variant(s) for this species. A species with one look (most of the
 ## current roster) carries a single-entry array; a species with several looks (e.g. the
 ## villager) carries several. Stably picked per resident by `pick_variant()` — never read
@@ -292,6 +314,60 @@ func legacy_variant_index(index: int) -> int:
 ## than interrupting the `@export` block mid-way.
 func pick_variant(index: int) -> PackedScene:
 	return variant_scene(legacy_variant_index(index))
+
+
+## The tiers capacity actually evaluates — authored tiers, or a single synthesised tier
+## built from the legacy flat fields. **Every capacity read must go through this**, the
+## same contract `effective_capacity_radius()` establishes for the radius sentinel.
+##
+## Returns an EMPTY array when the legacy fields cannot form a valid tier (see
+## `legacy_tier()`), which correctly yields capacity 0.
+func effective_tiers() -> Array[HabitatTier]:
+	if not tiers.is_empty():
+		return tiers
+	var synthesised: HabitatTier = legacy_tier()
+	if synthesised == null:
+		return []
+	return [synthesised]
+
+
+## The single tier equivalent to this species' flat legacy fields, or `null` when they
+## cannot form one.
+##
+## RETURNS NULL WHEN `tiles_per_individual < 1`, and that is load-bearing. The pre-tier
+## `capacity_from_counts()` returned 0 for a sub-1 divisor, and `test_capacity_formula.gd`
+## pins it. Under the new schema divisor 0 means `GATE_ONLY` — the OPPOSITE meaning — so
+## synthesising a tier here would silently convert "unsuitable" into "always qualifies".
+##
+## Note the radius: every synthesised need counts over `effective_capacity_radius()`, not
+## `scout_radius`. `capacity_radius` is what the pre-tier tile walk used, and this
+## synthesis must reproduce the old behaviour exactly.
+##
+## Cached: the evaluator calls this inside the dirty-queue drain, so it must not allocate
+## per call.
+func legacy_tier() -> HabitatTier:
+	if tiles_per_individual < 1:
+		return null
+	if _legacy_tier_cache != null:
+		return _legacy_tier_cache
+	var tier := HabitatTier.new()
+	tier.id = "legacy"
+	tier.max_individuals = max_individuals
+	tier.arrival_group_size = 1
+	var built: Array[HabitatNeed] = []
+	for tag: String in habitat_needs:
+		var need := HabitatNeed.new()
+		need.tag = tag
+		need.radius = effective_capacity_radius()
+		need.tiles_per_individual = tiles_per_individual
+		built.append(need)
+	tier.needs = built
+	_legacy_tier_cache = tier
+	return _legacy_tier_cache
+
+
+## Backing store for `legacy_tier()`. Not exported — it is derived, never authored.
+var _legacy_tier_cache: HabitatTier = null
 
 
 ## Non-fatal schema check. Returns human-readable problems; an empty array means clean.
