@@ -89,8 +89,16 @@ extends RefCounted
 ## inventing looks there would be actively wrong: it would change how an existing village looks
 ## the first time it is opened on the new build.
 ##
-## (row 13's mist extent takes v6 — v5 is spent here.)
-const SAVE_VERSION: int = 5
+## v5 -> v6 (habitat-tiers, Task 6): `home_sites` is unchanged, but `arrivals[]` entries grow
+## a `"count"` key — how many individuals this pending arrival lands as a group (deer as a
+## small herd, a fox alone), read off the qualifying tier's `arrival_group_size`. PURE
+## VERSION-BUMP BOOKKEEPING, same shape as v3 -> v4 and v4 -> v5: `ArrivalQueue.restore()`
+## already reads a missing `"count"` as 1 — never 0, which would silently drop the pending
+## arrival — and 1 is exactly what every pre-v6 file's implicit group size always was. No
+## migration step invents anything; see `ArrivalQueue.restore()`'s own comment.
+##
+## (row 13's mist extent takes v7 — v6 is spent here on habitat-tiers group arrivals.)
+const SAVE_VERSION: int = 6
 
 
 ## The live world as a JSON-native dictionary.
@@ -338,6 +346,13 @@ static func migrate(data: Dictionary) -> Dictionary:
 	if version < 5:
 		out["save_version"] = 5
 
+	# v5 -> v6 (habitat-tiers, Task 6): pure version-bump bookkeeping, for the same reason the
+	# two steps above are. `arrivals[].count` is additive and `ArrivalQueue.restore()` already
+	# reads a missing one as 1, which is exactly what a pre-v6 file's group size always was —
+	# uniformly 1, before `HabitatTier.arrival_group_size` existed. Nothing needs inventing here.
+	if version < 6:
+		out["save_version"] = 6
+
 	# THE SEED IS REPAIRED AT ANY VERSION, and the rule differs by version on purpose:
 	#
 	#   * **At v1**, `seed` was written as a constant 0 in every file that build ever saved, so
@@ -371,8 +386,9 @@ static func migrate(data: Dictionary) -> Dictionary:
 		# worse than deleting, which is the exact failure an earlier fix wave on this row closed.
 		out["seed"] = seed_from_name(text_or(out.get("name", ""), ""))
 
-	# (row 13 adds "mist" and its own migration step here — a v5 -> v6, now that v4 is taken by
-	# style_defaults and v5 by the resident-look field of the villager-variety fix)
+	# (row 13 adds "mist" and its own migration step here — a v6 -> v7, now that v4 is taken by
+	# style_defaults, v5 by the resident-look field of the villager-variety fix, and v6 by
+	# habitat-tiers' arrival-group-size count field)
 	return out
 
 

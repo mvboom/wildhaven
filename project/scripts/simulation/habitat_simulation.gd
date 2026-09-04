@@ -277,47 +277,70 @@ func population_at(position: Vector2i, species: AnimalDefinition) -> int:
 
 
 ## One evaluation: this candidate position against the whole roster.
+##
+## Reads `CapacityEvaluator.evaluate()` ONCE per species, not `capacity()` then `best_tier()`
+## — that pairing would run `species.effective_tiers()`'s `tag_counts()` grid walk twice per
+## species, doubling the cost of this hot path for no new information (`capacity()` IS
+## `tier_capacity(best_tier)`). See `CapacityEvaluator.evaluate()`'s header.
 func _evaluate(position: Vector2i) -> void:
 	if _grid == null or _roster == null:
 		return
 	evaluations_run += 1
 	for species: AnimalDefinition in _roster.species():
 		var site: HomeSite = _site_for(position, species)
-		var cap: int = CapacityEvaluator.capacity(_grid, _registry, position, species, site)
+		var result: Dictionary = CapacityEvaluator.evaluate(_grid, _registry, position, species, site)
+		var cap: int = int(result["capacity"])
 		capacity_evaluated.emit(position, species.id, cap)
 		var population: int = 0 if site == null else site.population()
 		# THE ARRIVAL PREDICATE, gdd.md verbatim: "an arrival is enqueued only where
 		# capacity(h, S) >= population(h, S) + 1 — one read, not two systems."
 		if cap >= population + 1:
-			_arrivals.enqueue(position, species.id)
+			var tier: HabitatTier = result["tier"] as HabitatTier
+			var group: int = 1 if tier == null else tier.arrival_group_size
+			# Never queue more than the site can actually hold right now; the due-time
+			# re-check may still trim it further (`_land_or_drop()`'s partial landing).
+			_arrivals.enqueue(position, species.id, mini(group, cap - population))
 
 
 func _resolve_due_arrivals(delta: float) -> void:
 	if _arrivals == null:
 		return
 	for entry: Dictionary in _arrivals.advance(delta):
-		_land_or_drop(entry["position"] as Vector2i, entry["species_id"] as String)
+		_land_or_drop(
+			entry["position"] as Vector2i,
+			entry["species_id"] as String,
+			int(entry.get("count", 1))
+		)
 
 
 ## The due-time re-check. The land may have changed since the enqueue, so capacity is read
 ## again — and if it no longer supports one more, the arrival is **silently dropped, never
 ## warned**. Nothing had moved in, so there is nothing to explain.
-func _land_or_drop(position: Vector2i, species_id: String) -> void:
+##
+## PARTIAL LANDING IS DELIBERATE: a group of three into room for two lands two, not zero.
+## All-or-nothing would make herds feel arbitrary, and would interact badly with the tap
+## burst the arrival delay exists to absorb. The re-check happens INSIDE the loop, once per
+## individual, because each `_move_in()` changes the population the next iteration tests
+## against — checking capacity once outside the loop would land the whole group or none of
+## it, which is exactly the all-or-nothing behaviour this rule forbids.
+func _land_or_drop(position: Vector2i, species_id: String, count: int = 1) -> void:
 	var species: AnimalDefinition = _roster.by_id(species_id)
 	if species == null:
 		return
-	var site: HomeSite = _site_for(position, species)
-	var cap: int = CapacityEvaluator.capacity(_grid, _registry, position, species, site)
-	var population: int = 0 if site == null else site.population()
-	if cap < population + 1:
-		return  # silently dropped
-	_move_in(position, species)
+	for i in range(maxi(count, 1)):
+		var site: HomeSite = _site_for(position, species)
+		var cap: int = CapacityEvaluator.capacity(_grid, _registry, position, species, site)
+		var population: int = 0 if site == null else site.population()
+		if cap < population + 1:
+			return  # silently dropped — the rest of the group simply never arrives
+		_move_in(position, species)
 
 
-## Group size is 1 per arrival (spec.md #7 -> D-25: "v1 ships a uniform group size of 1 —
-## the arrival predicate `capacity >= population + 1` already encodes this, so v1 needs no
-## new field"). A neighbourhood with room for several fills gradually: landing re-marks the
-## neighbourhood dirty, which enqueues the next one.
+## Lands exactly one individual. `_land_or_drop()` calls this once per member of a landing
+## group (habitat-tiers, `HabitatTier.arrival_group_size`) — a lone fox arrives alone, a
+## small deer group lands together, each `_move_in()` re-checked against the population it
+## just changed. A neighbourhood with room for more beyond the group also fills gradually:
+## landing re-marks the neighbourhood dirty, which enqueues the next arrival.
 func _move_in(position: Vector2i, species: AnimalDefinition) -> void:
 	var site: HomeSite = _site_for(position, species)
 	if site == null:

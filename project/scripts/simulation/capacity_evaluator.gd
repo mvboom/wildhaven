@@ -231,40 +231,24 @@ static func tier_capacity_from_counts(
 	return max(result, 0)
 
 
-## `capacity(h, S) = max over tiers of tier_capacity(h, S, T)`. Returns 0 for an unsuitable
-## site — that is a real value, not a failure.
-static func capacity(
-	grid: WorldGrid,
-	registry: HomeSiteRegistry,
-	origin: Vector2i,
-	species: AnimalDefinition,
-	self_site: HomeSite = null
-) -> int:
-	if species == null:
-		return 0
-	var best: int = 0
-	for tier: HabitatTier in species.effective_tiers():
-		var counts: Dictionary = tag_counts(grid, registry, origin, species, tier, self_site)
-		var value: int = tier_capacity_from_counts(counts, species, tier)
-		if value > best:
-			best = value
-	return best
-
-
-## The tier that produced `capacity()`'s value, or null when nothing qualifies.
+## `capacity(h, S)` AND the tier that produced it, in ONE pass over `species.effective_tiers()`
+## — one `tag_counts()` grid walk per tier, not two.
 ##
-## Needed by two callers that must know WHICH tier won, not just the number:
-## `HabitatSimulation` reads `arrival_group_size` off it, and `HabitatRecipe` shows the
-## player which tier they are on.
-static func best_tier(
+## `capacity()` and `best_tier()` below are this exact loop, run separately, because each
+## existed before the other. A caller that needs both (`HabitatSimulation._evaluate()`, the
+## whole dirty-queue hot path) must NOT call them back to back — that would walk the grid
+## twice per tier for the one answer this function computes once. Call `evaluate()` instead
+## and read both keys off the result.
+static func evaluate(
 	grid: WorldGrid,
 	registry: HomeSiteRegistry,
 	origin: Vector2i,
 	species: AnimalDefinition,
 	self_site: HomeSite = null
-) -> HabitatTier:
+) -> Dictionary:
+	var result: Dictionary = {"capacity": 0, "tier": null}
 	if species == null:
-		return null
+		return result
 	var best: int = 0
 	var winner: HabitatTier = null
 	for tier: HabitatTier in species.effective_tiers():
@@ -273,7 +257,40 @@ static func best_tier(
 		if value > best:
 			best = value
 			winner = tier
-	return winner
+	result["capacity"] = best
+	result["tier"] = winner
+	return result
+
+
+## `capacity(h, S) = max over tiers of tier_capacity(h, S, T)`. Returns 0 for an unsuitable
+## site — that is a real value, not a failure.
+##
+## A thin adapter onto `evaluate()`, kept as its own entry point because most callers (every
+## readout, `qualifies()`) want only the number and never the tier.
+static func capacity(
+	grid: WorldGrid,
+	registry: HomeSiteRegistry,
+	origin: Vector2i,
+	species: AnimalDefinition,
+	self_site: HomeSite = null
+) -> int:
+	return int(evaluate(grid, registry, origin, species, self_site)["capacity"])
+
+
+## The tier that produced `capacity()`'s value, or null when nothing qualifies.
+##
+## Needed by callers that must know WHICH tier won, not just the number — `HabitatRecipe`
+## shows the player which tier they are on. `HabitatSimulation` does NOT call this: it needs
+## both the tier and the capacity in its hot path, so it calls `evaluate()` directly instead
+## of pairing this with `capacity()` and doubling the grid walk.
+static func best_tier(
+	grid: WorldGrid,
+	registry: HomeSiteRegistry,
+	origin: Vector2i,
+	species: AnimalDefinition,
+	self_site: HomeSite = null
+) -> HabitatTier:
+	return evaluate(grid, registry, origin, species, self_site)["tier"] as HabitatTier
 
 
 ## THE PRE-TIER ENTRY POINT, kept because `test_capacity_formula.gd` pins gdd.md's stated
