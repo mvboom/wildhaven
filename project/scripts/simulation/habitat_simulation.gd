@@ -191,6 +191,26 @@ func _home_site_radius_for(def: PlaceableDefinition) -> int:
 	return best
 
 
+## THE WILD (non-structure) SITE'S COUNTERPART TO `_home_site_radius_for()` — final review
+## finding I2 (2026-09-04). Reuses the exact same `tier.max_radius(species.scout_radius)`
+## call that function maxes across every MATCHING species/tier for a building's site; this
+## one maxes it across a single species' OWN `effective_tiers()` for a settled/claimed site,
+## since here the species is already known and every one of its tiers is a candidate, not
+## just the ones matching one building's tags.
+##
+## WHY THIS MATTERS: `_move_in()` used to register and claim every site at a bare
+## `species.scout_radius`, even though a tier's own need or limit can reach wider
+## (`HabitatTier.max_radius()`) — Deer's herd tier counts `browse` out to 14 while
+## `scout_radius` is 10, and grass painted 11-14 tiles out never marked the site dirty
+## (`HomeSiteRegistry.sites_covering()` -> `HomeSite.covers()`, both keyed on `site.radius`).
+## Reading `_species_widest_radius()` here instead is what makes that edit re-evaluate.
+func _species_widest_radius(species: AnimalDefinition) -> int:
+	var best: int = species.scout_radius
+	for tier: HabitatTier in species.effective_tiers():
+		best = maxi(best, tier.max_radius(species.scout_radius))
+	return best
+
+
 ## Trigger 3 — a resident landed. Its own neighbourhood is dirty (population changed), and
 ## so is every site whose owned tiles the new site took (the exclusivity rule reallocates).
 func on_resident_arrived(site: HomeSite) -> void:
@@ -364,9 +384,9 @@ func _land_or_drop(position: Vector2i, species_id: String, count: int = 1) -> vo
 func _move_in(position: Vector2i, species: AnimalDefinition) -> void:
 	var site: HomeSite = _site_for(position, species)
 	if site == null:
-		site = _registry.register(position, species.id, species.scout_radius)
+		site = _registry.register(position, species.id, _species_widest_radius(species))
 	elif site.is_vacant():
-		_registry.claim(site, species.id, species.scout_radius)
+		_registry.claim(site, species.id, _species_widest_radius(species))
 	# Derived, not persisted -- re-copied here and in `restore_site()` so a retuned `.tres`
 	# takes effect immediately instead of being frozen into an old save.
 	site.resident_tags = species.emits_tags.duplicate()

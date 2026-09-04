@@ -11,6 +11,7 @@ func _init() -> void:
 	_check_limit_defaults()
 	_check_tier_max_radius()
 	_check_validate_catches_bad_data()
+	_check_validate_catches_duplicate_buckets()
 	finish()
 
 
@@ -86,3 +87,60 @@ func _check_validate_catches_bad_data() -> void:
 	n.tiles_per_individual = 6
 	good.needs = [n]
 	check(good.validate().is_empty(), "a well-formed tier validates clean")
+
+
+## Final review finding #3 (2026-09-04): `needs` and `limits` share one bucket list in
+## `CapacityEvaluator.tag_counts()` (keyed by tag + resolved radius), so two children that
+## resolve to the same key double-count every matching tile. `validate()` cannot resolve the
+## sentinel (no species to hand it a fallback), so this checks the guard's actual, narrower
+## contract: two children left at the SAME raw radius (including both at the sentinel, which
+## always resolves equal for whichever species ends up owning this tier) are caught.
+func _check_validate_catches_duplicate_buckets() -> void:
+	# Two NEEDS, same tag, same explicit radius — the plainest double-count shape.
+	var dup_needs := HabitatTier.new()
+	dup_needs.id = "dup_needs"
+	var need_a := HabitatNeed.new()
+	need_a.tag = "open_grass"
+	need_a.radius = 8
+	need_a.tiles_per_individual = 4
+	var need_b := HabitatNeed.new()
+	need_b.tag = "open_grass"
+	need_b.radius = 8
+	need_b.tiles_per_individual = 6
+	dup_needs.needs = [need_a, need_b]
+	check(not dup_needs.validate().is_empty(),
+		"two needs sharing a tag AND an explicit radius is a problem")
+
+	# A NEED and a LIMIT, same tag, BOTH left at the sentinel — collide for every species,
+	# regardless of which one ends up owning this tier, since both resolve against the same
+	# fallback.
+	var dup_sentinel := HabitatTier.new()
+	dup_sentinel.id = "dup_sentinel"
+	var sentinel_need := HabitatNeed.new()
+	sentinel_need.tag = "built"
+	sentinel_need.radius = HabitatNeed.RADIUS_FOLLOWS_SCOUT
+	sentinel_need.tiles_per_individual = 4
+	var sentinel_limit := HabitatLimit.new()
+	sentinel_limit.tag = "built"
+	sentinel_limit.radius = HabitatLimit.RADIUS_FOLLOWS_SCOUT
+	dup_sentinel.needs = [sentinel_need]
+	dup_sentinel.limits = [sentinel_limit]
+	check(not dup_sentinel.validate().is_empty(),
+		"a need and a limit sharing a tag, both left at the sentinel radius, is a problem — "
+		+ "they resolve to the same fallback for every species")
+
+	# The NEGATIVE CONTROL: same tag, DIFFERENT radii, must not false-positive.
+	var different_radii := HabitatTier.new()
+	different_radii.id = "clean"
+	var near := HabitatNeed.new()
+	near.tag = "open_grass"
+	near.radius = 8
+	near.tiles_per_individual = 4
+	var far := HabitatNeed.new()
+	far.tag = "open_grass"
+	far.radius = 14
+	far.tiles_per_individual = 4
+	different_radii.needs = [near, far]
+	check(different_radii.validate().is_empty(),
+		"the same tag at two DIFFERENT radii resolves to two DIFFERENT bucket keys — no "
+		+ "double-count, so this must not be flagged")

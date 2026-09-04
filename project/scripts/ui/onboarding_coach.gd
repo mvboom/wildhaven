@@ -8,7 +8,10 @@ extends RefCounted
 ## `_process(delta)`.
 ##
 ## IT NAMES NO SPECIES AND NO TERRAIN. Beat 2's wording comes from
-## `HabitatRecipe.easiest_species()` + `describe()` + `recipe_for()`, so the human's later
+## `HabitatRecipe.easiest_species_by_tier()` + `describe_tier_needs()` + `recipe_for_tier()`
+## — the TIER-AWARE path (final review finding C1, 2026-09-04; `HabitatRecipe`'s own
+## "THE COACH'S OWN PATH" doc comment explains why this reads tiers and not the flat
+## `easiest_species()` / `describe()` / `recipe_for()` above it) — so the human's later
 ## roster retune changes what the coach says without touching this file.
 ##
 ## FOUR WAYS OUT, and that is the whole non-intrusiveness contract:
@@ -129,11 +132,12 @@ func bind_content(world: WorldRoot) -> void:
 		return
 	if _beat != Beat.BUILD:
 		return
-	var starter: AnimalDefinition = HabitatRecipe.easiest_species(world)
+	var starter: AnimalDefinition = HabitatRecipe.easiest_species_by_tier(world)
 	if starter == null:
 		_finish()
 		return
-	var recipe: Dictionary = HabitatRecipe.recipe_for(starter, world)
+	var tier: HabitatTier = HabitatRecipe.starter_tier(starter)
+	var recipe: Dictionary = HabitatRecipe.recipe_for_tier(tier, world)
 	var entries: Array = recipe["entries"] as Array
 	if entries.is_empty():
 		_finish()
@@ -142,7 +146,7 @@ func bind_content(world: WorldRoot) -> void:
 	_target_id = first["id"] as String
 	_text = BEAT_TWO_TEMPLATE % [
 		starter.display_name,
-		HabitatRecipe.describe(starter, world),
+		HabitatRecipe.describe_tier_needs(tier, world),
 		first["display_name"],
 	]
 

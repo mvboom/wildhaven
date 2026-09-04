@@ -61,4 +61,49 @@ func validate() -> Array[String]:
 		problems.append("tier \"%s\" `max_individuals` %d is below 1." % [id, max_individuals])
 	if arrival_group_size < 1:
 		problems.append("tier \"%s\" `arrival_group_size` %d is below 1." % [id, arrival_group_size])
+	problems.append_array(_duplicate_bucket_problems())
+	return problems
+
+
+## THE DOUBLE-COUNT GUARD — final review finding #3 (2026-09-04). `CapacityEvaluator.
+## tag_counts()` buckets every child into a `count_key(tag, resolved_radius)` slot, and
+## `needs` and `limits` share that ONE bucket list — a limit's exclusion count and a need's
+## scaling count walk the same tile the same way, so nothing stops a `(tag, radius)` pair
+## from naming both a need and a limit, or two needs. Two children that resolve to the SAME
+## bucket key both get credited for every matching tile independently during the walk,
+## silently doubling (or worse) whatever count each of them reads back.
+##
+## Checked on the RAW `radius` field, not `effective_radius()`: `HabitatTier` carries no
+## species to resolve `HabitatNeed.RADIUS_FOLLOWS_SCOUT` / `HabitatLimit.RADIUS_FOLLOWS_SCOUT`
+## against. Two children BOTH left at that sentinel still collide for certain — they resolve
+## against the same species' `scout_radius`/`capacity_radius` regardless of which species
+## this tier ends up on, so the sentinel is one more ordinary radius value for this check's
+## purposes, not a special case. Two children with different EXPLICIT radii that merely
+## happen to equal a particular species' resolved fallback are a real but rarer case this
+## function has no way to see from here — no live instance in the roster today.
+func _duplicate_bucket_problems() -> Array[String]:
+	var problems: Array[String] = []
+	var seen: Dictionary = {}  # "tag@radius" -> true
+	for need: HabitatNeed in needs:
+		if need == null or need.tag.strip_edges().is_empty():
+			continue
+		var key: String = "%s@%d" % [need.tag, need.radius]
+		if seen.has(key):
+			problems.append(
+				("tier \"%s\" has more than one need/limit reading \"%s\" at radius %d — "
+				+ "they collapse into one bucket and double-count every matching tile.")
+				% [id, need.tag, need.radius]
+			)
+		seen[key] = true
+	for limit: HabitatLimit in limits:
+		if limit == null or limit.tag.strip_edges().is_empty():
+			continue
+		var key: String = "%s@%d" % [limit.tag, limit.radius]
+		if seen.has(key):
+			problems.append(
+				("tier \"%s\" has more than one need/limit reading \"%s\" at radius %d — "
+				+ "they collapse into one bucket and double-count every matching tile.")
+				% [id, limit.tag, limit.radius]
+			)
+		seen[key] = true
 	return problems

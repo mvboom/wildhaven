@@ -12,6 +12,7 @@ func _init() -> void:
 	_check_categories()
 	_check_inert_land_ignores_limits()
 	_check_acyclicity()
+	_check_duplicate_emits_tags_is_flagged()
 	finish()
 
 
@@ -80,6 +81,22 @@ func _check_acyclicity() -> void:
 		not HabitatGraph.find_cycle([a, b]).is_empty(),
 		"a mutual dependency is reported as a cycle"
 	)
+
+
+## Final review finding #4 (2026-09-04): `CapacityEvaluator.tag_counts()` reads
+## `resident_tags` (copied from `emits_tags`) with a plain per-entry loop, adding a site's
+## population once PER ENTRY — a duplicate tag is never deduped downstream, so a site would
+## silently double-count itself for that tag against every OTHER species reading it.
+func _check_duplicate_emits_tags_is_flagged() -> void:
+	var clean := _species("deer", ["open_grass"], 5)
+	clean.emits_tags = ["deer"]
+	check(not _mentions(clean.validate(), "emits_tags"),
+		"a single emits_tags entry is not flagged")
+
+	var doubled := _species("deer", ["open_grass"], 5)
+	doubled.emits_tags = ["deer", "deer"]
+	check(_mentions(doubled.validate(), "emits_tags"),
+		"a duplicate emits_tags entry (a site would double-count itself for that tag) is flagged")
 
 
 # --- helpers ------------------------------------------------------------------------

@@ -7,6 +7,20 @@ extends RefCounted
 ## the `[?]` route and the onboarding coach all render from this one file, so a roster or
 ## tag retune is a data edit with no code change anywhere.
 ##
+## TWO GENERATIONS OF THIS FILE'S FUNCTIONS NOW COEXIST, and no live display path calls
+## the flat one any more (final review finding C1, 2026-09-04):
+##   * `recipe_for()` / `describe()` / `easiest_species()`, directly below, read a species'
+##     FLAT fields (`habitat_needs` / `tiles_per_individual`). Retained for
+##     `test_habitat_recipe.gd` / `test_field_guide_reachability.gd`, which pin their
+##     behaviour directly, and because `AnimalDefinition.effective_tiers()`'s documented
+##     migration path still synthesises a tier from those exact flat fields for any future
+##     species shipped with no authored `tiers` — but no screen or coach reads them any more.
+##   * `recipe_for_tier()` / `describe_tier_needs()` / `easiest_species_by_tier()` (this
+##     file's "THE COACH'S OWN PATH" section, further down) and `describe_tiers()` (below
+##     that) read `effective_tiers()` — the TIER data, which is what every shipped species'
+##     `.tres` actually carries today. The Field Guide (`describe_tiers()`) and the
+##     onboarding coach (`easiest_species_by_tier()` + friends) both render from these.
+##
 ## THE ANSWER IS KEYED BY PALETTE BUTTON, NOT BY TAG, AND THAT IS LOAD-BEARING TWICE OVER:
 ##   * Rock emits both `cover` and `rocks`. Stag needs both, plus `forest`. Grouping by tag
 ##     would render three chips, two of them the same button.
@@ -420,6 +434,131 @@ static func easiest_species(world: WorldRoot) -> AnimalDefinition:
 		var effort: float = 0.0
 		for entry: Dictionary in (recipe["entries"] as Array):
 			var count: float = float(entry["count"] as int)
+			effort += count * (1.0 + float(entry["cost"] as int) * WOOD_COST_WEIGHT)
+		# Strictly `<`, so a tie keeps the earlier roster entry — deterministic run to run.
+		if effort < best_effort:
+			best_effort = effort
+			best = candidate
+	return best
+
+
+## ---------------------------------------------------------------------------------------
+## THE COACH'S OWN PATH — final review finding C1 (2026-09-04), NOT a rewrite of
+## `recipe_for()` / `describe()` / `easiest_species()` above.
+##
+## Those three still read `species.habitat_needs` / `species.tiles_per_individual` — the
+## flat fields — and stay that way ON PURPOSE: `effective_tiers()`'s documented migration
+## path is that a species with NO authored `tiers` synthesises one from those exact flat
+## fields (`AnimalDefinition.legacy_tier()`), so the flat fields are still load-bearing for
+## any future species that ships without tiers, and `test_habitat_recipe.gd` /
+## `test_field_guide_reachability.gd` pin `recipe_for()`'s current behaviour directly.
+## Every shipped species today DOES carry authored `tiers`, so rewriting those three
+## functions in place would silently change what they mean for every existing caller and
+## test at once, not just the coach's — out of scope for this fix. This section is new
+## code with no legacy behaviour to preserve, built on `effective_tiers()` from the start.
+##
+## THE BASE TIER, NOT EVERY TIER. `HabitatTier`'s own header documents authoring order as
+## "cheapest/lowest-cap first by convention" (the same convention `describe_tiers()` already
+## relies on for presentation), so `effective_tiers()[0]` is the cheapest way in — the one
+## worth teaching a first-time player, not a wider/pricier tier further requirements unlock.
+
+## The tier the coach should teach — a species' cheapest (first) tier, or `null` if it has
+## none.
+static func starter_tier(species: AnimalDefinition) -> HabitatTier:
+	if species == null:
+		return null
+	var tiers: Array[HabitatTier] = species.effective_tiers()
+	if tiers.is_empty():
+		return null
+	return tiers[0]
+
+
+## `recipe_for()`'s exact shape (satisfiable + deduped, palette-button-keyed entries), over
+## a TIER's `needs` instead of a species' flat fields. Deliberately ignores `HabitatLimit`s,
+## the same scope `recipe_for()` has always had — a "what to place" answer, not a "where not
+## to place it" one; the coach's beat 2 teaches one placement, not an avoidance rule.
+static func recipe_for_tier(tier: HabitatTier, world: WorldRoot) -> Dictionary:
+	var result: Dictionary = {"satisfiable": true, "entries": [] as Array[Dictionary]}
+	if tier == null or world == null or tier.needs.is_empty():
+		result["satisfiable"] = false
+		return result
+
+	var sources: Dictionary = tag_sources(world)
+	var by_button: Dictionary = {}
+
+	for need: HabitatNeed in tier.needs:
+		var candidates: Array = sources.get(need.tag, []) as Array
+		if candidates.is_empty():
+			result["satisfiable"] = false
+			result["entries"] = [] as Array[Dictionary]
+			return result
+		var chosen: Dictionary = _cheapest(candidates)
+		var button_id: String = chosen["id"] as String
+		if by_button.has(button_id):
+			((by_button[button_id] as Dictionary)["tags"] as Array).append(need.tag)
+			continue
+		by_button[button_id] = {
+			"id": button_id,
+			"kind": chosen["kind"],
+			"display_name": chosen["display_name"],
+			"icon_kind": TileIcon.kind_for_id(button_id),
+			"count": need.tiles_per_individual,
+			"cost": chosen["cost"],
+			"tags": [need.tag],
+		}
+
+	var entries: Array[Dictionary] = []
+	for button_id: String in by_button:
+		entries.append(by_button[button_id] as Dictionary)
+	result["entries"] = entries
+	return result
+
+
+## `describe()`'s exact "Likes X and Y." composition, over a TIER's needs instead of a
+## species' flat fields — same dedup-by-button entries, same `SOURCE_PHRASES` lookup, same
+## lead-in, so the coach's wording never drifts from the Field Guide's register.
+static func describe_tier_needs(tier: HabitatTier, world: WorldRoot) -> String:
+	var recipe: Dictionary = recipe_for_tier(tier, world)
+	if not (recipe["satisfiable"] as bool):
+		return DESCRIBE_UNKNOWN
+	var phrases: Array[String] = []
+	for entry: Dictionary in (recipe["entries"] as Array):
+		var id: String = entry["id"] as String
+		var phrase: String = SOURCE_PHRASES.get(id, "") as String
+		if phrase.is_empty():
+			phrase = (entry["display_name"] as String).to_lower()
+		phrases.append(phrase)
+	return DESCRIBE_LEAD + _join_and(phrases) + "."
+
+
+## The cheapest species to invite, ranked over each species' OWN starter tier —
+## `easiest_species()`'s ranking (total tiles weighted by what each source costs), reading
+## real tier requirements instead of the flat fields. THE ONLY PLACE THE COACH ranks
+## species; feeds beat 2 alone, never the Field Guide's list — `easiest_species()`'s own
+## scope note applies here unchanged.
+##
+## A GATE-ONLY need (`HabitatNeed.GATE_ONLY`, e.g. Horse's `stable`) counts as ONE tile for
+## this ranking, not zero: `tiles_per_individual == 0` means "present or not, never
+## scaling", not "free". Scoring it at its literal 0 would let an expensive gate building
+## (a stable, a barn) vanish from the effort total entirely, understating a domesticated
+## species' true cost against a wild one built from free terrain alone — `maxi(..., 1)`
+## charges it the one tile it actually costs to place. PROPOSED — human owns this scoring
+## call, same as `WOOD_COST_WEIGHT` above.
+static func easiest_species_by_tier(world: WorldRoot) -> AnimalDefinition:
+	if world == null or world.roster == null:
+		return null
+	var best: AnimalDefinition = null
+	var best_effort: float = INF
+	for candidate: AnimalDefinition in world.roster.species():
+		var tier: HabitatTier = starter_tier(candidate)
+		if tier == null:
+			continue
+		var recipe: Dictionary = recipe_for_tier(tier, world)
+		if not (recipe["satisfiable"] as bool):
+			continue
+		var effort: float = 0.0
+		for entry: Dictionary in (recipe["entries"] as Array):
+			var count: float = float(maxi(entry["count"] as int, 1))
 			effort += count * (1.0 + float(entry["cost"] as int) * WOOD_COST_WEIGHT)
 		# Strictly `<`, so a tie keeps the earlier roster entry — deterministic run to run.
 		if effort < best_effort:

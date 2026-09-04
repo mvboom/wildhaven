@@ -42,11 +42,18 @@ var structure_tags: Array[String] = []
 ## cannot map `species_id` back to an `AnimalDefinition`.
 var resident_tags: Array[String] = []
 
-## The radius this site allocates tiles over — the species' `scout_radius`, which is the
-## radius that picked the site. Capacity counts over `capacity_radius` instead (-> D-27 #1);
-## v1's default makes the two equal, and a species that diverges would count acreage over a
-## radius wider or narrower than the one it allocates. That is deliberate and expressible;
-## nothing in the floor roster does it.
+## The radius this site allocates tiles over (`covers()`, and therefore
+## `HomeSiteRegistry.sites_covering()` / the exclusivity ownership walk) — the WIDEST radius
+## any matching (species, tier) pair reaches, not a bare `scout_radius` copy (final review
+## finding I2, 2026-09-04). A settled site is registered/claimed at
+## `HabitatSimulation._species_widest_radius()`; a structure site at
+## `_home_site_radius_for()`'s max across every species/tier it could serve. Both max in
+## `HabitatTier.max_radius(species.scout_radius)`, so this degrades to `scout_radius` exactly
+## when nothing in the species' tiers reaches wider — which is every species whose needs all
+## follow the sentinel. `HomeSiteRegistry.claim()` never narrows this once set. Capacity
+## counts over `capacity_radius` instead (-> D-27 #1); v1's default makes the two equal, and a
+## species that diverges would count acreage over a radius wider or narrower than the one it
+## allocates. That is deliberate and expressible; nothing in the floor roster does it.
 var radius: int = 0
 
 ## Monotonic creation order. **This is the tie-break in the exclusivity rule**: where two

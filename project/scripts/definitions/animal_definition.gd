@@ -529,9 +529,22 @@ func validate(known_ids: PackedStringArray = PackedStringArray()) -> Array[Strin
 			if not HABITAT_TAGS.has(limit.tag):
 				problems.append("tier \"%s\" limit tag \"%s\" is not in the shared vocabulary." % [tier.id, limit.tag])
 
+	# THE DOUBLE-COUNT GUARD — final review finding #4 (2026-09-04). `CapacityEvaluator.
+	# tag_counts()` reads a resident site's `resident_tags` (copied verbatim from `emits_tags`
+	# at claim time) with a plain `for emitted: String in resident_site.resident_tags:` loop
+	# that adds `population` once PER ENTRY — a duplicate tag in this array is not deduped
+	# anywhere downstream, so a site would silently contribute its population twice (or more)
+	# toward that one tag's count, inflating every OTHER species' need or limit that reads it.
+	var seen_emitted_tags: Dictionary = {}
 	for tag: String in emits_tags:
 		if not HABITAT_TAGS.has(tag):
 			problems.append("`emits_tags` entry \"%s\" is not in the shared vocabulary." % tag)
+		if seen_emitted_tags.has(tag):
+			problems.append(
+				"`emits_tags` lists \"%s\" more than once — a resident site would double-count "
+				% tag + "itself for that tag."
+			)
+		seen_emitted_tags[tag] = true
 
 	# A species matching no category is a WARNING, not an error: it means design intent is
 	# unclear, not that the data is broken.

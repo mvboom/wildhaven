@@ -210,6 +210,18 @@ func restore_hosted(species_ids: Array[String]) -> void:
 ## A species moves into a vacant structure site. The site keeps its sequence — it has been
 ## a home site since the building was placed, and its age is what makes the exclusivity
 ## tie-break come out right.
+##
+## NEVER NARROWS `site.radius` — final review finding I2 (2026-09-04). A structure site is
+## registered at `_home_site_radius_for()`'s max across every species/tier the building could
+## ever serve (`HabitatSimulation._sync_structure_site()`), which for a building like Open
+## Barn can be wider than the ONE species that actually claims it needs today (Horse's herd
+## tier reaches `water@12`; a lone claiming horse's own widest tier might ask for less). Prior
+## to this fix `claim()` set `site.radius = radius` unconditionally, so the moment ANY horse
+## moved in the site silently SHRANK back down — breaking the spec's own flagship example
+## (§9: "digging more pond visibly buys more horses") from the first arrival onward, since
+## `sites_covering()` (and therefore re-evaluation) is keyed on `site.radius`. `maxi()` keeps
+## whichever is wider: the structure's own registration radius, or what this particular claim
+## asks for.
 func claim(site: HomeSite, species_id: String, radius: int) -> void:
 	if site == null or not site.is_vacant():
 		return
@@ -219,7 +231,7 @@ func claim(site: HomeSite, species_id: String, radius: int) -> void:
 	# `STRUCTURE_SCOPE` either way, so the two collapse to one and this costs nothing.
 	var previous_scope: String = _scope_key(site)
 	site.species_id = AnimalDefinition.normalize_id(species_id)
-	site.radius = radius
+	site.radius = maxi(site.radius, radius)
 	_ever_hosted[site.species_id] = true
 	rebuild_ownership(_scopes_of(previous_scope, _scope_key(site)))
 
