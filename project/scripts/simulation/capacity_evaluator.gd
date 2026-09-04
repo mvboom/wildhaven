@@ -41,20 +41,20 @@ static func count_key(tag: String, radius: int) -> String:
 ## bucket loop is cheaper than re-walking, and the cost shape stays `radius^2 * roster *
 ## tiers` — independent of world size, which is the property that matters.
 ##
-## `tier` defaults to `null`, resolving to `_uncached_legacy_tier(species)` — DEVIATION FROM
-## THE TASK BRIEF'S REFERENCE SNIPPET, which shows `tier` as a required positional. A
-## required `tier` would break `test_capacity_formula.gd`'s own direct 4-arg
-## `tag_counts(grid, registry, origin, species)` calls (its
-## `_check_capacity_radius_is_consumed()` and `_check_sentinel_follows_scout_radius()`),
-## which that 409-line pinned suite is not to be edited. NOTE it is `_uncached_legacy_tier()`
-## and NOT `species.legacy_tier()`: the latter is cached and bakes a concrete radius, which
-## silently stops tracking a live `scout_radius` retune — exactly the failure
-## `_check_sentinel_follows_scout_radius()`'s retune assertion catches. When `tier` resolves
-## via the legacy fallback, each bucket ALSO seeds a bare-tag alias key (no `@radius` suffix)
-## alongside its `count_key()` entry, so that suite's `.get("cover", ...)` reads keep
-## returning exactly what they did before tiers existed. Every other caller in this codebase
-## (this file's own `capacity()`/`best_tier()`, and every external caller updated for this
-## task) always passes a real `HabitatTier` and never touches the alias path.
+## `tier` defaults to `null`, resolving to `species.legacy_tier()` — DEVIATION FROM THE TASK
+## BRIEF'S REFERENCE SNIPPET, which shows `tier` as a required positional. A required `tier`
+## would break `test_capacity_formula.gd`'s own direct 4-arg `tag_counts(grid, registry,
+## origin, species)` calls (its `_check_capacity_radius_is_consumed()` and
+## `_check_sentinel_follows_scout_radius()`), which that 409-line pinned suite is not to be
+## edited. `legacy_tier()`'s cache is safe to read here (human ruling, 2026-09-04): its
+## synthesised needs are left at `HabitatNeed.RADIUS_FOLLOWS_SCOUT` rather than a baked
+## concrete radius, so retuning `scout_radius` between two calls does not go stale — see
+## `legacy_tier()`'s own header. When `tier` resolves via the legacy fallback, each bucket
+## ALSO seeds a bare-tag alias key (no `@radius` suffix) alongside its `count_key()` entry,
+## so that suite's `.get("cover", ...)` reads keep returning exactly what they did before
+## tiers existed. Every other caller in this codebase (this file's own
+## `capacity()`/`best_tier()`, and every external caller updated for this task) always
+## passes a real `HabitatTier` and never touches the alias path.
 ##
 ## `self_site` is the already-registered site being re-evaluated, or null for a PROSPECTIVE
 ## candidate (a tile the player just edited, which no one lives on yet).
@@ -73,16 +73,7 @@ static func tag_counts(
 	var use_tier: HabitatTier = tier
 	var legacy_mode: bool = false
 	if use_tier == null:
-		# NOT `species.legacy_tier()` — that tier is CACHED, and its synthesised needs bake a
-		# CONCRETE radius (`effective_capacity_radius()` at first-call time), not the
-		# `RADIUS_FOLLOWS_SCOUT` sentinel. `test_capacity_formula.gd`'s
-		# `_check_sentinel_follows_scout_radius()` retunes `scout_radius` on a live species
-		# object between two direct `tag_counts()` calls and expects the walk to follow —
-		# which a baked, cached radius cannot do. `_uncached_legacy_tier()` mirrors
-		# `legacy_tier()`'s construction but leaves the sentinel in place and is never cached,
-		# so the fallback radius is re-resolved fresh on every call, exactly like the pre-tier
-		# `tag_counts()` did.
-		use_tier = _uncached_legacy_tier(species)
+		use_tier = species.legacy_tier()
 		legacy_mode = true
 	if use_tier == null:
 		return counts
@@ -132,30 +123,6 @@ static func tag_counts(
 					for key: String in (bucket["keys"] as Array[String]):
 						counts[key] = int(counts[key]) + 1
 	return counts
-
-
-## An UNCACHED mirror of `AnimalDefinition.legacy_tier()`, built fresh on every call and
-## leaving each synthesised need's radius at `HabitatNeed.RADIUS_FOLLOWS_SCOUT` (the
-## sentinel) rather than baking in a concrete radius. Exists only for `tag_counts()`'s
-## legacy fallback (`tier == null`) — see the deviation note there.
-##
-## Returns null under the same condition `legacy_tier()` does: `tiles_per_individual < 1`.
-static func _uncached_legacy_tier(species: AnimalDefinition) -> HabitatTier:
-	if species.tiles_per_individual < 1:
-		return null
-	var tier := HabitatTier.new()
-	tier.id = "legacy"
-	tier.max_individuals = species.max_individuals
-	tier.arrival_group_size = 1
-	var built: Array[HabitatNeed] = []
-	for tag: String in species.habitat_needs:
-		var need := HabitatNeed.new()
-		need.tag = tag
-		need.radius = HabitatNeed.RADIUS_FOLLOWS_SCOUT
-		need.tiles_per_individual = species.tiles_per_individual
-		built.append(need)
-	tier.needs = built
-	return tier
 
 
 ## The exclusivity test, O(1) per tile against the registry's ownership index.
@@ -292,8 +259,10 @@ static func best_tier(
 ## formula against it and takes bare-tag keys. It is now a thin adapter onto the tiered
 ## formula rather than a second copy of it — one formula, two key shapes.
 ##
-## The re-key is exact: `legacy_tier()` sets every synthesised need's radius to
-## `effective_capacity_radius()`, which is the radius used here.
+## The re-key is exact: `legacy_tier()` leaves every synthesised need's radius at
+## `HabitatNeed.RADIUS_FOLLOWS_SCOUT`, which `tier_capacity_from_counts()` resolves against
+## `fallback = species.effective_capacity_radius()` — the same value used to build `r`
+## here, so the rekeyed dictionary's keys line up with what the tier's needs look up.
 static func capacity_from_counts(counts: Dictionary, species: AnimalDefinition) -> int:
 	if species == null:
 		return 0

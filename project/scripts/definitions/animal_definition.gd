@@ -384,12 +384,17 @@ func category() -> String:
 ## pins it. Under the new schema divisor 0 means `GATE_ONLY` — the OPPOSITE meaning — so
 ## synthesising a tier here would silently convert "unsuitable" into "always qualifies".
 ##
-## Note the radius: every synthesised need counts over `effective_capacity_radius()`, not
-## `scout_radius`. `capacity_radius` is what the pre-tier tile walk used, and this
-## synthesis must reproduce the old behaviour exactly.
+## Note the radius: every synthesised need is left at `HabitatNeed.RADIUS_FOLLOWS_SCOUT`
+## (the sentinel), NOT a baked `effective_capacity_radius()`. This is what makes the cache
+## below safe: every consumer of a `HabitatNeed` (`CapacityEvaluator.tag_counts()`,
+## `tier_capacity_from_counts()`, and `capacity_from_counts()`'s rekey) resolves the
+## sentinel by computing its OWN `fallback` fresh as `effective_capacity_radius()` at call
+## time, so a baked concrete radius would go stale the moment `scout_radius` (or
+## `capacity_radius`) is retuned after the cache is first populated — and the sentinel
+## resolves to exactly the value the pre-tier tile walk used, so behaviour is unchanged.
 ##
 ## Cached: the evaluator calls this inside the dirty-queue drain, so it must not allocate
-## per call.
+## per call. The sentinel radius is what makes that caching safe rather than stale.
 func legacy_tier() -> HabitatTier:
 	if tiles_per_individual < 1:
 		return null
@@ -403,7 +408,7 @@ func legacy_tier() -> HabitatTier:
 	for tag: String in habitat_needs:
 		var need := HabitatNeed.new()
 		need.tag = tag
-		need.radius = effective_capacity_radius()
+		need.radius = HabitatNeed.RADIUS_FOLLOWS_SCOUT
 		need.tiles_per_individual = tiles_per_individual
 		built.append(need)
 	tier.needs = built

@@ -25,10 +25,18 @@ func _check_legacy_synthesis() -> void:
 	check_eq(tier.limits.size(), 0, "a legacy species has no limits")
 	check_eq(tier.needs[0].tag, "open_grass", "legacy need keeps its tag")
 	check_eq(tier.needs[0].tiles_per_individual, 4, "legacy divisor applies to every need")
-	# The legacy radius is capacity_radius, NOT scout_radius — pin it explicitly.
+	# The legacy need's `radius` field itself is the sentinel (RADIUS_FOLLOWS_SCOUT), not a
+	# baked value — human ruling 2026-09-04, overriding this task's original brief text, so
+	# that caching `legacy_tier()` can never go stale after a `scout_radius`/`capacity_radius`
+	# retune. It resolves to the species' capacity radius when given that as its fallback,
+	# which is what every real caller (`CapacityEvaluator`) passes.
 	check_eq(
-		tier.needs[0].effective_radius(0), def.effective_capacity_radius(),
-		"legacy need radius is the species' capacity radius"
+		tier.needs[0].radius, HabitatNeed.RADIUS_FOLLOWS_SCOUT,
+		"the legacy need's radius is left at the sentinel, not baked, so the cache cannot go stale"
+	)
+	check_eq(
+		tier.needs[0].effective_radius(def.effective_capacity_radius()), def.effective_capacity_radius(),
+		"...and resolves to the species' capacity radius when given it as the fallback"
 	)
 
 
