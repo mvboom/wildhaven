@@ -71,6 +71,7 @@ func _process(_delta: float) -> bool:
 	_check_built_limit_reads_as_plain_english()
 	_check_grasslands_tags_stay_distinct()
 	_check_grouped_building_tags_name_the_carrying_member()
+	_check_no_article_defects_across_the_roster()
 
 	finish()
 	return true
@@ -469,3 +470,35 @@ func _check_grouped_building_tags_name_the_carrying_member() -> void:
 				"...and still names a barn-family building too (open barn, tied-cheapest "
 				+ "with small barn — see the doc comment above) — two different buildings, "
 				+ "one button, BOTH rendered: '%s'" % line)
+
+
+## FIX ROUND 2, CRITICAL. `SOURCE_PHRASES` used to bake an article into some entries ("a
+## house", "a farm field") because they were written for `describe()`'s "Likes X" sentence,
+## which never minded either way. `describe_tiers()`'s two templates DID mind, and
+## disagreed with each other: the scaling clause never adds its own article, so a baked-in
+## one produced NOTHING ("more a farm field means room for more" — Human's cultivated
+## scaling need, also Bull/Pig/Rabbit); the gate clause always adds one, so a baked-in one
+## produced TWO ("needs an a house" — Human/Pug/Shiba Inu's `house`/`large_house` gate).
+##
+## Scans EVERY roster species' rendered tier lines for both symptom patterns, rather than
+## pinning six hardcoded strings — a single check that would also catch this defect
+## reappearing for a SEVENTH species (or the fifteen-and-growing roster's sixteenth) that
+## six literals never would. `" a a "`/`" a an "`/`" an a "`/`" an an "` catch article
+## doubling anywhere in the line, not just at "needs "; `"more a "`/`"more an "` catch the
+## scaling clause's missing-article symptom specifically.
+func _check_no_article_defects_across_the_roster() -> void:
+	if not check(_world.roster != null and not _world.roster.species().is_empty(),
+		"the roster loaded and is non-empty"):
+		return
+	var doubling_patterns: Array[String] = ["a a ", "a an ", "an a ", "an an "]
+	var scaling_patterns: Array[String] = ["more a ", "more an "]
+	for species: AnimalDefinition in _world.roster.species():
+		for line: String in HabitatRecipe.describe_tiers(species, _world):
+			for pattern: String in doubling_patterns:
+				check(not line.contains(pattern),
+					"%s's tier line has no article doubling ('%s'): '%s'"
+					% [species.id, pattern, line])
+			for pattern: String in scaling_patterns:
+				check(not line.contains(pattern),
+					"%s's tier line has no missing-article scaling clause ('%s'): '%s'"
+					% [species.id, pattern, line])

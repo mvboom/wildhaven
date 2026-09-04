@@ -29,13 +29,27 @@ extends RefCounted
 ## [COPY] — content-writer's, one phrase per PALETTE BUTTON (not per tag; see the header).
 ## Keying by button is what keeps this sentence and the chips under it from ever disagreeing,
 ## and means waking a currently-inert building costs exactly one new entry here.
+##
+## BARE NOUNS ONLY — NO BAKED-IN ARTICLE ("house", never "a house"). Fix round 2 ruling: this
+## dictionary used to hold whatever read naturally as the object of `describe()`'s "Likes "
+## sentence, which doesn't care whether its object carries an article or not — so some
+## entries got one baked in ("a house", "a farm field") and others didn't ("open grass",
+## "woods"). `describe_tiers()`'s two templates DO care, and disagreed with each other: the
+## scaling clause ("more X means room for more") never added an article, so a baked-in one
+## produced nothing ("more a farm field..."); the gate clause (`_with_article()`) always adds
+## one, so a baked-in one produced two ("needs an a house"). Two different bugs, same root
+## cause: THE GRAMMAR IS THIS FILE'S JOB, NOT THE CONTENT WRITER'S — a phrase here is a noun,
+## full stop, and each template decides for itself whether ITS sentence needs an article in
+## front of it. `_need_phrase()` also normalizes any leading article off of whatever it
+## returns (`_bare_noun()`), belt-and-suspenders against a future rewording that puts one
+## back in here by habit; the entries below are meant to need no normalizing at all.
 const SOURCE_PHRASES: Dictionary = {
 	"grass": "open grass",
 	"forest": "woods",
 	"rock": "rocky cover",
-	"cultivated_field": "a farm field",
+	"cultivated_field": "farm field",
 	"water": "water nearby",
-	"house": "a house",
+	"house": "house",
 }
 
 ## PROPOSED — human owns this. How much a wood cost outweighs raw tile count when ranking
@@ -310,16 +324,32 @@ static func _need_phrase(tag: String, world: WorldRoot, seen: Dictionary) -> Str
 			var phrase: String = SOURCE_PHRASES.get(chosen["id"] as String, "") as String
 			if phrase.is_empty():
 				phrase = (chosen["display_name"] as String).to_lower()
-			return phrase
+			return _bare_noun(phrase)
 	if seen.has(tag):
 		return ""
 	seen[tag] = true
-	return tag.replace("_", " ")
+	return _bare_noun(tag.replace("_", " "))
+
+
+## Strips a leading "a ", "an " or "the " (case-insensitively) off `phrase`, if present.
+## Fix round 2's structural fix: `SOURCE_PHRASES` is documented as bare nouns, but this is
+## the defensive half of that contract, applied at the one point every phrase passes
+## through on its way into `describe_tiers()`'s two templates — so a future rewording that
+## puts an article back in (out of habit, since `describe()`'s "Likes X" sentence never
+## minded one) still cannot reproduce the "needs an a house" / "more a farm field" defects.
+## A no-op on every phrase this file produces today, which is already bare.
+static func _bare_noun(phrase: String) -> String:
+	var lower: String = phrase.to_lower()
+	for article: String in ["a ", "an ", "the "]:
+		if lower.begins_with(article):
+			return phrase.substr(article.length())
+	return phrase
 
 
 ## "a stable", "an open barn" — the indefinite article a gate-only need reads with. A plain
 ## first-letter-is-a-vowel heuristic, adequate for the tag vocabulary this reads over; not a
-## general-purpose English rule.
+## general-purpose English rule. Safe to apply unconditionally: every phrase it receives has
+## already passed through `_need_phrase()`'s `_bare_noun()` normalization.
 static func _with_article(phrase: String) -> String:
 	if phrase.is_empty():
 		return phrase
