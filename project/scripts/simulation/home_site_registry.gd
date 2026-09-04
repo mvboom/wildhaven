@@ -367,6 +367,19 @@ func sites_covering(tile: Vector2i) -> Array[HomeSite]:
 	return out
 
 
+## Every site whose position is exactly `position`, of any species.
+##
+## Distinct from `sites_covering()`, which returns sites whose RADIUS reaches a tile.
+## Residents live at their site's own position, so resident-tag counting needs this
+## tile-exact form.
+func sites_at(position: Vector2i) -> Array[HomeSite]:
+	var found: Array[HomeSite] = []
+	for site: HomeSite in _sites:
+		if site.position == position:
+			found.append(site)
+	return found
+
+
 func total_residents() -> int:
 	var total: int = 0
 	for site: HomeSite in _sites:

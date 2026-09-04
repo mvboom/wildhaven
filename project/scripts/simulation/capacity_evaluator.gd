@@ -116,12 +116,33 @@ static func tag_counts(
 			if not _tile_counts_for(registry, tile, origin, d_squared, self_site, species):
 				continue
 			var tile_tags: Array = grid.get_tile_tags(tile.x, tile.y)
+			# Resident-emitted tags, counted PER INDIVIDUAL. A house holding four villagers
+			# contributes people=4. Counting this per-tile instead would silently turn
+			# "one pug per five people" into "one pug per five houses".
+			var resident_counts: Dictionary = {}
+			if registry != null:
+				for resident_site: HomeSite in registry.sites_at(tile):
+					if resident_site == self_site:
+						continue
+					var population: int = resident_site.population()
+					if population < 1:
+						continue
+					for emitted: String in resident_site.resident_tags:
+						resident_counts[emitted] = int(resident_counts.get(emitted, 0)) + population
 			for bucket: Dictionary in buckets:
 				if d_squared > int(bucket["r_squared"]):
 					continue
-				if tile_tags.has(bucket["tag"]):
+				var bucket_tag: String = bucket["tag"]
+				var added: int = 0
+				if tile_tags.has(bucket_tag):
+					added += 1
+				added += int(resident_counts.get(bucket_tag, 0))
+				if added > 0:
+					# Reaches EVERY key shape this bucket emits -- both the radius-keyed entry
+					# and, in legacy mode, the bare-tag alias -- so a resident contribution is
+					# never invisible to a legacy-mode caller.
 					for key: String in (bucket["keys"] as Array[String]):
-						counts[key] = int(counts[key]) + 1
+						counts[key] = int(counts[key]) + added
 	return counts
 
 

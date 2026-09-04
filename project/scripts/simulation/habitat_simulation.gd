@@ -324,6 +324,9 @@ func _move_in(position: Vector2i, species: AnimalDefinition) -> void:
 		site = _registry.register(position, species.id, species.scout_radius)
 	elif site.is_vacant():
 		_registry.claim(site, species.id, species.scout_radius)
+	# Derived, not persisted -- re-copied here and in `restore_site()` so a retuned `.tres`
+	# takes effect immediately instead of being frozen into an old save.
+	site.resident_tags = species.emits_tags.duplicate()
 	var world_position: Vector3 = _grid.tile_to_world(position.x, position.y)
 
 	# WHICH LOOK THIS VILLAGER WEARS. Dealt from the per-species shuffle bag, so every look in
@@ -412,6 +415,9 @@ func restore_site(
 		push_warning("Save names unknown species `%s`; its home is dropped." % species_id)
 		_registry.unregister(site)
 		return null
+	# Derived, not persisted -- a save loaded without this re-derivation would silently
+	# drop every `people`/`deer` contribution until the next move-in.
+	site.resident_tags = species.emits_tags.duplicate()
 
 	for i in resident_positions.size():
 		var entry: Variant = resident_positions[i]

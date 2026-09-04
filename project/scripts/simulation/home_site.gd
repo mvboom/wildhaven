@@ -32,6 +32,16 @@ var species_id: String = ""
 ## simply by qualifying on the grass around it.
 var structure_tags: Array[String] = []
 
+## Tags this site's RESIDENTS contribute to its tile, copied from the species'
+## `emits_tags` when the site is claimed.
+##
+## DERIVED, NEVER PERSISTED. It is re-copied from the species on load, so a retuned
+## `.tres` takes effect immediately rather than being frozen into old saves.
+##
+## Cached here rather than looked up because `CapacityEvaluator` holds no roster and so
+## cannot map `species_id` back to an `AnimalDefinition`.
+var resident_tags: Array[String] = []
+
 ## The radius this site allocates tiles over — the species' `scout_radius`, which is the
 ## radius that picked the site. Capacity counts over `capacity_radius` instead (-> D-27 #1);
 ## v1's default makes the two equal, and a species that diverges would count acreage over a
