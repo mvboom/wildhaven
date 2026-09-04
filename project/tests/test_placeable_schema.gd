@@ -23,7 +23,11 @@ const MODEL_PATH: String = "res://assets/buildings/house/House.tscn"
 const EXPECTED_COST: int = 15
 const EXPECTED_FOOTPRINT: Vector2i = Vector2i(1, 1)
 const EXPECTED_ALLOWED_TERRAIN: PackedStringArray = ["grass"]
-const EXPECTED_EMITTED_TAGS: PackedStringArray = ["house"]
+## RE-POINTED 2026-09-04 (habitat-tiers Task 7): was ["house"]. `built` now added
+## alongside the already-decided `house` — `built` is emitted by EVERY placeable so one
+## `HabitatLimit` on `built` excludes all of them, including buildings added later. See
+## docs/superpowers/specs/2026-09-04-habitat-tiers-design.md § 8.
+const EXPECTED_EMITTED_TAGS: PackedStringArray = ["built", "house"]
 
 ## Content Pipeline step 5, CLOSED 2026-08-06 (house.tres's own header). Pinned as an exact
 ## string, the same pattern `test_human_schema.gd` uses for human.tres's fact card: this is
@@ -74,7 +78,7 @@ func _init() -> void:
 	check_eq(PackedStringArray(house.allowed_terrain), EXPECTED_ALLOWED_TERRAIN,
 		"allowed_terrain == [\"grass\"] (\"houses build on grass only\")")
 	check_eq(PackedStringArray(house.emitted_tags), EXPECTED_EMITTED_TAGS,
-		"emitted_tags == [\"house\"] — the House is the `house` tag's only source")
+		"emitted_tags == [\"built\", \"house\"] — House is the `house` tag's only source, plus the universal `built` exclusion handle")
 
 	# --- types ----------------------------------------------------------------
 	check_eq(typeof(house.cost), TYPE_INT, "cost is int")

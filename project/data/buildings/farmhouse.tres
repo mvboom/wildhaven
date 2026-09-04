@@ -1,0 +1,59 @@
+; Farmhouse — NEW PlaceableDefinition (habitat-tiers ruling, 2026-09-04).
+;
+; WHY IT EXISTS: the human ruled that a villager FAMILY needs "a larger house plus
+; cultivated land at >= 2 tiles per person" (spec OQ-D). "Larger house" has to be a TAG,
+; and house.tres is a single placeable, so buildings.md's "House at 2x2" form becomes a
+; distinct placeable here. `large_house` is what Villager's family tier gates on.
+;
+; A FARMHOUSE IS A HOUSE: it emits `house` as well as `large_house`, so it still shelters
+; dogs and single villagers. Same subsumption as Barn -> `barn` + `large_barn`, and
+; OpenBarn -> `barn` + `stable`.
+;
+; PROPOSALS AWAITING HUMAN SIGN-OFF — cost and footprint follow buildings.md's stated 2x2
+; baseline ("~30 Wood"); neither is a decided value. Both are copied straight from
+; barn.tres's own 2x2/30-Wood proposal (this task's brief), not independently re-derived.
+;
+; MODEL CHOSEN: assets/buildings/house_secondage_1_level3/HouseSecondage1Level3.tscn — the
+; already-imported Quaternius "Ultimate Fantasy RTS" SecondAge house look-variant wired
+; into house.tres's own model_scenes pool (index 12, "SecondAge 1 Level 3"). Reused here,
+; NOT re-imported — no new art was sourced for this task.
+;
+; WHY THIS VARIANT: picked by measured size against the default 1x1 House
+; (Houses_FirstAge_1_Level1). Per this variant's own wrapper header
+; (house_secondage_1_level3/HouseSecondage1Level3.tscn), its RAW (pre-fit) footprint is
+; 0.889953 x 1.172419 tile-units at height 1.226234 — larger on every axis than the
+; default House's raw 0.869309 x 0.761394 footprint at height 0.7645. Even after that
+; wrapper's own uniform footprint-fit scale (0.741466, applied so its long axis matches
+; the House pool's shared 0.869309 tile-margin convention — see house.tres's own header),
+; its resulting height (0.9092) is the second tallest of all 18 wired House look-variants,
+; behind only the two purpose-built towers (0.9236 FirstAge tower, 0.9540 SecondAge
+; tower) and ahead of every ordinary house shape including the shipped 1x1 default
+; (0.7645). It reads as visibly bigger than the House it is standing in for. FLAG FOR
+; HUMAN SIGN-OFF alongside every other model-facing/scale judgment call already flagged
+; on house.tres and its variants — none of these has had a human eye pass yet.
+;
+; emitted_tags SET 2026-09-04 by the habitat-tiers ruling, at creation (not retrofitted —
+; this placeable did not exist before). `built` is emitted by EVERY placeable so one
+; `HabitatLimit` on `built` excludes all of them, including buildings added later, without
+; touching a single species file. See
+; docs/superpowers/specs/2026-09-04-habitat-tiers-design.md § 8.
+;
+; fact_text is Content Pipeline step 5 (content-writer's job, not tech-art's) — left as
+; PLACEHOLDER, the correct interim state PlaceableDefinition.pending_signoff() already
+; expects and handles, matching barn.tres's convention exactly.
+[gd_resource type="Resource" script_class="PlaceableDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/placeable_definition.gd" id="1_schema"]
+[ext_resource type="PackedScene" path="res://assets/buildings/house_secondage_1_level3/HouseSecondage1Level3.tscn" id="2_model"]
+
+[resource]
+script = ExtResource("1_schema")
+id = "farmhouse"
+display_name = "Farmhouse"
+hotbar_category = "farm_building"
+cost = 30
+footprint = Vector2i(2, 2)
+allowed_terrain = Array[String](["grass"])
+emitted_tags = Array[String](["built", "house", "large_house"])
+model_scenes = Array[PackedScene]([ExtResource("2_model")])
+fact_text = "PLACEHOLDER — flavor copy for the Farmhouse pending Content Pipeline step 5."

@@ -306,8 +306,11 @@ func _check_villager_causality() -> void:
 	check(_world.place_building(HOUSE_TILE.x, HOUSE_TILE.y, "house"),
 		"the House places on grass")
 	check_eq(_world.get_wood(), wood_before - 15, "...and costs 15 Wood")
-	check_eq(_world.get_tile_tags(HOUSE_TILE.x, HOUSE_TILE.y), ["house"] as Array[String],
-		"the footprint suppresses the ground's tags and emits `house` instead")
+	# RE-POINTED 2026-09-04 (habitat-tiers Task 7): was ["house"]. `built` now added
+	# alongside `house` — the universal exclusion handle every placeable emits. See
+	# docs/superpowers/specs/2026-09-04-habitat-tiers-design.md § 8.
+	check_eq(_world.get_tile_tags(HOUSE_TILE.x, HOUSE_TILE.y), ["built", "house"] as Array[String],
+		"the footprint suppresses the ground's tags and emits `built` + `house` instead")
 
 	# THE HOUSE ALONE IS NOT ENOUGH. This is the assertion that makes the villager's arrival a
 	# habitat result rather than a building side effect.

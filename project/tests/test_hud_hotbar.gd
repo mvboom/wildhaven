@@ -220,7 +220,7 @@ func _check_every_catalog_entry_has_a_button() -> void:
 		"the House button specifically exists — Build is reachable with no other door needed")
 	check(_hud.palette_button_for("farm_building") != null,
 		"...and the Farm Building GROUP button exists, keyed by category rather than by any one "
-		+ "of its 8 members' real ids")
+		+ "of its 9 members' real ids")
 
 
 func _check_farm_rename() -> void:
@@ -451,14 +451,20 @@ func _farm_building_ids() -> Array[String]:
 	return ids
 
 
-## The 8 raw farm-building `PlaceableDefinition`s render through exactly ONE button, keyed by
-## the shared `hotbar_category` rather than by any one member's own id — none of the 8 gets a
+## RE-POINTED 2026-09-04 (habitat-tiers Task 7): was 8. Farmhouse joins the group as a
+## real, independent `farm_building`-category buildable (habitat-tiers ruling, `large_house`
+## tag) — PLAYER-VISIBLE EFFECT: it now appears as a 9th option behind the single grouped
+## "Farm Building" hotbar button, same as every other farm building. The button count itself
+## (2, checked below) is unaffected — grouping is by category, not by member count.
+##
+## The 9 raw farm-building `PlaceableDefinition`s render through exactly ONE button, keyed by
+## the shared `hotbar_category` rather than by any one member's own id — none of the 9 gets a
 ## button of its own.
 func _check_farm_buildings_group_into_one_button() -> void:
 	_hud.set_mode(GameHud.Mode.BUILD)
 	var farm_building_ids: Array[String] = _farm_building_ids()
-	if not check(farm_building_ids.size() == 8,
-		"the farm-building catalog still has 8 members (got %d)" % farm_building_ids.size()):
+	if not check(farm_building_ids.size() == 9,
+		"the farm-building catalog now has 9 members (got %d) — Farmhouse added by the habitat-tiers ruling" % farm_building_ids.size()):
 		return
 
 	for id: String in farm_building_ids:

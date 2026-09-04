@@ -263,17 +263,25 @@ func _check_inspect_names_the_building_on_the_tile() -> void:
 	check_eq(_hud.tile_readout_text(), "House",
 		"...and the readout is the building's name, and only that")
 
-	# A farm building is the case the old two-line readout rendered as a bare em dash: it emits
-	# no tags at all, so nothing but the name can identify it. Addressed by its
-	# REAL id, not the "farm_building" group key — `select_palette_option()` takes catalog ids
-	# only (a group key returns false and would silently leave the House selected).
+	# A farm building was the case the old two-line readout rendered as a bare em dash, back
+	# when every farm building emitted no tags at all. RE-POINTED 2026-09-04 (habitat-tiers
+	# Task 7): the Well now emits ["built", "water"] (the universal `built` exclusion handle
+	# plus the tag it shares with natural water), so it no longer emits zero tags — but the
+	# INVARIANT this test protects is unchanged and, if anything, now proven more strongly:
+	# the readout names the building from its display_name regardless of whether emitted_tags
+	# is empty or not. Addressed by its REAL id, not the "farm_building" group key —
+	# `select_palette_option()` takes catalog ids only (a group key returns false and would
+	# silently leave the House selected).
 	var barn_tile := Vector2i(20, 6)
 	_hud.set_mode(GameHud.Mode.BUILD)
 	check(_hud.select_palette_option("well"), "the Well is selectable by its catalog id")
 	check_eq(_tap(barn_tile), TapRouter.RESULT_PLACED, "a farm building is standing on a second tile")
 	var placed: PlaceableDefinition = _world.grid.get_building(barn_tile.x, barn_tile.y)
 	check(placed != null and not placed.display_name.is_empty(), "...and it has a display name")
-	check(placed.emitted_tags.is_empty(), "...and emits no tags, so only its name can identify it")
+	check_eq(PackedStringArray(placed.emitted_tags), PackedStringArray(["built", "water"]),
+		"...and now emits [\"built\", \"water\"] (habitat-tiers), yet the readout still resolves "
+		+ "to the display_name, not a tag list — the em-dash bug is about the readout logic, "
+		+ "not about which buildings happen to have zero tags")
 
 	_hud.set_mode(GameHud.Mode.INSPECT)
 	check_eq(_tap(barn_tile), TapRouter.RESULT_INSPECT, "an Inspect tap on it resolves to Inspect")

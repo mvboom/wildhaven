@@ -25,6 +25,11 @@ const KNOWN_TERRAIN_IDS: PackedStringArray = [
 ## FIRST-PASS PROPOSAL, sourced only from House's own stated baselines (buildings.md:
 ## ~15 Wood at 1x1, ~30 Wood at 2x2); flagged for human sign-off in the build report,
 ## Barn's 2x2 footprint especially (the one outlier in an otherwise uniform table).
+## emitted_tags RE-POINTED 2026-09-04 (habitat-tiers Task 7): every entry was `[]` --
+## placeable decoration with no simulation meaning. `built` is now emitted by EVERY
+## placeable (the universal `HabitatLimit` exclusion handle); Barn/OpenBarn additionally
+## carry their deliberate subsumption tags (`large_barn`, `stable`). See
+## docs/superpowers/specs/2026-09-04-habitat-tiers-design.md § 8.
 const EXPECTED: Array[Dictionary] = [
 	{
 		"tres": "res://data/buildings/barn.tres",
@@ -33,6 +38,7 @@ const EXPECTED: Array[Dictionary] = [
 		"display_name": "Barn",
 		"cost": 30,
 		"footprint": Vector2i(2, 2),
+		"emitted_tags": ["built", "barn", "large_barn"],
 	},
 	{
 		"tres": "res://data/buildings/small_barn.tres",
@@ -41,6 +47,7 @@ const EXPECTED: Array[Dictionary] = [
 		"display_name": "Small Barn",
 		"cost": 15,
 		"footprint": Vector2i(1, 1),
+		"emitted_tags": ["built", "barn"],
 	},
 	{
 		"tres": "res://data/buildings/open_barn.tres",
@@ -49,6 +56,7 @@ const EXPECTED: Array[Dictionary] = [
 		"display_name": "Open Barn",
 		"cost": 15,
 		"footprint": Vector2i(1, 1),
+		"emitted_tags": ["built", "barn", "stable"],
 	},
 	{
 		"tres": "res://data/buildings/chicken_coop.tres",
@@ -57,6 +65,7 @@ const EXPECTED: Array[Dictionary] = [
 		"display_name": "Chicken Coop",
 		"cost": 15,
 		"footprint": Vector2i(1, 1),
+		"emitted_tags": ["built", "coop"],
 	},
 	{
 		"tres": "res://data/buildings/silo.tres",
@@ -65,6 +74,7 @@ const EXPECTED: Array[Dictionary] = [
 		"display_name": "Silo",
 		"cost": 15,
 		"footprint": Vector2i(1, 1),
+		"emitted_tags": ["built", "silo"],
 	},
 	{
 		"tres": "res://data/buildings/windmill.tres",
@@ -73,6 +83,7 @@ const EXPECTED: Array[Dictionary] = [
 		"display_name": "Windmill",
 		"cost": 15,
 		"footprint": Vector2i(1, 1),
+		"emitted_tags": ["built", "mill"],
 	},
 	{
 		"tres": "res://data/buildings/water_tower.tres",
@@ -81,6 +92,7 @@ const EXPECTED: Array[Dictionary] = [
 		"display_name": "Water Tower",
 		"cost": 15,
 		"footprint": Vector2i(1, 1),
+		"emitted_tags": ["built", "water"],
 	},
 	{
 		"tres": "res://data/buildings/well.tres",
@@ -89,11 +101,11 @@ const EXPECTED: Array[Dictionary] = [
 		"display_name": "Well",
 		"cost": 15,
 		"footprint": Vector2i(1, 1),
+		"emitted_tags": ["built", "water"],
 	},
 ]
 
 const EXPECTED_ALLOWED_TERRAIN: PackedStringArray = ["grass"]
-const EXPECTED_EMITTED_TAGS: PackedStringArray = []
 
 var _world: WorldRoot = null
 var _frames: int = 0
@@ -107,8 +119,10 @@ func _initialize() -> void:
 	for entry: Dictionary in EXPECTED:
 		_check_one(entry)
 
-	# --- WorldRoot.placeable_options() surfaces all 9 buildables ---------------
-	# Needs a live, ticking SceneTree the same way test_mode_tap_model.gd/
+	# --- WorldRoot.placeable_options() surfaces all 10 buildables ---------------
+	# RE-POINTED 2026-09-04 (habitat-tiers Task 7): was 9 (House + 8 farm buildings).
+	# Farmhouse joins as a 10th, real, independent buildable (habitat-tiers ruling,
+	# large_house tag). Needs a live, ticking SceneTree the same way test_mode_tap_model.gd/
 	# test_hud_hotbar.gd instantiate Main.tscn -- WorldRoot's building registry is built
 	# in _ready(), which needs the node actually entering the tree.
 	var packed: PackedScene = load(WORLD_PATH) as PackedScene
@@ -132,7 +146,7 @@ func _process(_delta: float) -> bool:
 		return false
 
 	var options: Array[PlaceableDefinition] = _world.placeable_options()
-	check_eq(options.size(), 9, "WorldRoot.placeable_options() reports 9 buildables (House + 8 new farm buildings)")
+	check_eq(options.size(), 10, "WorldRoot.placeable_options() reports 10 buildables (House + 8 farm buildings + Farmhouse)")
 
 	var ids: Array[String] = []
 	for def: PlaceableDefinition in options:
@@ -166,8 +180,9 @@ func _check_one(entry: Dictionary) -> void:
 	check_eq(def.footprint, entry["footprint"], "%s footprint (proposal, not decided)" % entry["id"])
 	check_eq(PackedStringArray(def.allowed_terrain), EXPECTED_ALLOWED_TERRAIN,
 		"%s allowed_terrain == [\"grass\"]" % entry["id"])
-	check_eq(PackedStringArray(def.emitted_tags), EXPECTED_EMITTED_TAGS,
-		"%s emitted_tags == [] (no shared-vocabulary tag needs a farm-building source)" % entry["id"])
+	check_eq(PackedStringArray(def.emitted_tags), PackedStringArray(entry["emitted_tags"]),
+		"%s emitted_tags matches the habitat-tiers tag table (built + %s)" % [
+			entry["id"], PackedStringArray(entry["emitted_tags"]).slice(1)])
 	check_eq(def.hotbar_category, "farm_building",
 		"%s hotbar_category groups this buildable under the Farm Building hotbar slot" % entry["id"])
 
