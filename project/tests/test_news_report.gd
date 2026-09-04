@@ -107,7 +107,13 @@ func _check_schema_field_exists() -> void:
 
 	fresh.id = "critter"
 	fresh.display_name = "Critter"
-	fresh.habitat_needs = ["cover"] as Array[String]
+	# RE-POINTED 2026-09-04 (habitat-tiers ruling): `category()` is now part of `validate()`
+	# (Task 3), and a legacy-field-only fixture with no building gate and no `HabitatLimit`
+	# matches none of person/wild/domesticated. `"people"` added to `habitat_needs` is the
+	# minimal fix — it makes this fixture Person, the same category a real needs-`people`
+	# species like Pig resolves to — without touching what this check is actually about
+	# (that `news_reports` stays optional).
+	fresh.habitat_needs = ["cover", "people"] as Array[String]
 	fresh.model_scenes = [load("res://assets/placeholder/grass/Grass.tscn") as PackedScene]
 	fresh.fact_text_pool = ["A critter fact."]
 	check(fresh.validate().is_empty(),

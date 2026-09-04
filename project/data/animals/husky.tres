@@ -28,10 +28,46 @@
 ;
 ; news_reports intentionally empty — News Report pools for this pool are a separate, later
 ; purchase (not part of Content Pipeline step 4/5 for this dispatch).
-[gd_resource type="Resource" script_class="AnimalDefinition" load_steps=3 format=3]
+;
+; TIERS — RE-SPEC 2026-09-04 (habitat tiers).
+;
+; PROPOSAL, NOT A DECISION. Every divisor below is this design's own first-pass proposal
+; awaiting human sign-off, per the project rule that all tuning values are the human's.
+; Source: docs/superpowers/specs/2026-09-04-habitat-tiers-design.md § 9.
+;
+; PERSON CATEGORY, needing an actual person rather than an empty house: single tier
+; "companion": `snow/6` `people/2` — a husky's cold-climate ecology, now genuinely
+; distinguishing it from Pug and Shiba Inu, which both gate on a house instead.
+;
+; The legacy flat fields (habitat_needs / tiles_per_individual / max_individuals) are LEFT
+; IN PLACE and are now inert: `effective_tiers()` prefers `tiers` when non-empty. They are
+; retained so a rollback is a one-line edit rather than a re-authoring.
+[gd_resource type="Resource" script_class="AnimalDefinition" load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scripts/definitions/animal_definition.gd" id="1_schema"]
 [ext_resource type="PackedScene" path="res://assets/animals/husky/Husky.tscn" id="2_model"]
+[ext_resource type="Script" path="res://scripts/definitions/habitat_need.gd" id="3_need"]
+[ext_resource type="Script" path="res://scripts/definitions/habitat_tier.gd" id="4_tier"]
+
+[sub_resource type="Resource" id="need_companion_snow"]
+script = ExtResource("3_need")
+tag = "snow"
+radius = 0
+tiles_per_individual = 6
+
+[sub_resource type="Resource" id="need_companion_people"]
+script = ExtResource("3_need")
+tag = "people"
+radius = 0
+tiles_per_individual = 2
+
+[sub_resource type="Resource" id="tier_companion"]
+script = ExtResource("4_tier")
+id = "companion"
+needs = Array[Resource]([SubResource("need_companion_snow"), SubResource("need_companion_people")])
+limits = Array[Resource]([])
+max_individuals = 6
+arrival_group_size = 1
 
 [resource]
 script = ExtResource("1_schema")
@@ -45,6 +81,8 @@ scout_radius = 8
 capacity_radius = 0
 tiles_per_individual = 2
 max_individuals = 6
+tiers = Array[Resource]([SubResource("tier_companion")])
+emits_tags = Array[String]([])
 model_scenes = Array[PackedScene]([ExtResource("2_model")])
 fact_text_pool = Array[String](["Huskies were bred to be strong pullers — people used them to help pull heavy loads and sleds."])
 news_reports = Array[String]([])

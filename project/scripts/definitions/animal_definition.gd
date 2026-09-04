@@ -64,12 +64,18 @@ const CATEGORY_DOMESTICATED: String = "domesticated"
 ## MUST BECOME DERIVED. Once terrain definitions carry an emitted-tags mapping, compute
 ## this from that mapping instead of listing it here. A hardcoded copy silently rots the
 ## first time emission changes — which is the exact failure this invariant exists to
-## prevent.
+## prevent. `TerrainDefinition.derive_bare_tags()` is that derivation (over real data it
+## returns EMPTY — wild_grass.tres emits nothing); this hardcoded set stays a strict
+## SUPERSET of it, so the species-side check below is over-enforced, never under-enforced —
+## the safe direction to err for a load-bearing pillar. Reconciling the two (making this
+## field read the derivation) is Tier 1 row 6's work, not this task's (test_bare_tags_
+## derivation.gd tracks it).
 ##
-## `quiet` is included deliberately while OQ#5 is open: if bare land turns out not to emit
-## it, the invariant is merely stricter than necessary, which is the safe direction to err
-## for a load-bearing pillar.
-const BARE_TAGS: PackedStringArray = ["open_grass", "quiet"]
+## `quiet` RETIRED 2026-09-04 by the habitat-tiers ruling (spec OQ-F): it had no source and
+## no consumer, and a `built` `HabitatLimit` does its job strictly better. Retiring it here
+## too keeps this constant a subset of `HABITAT_TAGS` — every entry in this array must
+## resolve inside the shared vocabulary, and `quiet` no longer does.
+const BARE_TAGS: PackedStringArray = ["open_grass"]
 
 ## Roster-wide id convention: lowercase bare species name, no spaces. `avoids` entries
 ## must match this form exactly so a pair resolves symmetrically (gdd.md:207).

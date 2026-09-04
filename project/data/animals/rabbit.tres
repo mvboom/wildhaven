@@ -36,10 +36,87 @@
 ; relocation and Symmetric-avoids lines from the same file are not included — Move-in already
 ; has its own channel (the fact card), and the other two describe a different trigger (row
 ; 9/10's Avoids flow) this row's cadence never fires.
-[gd_resource type="Resource" script_class="AnimalDefinition" load_steps=3 format=3]
+;
+; TIERS — RE-SPEC 2026-09-04 (habitat tiers).
+;
+; PROPOSAL, NOT A DECISION. Every divisor, radius, limit and cap below is this design's
+; own first-pass proposal awaiting human sign-off, per the project rule that all tuning
+; values are the human's. Source: docs/superpowers/specs/2026-09-04-habitat-tiers-design.md
+; § 9.
+;
+; TWO TIERS: "base" (`open_grass/4` `cultivated/4`, gated by `!built<=2` — a distant
+; cottage is fine, a village is not) and "warren" (the same needs plus `flowers/5`,
+; arriving in groups of 4) — a rich meadow with flowers supports a whole warren, not just
+; a pair.
+;
+; The legacy flat fields (habitat_needs / tiles_per_individual / max_individuals) are LEFT
+; IN PLACE and are now inert: `effective_tiers()` prefers `tiers` when non-empty. They are
+; retained so a rollback is a one-line edit rather than a re-authoring.
+[gd_resource type="Resource" script_class="AnimalDefinition" load_steps=15 format=3]
 
 [ext_resource type="Script" path="res://scripts/definitions/animal_definition.gd" id="1_schema"]
 [ext_resource type="PackedScene" path="res://assets/animals/rabbit/Rabbit.tscn" id="2_model"]
+[ext_resource type="Script" path="res://scripts/definitions/habitat_need.gd" id="3_need"]
+[ext_resource type="Script" path="res://scripts/definitions/habitat_limit.gd" id="4_limit"]
+[ext_resource type="Script" path="res://scripts/definitions/habitat_tier.gd" id="5_tier"]
+
+[sub_resource type="Resource" id="need_base_grass"]
+script = ExtResource("3_need")
+tag = "open_grass"
+radius = 0
+tiles_per_individual = 4
+
+[sub_resource type="Resource" id="need_base_cultivated"]
+script = ExtResource("3_need")
+tag = "cultivated"
+radius = 0
+tiles_per_individual = 4
+
+[sub_resource type="Resource" id="limit_base_built"]
+script = ExtResource("4_limit")
+tag = "built"
+radius = 0
+max_count = 2
+
+[sub_resource type="Resource" id="tier_base"]
+script = ExtResource("5_tier")
+id = "base"
+needs = Array[Resource]([SubResource("need_base_grass"), SubResource("need_base_cultivated")])
+limits = Array[Resource]([SubResource("limit_base_built")])
+max_individuals = 3
+arrival_group_size = 1
+
+[sub_resource type="Resource" id="need_warren_grass"]
+script = ExtResource("3_need")
+tag = "open_grass"
+radius = 0
+tiles_per_individual = 4
+
+[sub_resource type="Resource" id="need_warren_cultivated"]
+script = ExtResource("3_need")
+tag = "cultivated"
+radius = 0
+tiles_per_individual = 4
+
+[sub_resource type="Resource" id="need_warren_flowers"]
+script = ExtResource("3_need")
+tag = "flowers"
+radius = 0
+tiles_per_individual = 5
+
+[sub_resource type="Resource" id="limit_warren_built"]
+script = ExtResource("4_limit")
+tag = "built"
+radius = 0
+max_count = 2
+
+[sub_resource type="Resource" id="tier_warren"]
+script = ExtResource("5_tier")
+id = "warren"
+needs = Array[Resource]([SubResource("need_warren_grass"), SubResource("need_warren_cultivated"), SubResource("need_warren_flowers")])
+limits = Array[Resource]([SubResource("limit_warren_built")])
+max_individuals = 8
+arrival_group_size = 4
 
 [resource]
 script = ExtResource("1_schema")
@@ -53,6 +130,8 @@ scout_radius = 8
 capacity_radius = 0
 tiles_per_individual = 4
 max_individuals = 6
+tiers = Array[Resource]([SubResource("tier_base"), SubResource("tier_warren")])
+emits_tags = Array[String]([])
 model_scenes = Array[PackedScene]([ExtResource("2_model")])
 fact_text_pool = Array[String](["Rabbits live together in a warren — a cozy maze of tunnels under the grass. One warren can be home to a whole group of rabbits."])
 news_reports = Array[String](["Word has it a group of rabbits is looking for a new home — somewhere with wide open grass to graze…", "A rabbit was seen out in the meadow, sizing it up as if measuring it for tunnels.", "Rumor from the hedgerow: rabbits want a big grassy spot with room for a whole warren…", "The rabbits came out to graze as the sun went down.", "Someone counted eight rabbits out on the grass this evening — a whole warren's worth.", "There's a new tunnel entrance out in the meadow that wasn't there last week.", "The rabbits have been at the garden greens again.", "The young rabbits stayed close to the warren all evening.", "Whoever saw the rabbits today says no two are quite the same shade of brown."])

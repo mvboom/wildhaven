@@ -36,10 +36,48 @@
 ;
 ; news_reports intentionally empty — News Report pools for this pool are a separate, later
 ; purchase (not part of Content Pipeline step 4/5 for this dispatch).
-[gd_resource type="Resource" script_class="AnimalDefinition" load_steps=3 format=3]
+;
+; TIERS — RE-SPEC 2026-09-04 (habitat tiers).
+;
+; PROPOSAL, NOT A DECISION. Every divisor and cap below is this design's own first-pass
+; proposal awaiting human sign-off, per the project rule that all tuning values are the
+; human's. Source: docs/superpowers/specs/2026-09-04-habitat-tiers-design.md § 9.
+;
+; THIS IS WHAT FIXES THE DEFECT this whole design exists for: Bull used to share the
+; IDENTICAL `cultivated, open_grass` recipe with Horse, Cow and Alpaca. Bull now gates on
+; `large_barn*` specifically — a BIG barn, not a small one or an open-sided one — which no
+; other species requires. Single tier "pen": `large_barn*` `cultivated/6`, max 1 (a bull is
+; kept singly, never in a herd).
+;
+; The legacy flat fields (habitat_needs / tiles_per_individual / max_individuals) are LEFT
+; IN PLACE and are now inert: `effective_tiers()` prefers `tiers` when non-empty. They are
+; retained so a rollback is a one-line edit rather than a re-authoring.
+[gd_resource type="Resource" script_class="AnimalDefinition" load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scripts/definitions/animal_definition.gd" id="1_schema"]
 [ext_resource type="PackedScene" path="res://assets/animals/bull/Bull.tscn" id="2_model"]
+[ext_resource type="Script" path="res://scripts/definitions/habitat_need.gd" id="3_need"]
+[ext_resource type="Script" path="res://scripts/definitions/habitat_tier.gd" id="4_tier"]
+
+[sub_resource type="Resource" id="need_pen_large_barn"]
+script = ExtResource("3_need")
+tag = "large_barn"
+radius = 0
+tiles_per_individual = 0
+
+[sub_resource type="Resource" id="need_pen_cultivated"]
+script = ExtResource("3_need")
+tag = "cultivated"
+radius = 0
+tiles_per_individual = 6
+
+[sub_resource type="Resource" id="tier_pen"]
+script = ExtResource("4_tier")
+id = "pen"
+needs = Array[Resource]([SubResource("need_pen_large_barn"), SubResource("need_pen_cultivated")])
+limits = Array[Resource]([])
+max_individuals = 1
+arrival_group_size = 1
 
 [resource]
 script = ExtResource("1_schema")
@@ -53,6 +91,8 @@ scout_radius = 8
 capacity_radius = 0
 tiles_per_individual = 6
 max_individuals = 6
+tiers = Array[Resource]([SubResource("tier_pen")])
+emits_tags = Array[String]([])
 model_scenes = Array[PackedScene]([ExtResource("2_model")])
 ; fact_text_pool REPLACED by scripts/fact_card_pipeline.py (2026-08-17) -- AWAITING STEP-8 HUMAN SIGN-OFF, not yet reviewed.
 fact_text_pool = Array[String](["Bulls can see almost all the way around themselves without moving their heads!", "Bulls are super strong animals that people have used for thousands of years to help pull heavy plows and carry big loads."])
