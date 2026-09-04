@@ -245,7 +245,7 @@ func handle_tap(screen_position: Vector2) -> String:
 ## — handled above by the priority rule — and land shows its terrain and tags. Tap-to-tend is
 ## row 5's depth and is deliberately absent.
 func _tap_inspect(tile: Vector2i, screen_position: Vector2) -> String:
-	_hud.show_tile_readout(_terrain_display_name(tile), _world.get_tile_tags(tile.x, tile.y))
+	_hud.show_tile_readout(_inspect_title(tile))
 	_accept(screen_position)
 	return RESULT_INSPECT
 
@@ -412,6 +412,23 @@ func species_definition(species_id: String) -> AnimalDefinition:
 	if _world.roster == null:
 		return null
 	return _world.roster.by_id(species_id)
+
+
+## What the Inspect readout NAMES: the building standing on the tile when there is one, the
+## terrain otherwise. Buildings win because a footprint already suppresses the ground
+## everywhere else it matters — `WorldGrid.get_tile_tags()` returns the building's tags and
+## not the terrain's on an occupied tile (buildings.md -> What a Building Is) — so naming the
+## grass under a barn while listing the barn's own tags beside it described two different
+## things at once.
+##
+## This is the readout's WHOLE text — the tag line it used to sit above is gone by human
+## ruling (see `GameHud.show_tile_readout()`), so this name is the only thing identifying the
+## tile and a wrong answer here has nothing beside it to soften the miss.
+func _inspect_title(tile: Vector2i) -> String:
+	var building_name: String = _world.get_building_display_name(tile.x, tile.y)
+	if building_name != "":
+		return building_name
+	return _terrain_display_name(tile)
 
 
 func _terrain_display_name(tile: Vector2i) -> String:

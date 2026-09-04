@@ -113,6 +113,7 @@ func _process(_delta: float) -> bool:
 	_check_terraform_tap_paints()
 	_check_build_tap_places()
 	_check_inspect_tap_does_neither()
+	_check_inspect_names_the_building_on_the_tile()
 	_check_ineligible_build_refuses_silently()
 	_check_priority_rule_in_all_three_modes()
 	_check_off_world_tap_is_not_a_refusal()
@@ -245,6 +246,42 @@ func _check_inspect_tap_does_neither() -> void:
 	# terrain from data, not a hardcoded string) is unaffected by which terrain it is.
 	check(_hud.tile_readout_text().contains("Wild grass"),
 		"...naming the terrain from data", "got %s" % _hud.tile_readout_text())
+
+
+## Inspecting an OCCUPIED tile names the building, not the ground under it. Before this, the
+## readout named the terrain and listed the tile's tags, so a House read as its `emitted_tags`
+## entry ("house") and every farm building — none of which emit any tags — read as the no-tags
+## em dash with nothing naming it at all.
+func _check_inspect_names_the_building_on_the_tile() -> void:
+	var tile := Vector2i(19, 6)
+	_hud.set_mode(GameHud.Mode.BUILD)
+	_hud.select_palette_option("house")
+	check_eq(_tap(tile), TapRouter.RESULT_PLACED, "a House is standing on the tile")
+
+	_hud.set_mode(GameHud.Mode.INSPECT)
+	check_eq(_tap(tile), TapRouter.RESULT_INSPECT, "an Inspect tap on it resolves to Inspect")
+	check_eq(_hud.tile_readout_text(), "House",
+		"...and the readout is the building's name, and only that")
+
+	# A farm building is the case the old two-line readout rendered as a bare em dash: it emits
+	# no tags at all, so nothing but the name can identify it. Addressed by its
+	# REAL id, not the "farm_building" group key — `select_palette_option()` takes catalog ids
+	# only (a group key returns false and would silently leave the House selected).
+	var barn_tile := Vector2i(20, 6)
+	_hud.set_mode(GameHud.Mode.BUILD)
+	check(_hud.select_palette_option("well"), "the Well is selectable by its catalog id")
+	check_eq(_tap(barn_tile), TapRouter.RESULT_PLACED, "a farm building is standing on a second tile")
+	var placed: PlaceableDefinition = _world.grid.get_building(barn_tile.x, barn_tile.y)
+	check(placed != null and not placed.display_name.is_empty(), "...and it has a display name")
+	check(placed.emitted_tags.is_empty(), "...and emits no tags, so only its name can identify it")
+
+	_hud.set_mode(GameHud.Mode.INSPECT)
+	check_eq(_tap(barn_tile), TapRouter.RESULT_INSPECT, "an Inspect tap on it resolves to Inspect")
+	check_eq(_hud.tile_readout_text(), placed.display_name,
+		"...and the readout names it from data, not a hardcoded string")
+
+	# The bare-tile path is unchanged: no building means the terrain still names the tile.
+	check_eq(_world.get_building_display_name(4, 4), "", "a bare tile reports no building")
 
 
 # --- The soft "no" -----------------------------------------------------------------------------------
@@ -518,7 +555,7 @@ func _check_hud_panels_do_not_swallow_gameplay_taps() -> void:
 	if not check(readout != null, "the HUD's tile readout panel is where this check expects it"):
 		return
 	_hud.set_mode(GameHud.Mode.INSPECT)
-	_hud.show_tile_readout("Grass", ["open_grass"] as Array[String])
+	_hud.show_tile_readout("Grass")
 	check(_hud.tile_readout_visible(), "the readout is on screen — the state the defect needed")
 	check_eq(readout.mouse_filter, Control.MOUSE_FILTER_IGNORE,
 		"THE FIXED DEFECT: the tile readout is MOUSE_FILTER_IGNORE. It is a label, and a label "

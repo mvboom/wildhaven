@@ -112,11 +112,6 @@ const REMOVE_OPTION_ID: String = "__remove__"
 ## Away" read as unclear next to an eraser icon, so it is "Erase" — no longer a `[COPY]` stub.
 const REMOVE_ENTRY_LABEL: String = "Erase"
 
-## Shown where a tile has no habitat tags at all. A dash, not a sentence — the tile readout
-## deliberately renders only data (terrain name, tags) so that no player-facing copy has to
-## be invented here. Copy is the content-writer's.
-const NO_TAGS_GLYPH: String = "—"
-
 # --- Live neighborhood preview copy (row 6). CONTENT-WRITER'S, NOT THIS FILE'S. -----------
 #
 # One string per band of `NeighborhoodPreview`. They are gathered here, beside the other
@@ -1072,10 +1067,17 @@ func palette_button_for(id: String) -> Button:
 # --- Inspect readout ---------------------------------------------------------------------
 
 ## "empty land does nothing, optionally showing its terrain/tags" (gdd.md -> Inspect Mode).
-## Data only — a terrain's authored name and its tags — so no copy is invented here.
-func show_tile_readout(terrain_name: String, tags: Array[String]) -> void:
-	var tag_line: String = NO_TAGS_GLYPH if tags.is_empty() else " · ".join(tags)
-	_tile_readout_label.text = "%s\n%s" % [terrain_name, tag_line]
+## Data only — an authored `display_name`, never copy invented here.
+##
+## ONE LINE, and the tag line is gone. HUMAN RULING (2026-09-03): "either the terrain, or the
+## building name. no need to show the second line." gdd.md's "terrain/tags" wording is what
+## the second line came from, so this narrows it deliberately rather than by omission. It was
+## the weaker half in practice: tags are internal vocabulary ("open_grass"), and the only
+## building that emits any is the House, so on every farm building the line rendered as a
+## lone em dash that read as a missing value. `WorldGrid.get_tile_tags()` is untouched — the
+## simulation still derives from it; it simply no longer surfaces raw here.
+func show_tile_readout(name_text: String) -> void:
+	_tile_readout_label.text = name_text
 	_tile_readout.visible = true
 	if _readout_timer != null:
 		_readout_timer.start(READOUT_SECONDS)

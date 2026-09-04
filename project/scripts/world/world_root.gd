@@ -664,6 +664,24 @@ func get_tile_tags(x: int, z: int) -> Array[String]:
 	return [] if grid == null else grid.get_tile_tags(x, z)
 
 
+## The display name of the building standing on this tile, or "" when the tile is bare.
+##
+## Every FOOTPRINT tile answers, not just the anchor — `WorldGrid.get_building()` stores the
+## definition on all of them (see its own comment), so tapping the far corner of a multi-tile
+## building names it just as tapping its origin does.
+##
+## Exists for the Inspect readout, which had no way to ask this: it named the terrain and
+## listed the tile's tags, so a house read as its `emitted_tags` entry ("house") and every
+## farm building — all of which emit no tags at all — read as the no-tags em dash. Returning
+## the display_name rather than the id is the point: that field is the human-authored copy
+## ("Water Tower", not "water_tower").
+func get_building_display_name(x: int, z: int) -> String:
+	if grid == null:
+		return ""
+	var building: PlaceableDefinition = grid.get_building(x, z)
+	return "" if building == null else building.display_name
+
+
 func get_wood() -> int:
 	return 0 if wood == null else wood.get_wood()
 

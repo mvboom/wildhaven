@@ -22,9 +22,22 @@
 ;
 ; SCALE: raw AABB measured via manual local-transform composition on the unmodified FBX
 ; (NOT global_transform): footprint 1.2767 x 1.4869 (x, z) tile-units, height 2.1456 — the
-; smallest of the 8 raw meshes. Target max-axis 0.869309 (House's own established 1x1
-; margin). Long axis (z) scaled by 0.584652. Scaled result: 0.7465 x 1.2544 x 0.8693 (x,
-; y, z).
+; smallest of the 8 raw meshes. The import rule normalised every building's LONG HORIZONTAL
+; AXIS to the same 0.869309 (House's own established 1x1 margin), which for this mesh meant
+; scaling by 0.584652 — the largest factor of the eight, because a well is the smallest real
+; object in the set. That is exactly what made it wrong on screen: filling a 1x1 tile the way
+; a barn does, a well reads as barn-sized, and normalising a shared max-axis cannot express
+; that a well is SUPPOSED to be the small one next to a barn.
+;
+; HUMAN RULING (2026-09-03): "too big, at least 50% smaller". Applied as a straight halving —
+; 0.584652 -> 0.292326. Scaled result: 0.3732 x 0.6272 x 0.4347 (x, y, z), i.e. it now
+; occupies just under half its tile rather than all of it. The 1x1 `footprint` in well.tres
+; is UNCHANGED and deliberately so: footprint is the placement/collision claim, and a well
+; still owns its tile — this is a visual-size ruling, not a grid one.
+;
+; NOTE FOR THE REST OF THE SET: the same max-axis normalisation is why chicken_coop (0.3611)
+; and water_tower (0.3433) also render at full-tile size. Not touched here — only the Well
+; was ruled on.
 ;
 ; FACING: left as authored (identity transform, no rotation) — unconfirmed by a human eye
 ; pass. FLAG FOR HUMAN SIGN-OFF.
@@ -35,4 +48,4 @@
 [node name="Well" type="Node3D"]
 
 [node name="Model" parent="." instance=ExtResource("1_model")]
-transform = Transform3D(0.584652, 0, 0, 0, 0.584652, 0, 0, 0, 0.584652, 0, 0, 0)
+transform = Transform3D(0.292326, 0, 0, 0, 0.292326, 0, 0, 0, 0.292326, 0, 0, 0)
