@@ -65,6 +65,8 @@ func _process(_delta: float) -> bool:
 	_check_description_never_repeats_a_shared_source()
 	_check_avoids_unions_both_directions()
 	_check_starter_prefers_free_terrain()
+	_check_starter_species_prefers_the_pinned_id_over_the_cost_score()
+	_check_starter_species_falls_back_when_the_pinned_id_is_missing()
 	_check_unsatisfiable_species_describes_honestly()
 	_check_grouped_button_names_the_tag_carrying_member()
 	_check_tiers_are_presented()
@@ -184,6 +186,46 @@ func _check_starter_prefers_free_terrain() -> void:
 	for entry: Dictionary in (recipe["entries"] as Array):
 		check_eq(entry["cost"], 0,
 			"the starter's recipe is entirely free terrain (chip '%s')" % entry["id"])
+
+
+## THE STARTER PIN (human ruling, 2026-09-04): `starter_species()` names Rabbit explicitly
+## via `PINNED_STARTER_SPECIES_ID` rather than deriving it from `easiest_species_by_tier()`'s
+## cost score — real tier data scores Deer cheaper (free terrain vs. Rabbit's Wood-costing
+## `cultivated` need), which is correct arithmetic but the wrong first animal (Deer is Shy;
+## Rabbit is Bold and visible). Against the full, untouched live roster this must be Rabbit.
+func _check_starter_species_prefers_the_pinned_id_over_the_cost_score() -> void:
+	var starter: AnimalDefinition = HabitatRecipe.starter_species(_world)
+	if not check(starter != null, "the pinned starter is derivable from the live roster"):
+		return
+	check_eq(starter.id, "rabbit",
+		"starter_species() returns the pinned id ('%s'), not whatever the cost score "
+		% [HabitatRecipe.PINNED_STARTER_SPECIES_ID]
+		+ "currently favours")
+
+
+## GRACEFUL DEGRADATION: a roster that does not carry `PINNED_STARTER_SPECIES_ID` (a typo
+## in the constant, or the pinned species retired later) must never return `null` or crash —
+## `starter_species()` falls back to `easiest_species_by_tier()`'s derived pick instead, so
+## the onboarding path never hard-fails or shows an empty coach over a stale id. Swaps in a
+## fixture roster that deliberately omits "rabbit" entirely.
+func _check_starter_species_falls_back_when_the_pinned_id_is_missing() -> void:
+	var deer: AnimalDefinition = load(DEER_PATH) as AnimalDefinition
+	if not check(deer != null, "%s loads" % DEER_PATH):
+		return
+
+	var real_roster: SpeciesRoster = _world.roster
+	_world.roster = SpeciesRoster.new([deer])
+
+	var expected_fallback: AnimalDefinition = HabitatRecipe.easiest_species_by_tier(_world)
+	var starter: AnimalDefinition = HabitatRecipe.starter_species(_world)
+
+	_world.roster = real_roster
+
+	check(expected_fallback != null,
+		"the fallback roster (Deer only) still derives a species via the cost score")
+	check_eq(starter, expected_fallback,
+		"a roster missing the pinned id falls back to easiest_species_by_tier()'s pick "
+		+ "instead of returning null")
 
 
 func _check_unsatisfiable_species_describes_honestly() -> void:

@@ -8,11 +8,15 @@ extends RefCounted
 ## `_process(delta)`.
 ##
 ## IT NAMES NO SPECIES AND NO TERRAIN. Beat 2's wording comes from
-## `HabitatRecipe.easiest_species_by_tier()` + `describe_tier_needs()` + `recipe_for_tier()`
+## `HabitatRecipe.starter_species()` + `describe_tier_needs()` + `recipe_for_tier()`
 ## — the TIER-AWARE path (final review finding C1, 2026-09-04; `HabitatRecipe`'s own
 ## "THE COACH'S OWN PATH" doc comment explains why this reads tiers and not the flat
-## `easiest_species()` / `describe()` / `recipe_for()` above it) — so the human's later
-## roster retune changes what the coach says without touching this file.
+## `easiest_species()` / `describe()` / `recipe_for()` above it) — so a roster or terrain
+## retune still changes what the coach says without touching this file. `starter_species()`
+## itself is pinned (human ruling, 2026-09-04): the tutorial's first species — Rabbit — is
+## named explicitly in `HabitatRecipe.PINNED_STARTER_SPECIES_ID`, not derived from a cost
+## score, only falling back to the derived pick if that id ever goes missing from the
+## roster. See `HabitatRecipe`'s doc comment on that constant for why.
 ##
 ## FOUR WAYS OUT, and that is the whole non-intrusiveness contract:
 ##   * the guide route completes both beats;
@@ -132,7 +136,7 @@ func bind_content(world: WorldRoot) -> void:
 		return
 	if _beat != Beat.BUILD:
 		return
-	var starter: AnimalDefinition = HabitatRecipe.easiest_species_by_tier(world)
+	var starter: AnimalDefinition = HabitatRecipe.starter_species(world)
 	if starter == null:
 		_finish()
 		return

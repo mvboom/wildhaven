@@ -185,26 +185,30 @@ func _check_bind_content_at_beat_one_names_no_species() -> void:
 ## come entirely from `HabitatRecipe`, live, so a later roster retune changes what the coach
 ## says with no code change here. Asserting against `HabitatRecipe`'s own answer (rather than
 ## hardcoding "rabbit"/"grass") is what keeps this test honoring that same promise, and what
-## keeps it passing the day the human retunes the roster.
+## keeps it passing the day the human retunes the roster's tier costs — it is NOT what pins
+## Rabbit specifically; that is the `check_eq(starter.id, "rabbit", ...)` line below, which
+## hardcodes the id on purpose (see that line's own comment).
 ##
-## REWRITTEN, final review finding C1 (2026-09-04, not a silent adjustment — see the fix
-## report). Used to assert against `HabitatRecipe.easiest_species()` / `recipe_for()` /
-## `describe()` — the FLAT-FIELD functions `bind_content()` no longer calls. That made this
-## check self-referential in exactly the way finding C1 warned about (both sides read the
-## same stale `habitat_needs` and agreed while both were wrong): against today's live roster
-## it would derive "Rabbit" from the flat path while `bind_content()` itself now derives
-## "Deer" from the tier path, and the two would silently diverge without this test ever
-## catching it. Asserting against the SAME functions `bind_content()` actually calls
-## (`easiest_species_by_tier()` / `starter_tier()` / `recipe_for_tier()` /
-## `describe_tier_needs()`) is not independent of the implementation — see
+## REWRITTEN AGAIN, starter-pin fix (2026-09-04, not a silent adjustment — see the fix
+## report). `bind_content()` now calls `HabitatRecipe.starter_species()` (pinned to Rabbit),
+## not `easiest_species_by_tier()` (the derived cost score, which real tier data now picks
+## Deer from — correct arithmetic, wrong lesson; see `PINNED_STARTER_SPECIES_ID`'s doc
+## comment for the human's reasoning). Asserting against the SAME function `bind_content()`
+## actually calls is not independent of the implementation on its own — see
 ## `_check_bind_content_beat_two_uses_rabbits_real_tier_not_the_stale_flat_fields()` below for
-## the independently-derived regression pin the finding actually asked for — but it still
-## honors this check's own original promise (no species/terrain hardcoded here) and catches a
-## `bind_content()` that stops calling the tier path at all.
+## the independently-derived regression pin over Rabbit's actual tier needs — but the
+## `starter.id == "rabbit"` assertion here IS independent: it is a literal hardcoded against
+## today's FULL, untouched live roster, and it is exactly the assertion that would have
+## caught the derived score's silent switch to Deer, because `starter_species()` calling
+## through to `easiest_species_by_tier()` unconditionally (the pre-pin bug) would fail it.
 func _check_bind_content_at_beat_two_names_the_derived_starter() -> void:
-	var starter: AnimalDefinition = HabitatRecipe.easiest_species_by_tier(_world)
+	var starter: AnimalDefinition = HabitatRecipe.starter_species(_world)
 	if not check(starter != null, "a starter species is derivable from the live roster"):
 		return
+	check_eq(starter.id, "rabbit",
+		"the coach's starter is pinned to Rabbit against the full, untouched live roster — "
+		+ "not whatever species the cost score currently favours (Deer, once real tier data "
+		+ "replaced the retired flat fields — see PINNED_STARTER_SPECIES_ID)")
 	var tier: HabitatTier = HabitatRecipe.starter_tier(starter)
 	var recipe: Dictionary = HabitatRecipe.recipe_for_tier(tier, _world)
 	var entries: Array = recipe["entries"] as Array
@@ -221,7 +225,7 @@ func _check_bind_content_at_beat_two_names_the_derived_starter() -> void:
 	check_eq(coach.current_target_id(), first["id"] as String,
 		"beat 2 targets the same first palette button HabitatRecipe.recipe_for_tier() derives")
 	check(coach.current_text().contains(starter.display_name),
-		"beat 2's text names the derived starter's display name")
+		"beat 2's text names the pinned starter's display name")
 	check(coach.current_text().contains(HabitatRecipe.describe_tier_needs(tier, _world)),
 		"beat 2's text carries HabitatRecipe.describe_tier_needs()'s own sentence verbatim")
 	check(coach.current_text().contains(first["display_name"] as String),

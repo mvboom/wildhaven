@@ -461,6 +461,13 @@ static func easiest_species(world: WorldRoot) -> AnimalDefinition:
 ## "cheapest/lowest-cap first by convention" (the same convention `describe_tiers()` already
 ## relies on for presentation), so `effective_tiers()[0]` is the cheapest way in — the one
 ## worth teaching a first-time player, not a wider/pricier tier further requirements unlock.
+##
+## 2026-09-04 UPDATE: the coach no longer calls `easiest_species_by_tier()` directly to pick
+## WHICH species to teach — it calls `starter_species()`, further down, which prefers the
+## human-pinned `PINNED_STARTER_SPECIES_ID` (Rabbit) and only falls back to this function's
+## derived ranking if the pinned id goes missing from the roster. `starter_tier()` /
+## `recipe_for_tier()` / `describe_tier_needs()` below are unchanged and still do all of the
+## actual "what does this species need" work, for whichever species is chosen either way.
 
 ## The tier the coach should teach — a species' cheapest (first) tier, or `null` if it has
 ## none.
@@ -565,6 +572,43 @@ static func easiest_species_by_tier(world: WorldRoot) -> AnimalDefinition:
 			best_effort = effort
 			best = candidate
 	return best
+
+
+## THE TUTORIAL'S STARTER SPECIES — human ruling 2026-09-04, named here in data rather than
+## derived from `easiest_species_by_tier()`'s cost score.
+##
+## Real tier data makes Deer the cost-cheapest starter (its tier's needs are free terrain;
+## Rabbit's `cultivated` need costs 2 Wood/tile) — correct scoring, wrong lesson. The human's
+## reasoning, so a future maintainer honours the intent and not just the id:
+##   * Rabbit is Bold; Deer is Shy. A Shy species deliberately spends more time in cover, so a
+##     Deer starter would make a child's very first animal the hard one to actually see — a
+##     first success has to be visible.
+##   * Deer's base tier carries a `!built<=1` limit, teaching a CONSTRAINT first. Rabbit's base
+##     tier teaches something purely additive: paint grass, paint a field.
+##   * A derived starter silently changes whenever tuning moves (exactly what just happened
+##     here) — the tutorial's first species is a design decision and should read as one, not
+##     fall out of a score nobody meant to be reading as a curriculum choice.
+##
+## PROPOSED id, same status as `WOOD_COST_WEIGHT` above: the human owns which species this
+## names, not just that one is named. Deliberately a plain roster id, not a `.tres` field or
+## a new resource type — `WorldPreset.DEFAULT_PRESET_ID`'s exact shape (a named-default
+## constant living beside the code that resolves it), which is the convention this codebase
+## already uses for "the one a designer would look here to change."
+const PINNED_STARTER_SPECIES_ID: String = "rabbit"
+
+
+## The species the onboarding coach should teach — `PINNED_STARTER_SPECIES_ID` when the live
+## roster still has it, so beat 2 never silently drifts to whatever the cost score currently
+## favours. Falls back to `easiest_species_by_tier()`'s derived pick if the pinned id is
+## missing (a typo, or the species retired from the roster) — the onboarding path must never
+## hard-fail or show an empty coach over a stale id.
+static func starter_species(world: WorldRoot) -> AnimalDefinition:
+	if world == null or world.roster == null:
+		return null
+	var pinned: AnimalDefinition = world.roster.by_id(PINNED_STARTER_SPECIES_ID)
+	if pinned != null:
+		return pinned
+	return easiest_species_by_tier(world)
 
 
 ## "a", "a and b", "a, b and c" — Oxford-comma-free, matching the register of the rest of the
