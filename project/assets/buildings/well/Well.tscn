@@ -30,10 +30,17 @@
 ; that a well is SUPPOSED to be the small one next to a barn.
 ;
 ; HUMAN RULING (2026-09-03): "too big, at least 50% smaller". Applied as a straight halving —
-; 0.584652 -> 0.292326. Scaled result: 0.3732 x 0.6272 x 0.4347 (x, y, z), i.e. it now
-; occupies just under half its tile rather than all of it. The 1x1 `footprint` in well.tres
-; is UNCHANGED and deliberately so: footprint is the placement/collision claim, and a well
-; still owns its tile — this is a visual-size ruling, not a grid one.
+; 0.584652 -> 0.292326.
+;
+; HUMAN RULING, SECOND PASS (2026-09-03, after seeing the halved version in place): "could be
+; another 15% smaller" — 0.292326 * 0.85 -> 0.248477. Scaled result: 0.3172 x 0.5331 x 0.3695
+; (x, y, z), which is 0.425x the size the import rule originally chose. Compounded on the
+; halving rather than re-derived from the raw AABB, because "another 15%" is 15% of what was
+; on screen when the ruling was made, not of the original import.
+;
+; The 1x1 `footprint` in well.tres is UNCHANGED and deliberately so: footprint is the
+; placement/collision claim, and a well still owns its tile — this is a visual-size ruling,
+; not a grid one.
 ;
 ; NOTE FOR THE REST OF THE SET: the same max-axis normalisation is why chicken_coop (0.3611)
 ; and water_tower (0.3433) also render at full-tile size. Not touched here — only the Well
@@ -48,4 +55,4 @@
 [node name="Well" type="Node3D"]
 
 [node name="Model" parent="." instance=ExtResource("1_model")]
-transform = Transform3D(0.292326, 0, 0, 0, 0.292326, 0, 0, 0, 0.292326, 0, 0, 0)
+transform = Transform3D(0.248477, 0, 0, 0, 0.248477, 0, 0, 0, 0.248477, 0, 0, 0)

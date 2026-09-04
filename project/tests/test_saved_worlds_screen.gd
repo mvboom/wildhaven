@@ -44,6 +44,9 @@ func _process(_delta: float) -> bool:
 	_check_selecting_enables_actions()
 	_check_rename_flow()
 	_check_delete_flow()
+	# BEFORE `_check_double_click_loads()`: that check double-clicks too, so it also raises the
+	# wait cursor, and this one's opening assertion is that the cursor is NOT already up.
+	_check_double_click_shows_the_wait_cursor()
 	_check_double_click_loads()
 
 	_clean()
@@ -151,6 +154,49 @@ func _check_double_click_loads() -> void:
 		"double-clicking a readable row loads it outright — no need to then press Play")
 	check_eq((intent.get("path", "") as String), path,
 		"...and it loads that row's own save, not some other")
+	GameSession.clear()
+
+
+## THE CLICK FEEDBACK (2026-09-03). Opening a saved world is the one action on this screen that
+## leaves it, and it used to give no sign the double-click had registered at all.
+##
+## WHY THIS ASSERTS A NODE AND NOT `Input.get_current_cursor_shape()`: the shape actually under
+## the pointer is decided by whichever `Control` is under it, and `mouse_default_cursor_shape`
+## defaults to `CURSOR_ARROW` on every one of them — including the save row that was just
+## double-clicked. So `Input.set_default_cursor_shape()` alone would leave the pointer an arrow
+## and still "pass" a check of Input's own default. What has to be true is that something on
+## top is claiming the shape, which is what this checks.
+func _check_double_click_shows_the_wait_cursor() -> void:
+	GameSession.clear()
+	var path: String = SaveStore.unique_path_for("Cursor")
+	SaveStore.write(path, {"save_version": 1, "name": "Cursor"})
+	_screen.call("_refresh")
+
+	var row: Button = _row_button_named("Cursor")
+	if not check(row != null, "the save has a row to double-click"):
+		return
+	check(not (_screen.call("is_showing_wait_cursor") as bool),
+		"the pointer is normal before the tap — the wait cursor is not simply always on")
+
+	row.pressed.emit()
+	row = _row_button_named("Cursor")
+	var double: InputEventMouseButton = InputEventMouseButton.new()
+	double.button_index = MOUSE_BUTTON_LEFT
+	double.pressed = true
+	double.double_click = true
+	row.gui_input.emit(double)
+
+	if not check(_screen.call("is_showing_wait_cursor") as bool,
+			"THE FIX: a double-click turns the pointer into the OS wait cursor"):
+		return
+	var blocker: Control = _screen.get_node_or_null("WaitCursor") as Control
+	check_eq(blocker.mouse_default_cursor_shape, Control.CURSOR_WAIT,
+		"...the hourglass shape specifically, claimed by a Control on top so the row underneath "
+		+ "cannot keep overriding it with CURSOR_ARROW")
+	check_eq(blocker.mouse_filter, Control.MOUSE_FILTER_STOP,
+		"...and it swallows further clicks, so the screen visibly stops responding")
+	check_eq(blocker.anchor_right, 1.0,
+		"...across the whole screen, not just where the pointer happened to be")
 	GameSession.clear()
 
 

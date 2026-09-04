@@ -12,7 +12,29 @@ extends Control
 ## like the button's own label text does, so it stays legible in both states without a
 ## second palette of icon-specific colors.
 
-enum Kind { WILD_GRASS, GRASS, WATER, FOREST, ROCK, FARM, HOUSE, FARM_BUILDING, ERASER, EXIT, LOOK, HELP }
+## THE ORDINALS ARE A SERIALISED CONTRACT — write them explicitly, and only ever APPEND.
+##
+## `kind` is an `@export`, so a scene that sets it stores the INTEGER, not the name:
+## `GameUI.tscn`'s Field Guide button is `kind = 10` and `LeaveOverlay.tscn`'s Exit is
+## `kind = 8`. Inserting FARM_BUILDING in the middle of this enum (2026-09-03) shifted every
+## later member by one and silently repointed both — the Field Guide's "?" started drawing
+## LOOK's arrow, and Leave's "X" drew the eraser block. Nothing failed; the glyphs just
+## changed. The explicit values below are what makes that a diff you have to write on purpose
+## rather than a side effect of where you happened to type a new name.
+enum Kind {
+	WILD_GRASS = 0,
+	GRASS = 1,
+	WATER = 2,
+	FOREST = 3,
+	ROCK = 4,
+	FARM = 5,
+	HOUSE = 6,
+	ERASER = 7,
+	EXIT = 8,
+	LOOK = 9,
+	HELP = 10,
+	FARM_BUILDING = 11,
+}
 
 ## Palette option id -> glyph. Lives here rather than on `GameHud` because `HabitatRecipe`
 ## needs the same mapping to render a recipe chip, and two copies would silently diverge the

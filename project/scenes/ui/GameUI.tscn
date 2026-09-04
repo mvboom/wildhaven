@@ -305,6 +305,7 @@ kind = 10
 ; occupies offset_right -24 to offset_left -96 (a 72px button, 24px corner margin); this
 ; container's own offset_right -106 leaves a 10px gap, matching PaletteRow's own separation.
 [node name="BottomRight" type="HBoxContainer" parent="HUD"]
+unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 3
 anchor_left = 1.0

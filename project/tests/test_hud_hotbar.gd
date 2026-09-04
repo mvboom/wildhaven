@@ -62,6 +62,8 @@ func _process(delta: float) -> bool:
 	_hud = _ui.hud
 
 	_check_hit_target_shrunk()
+	_check_serialised_icon_ordinals_still_point_at_their_glyphs()
+	_check_palette_row_never_overlaps_the_corner_clusters()
 	_check_inspect_toggle_remembers_last_content_mode()
 	_check_every_catalog_entry_has_a_button()
 	_check_farm_rename()
@@ -95,6 +97,88 @@ func _process(delta: float) -> bool:
 	_check_long_press_drag_off_release_via_real_routed_input_does_not_strand_the_swallow_flag()
 
 	return not _begin_real_long_press_timer_wait()
+
+
+## REGRESSION GUARD (2026-09-03), and the defect it guards was LIVE AT THE DEFAULT SIZE, not on
+## some hypothetical small screen. `PaletteRow` centred on the whole canvas while `HelpButton`
+## and `BottomRight` sat pinned in the corners, so at the 1152-wide canvas that
+## `window/stretch/mode="canvas_items"` + `aspect="expand"` produces for EVERY window at 16:9
+## or narrower, the row spanned 171..981 against a Rotate cluster at 892..1046 — Erase was
+## entirely underneath it and unpressable. It cleared only on an ultrawide canvas (1536), which
+## is exactly the kind of defect that looks fine on whichever machine you happened to check.
+##
+## Asserted as REAL LAID-OUT RECTS, deliberately: `_fit_palette_row()` could compute a perfect
+## band and still be wrong if the row did not end up where it thought. The gap must be
+## non-negative on BOTH sides — the left corner is one Help-button-width from overlapping too.
+func _check_palette_row_never_overlaps_the_corner_clusters() -> void:
+	var hud_node: Control = _hud as Control
+	var help: Control = hud_node.get_node_or_null("HelpButton") as Control
+	var bottom_right: Control = hud_node.get_node_or_null("BottomRight") as Control
+	var row: Control = hud_node.get_node_or_null("PaletteRow") as Control
+	if not check(help != null and bottom_right != null and row != null,
+			"the bottom band's three pieces are all present"):
+		return
+
+	var left_gap: float = row.get_rect().position.x - help.get_rect().end.x
+	var right_gap: float = bottom_right.get_rect().position.x - row.get_rect().end.x
+	check(left_gap >= 0.0, "the palette row does not overlap the Help button",
+		"left gap %.0fpx (row starts %.0f, Help ends %.0f)"
+			% [left_gap, row.get_rect().position.x, help.get_rect().end.x])
+	check(right_gap >= 0.0,
+		"THE FIXED DEFECT: the palette row does not run under the Rotate buttons — Erase is the "
+		+ "last button in the row and it was completely covered",
+		"right gap %.0fpx (row ends %.0f, Rotate starts %.0f)"
+			% [right_gap, row.get_rect().end.x, bottom_right.get_rect().position.x])
+
+	# Erase specifically, by node: the check above would still pass if Erase had been dropped
+	# from the row entirely, which would "fix" the overlap by deleting the button.
+	var erase: Button = _hud.get_node_or_null("%RemoveButton") as Button
+	if check(erase != null, "the Erase button is in the row"):
+		check(erase.get_global_rect().end.x <= bottom_right.get_global_rect().position.x,
+			"...and its right edge clears the Rotate cluster",
+			"Erase ends %.0f, Rotate starts %.0f"
+				% [erase.get_global_rect().end.x, bottom_right.get_global_rect().position.x])
+
+	# The fit spends separation before hit target, and never crosses the floor.
+	var metrics: Dictionary = _hud.palette_fit_metrics()
+	check(metrics["used"] <= metrics["band"],
+		"the row fits the band between the corner clusters",
+		"used %.0f of %.0f" % [metrics["used"], metrics["band"]])
+	check_eq(metrics["button_size"], float(UiPalette.HIT_TARGET),
+		"...without shrinking a button below UiPalette.HIT_TARGET, the stated touch floor")
+	check(metrics["separation"] >= GameHud.PALETTE_SEPARATION_MIN,
+		"...and separation stayed at or above its own minimum",
+		"separation %d" % metrics["separation"])
+
+
+## REGRESSION GUARD (2026-09-03). `TileIcon.kind` is an `@export`, so a scene that sets it
+## stores the ENUM'S INTEGER: GameUI's Field Guide button is `kind = 10` and LeaveOverlay's
+## Exit is `kind = 8`. Adding FARM_BUILDING in the MIDDLE of `TileIcon.Kind` shifted both by
+## one — the Field Guide's "?" silently became LOOK's arrow, and Leave's "X" became the eraser
+## block. Nothing threw and no existing check noticed, because both scenes were still perfectly
+## valid; they just meant something else.
+##
+## Asserted against the LITERALS the two .tscn files carry, deliberately: reading the scene's
+## number back out of the scene would agree with itself no matter what the enum did. These are
+## the ordinals on disk, and this fails if the enum stops agreeing with them.
+func _check_serialised_icon_ordinals_still_point_at_their_glyphs() -> void:
+	check_eq(int(TileIcon.Kind.HELP), 10,
+		"GameUI.tscn's Field Guide button (kind = 10) still resolves to the HELP question mark")
+	check_eq(int(TileIcon.Kind.EXIT), 8,
+		"LeaveOverlay.tscn's Exit button (kind = 8) still resolves to the EXIT cross")
+
+	# The rest of the enum is pinned too, so an insertion anywhere is caught here rather than
+	# in whichever scene happens to serialise the member that moved.
+	var expected: Dictionary = {
+		"WILD_GRASS": 0, "GRASS": 1, "WATER": 2, "FOREST": 3, "ROCK": 4, "FARM": 5,
+		"HOUSE": 6, "ERASER": 7, "EXIT": 8, "LOOK": 9, "HELP": 10, "FARM_BUILDING": 11,
+	}
+	for name: String in expected:
+		check_eq(int(TileIcon.Kind[name]), expected[name] as int,
+			"TileIcon.Kind.%s keeps ordinal %d — new members APPEND, never insert"
+				% [name, expected[name]])
+	check_eq(TileIcon.Kind.size(), expected.size(),
+		"...and every member of the enum is accounted for above")
 
 
 func _check_hit_target_shrunk() -> void:

@@ -233,6 +233,7 @@ var _readout_timer: Timer = null
 @onready var _currently_resident_value: Label = %CurrentlyResidentValue
 @onready var _village_population_value: Label = %VillagePopulationValue
 @onready var _inspect_button: Button = %InspectButton
+@onready var _bottom_right: HBoxContainer = %BottomRight
 @onready var _rotate_ccw_button: Button = %RotateCcwButton
 @onready var _rotate_cw_button: Button = %RotateCwButton
 @onready var _help_button: Button = %HelpButton
@@ -293,6 +294,15 @@ func _ready() -> void:
 	hide_tile_readout()
 	hide_neighborhood_preview()
 	_refresh_mode_buttons()
+
+	# DEFERRED, not direct: the corner clusters this measures against are positioned by their
+	# anchors, which have not resolved yet during `_ready()` — their rects are still zero here.
+	# `size_changed` then re-fits for the life of the scene, which is what makes the row track
+	# an ultrawide canvas (measured 1536 wide at 2560x1080) as well as the common 1152 one.
+	_fit_palette_row.call_deferred()
+	var vp: Viewport = get_viewport()
+	if vp != null:
+		vp.size_changed.connect(_fit_palette_row)
 
 
 # --- Wood (read-only indicator, Pillar 1) ------------------------------------------------
@@ -392,6 +402,119 @@ func _refresh_mode_buttons() -> void:
 	UiPalette.paint_button(_inspect_button, _mode == Mode.INSPECT)
 	if _inspect_icon != null:
 		_inspect_icon.active = _mode == Mode.INSPECT
+
+
+# --- Palette row fit -------------------------------------------------------------------------
+
+## THE BOTTOM BAND IS SHARED, AND THE ROW USED TO IGNORE THAT. `HelpButton` is pinned to the
+## bottom-LEFT corner and `BottomRight`'s two Rotate buttons to the bottom-RIGHT (with
+## `LeaveOverlay`'s Exit further right still), while `PaletteRow` centred itself on the WHOLE
+## canvas as though neither existed.
+##
+## MEASURED (2026-09-03), not predicted: at a 1152x648 canvas the row spanned x 171..981 and the
+## Rotate cluster x 892..1046 — Erase (909..981) sat ENTIRELY underneath it and could not be
+## pressed. And this was not a small-screen edge case: `window/stretch/mode="canvas_items"` with
+## `aspect="expand"` produces exactly 1152 canvas pixels of width for EVERY window at 16:9 or
+## narrower (verified identical at 1152x648, 1280x720 and 1920x1080), so it was the default.
+## Only an ultrawide window buys real width (2560x1080 -> 1536 canvas), where it happened to
+## clear by 103px — which is why it could look fine on one machine and be broken on the next.
+##
+## The row is therefore fitted to the CLEAR BAND between the two corner clusters, measured off
+## their actual rects rather than off numbers copied out of the scene file — move a corner
+## button in `GameUI.tscn` and this follows it with no second edit here.
+
+## Separation is spent BEFORE button size, and this is the whole ordering decision: 4px of gap
+## is invisible, 4px of button is 4px of hit target. `UiPalette.HIT_TARGET` is documented as
+## "THE actual floor" for a touch target, so `_fit_palette_row()` will refuse to cross it and
+## warn instead of quietly shipping buttons a child cannot hit.
+const PALETTE_SEPARATION_MAX: int = 10
+const PALETTE_SEPARATION_MIN: int = 6
+
+## Clearance left between the row and each corner cluster. Matches `PALETTE_SEPARATION_MAX` —
+## the gap to the neighbouring cluster should read the same as the gaps inside the row.
+const PALETTE_EDGE_GAP: float = 10.0
+
+
+## Sizes and positions `PaletteRow` so it fits between the two corner clusters, and reports it
+## when it cannot. Idempotent: safe to call on every resize and after every row rebuild.
+func _fit_palette_row() -> void:
+	if _palette_row == null or _help_button == null or _bottom_right == null:
+		return
+	# Both corners and the row are siblings under `HUD`, so `get_rect()` already puts all three
+	# in one coordinate space — no global/local conversion to get wrong.
+	var band_left: float = _help_button.get_rect().end.x + PALETTE_EDGE_GAP
+	var band_right: float = _bottom_right.get_rect().position.x - PALETTE_EDGE_GAP
+	var band: float = band_right - band_left
+	if band <= 0.0:
+		return  # not laid out yet — `size_changed` calls this again once it is
+
+	var buttons: Array[Control] = []
+	for child: Node in _palette_row.get_children():
+		var control := child as Control
+		if control != null and control.visible:
+			buttons.append(control)
+	if buttons.is_empty():
+		return
+	var gaps: int = buttons.size() - 1
+
+	# STEP 1: spend separation, down to PALETTE_SEPARATION_MIN.
+	var base_size: float = UiPalette.scaled(UiPalette.HOTBAR_ICON_SIZE)
+	var separation: int = PALETTE_SEPARATION_MAX
+	while separation > PALETTE_SEPARATION_MIN \
+			and buttons.size() * base_size + gaps * separation > band:
+		separation -= 1
+
+	# STEP 2: only then shrink the buttons, and never past the hit-target floor. This is a
+	# no-op while `UI_SCALE_FACTOR` is 1.0 (base_size IS the floor then) and does real work the
+	# moment that dial is raised — which is exactly when the row would otherwise burst the band.
+	var room: float = band - gaps * separation
+	var button_size: float = base_size
+	if buttons.size() * button_size > room:
+		button_size = maxf(float(UiPalette.HIT_TARGET), floorf(room / float(buttons.size())))
+
+	_palette_row.add_theme_constant_override("separation", separation)
+	var button_min := Vector2(button_size, button_size)
+	for button: Control in buttons:
+		button.custom_minimum_size = button_min
+
+	# Centre in the BAND rather than on the canvas. The row keeps GameUI.tscn's own centre
+	# anchoring and is simply shifted by the difference, so its anchor setup stays untouched.
+	var row_width: float = buttons.size() * button_size + gaps * separation
+	_palette_row.offset_left = (band_left + band_right) * 0.5 - size.x * 0.5
+	_palette_row.offset_right = _palette_row.offset_left
+
+	# THE FLOOR IS REPORTED, NOT CROSSED. If the catalog ever grows past what the band can hold
+	# at the minimum separation and the minimum button, the row overflows — visibly, and with
+	# this in the log naming the shortfall — rather than silently handing back sub-target
+	# buttons or sliding back under the Rotate cluster with nothing said.
+	if row_width > band + 0.5:
+		push_warning(
+			("GameHud: the palette row needs %.0fpx (%d buttons at %.0fpx, %dpx apart) but the "
+			+ "band between HelpButton and BottomRight is only %.0fpx. It will overlap a corner "
+			+ "cluster. Widen the band, or give the catalog fewer top-level buttons.")
+				% [row_width, buttons.size(), button_size, separation, band])
+
+
+## The band currently available to the palette row, and what it is using of it, as
+## `{"band": float, "used": float, "separation": int, "button_size": float}`. Test-facing: an
+## overlap check wants the numbers this fit actually resolved to, not a re-derivation of them.
+func palette_fit_metrics() -> Dictionary:
+	var buttons: int = 0
+	var button_size: float = 0.0
+	for child: Node in _palette_row.get_children():
+		var control := child as Control
+		if control != null and control.visible:
+			buttons += 1
+			button_size = maxf(button_size, control.custom_minimum_size.x)
+	var separation: int = _palette_row.get_theme_constant("separation")
+	var band_left: float = _help_button.get_rect().end.x + PALETTE_EDGE_GAP
+	var band_right: float = _bottom_right.get_rect().position.x - PALETTE_EDGE_GAP
+	return {
+		"band": band_right - band_left,
+		"used": buttons * button_size + maxf(0, buttons - 1) * separation,
+		"separation": separation,
+		"button_size": button_size,
+	}
 
 
 # --- Palette row ---------------------------------------------------------------------------
@@ -559,6 +682,7 @@ func _build_palette_row() -> void:
 		_add_palette_button("placeable", _placeable_group_row(group_key))
 
 	_refresh_palette_rendering()
+	_fit_palette_row()
 
 
 ## Every distinct `hotbar_category` (falling back to the placeable's own id when that field is

@@ -138,7 +138,43 @@ func _play() -> void:
 	if _selected_path == "":
 		return
 	GameSession.request_load(_selected_path)
+	_show_wait_cursor()
 	_go(WORLD_SCENE)
+
+
+## Standard "that click registered" feedback for the one action in this screen that leaves it:
+## the pointer becomes the OS wait cursor for as long as the world scene takes to come up.
+##
+## WHY A NODE AND NOT `Input.set_default_cursor_shape()`. That call only decides the shape for
+## when the pointer is over nothing that states its own — and every `Control` states its own,
+## because `mouse_default_cursor_shape` defaults to `CURSOR_ARROW`. The pointer is sitting on
+## the save row the player just double-clicked, so that call on its own changes nothing you can
+## see. A full-rect Control on top, carrying `CURSOR_WAIT` itself, is what actually puts the
+## hourglass under the pointer.
+##
+## It draws nothing. Both its jobs are invisible: it owns the cursor shape, and
+## `MOUSE_FILTER_STOP` makes it swallow any further click at the row underneath, so the screen
+## visibly stops responding to a second impatient double-click instead of queueing one up.
+##
+## NOTHING RESETS IT, deliberately. The node is a child of this screen and is freed with it when
+## `change_scene_to_file()` swaps in the world — so the cursor goes back to normal on its own,
+## with no teardown to forget. That is the whole reason the shape lives on a node here rather
+## than in `Input`'s global default, which would outlive this scene and follow the player into
+## the world as a permanent hourglass.
+func _show_wait_cursor() -> void:
+	if has_node("WaitCursor"):
+		return
+	var blocker := Control.new()
+	blocker.name = "WaitCursor"
+	blocker.set_anchors_preset(Control.PRESET_FULL_RECT)
+	blocker.mouse_filter = Control.MOUSE_FILTER_STOP
+	blocker.mouse_default_cursor_shape = Control.CURSOR_WAIT
+	add_child(blocker)
+
+
+## Test-facing: true once the wait cursor is up.
+func is_showing_wait_cursor() -> bool:
+	return has_node("WaitCursor")
 
 
 func _on_rename_pressed() -> void:
