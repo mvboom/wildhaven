@@ -231,6 +231,33 @@ func _make_species_card(species: AnimalDefinition, world: WorldRoot) -> VBoxCont
 		avoids_label.add_theme_color_override("font_color", UiPalette.FIELD_GUIDE_SILHOUETTE_INK)
 		card.add_child(avoids_label)
 
+	# TIER LINES — habitat-tiers Task 10, the payoff of the whole branch: what a site
+	# satisfies now, and what the NEXT tier on top of it needs (a stable turning a pair of
+	# horses into a herd). Every species presents at least one tier — `effective_tiers()`
+	# synthesises one from the legacy flat fields when `tiers` is empty — so this renders
+	# for the whole roster, not just the handful re-authored onto real tiers so far.
+	# ADDITIVE, not a replacement of `description`/`chips` above: those two are still
+	# pinned exactly by `test_field_guide.gd`'s `_check_every_species_shows_its_recipe()`
+	# and by `test_habitat_recipe.gd`'s own `describe()` checks, and this file's job is to
+	# extend the card, not to demolish tested rendering to make room.
+	# DELIBERATELY a `VBoxContainer`, NOT an `HFlowContainer`: `recipe_chip_texts_for()`
+	# (this file's own TEST ACCESSOR) reads Label text only out of HFlowContainer children
+	# (see that method's own header) — a VBoxContainer here stays invisible to it, so this
+	# addition cannot perturb that pinned exact-match check against `recipe_for()`.
+	var tier_lines: Array[String] = HabitatRecipe.describe_tiers(species, world)
+	if not tier_lines.is_empty():
+		var tier_box := VBoxContainer.new()
+		tier_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		for line: String in tier_lines:
+			var tier_label := Label.new()
+			tier_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			tier_label.text = line
+			tier_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			tier_label.add_theme_font_size_override("font_size", FONT_SPECIES_BODY)
+			tier_label.add_theme_color_override("font_color", UiPalette.BARK)
+			tier_box.add_child(tier_label)
+		card.add_child(tier_box)
+
 	# Human direction 2026-09-01: one rule per species, so the cards read as distinct
 	# entries rather than one run-on column. Deliberately the LAST child of the card rather
 	# than a sibling in `_resident_list`: a sibling would make the list's children alternate

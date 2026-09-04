@@ -208,6 +208,143 @@ static func describe(species: AnimalDefinition, world: WorldRoot) -> String:
 	return DESCRIBE_LEAD + _join_and(phrases) + "."
 
 
+## ---------------------------------------------------------------------------------------
+## TIER DESCRIPTIONS — habitat-tiers Task 10.
+##
+## `describe_tiers()` gives one line per tier, in authoring order (cheapest/lowest-cap
+## first by convention — see `HabitatTier`'s own "ORDER IS PRESENTATIONAL ONLY" note, which
+## is exactly why order is safe to lean on here for presentation even though the capacity
+## formula itself never does). Read together, line 1 is "what you have now" and line 2 is
+## "what the NEXT tier on top of it needs" — the entire payoff of the habitat-tiers branch:
+## without this, nothing tells a player that adding a stable turns a pair of horses into a
+## herd (spec.md -> Screen Layouts).
+##
+## TIER IDS NEVER APPEAR. `HabitatTier.id` is "pair"/"herd" — internal only, because
+## player-facing tier naming was explicitly ruled out of scope (spec § 13). Every line
+## below describes REQUIREMENTS, never the tier's own name.
+##
+## KEYED BY PALETTE BUTTON WHEN A `world` IS AVAILABLE — the same discipline `recipe_for()`
+## uses (see this file's own header) and for the same two reasons: Rock supplies both
+## `cover` and `rocks`, so a tier needing both must read as ONE requirement, not two; and a
+## button-resolved phrase is closer to what the player actually presses than a raw tag name
+## a six-year-old has never seen. `world` defaults to null because the one caller wired up
+## so far (the Field Guide card) is not necessarily the only one — a future tooltip or a
+## fixture-only test may have no `WorldRoot` to hand. Without one, each tag degrades to its
+## own name, spaced out ("open_grass" -> "open grass") — readable, if less precise about
+## which button solves it.
+##
+## TERRAIN IS DELIBERATELY *NOT* MERGED INTO THE "Grasslands" PALETTE GROUP HERE, even
+## though `game_hud.gd` merges Grass/Wild Grass/Meadow/Scrub behind one button to save
+## palette-row space (`GameHud.TERRAIN_GROUP_ID`). That merge is COSMETIC, not data:
+## `TerrainDefinition` itself carries no `hotbar_category` field the way `PlaceableDefinition`
+## does (`game_hud.gd`'s own header: "ONE DELIBERATE DIFFERENCE"), so `tag_sources()` above
+## never learns about it, and this function follows `tag_sources()`'s lead rather than
+## re-deriving the merge from `GameHud`'s hardcoded id list. `open_grass` (Grass or Meadow)
+## and `browse` (Scrub) are satisfied by placing DIFFERENT tiles even though they currently
+## sit behind one button on the palette row — captioning both "Grasslands" would read
+## identically for two requirements a player cannot actually solve the same way, which is a
+## worse trap than the "three chips for Rock's two tags" one this file's header already
+## warns about: Rock's two tags really are the same tile: Grass's and Scrub's are not. So
+## Deer's herd tier (`open_grass` AND `browse` together) names both, distinctly, via two
+## different resolved buttons — never the same button rendered twice, because at this
+## layer they were never the same button to begin with.
+##
+## `built` NEVER NAMES A SPECIFIC BUILDING. It is the one tag every placeable emits (see
+## `AnimalDefinition.BUILDING_TAGS`'s own comment), so a `built` LIMIT reads as "away from
+## buildings", not "build one of every building" — see `_describe_limit()`.
+##
+## Every string this composes is NEW player-facing copy with no prior sign-off, hence the
+## single `[COPY]` marker at the front of each line — one per rendered sentence, matching
+## the ruling `SOURCE_PHRASES`' own header already established, not one per fragment.
+static func describe_tiers(species: AnimalDefinition, world: WorldRoot = null) -> Array[String]:
+	var lines: Array[String] = []
+	if species == null:
+		return lines
+	for tier: HabitatTier in species.effective_tiers():
+		lines.append(_describe_tier(tier, world))
+	return lines
+
+
+## "[COPY] Up to N: needs ...; more ... means room for more; away from buildings."
+static func _describe_tier(tier: HabitatTier, world: WorldRoot) -> String:
+	var seen: Dictionary = {}
+	var gate_phrases: Array[String] = []
+	var scaling_phrases: Array[String] = []
+	for need: HabitatNeed in tier.needs:
+		var phrase: String = _need_phrase(need.tag, world, seen)
+		if phrase.is_empty():
+			continue
+		if need.is_gate_only():
+			gate_phrases.append(_with_article(phrase))
+		else:
+			scaling_phrases.append(phrase)
+
+	var clauses: Array[String] = []
+	if not gate_phrases.is_empty():
+		clauses.append("needs " + _join_and(gate_phrases))
+	if not scaling_phrases.is_empty():
+		clauses.append("more " + _join_and(scaling_phrases) + " means room for more")
+	for limit: HabitatLimit in tier.limits:
+		clauses.append(_describe_limit(limit))
+
+	var body: String = "; ".join(clauses) if not clauses.is_empty() else "no requirements yet"
+	return "[COPY] Up to %d: %s." % [tier.max_individuals, body]
+
+
+## The readable phrase for one need's tag, deduped against `seen` by whichever identity
+## actually decides whether two needs are solved the SAME way: a resolved palette button id
+## when `world` can resolve one — mirroring `recipe_for()`'s own dedup, so Rock's `cover`
+## and `rocks` collapse into one "rocky cover" phrase here exactly as they do there — or the
+## bare tag itself when there is no `world` to resolve against (or no source is catalogued
+## for it — an unsourced tag still deserves a readable line rather than a blank one; that
+## honesty lives in `recipe_for()`'s `satisfiable` flag, not here). Returns "" for an
+## already-seen key, which the caller drops instead of rendering the same requirement twice.
+static func _need_phrase(tag: String, world: WorldRoot, seen: Dictionary) -> String:
+	if world != null:
+		var candidates: Array = (tag_sources(world) as Dictionary).get(tag, []) as Array
+		if not candidates.is_empty():
+			var chosen: Dictionary = _cheapest(candidates)
+			var button_id: String = chosen["id"] as String
+			if seen.has(button_id):
+				return ""
+			seen[button_id] = true
+			var phrase: String = SOURCE_PHRASES.get(button_id, "") as String
+			if phrase.is_empty():
+				phrase = (chosen["display_name"] as String).to_lower()
+			return phrase
+	if seen.has(tag):
+		return ""
+	seen[tag] = true
+	return tag.replace("_", " ")
+
+
+## "a stable", "an open barn" — the indefinite article a gate-only need reads with. A plain
+## first-letter-is-a-vowel heuristic, adequate for the tag vocabulary this reads over; not a
+## general-purpose English rule.
+static func _with_article(phrase: String) -> String:
+	if phrase.is_empty():
+		return phrase
+	var first: String = phrase.substr(0, 1).to_lower()
+	var article: String = "an" if "aeiou".contains(first) else "a"
+	return "%s %s" % [article, phrase]
+
+
+## `built` is emitted by EVERY placeable (`AnimalDefinition.BUILDING_TAGS`'s own comment),
+## so a `built` limit is a "how close is too close to ANY building" rule, never a specific
+## building's name — resolving it through `tag_sources()`/a palette button the way a NEED
+## does would name just one placeable (whichever the catalog happens to list first), which
+## reads as "build one of every building" levels of wrong for a rule that is actually about
+## keeping distance from all of them. `max_count == 0` (Deer's herd tier — genuinely wild
+## land) reads stricter than `max_count >= 1` (Deer's base tier — "a distant cottage is
+## tolerated"), because a six-year-old parsing "at most 1" gets no mental picture at all.
+## A non-`built` limit (none in the roster today) degrades to a generic phrase naming its
+## own tag, since there is no real content yet to justify a bespoke one.
+static func _describe_limit(limit: HabitatLimit) -> String:
+	if limit.tag == "built":
+		return "far from any buildings" if limit.max_count == 0 else "away from buildings"
+	return "not too much %s nearby" % limit.tag.replace("_", " ")
+
+
 ## Display names of every species this one keeps distance from, BOTH directions unioned —
 ## `AnimalDefinition.avoids`' own docstring: "The relation is symmetric at runtime and may be
 ## declared on either species ... the resolver must union both directions rather than

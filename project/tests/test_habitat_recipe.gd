@@ -25,6 +25,8 @@ extends QATestCase
 const WORLD_PATH: String = "res://scenes/Main.tscn"
 const FOX_PATH: String = "res://data/animals/fox.tres"
 const STAG_PATH: String = "res://data/animals/stag.tres"
+const DEER_PATH: String = "res://data/animals/deer.tres"
+const HORSE_PATH: String = "res://data/animals/horse.tres"
 
 var _world: WorldRoot = null
 var _frames: int = 0
@@ -62,6 +64,9 @@ func _process(_delta: float) -> bool:
 	_check_starter_prefers_free_terrain()
 	_check_unsatisfiable_species_describes_honestly()
 	_check_grouped_button_names_the_resolved_member()
+	_check_tiers_are_presented()
+	_check_built_limit_reads_as_plain_english()
+	_check_grasslands_tags_stay_distinct()
 
 	finish()
 	return true
@@ -246,3 +251,140 @@ func _check_grouped_button_names_the_resolved_member() -> void:
 	# (this whole suite runs inside one `_process()` call, so a queued free would never run
 	# before `finish()` quits the tree).
 	fixture_buildings.free()
+
+
+## Task 10's own failing test (habitat-tiers task-10-brief.md, Step 1): a species with two
+## tiers must present BOTH — the one currently met, and the one above it — or nothing tells
+## the player a stable would turn a pair into a herd.
+func _check_tiers_are_presented() -> void:
+	var horse := AnimalDefinition.new()
+	horse.id = "horse"
+	horse.display_name = "Horse"
+	horse.scout_radius = 8
+
+	var pair := HabitatTier.new()
+	pair.id = "pair"
+	pair.max_individuals = 2
+	var stable := HabitatNeed.new()
+	stable.tag = "stable"
+	stable.tiles_per_individual = HabitatNeed.GATE_ONLY
+	var grass := HabitatNeed.new()
+	grass.tag = "open_grass"
+	grass.tiles_per_individual = 6
+	pair.needs = [stable, grass]
+
+	var herd := HabitatTier.new()
+	herd.id = "herd"
+	herd.max_individuals = 12
+	var wide := HabitatNeed.new()
+	wide.tag = "open_grass"
+	wide.radius = 14
+	wide.tiles_per_individual = 4
+	var water := HabitatNeed.new()
+	water.tag = "water"
+	water.radius = 12
+	water.tiles_per_individual = 2
+	herd.needs = [stable, wide, water]
+
+	horse.tiers = [pair, herd]
+
+	check_eq(horse.effective_tiers().size(), 2, "the horse presents two tiers")
+	var lines: Array[String] = HabitatRecipe.describe_tiers(horse)
+	check_eq(lines.size(), 2, "one description line per tier")
+	check(lines[1].contains("water"), "the herd line names water, the need that unlocks it")
+	check(not lines[0].contains("herd"), "internal tier ids never reach player copy")
+
+
+## `built` is emitted by EVERY placeable (nine buildings and counting — see
+## `AnimalDefinition.BUILDING_TAGS`), so a `built` limit must read as a place a player
+## avoids, never a specific building, and Deer's real two tiers use two different
+## tolerances (`max_count` 1, then 0) that must read as two different sentences, not the
+## same "built <= N" formula with the number swapped — the human-readability half of Task
+## 10's brief.
+func _check_built_limit_reads_as_plain_english() -> void:
+	var deer: AnimalDefinition = load(DEER_PATH) as AnimalDefinition
+	if not check(deer != null, "deer.tres loads"):
+		return
+	var lines: Array[String] = HabitatRecipe.describe_tiers(deer)
+	check_eq(lines.size(), 2, "deer presents its base and herd tiers")
+	if lines.size() != 2:
+		return
+	for line: String in lines:
+		check(not line.contains("built"), "the raw tag 'built' never reaches '%s'" % line)
+		check(line.contains("buildings"), "the limit reads as a place, not a formula: '%s'" % line)
+	check(lines[0].contains("away from buildings"),
+		"the base tier (max_count 1, a distant cottage is tolerated) reads as tolerant: '%s'"
+		% lines[0])
+	check(lines[1].contains("far from any buildings"),
+		"the herd tier (max_count 0, genuinely wild land) reads stricter than the base "
+		+ "tier: '%s'" % lines[1])
+
+
+## Grass, Wild Grass, Meadow and Scrub now share one palette button ("Grasslands" —
+## `GameHud.TERRAIN_GROUP_ID`), but `open_grass` (Grass/Meadow) and `browse` (Scrub) remain
+## DIFFERENT terrain underneath: placing one never satisfies the other. A tier line must
+## therefore never collapse the two into the same generic "Grasslands" wording, and a tier
+## needing BOTH (Deer's real herd tier does exactly this) must name both rather than
+## silently dropping one as "already covered by Grasslands".
+func _check_grasslands_tags_stay_distinct() -> void:
+	var grass_species := AnimalDefinition.new()
+	grass_species.id = "grass_test"
+	grass_species.display_name = "Grass Test"
+	var grass_tier := HabitatTier.new()
+	grass_tier.id = "only"
+	grass_tier.max_individuals = 4
+	var grass_need := HabitatNeed.new()
+	grass_need.tag = "open_grass"
+	grass_need.tiles_per_individual = 5
+	grass_tier.needs = [grass_need]
+	grass_species.tiers = [grass_tier]
+
+	var browse_species := AnimalDefinition.new()
+	browse_species.id = "browse_test"
+	browse_species.display_name = "Browse Test"
+	var browse_tier := HabitatTier.new()
+	browse_tier.id = "only"
+	browse_tier.max_individuals = 4
+	var browse_need := HabitatNeed.new()
+	browse_need.tag = "browse"
+	browse_need.tiles_per_individual = 5
+	browse_tier.needs = [browse_need]
+	browse_species.tiers = [browse_tier]
+
+	var grass_lines: Array[String] = HabitatRecipe.describe_tiers(grass_species, _world)
+	var browse_lines: Array[String] = HabitatRecipe.describe_tiers(browse_species, _world)
+	if not check(grass_lines.size() == 1 and browse_lines.size() == 1,
+		"both single-need fixtures present exactly one tier"):
+		return
+	check(not grass_lines[0].contains("Grasslands"),
+		"the cosmetic palette-group name never leaks into the line: '%s'" % grass_lines[0])
+	check(not browse_lines[0].contains("Grasslands"),
+		"the cosmetic palette-group name never leaks into the line: '%s'" % browse_lines[0])
+	check(grass_lines[0] != browse_lines[0],
+		"open_grass and browse read as different requirements even though both currently "
+		+ "sit behind the same palette button")
+
+	# A tier needing BOTH open_grass and browse must name both — Deer's real herd tier is
+	# exactly this shape.
+	var both_species := AnimalDefinition.new()
+	both_species.id = "both_test"
+	both_species.display_name = "Both Test"
+	var both_tier := HabitatTier.new()
+	both_tier.id = "only"
+	both_tier.max_individuals = 4
+	var need_a := HabitatNeed.new()
+	need_a.tag = "open_grass"
+	need_a.tiles_per_individual = 5
+	var need_b := HabitatNeed.new()
+	need_b.tag = "browse"
+	need_b.tiles_per_individual = 5
+	both_tier.needs = [need_a, need_b]
+	both_species.tiers = [both_tier]
+	var both_lines: Array[String] = HabitatRecipe.describe_tiers(both_species, _world)
+	if check(both_lines.size() == 1, "the combined fixture presents one tier"):
+		check(both_lines[0].contains("scrub"),
+			("browse's only real source (Scrub) is still named when open_grass is ALSO "
+			+ "needed: '%s'") % both_lines[0])
+		check(both_lines[0] != browse_lines[0],
+			"the combined line is not just the browse-only line with open_grass silently "
+			+ "dropped: '%s'" % both_lines[0])
