@@ -627,13 +627,29 @@ func _add_palette_button(kind: String, row: Dictionary) -> void:
 	button.owner = _palette_row.owner
 	_palette_row.move_child(button, _remove_button.get_index())
 
-	var icon_kind: Variant = TileIcon.kind_for_id(icon_id)
+	var icon_kind: Variant = _icon_kind_for(icon_id, id)
 	_decorate_button(
 		button, icon_kind, str(_palette_order.size() + 1), display_name, _has_style_choice(id)
 	)
 
 	_palette_order.append({"kind": kind, "id": id})
 	_palette_buttons.append(button)
+
+
+## The glyph for a palette button, preferring the resolved member id and falling back to the
+## GROUP key. A single-member group (House, every terrain) has `icon_id == group_key`, so the
+## fallback is a no-op there. It is load-bearing for Farm Building: `icon_id` is whichever
+## member is currently the default (barn, silo, well, ...) and `TileIcon.KIND_BY_ID` maps none
+## of those eight ids — before the fallback existed that button rendered with NO glyph at all
+## (playtest: "the Barn button looks blank"). The group key "farm_building" IS mapped, and one
+## barn silhouette standing for the whole group is the deliberate choice there — see that
+## entry's own comment in `tile_icon.gd`. Still returns `null` when neither is mapped, which is
+## the graceful-degradation case `_decorate_button()` already handles.
+func _icon_kind_for(icon_id: String, group_key: String) -> Variant:
+	var kind: Variant = TileIcon.kind_for_id(icon_id)
+	if kind == null:
+		kind = TileIcon.kind_for_id(group_key)
+	return kind
 
 
 ## REVIEW FIX (2026-08-27): `id in _PICKER_CATEGORIES` alone is no longer enough to promise a
@@ -679,7 +695,7 @@ func refresh_palette_button(category_or_id: String) -> void:
 	if name_label != null:
 		name_label.text = display_name
 	var icon: TileIcon = _icon_child_of(button)
-	var icon_kind: Variant = TileIcon.kind_for_id(icon_id)
+	var icon_kind: Variant = _icon_kind_for(icon_id, category_or_id)
 	if icon != null and icon_kind != null:
 		icon.kind = icon_kind as TileIcon.Kind
 

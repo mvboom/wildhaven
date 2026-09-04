@@ -12,7 +12,7 @@ extends Control
 ## like the button's own label text does, so it stays legible in both states without a
 ## second palette of icon-specific colors.
 
-enum Kind { WILD_GRASS, GRASS, WATER, FOREST, ROCK, FARM, HOUSE, ERASER, EXIT, LOOK, HELP }
+enum Kind { WILD_GRASS, GRASS, WATER, FOREST, ROCK, FARM, HOUSE, FARM_BUILDING, ERASER, EXIT, LOOK, HELP }
 
 ## Palette option id -> glyph. Lives here rather than on `GameHud` because `HabitatRecipe`
 ## needs the same mapping to render a recipe chip, and two copies would silently diverge the
@@ -25,6 +25,12 @@ const KIND_BY_ID: Dictionary = {
 	"rock": Kind.ROCK,
 	"cultivated_field": Kind.FARM,
 	"house": Kind.HOUSE,
+	# The hotbar's Farm Building GROUP key, not a placeable id — that button's `icon_id` is
+	# whichever member is currently the default (barn, silo, well...), and mapping eight
+	# separate ids to one barn silhouette would claim each of them looks like a barn. The
+	# group key earns one shared glyph instead; `GameHud._add_palette_button()` falls back to
+	# it when the resolved member has no glyph of its own.
+	"farm_building": Kind.FARM_BUILDING,
 }
 
 
@@ -73,6 +79,8 @@ func _draw() -> void:
 			_draw_farm(ink, c)
 		Kind.HOUSE:
 			_draw_house(ink, c)
+		Kind.FARM_BUILDING:
+			_draw_farm_building(ink, c)
 		Kind.ERASER:
 			_draw_eraser(ink, c)
 		Kind.EXIT:
@@ -138,15 +146,18 @@ func _draw_rock(ink: Color, c: Vector2) -> void:
 func _draw_farm(ink: Color, c: Vector2) -> void:
 	var row_width: float = 30.0
 	var row_height: float = 5.0
+	# Furrows sit BELOW centre and the sprouts occupy the space above them — the glyph as a
+	# whole is centred, but its filled mass is not, so the rows start at centre rather than
+	# above it (without this the top sprout clipped the icon rect's top edge).
 	for row in 3:
-		var y: float = c.y - 10.0 + row as float * 10.0
+		var y: float = c.y - 5.0 + float(row) * 10.0
 		draw_rect(
 			Rect2(Vector2(c.x - row_width * 0.5, y - row_height * 0.5), Vector2(row_width, row_height)),
 			ink
 		)
 	for i in 3:
-		var x: float = c.x - 10.0 + i as float * 10.0
-		var base_y: float = c.y - 15.0
+		var x: float = c.x - 10.0 + float(i) * 10.0
+		var base_y: float = c.y - 10.0
 		var sprout := PackedVector2Array([
 			Vector2(x, base_y - 7.0),
 			Vector2(x - 3.0, base_y),
@@ -170,6 +181,29 @@ func _draw_house(ink: Color, c: Vector2) -> void:
 	])
 	draw_colored_polygon(roof, ink)
 	draw_rect(Rect2(Vector2(c.x - 3.0, wall_bottom - 8.0), Vector2(6.0, 8.0)), ink)
+
+
+## A barn — the Farm Building group's glyph. Deliberately NOT a second cottage: a gambrel
+## (two-slope) roof that overhangs the walls, and one wide double door with a centre split,
+## are what separate it from `_draw_house()`'s pitched roof and single narrow door at 72px.
+func _draw_farm_building(ink: Color, c: Vector2) -> void:
+	var wall_top: float = c.y - 1.0
+	var wall_bottom: float = c.y + 16.0
+	var wall_left: float = c.x - 14.0
+	var wall_right: float = c.x + 14.0
+	draw_rect(Rect2(Vector2(wall_left, wall_top), Vector2(wall_right - wall_left, wall_bottom - wall_top)),
+		ink, false, THICKNESS * 0.8)
+	var roof := PackedVector2Array([
+		Vector2(wall_left - 3.0, wall_top + 1.0),
+		Vector2(wall_left + 1.0, c.y - 11.0),
+		Vector2(c.x, c.y - 17.0),
+		Vector2(wall_right - 1.0, c.y - 11.0),
+		Vector2(wall_right + 3.0, wall_top + 1.0),
+	])
+	draw_colored_polygon(roof, ink)
+	var door_top: float = wall_bottom - 11.0
+	draw_rect(Rect2(Vector2(c.x - 7.0, door_top), Vector2(14.0, 11.0)), ink, false, THICKNESS * 0.6)
+	draw_line(Vector2(c.x, door_top), Vector2(c.x, wall_bottom), ink, THICKNESS * 0.6, true)
 
 
 ## A plain outlined block with one divider line — the classic two-tone eraser silhouette,
