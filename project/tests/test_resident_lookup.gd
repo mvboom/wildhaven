@@ -185,6 +185,11 @@ func _land_a_wandering_rabbit() -> bool:
 	# needs BOTH `open_grass` and `cover`, and `wild_grass` (the new default) supplies neither
 	# implicitly — this border supplies the `open_grass` half the old ambient `grass` backdrop
 	# used to give away for free.
+	#
+	# RE-POINTED AGAIN 2026-09-04 (habitat-tiers ruling): `capacity_at()` now reads
+	# `AnimalDefinition.effective_tiers()`, which prefers the real `tiers` rabbit.tres now
+	# carries — base tier needs `open_grass/4` + `cultivated/4`, not `cover`. The block below
+	# is now painted `cultivated_field`, not `rock`.
 	for x in range(ROCK_ORIGIN.x - 1, ROCK_ORIGIN.x + ROCK_W + 1):
 		for z in range(ROCK_ORIGIN.y - 1, ROCK_ORIGIN.y + ROCK_D + 1):
 			var inside_rock: bool = (
@@ -195,7 +200,7 @@ func _land_a_wandering_rabbit() -> bool:
 				_world.paint_tile(x, z, "grass")
 	for dx in ROCK_W:
 		for dz in ROCK_D:
-			_world.paint_tile(ROCK_ORIGIN.x + dx, ROCK_ORIGIN.y + dz, "rock")
+			_world.paint_tile(ROCK_ORIGIN.x + dx, ROCK_ORIGIN.y + dz, "cultivated_field")
 	for _i in 60:
 		_world.simulation.tick(0.0)
 	_world.simulation.tick(ArrivalQueue.ARRIVAL_DELAY_MAX_SECONDS + 1.0)

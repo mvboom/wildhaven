@@ -296,14 +296,27 @@ func _check_avoids_never_gates_a_move_in() -> void:
 	check(rabbit.normalized_avoids().has("fox"), "the shipped rabbit avoids the shipped fox")
 	check(fox.normalized_avoids().has("rabbit"), "...and the shipped fox avoids the shipped rabbit")
 
+	# RE-POINTED 2026-09-04 (habitat-tiers ruling): `capacity_at()` now reads
+	# `AnimalDefinition.effective_tiers()`, which prefers the real `tiers` both fox.tres and
+	# rabbit.tres now carry over their old legacy `habitat_needs`. Rabbit's tier needs
+	# `open_grass` + `cultivated` (no longer `cover`); Fox's needs `forest` + `open_grass` +
+	# `water` (no longer `cover`). Painted to satisfy each species' base/single tier with
+	# margin, same footprint as before (two 4x3 blocks per species).
 	for dx in 4:
 		for dz in 3:
-			world.paint_tile(RABBIT_ROCK_ORIGIN.x + dx, RABBIT_ROCK_ORIGIN.y + dz, "rock")
-			world.paint_tile(RABBIT_ROCK_ORIGIN.x + dx, RABBIT_ROCK_ORIGIN.y + dz + 4, "grass")
+			world.paint_tile(RABBIT_ROCK_ORIGIN.x + dx, RABBIT_ROCK_ORIGIN.y + dz, "grass")
+			world.paint_tile(RABBIT_ROCK_ORIGIN.x + dx, RABBIT_ROCK_ORIGIN.y + dz + 4, "cultivated_field")
+	var fox_second_block: Array[Vector2i] = []
 	for dx in 4:
 		for dz in 3:
 			world.paint_tile(FOX_FOREST_ORIGIN.x + dx, FOX_FOREST_ORIGIN.y + dz, "forest")
-			world.paint_tile(FOX_FOREST_ORIGIN.x + dx, FOX_FOREST_ORIGIN.y + dz + 4, "rock")
+			fox_second_block.append(Vector2i(dx, dz))
+	# Split the second block 6 `water` / 6 `grass` — Fox's tier needs `water/6` and
+	# `open_grass/5`; 6 of each clears both divisors with margin.
+	for i in range(fox_second_block.size()):
+		var offset: Vector2i = fox_second_block[i]
+		var tag: String = "water" if i < 6 else "grass"
+		world.paint_tile(FOX_FOREST_ORIGIN.x + offset.x, FOX_FOREST_ORIGIN.y + offset.y + 4, tag)
 
 	check(world.capacity_at(RABBIT_ROCK_ORIGIN.x, RABBIT_ROCK_ORIGIN.y, "rabbit") >= 1,
 		"the rabbit habitat qualifies on its own")

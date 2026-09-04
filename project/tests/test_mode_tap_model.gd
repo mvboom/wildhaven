@@ -711,13 +711,18 @@ func _check_live_neighborhood_preview() -> void:
 	# needs BOTH `open_grass` and `cover`, and the old ambient `grass` backdrop used to supply
 	# the `open_grass` half implicitly everywhere. `wild_grass` emits nothing, so painting only
 	# `cover` (rock) now caps capacity at 0 forever — this ring of explicit `grass` just outside
-	# the rock block supplies the other need without touching the rock tiles or the cursor tile
-	# itself, which must stay untouched land for check 2 above.
+	# the block supplies the other need without touching the block's own tiles or the cursor
+	# tile itself, which must stay untouched land for check 2 above.
+	#
+	# RE-POINTED AGAIN 2026-09-04 (habitat-tiers ruling): `refresh_preview()` reads capacity
+	# through `AnimalDefinition.effective_tiers()`, which prefers the real `tiers` rabbit.tres
+	# now carries — base tier needs `open_grass/4` + `cultivated/4`, not `cover`. The block
+	# below is now painted `cultivated_field`, not `rock`.
 	var grass_painted: int = 0
 	for dx in range(-3, 4):
 		for dz in range(-3, 4):
 			if dx >= -2 and dx <= 1 and dz >= -2 and dz <= 1:
-				continue  # the rock block's own footprint, painted below
+				continue  # the cultivated block's own footprint, painted below
 			if _world.paint_tile(tile.x + dx, tile.y + dz, "grass"):
 				grass_painted += 1
 	check(grass_painted >= 4,
@@ -728,9 +733,9 @@ func _check_live_neighborhood_preview() -> void:
 		for dz in range(-2, 2):
 			if dx == 0 and dz == 0:
 				continue
-			if _world.paint_tile(tile.x + dx, tile.y + dz, "rock"):
+			if _world.paint_tile(tile.x + dx, tile.y + dz, "cultivated_field"):
 				painted += 1
-	check(painted >= 12, "painted %d rock tiles beside the cursor (cover for a rabbit)" % painted)
+	check(painted >= 12, "painted %d cultivated tiles beside the cursor (cultivated for a rabbit)" % painted)
 
 	var settled_band: String = _router.refresh_preview(screen)
 	check_eq(settled_band, NeighborhoodPreview.BAND_WELCOMING,

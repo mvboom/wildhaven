@@ -42,9 +42,10 @@ const WORLD_PATH: String = "res://scenes/Main.tscn"
 const _REAL_SAVE_DIR: String = "user://saves"
 const _TEST_SAVE_DIR: String = "user://test_saves_round_trip"
 
-## The rabbit's habitat: a row of grass (`open_grass`) beside a row of rock (`cover`). Both
-## needs must be present or capacity is 0 forever — `wild_grass`, the world's default tile, is
-## deliberately tag-inert.
+## The rabbit's habitat: a row of grass (`open_grass`) beside a row of cultivated field
+## (`cultivated`) — RE-POINTED 2026-09-04, habitat-tiers ruling: rabbit.tres's base tier needs
+## `open_grass/4` + `cultivated/4`, not `cover`. Both needs must be present or capacity is 0
+## forever — `wild_grass`, the world's default tile, is deliberately tag-inert.
 const GRASS_Z: int = 4
 const GRASS_X_FROM: int = 4
 const GRASS_X_TO: int = 10
@@ -231,8 +232,13 @@ func _check_the_session_hand_off() -> void:
 
 # --- The real causal path -------------------------------------------------------------------
 
-## Paint rock beside grass until a rabbit really moves in, then place a House and let a villager
-## in beside a cultivated field — the two arrivals the vertical slice proved.
+## Paint cultivated field beside grass until a rabbit really moves in, then place a House and
+## let a villager in beside a cultivated field — the two arrivals the vertical slice proved.
+##
+## RE-POINTED 2026-09-04 (habitat-tiers ruling): `capacity_at()` now reads
+## `AnimalDefinition.effective_tiers()`, which prefers the real `tiers` rabbit.tres now
+## carries — base tier needs `open_grass/4` + `cultivated/4`, not `cover`. The `ROCK_*` row
+## (names unchanged so the diff stays small) is painted `cultivated_field`, not `rock`.
 func _build_a_world_through_the_real_causal_path() -> void:
 	# Driven by hand from here on, so nothing depends on how many real frames elapse.
 	_source.wood.set_process(false)
@@ -243,7 +249,7 @@ func _build_a_world_through_the_real_causal_path() -> void:
 	for x in range(GRASS_X_FROM, GRASS_X_TO):
 		_source.paint_tile(x, GRASS_Z, "grass")
 	for x in range(ROCK_X_FROM, ROCK_X_TO):
-		_source.paint_tile(x, ROCK_Z, "rock")
+		_source.paint_tile(x, ROCK_Z, "cultivated_field")
 
 	# A House builds on grass only (buildings.md), and the world's default tile is `wild_grass`.
 	# Terraforming first is what a player does; without it `place_building` declines silently and
@@ -478,10 +484,12 @@ func _check_a_pending_arrival_survives_a_reload_with_no_home_site_yet() -> void:
 	root.add_child(unsettled)
 	_take_off_process(unsettled)
 
+	# RE-POINTED 2026-09-04 (habitat-tiers ruling): rabbit.tres's base tier needs `open_grass/4`
+	# + `cultivated/4`, not `cover` — the `ROCK_*` row is painted `cultivated_field`, not `rock`.
 	for x in range(GRASS_X_FROM, GRASS_X_TO):
 		unsettled.paint_tile(x, GRASS_Z, "grass")
 	for x in range(ROCK_X_FROM, ROCK_X_TO):
-		unsettled.paint_tile(x, ROCK_Z, "rock")
+		unsettled.paint_tile(x, ROCK_Z, "cultivated_field")
 
 	# Enough ticks to DRAIN the dirty queue (4 evaluations/frame) but nowhere near enough
 	# simulated time to spend the 20-60 s delay — which is exactly the state a child quits in.

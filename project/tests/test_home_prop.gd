@@ -152,12 +152,16 @@ func _check_prop_changes_nothing_about_the_tile() -> void:
 	var registry := HomeSiteRegistry.new()
 	var rabbit: AnimalDefinition = _world.roster.by_id("rabbit")
 	var tile := Vector2i(18, 18)
+	# RE-POINTED 2026-09-04 (habitat-tiers ruling): `CapacityEvaluator.capacity()` now reads
+	# `AnimalDefinition.effective_tiers()`, which prefers the real `tiers` rabbit.tres now
+	# carries — base tier needs `open_grass/4` + `cultivated/4`, not `cover`. This row used to
+	# be `rock`; it is `cultivated_field` now.
 	for i in 12:
-		grid.set_terrain(tile.x - 6 + i, tile.y + 1, "rock")
+		grid.set_terrain(tile.x - 6 + i, tile.y + 1, "cultivated_field")
 	# RE-POINTED (-> D-29 #1, `WorldGrid.START_TERRAIN_ID` "grass" -> "wild_grass"): this
 	# synthetic grid now starts all-`wild_grass`, tag-inert, so the rabbit's OTHER need
 	# (`open_grass`) has to be painted explicitly too, or capacity never rises off 0 no matter
-	# how much cover goes down. A row just south of the cover row supplies it.
+	# how much cultivated goes down. A row just south of the cultivated row supplies it.
 	for i in 12:
 		grid.set_terrain(tile.x - 6 + i, tile.y + 2, "grass")
 
@@ -349,6 +353,11 @@ func _check_counts_in_the_real_world() -> void:
 	# RE-POINTED (-> D-29 #1): the rabbit needs BOTH `open_grass` and `cover`, and `wild_grass`
 	# (the new default) supplies neither implicitly — this border supplies the `open_grass` half
 	# the old ambient `grass` backdrop used to give away for free.
+	#
+	# RE-POINTED AGAIN 2026-09-04 (habitat-tiers ruling): `capacity_at()` now reads
+	# `AnimalDefinition.effective_tiers()`, which prefers the real `tiers` rabbit.tres now
+	# carries — base tier needs `open_grass/4` + `cultivated/4`, not `cover`. The block below
+	# is now painted `cultivated_field`, not `rock`.
 	for x in range(ROCK_ORIGIN.x - 1, ROCK_ORIGIN.x + ROCK_W + 1):
 		for z in range(ROCK_ORIGIN.y - 1, ROCK_ORIGIN.y + ROCK_D + 1):
 			var inside_rock: bool = (
@@ -359,7 +368,7 @@ func _check_counts_in_the_real_world() -> void:
 				_world.paint_tile(x, z, "grass")
 	for dx in ROCK_W:
 		for dz in ROCK_D:
-			_world.paint_tile(ROCK_ORIGIN.x + dx, ROCK_ORIGIN.y + dz, "rock")
+			_world.paint_tile(ROCK_ORIGIN.x + dx, ROCK_ORIGIN.y + dz, "cultivated_field")
 	_drain(60)
 	_world.simulation.tick(ArrivalQueue.ARRIVAL_DELAY_MAX_SECONDS + 1.0)
 

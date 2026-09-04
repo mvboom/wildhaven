@@ -27,10 +27,20 @@ extends QATestCase
 
 const WORLD_PATH: String = "res://scenes/Main.tscn"
 
-## The rabbit's habitat, painted as a 4x3 block of rock. Rabbit needs `open_grass` + `cover`
-## at 4 tiles per individual (roster.md's decided value, -> D-27 #2), so 12 rock tiles beside
-## the starting meadow is THREE individuals' worth of the scarce need. It used to be exactly
-## one, against the schema stub's 12; the block is unchanged and the arithmetic under it moved.
+## The rabbit's habitat, painted as a 4x3 block of cultivated field. Rabbit needs `open_grass`
+## + `cover` at 4 tiles per individual (roster.md's decided value, -> D-27 #2) on the LEGACY
+## flat fields, so 12 tiles beside the starting meadow is THREE individuals' worth of the
+## scarce need. It used to be exactly one, against the schema stub's 12; the block is
+## unchanged and the arithmetic under it moved.
+##
+## RE-POINTED 2026-09-04 (habitat-tiers ruling): `capacity_at()` now reads
+## `AnimalDefinition.effective_tiers()`, which prefers the real `tiers` rabbit.tres now
+## carries. Rabbit's base tier needs `open_grass/4` + `cultivated/4` — `cover` is no longer
+## consumed — so the scarce block below is painted `cultivated_field`, not `rock`, to stay
+## the tag the arithmetic is actually about. Same block size, same divisor (4), so the "12
+## tiles / 4 = 3" arithmetic is unchanged; only which terrain supplies the tag moved. Costs
+## Wood now (`cultivated_field.cost == 2`), unlike free `rock`; the suite's 50-Wood starting
+## budget comfortably covers this block plus the House/field fixture below (24 + 17 = 41).
 ##
 ## RE-DERIVED 2026-07-28 against the new divisor, and the re-derivation is not just a division:
 ## once one edit supports more than one individual, several candidate sites compete for the
@@ -192,11 +202,12 @@ func _check_wild_species_causality() -> void:
 	check_eq(rabbit.habitat_needs, ["open_grass", "cover"] as Array[String],
 		"rabbit needs open_grass + cover — and rock, not forest, is the `cover` source")
 
-	# RE-POINTED (-> D-29 #1): the rabbit needs BOTH `open_grass` and `cover`, and the world's old
-	# ambient `grass` backdrop used to supply the `open_grass` half implicitly, everywhere, for
-	# free. `wild_grass` (the new default) emits no tags at all, so painting only the rock block
-	# would cap capacity at 0 forever — this explicit border supplies the other need, exactly the
-	# same fix `test_event_driven_simulation.gd`'s wander fixture needed for the same reason.
+	# RE-POINTED 2026-09-04 (habitat-tiers ruling): `capacity_at()` now reads
+	# `AnimalDefinition.effective_tiers()`, which prefers the real `tiers` rabbit.tres now
+	# carries — base tier needs `open_grass/4` + `cultivated/4` (`cover` is no longer
+	# consumed). The border below still supplies `open_grass`, exactly the same fix
+	# `test_event_driven_simulation.gd`'s wander fixture needed for the same reason
+	# (`wild_grass`, the world default, emits no tags at all).
 	var grass_painted: int = 0
 	for x in range(ROCK_ORIGIN.x - 1, ROCK_ORIGIN.x + ROCK_W + 1):
 		for z in range(ROCK_ORIGIN.y - 1, ROCK_ORIGIN.y + ROCK_D + 1):
@@ -207,17 +218,17 @@ func _check_wild_species_causality() -> void:
 			if not inside_rock and _world.paint_tile(x, z, "grass"):
 				grass_painted += 1
 	check(grass_painted >= ROCK_W * ROCK_D,
-		"painted %d grass border tiles — at least as many as the cover block, so cover (not "
-		% grass_painted + "open_grass) stays the scarce need the divisor-4 arithmetic below is about")
+		"painted %d grass border tiles — at least as many as the cultivated block, so cultivated "
+		% grass_painted + "(not open_grass) stays the scarce need the divisor-4 arithmetic below is about")
 
 	var painted: int = 0
 	for dx in ROCK_W:
 		for dz in ROCK_D:
-			if _world.paint_tile(ROCK_ORIGIN.x + dx, ROCK_ORIGIN.y + dz, "rock"):
+			if _world.paint_tile(ROCK_ORIGIN.x + dx, ROCK_ORIGIN.y + dz, "cultivated_field"):
 				painted += 1
 	check_eq(painted, ROCK_W * ROCK_D,
-		"%d rock tiles painted beside the meadow (free — nature costs nothing)" % (ROCK_W * ROCK_D))
-	check_eq(_world.get_tile_terrain(ROCK_ORIGIN.x, ROCK_ORIGIN.y), "rock",
+		"%d cultivated tiles painted beside the meadow" % (ROCK_W * ROCK_D))
+	check_eq(_world.get_tile_terrain(ROCK_ORIGIN.x, ROCK_ORIGIN.y), "cultivated_field",
 		"the tiles really did convert")
 
 	# CAUSE -> EFFECT, read through the same function the arrival predicate uses. This is the
@@ -227,8 +238,8 @@ func _check_wild_species_causality() -> void:
 		"the rabbit's decided divisor is 4 (-> D-27 #2), so the re-derivation below is against "
 		+ "the shipped value and not a number this suite chose")
 	check_eq(_world.capacity_at(RABBIT_SITE.x, RABBIT_SITE.y, "rabbit"), 3,
-		"capacity rose 0 -> 3 BECAUSE of the paint: 12 cover tiles / 4 per individual (this read "
-		+ "1 under the old stub divisor of 12)")
+		"capacity rose 0 -> 3 BECAUSE of the paint: 12 cultivated tiles / 4 per individual, against "
+		+ "the tier's own divisor")
 
 	_drain(60)
 	check(_world.simulation.arrivals().size() > 0,
@@ -417,10 +428,10 @@ func _note_capacity_is_not_a_binding_cap() -> void:
 	note_expected_pending(
 		"CAPACITY IS NOT A BINDING POPULATION CAP THE INSTANT SITES COMPETE — ARMED, not settled, "
 		+ "in this run (-> D-29 #5)",
-		"REPRO, from this run: paint the %dx%d rock block at %s (12 cover tiles) on the shipped "
+		"REPRO, from this run: paint the %dx%d cultivated block at %s (12 cultivated tiles) on "
 			% [ROCK_W, ROCK_D, str(ROCK_ORIGIN)]
-		+ "36x36 start and let every arrival come due. 12 cover tiles at the rabbit's decided "
-		+ "divisor of 4 is three individuals' worth, and `capacity_at%s` reads 3. "
+		+ "the shipped 36x36 start and let every arrival come due. 12 cultivated tiles at the "
+		+ "rabbit's decided divisor of 4 is three individuals' worth, and `capacity_at%s` reads 3. "
 			% str(RABBIT_SITE)
 		+ "MEASURED END STATE: %d rabbit home sites holding %d residents against %d total "
 			% [sites, total_population, total_capacity]

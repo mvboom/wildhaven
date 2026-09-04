@@ -84,11 +84,17 @@ const WORLD_PATH: String = "res://scenes/Main.tscn"
 ## around the rock block, so the fixture states its own habitat rather than borrowing the
 ## world's default. The assertion this buys — wander must not move `evaluations_run` — is
 ## unchanged; only how the fixture gets a resident to wander is.
+##
+## RE-POINTED AGAIN 2026-09-04 (habitat-tiers ruling): `capacity_at()` now reads
+## `AnimalDefinition.effective_tiers()`, which prefers the real `tiers` rabbit.tres now
+## carries — base tier needs `open_grass/4` + `cultivated/4`, not `cover`. The block below is
+## now painted `cultivated_field` (see `_check_wander_is_not_simulation_work_hand_driven()`);
+## the `grass` border is unchanged, since `open_grass` is still consumed.
 const WANDER_ROCK_ORIGIN := Vector2i(16, 17)
 const WANDER_ROCK_W: int = 4
 const WANDER_ROCK_D: int = 3
-## Width of the explicit `grass` border painted around the rock block, in tiles. 1 tile all the
-## way round a 4x3 rock block yields 18 grass tiles — comfortably above the 4 needed to clear
+## Width of the explicit `grass` border painted around the block, in tiles. 1 tile all the
+## way round a 4x3 block yields 18 grass tiles — comfortably above the 4 needed to clear
 ## `tiles_per_individual` for the `open_grass` need with margin to spare.
 const WANDER_GRASS_MARGIN: int = 1
 
@@ -222,10 +228,10 @@ func _check_wander_is_not_simulation_work_hand_driven() -> bool:
 	_world.presentation.set_process(false)
 	_world.simulation.set_process(false)
 
-	# RE-POINTED (-> D-29 #1, see WANDER_GRASS_MARGIN above): the rabbit needs BOTH
-	# `open_grass` and `cover`, and `wild_grass` (the new default) supplies neither implicitly.
-	# Paint the border first so it is present the instant the rock block completes, not painted
-	# over rock that already qualified on `cover` alone.
+	# RE-POINTED 2026-09-04 (habitat-tiers ruling): the rabbit's base tier needs BOTH
+	# `open_grass` and `cultivated` (no longer `cover`), and `wild_grass` (the world default)
+	# supplies neither implicitly. Paint the border first so it is present the instant the
+	# cultivated block completes, not painted over a block that already qualified alone.
 	var lo_x: int = WANDER_ROCK_ORIGIN.x - WANDER_GRASS_MARGIN
 	var lo_z: int = WANDER_ROCK_ORIGIN.y - WANDER_GRASS_MARGIN
 	var hi_x: int = WANDER_ROCK_ORIGIN.x + WANDER_ROCK_W - 1 + WANDER_GRASS_MARGIN
@@ -240,7 +246,7 @@ func _check_wander_is_not_simulation_work_hand_driven() -> bool:
 				_world.paint_tile(x, z, "grass")
 	for dx in WANDER_ROCK_W:
 		for dz in WANDER_ROCK_D:
-			_world.paint_tile(WANDER_ROCK_ORIGIN.x + dx, WANDER_ROCK_ORIGIN.y + dz, "rock")
+			_world.paint_tile(WANDER_ROCK_ORIGIN.x + dx, WANDER_ROCK_ORIGIN.y + dz, "cultivated_field")
 	for _i in 200:
 		_world.simulation.tick(ArrivalQueue.ARRIVAL_DELAY_MAX_SECONDS + 1.0)
 
