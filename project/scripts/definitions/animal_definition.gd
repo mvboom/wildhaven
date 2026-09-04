@@ -25,22 +25,34 @@ const PERSONALITY_SHY: String = "Shy"
 const PERSONALITY_BOLD: String = "Bold"
 const PERSONALITIES: PackedStringArray = [PERSONALITY_SHY, PERSONALITY_BOLD]
 
-## The shared habitat tag vocabulary (gdd.md -> Data Schemas -> Shared patterns).
-## Extending this vocabulary is a system-wide design decision reserved for the human
-## (gdd.md -> Content Pipelines -> Add-a-Terrain, "extra human gate"), so this list is
-## used only to REPORT unknown tags — never to reject or drop them at load.
+## The shared habitat tag vocabulary. Extending it is a system-wide design decision
+## reserved for the human (gdd.md -> Content Pipelines -> Add-a-Terrain, "extra human
+## gate"); this list is used only to REPORT unknown tags, never to reject or drop them.
+##
+## Extended 2026-09-04 by the habitat-tiers ruling. `quiet` was RETIRED: it had no source
+## and no consumer, and a `built` limit does its job strictly better because it is actually
+## enforced and needs no terrain to emit it.
 const HABITAT_TAGS: PackedStringArray = [
-	"water",
-	"forest",
-	"open_grass",
-	"quiet",
-	"cover",
-	"flowers",
-	"sand",
-	"rocks",
-	"cultivated",
-	"house",
+	# Terrain-emitted
+	"water", "forest", "open_grass", "browse", "cover", "flowers", "sand", "rocks",
+	"cultivated", "snow",
+	# Building-emitted
+	"built", "house", "large_house", "barn", "large_barn", "stable", "coop", "silo", "mill",
+	# Resident-emitted
+	"people", "deer",
 ]
+
+## The subset of HABITAT_TAGS emitted by placeables rather than terrain. Used by
+## `category()` to tell a Domesticated species (which gates on a building) from a Wild one
+## (which does not). `built` is deliberately included: it is emitted by every placeable.
+const BUILDING_TAGS: PackedStringArray = [
+	"built", "house", "large_house", "barn", "large_barn", "stable", "coop", "silo", "mill",
+]
+
+## Category names returned by `category()`.
+const CATEGORY_PERSON: String = "person"
+const CATEGORY_WILD: String = "wild"
+const CATEGORY_DOMESTICATED: String = "domesticated"
 
 ## PLACEHOLDER pending Open Question #5 (tag-source mapping) — human owns this. The tags
 ## that UNTOUCHED revealed land emits.
@@ -331,6 +343,39 @@ func effective_tiers() -> Array[HabitatTier]:
 	return [synthesised]
 
 
+## Which of the three design categories this species' DATA says it belongs to, or `""`
+## when it matches none.
+##
+## PRECEDENCE MATTERS and is not arbitrary. Person is tested first because Villager emits
+## `people` without consuming it, and because Pug and Shiba Inu gate on `house*` and would
+## otherwise read as Domesticated. The categories are not disjoint sets; this is an ordered
+## test.
+func category() -> String:
+	var tiers_to_read: Array[HabitatTier] = effective_tiers()
+	var needs_people: bool = false
+	var has_building_gate: bool = false
+	var has_building_need: bool = false
+	var has_limit: bool = false
+	for tier: HabitatTier in tiers_to_read:
+		for need: HabitatNeed in tier.needs:
+			if need.tag == "people":
+				needs_people = true
+			if BUILDING_TAGS.has(need.tag):
+				has_building_need = true
+				if need.is_gate_only():
+					has_building_gate = true
+		if not tier.limits.is_empty():
+			has_limit = true
+
+	if needs_people or emits_tags.has("people"):
+		return CATEGORY_PERSON
+	if not has_building_need and has_limit:
+		return CATEGORY_WILD
+	if has_building_gate:
+		return CATEGORY_DOMESTICATED
+	return ""
+
+
 ## The single tier equivalent to this species' flat legacy fields, or `null` when they
 ## cannot form one.
 ##
@@ -400,18 +445,21 @@ func validate(known_ids: PackedStringArray = PackedStringArray()) -> Array[Strin
 		if not HABITAT_TAGS.has(tag):
 			problems.append("`habitat_needs` tag \"%s\" is not in the shared vocabulary." % tag)
 
-	# The inert-land invariant (gdd.md -> Data Schemas; -> D-22). A species whose needs are
-	# ALL satisfiable by untouched revealed land would settle ground the player never made,
-	# breaking the mist no-reward pillar and the rule that every resident was attracted.
-	if not habitat_needs.is_empty():
+	# THE INERT-LAND INVARIANT (gdd.md -> Data Schemas; -> D-22), now tier-aware.
+	# POSITIVE NEEDS ONLY: a `HabitatLimit` may never be what makes a species non-bare,
+	# because a limit describes what must be ABSENT and absence is what bare land is made of.
+	for tier: HabitatTier in effective_tiers():
+		if tier.needs.is_empty():
+			continue
 		var only_bare: bool = true
-		for tag: String in habitat_needs:
-			if not BARE_TAGS.has(tag):
+		for need: HabitatNeed in tier.needs:
+			if not BARE_TAGS.has(need.tag):
 				only_bare = false
 				break
 		if only_bare:
 			problems.append(
-				"`habitat_needs` %s is satisfiable by untouched revealed land (bare tags: %s) — breaks the inert-land invariant." % [str(habitat_needs), str(BARE_TAGS)]
+				"tier \"%s\" is satisfiable by untouched revealed land (bare tags: %s) — breaks the inert-land invariant."
+				% [tier.id, str(BARE_TAGS)]
 			)
 
 	for entry: String in avoids:
@@ -422,15 +470,20 @@ func validate(known_ids: PackedStringArray = PackedStringArray()) -> Array[Strin
 	if normalized_avoids().has(normalize_id(id)):
 		problems.append("`avoids` lists this species itself.")
 
-	if scout_radius < 8 or scout_radius > 12:
-		problems.append("`scout_radius` %d sits outside the GDD's ~8-12 tile band (gdd.md:354)." % scout_radius)
-
-	# `capacity_radius` is checked against the SAME band as `scout_radius`, because the band is
-	# a statement about how far a neighborhood reaches, not about which system is reading it.
-	# The sentinel is exempt: it resolves to `scout_radius`, which is banded one check above.
-	if capacity_radius != CAPACITY_RADIUS_FOLLOWS_SCOUT and (capacity_radius < 8 or capacity_radius > 12):
-		problems.append("`capacity_radius` %d sits outside the GDD's ~8-12 tile band (gdd.md:354); use %d to follow `scout_radius`." % [
-			capacity_radius, CAPACITY_RADIUS_FOLLOWS_SCOUT
+	# THE RADIUS BAND, replaced 2026-09-04 (spec OQ-B). The old 8-12 band predates
+	# per-need radii and would hard-fail this design's own central cases: a barn gate at
+	# radius 4 and Stag counting at radius 14. Cost scales as `max_radius^2 * roster *
+	# tiers`, so RADIUS_MAX is the performance budget, not a style preference.
+	if scout_radius < HabitatNeed.RADIUS_MIN or scout_radius > HabitatNeed.RADIUS_MAX:
+		problems.append("`scout_radius` %d is outside the %d-%d band." % [
+			scout_radius, HabitatNeed.RADIUS_MIN, HabitatNeed.RADIUS_MAX
+		])
+	if capacity_radius != CAPACITY_RADIUS_FOLLOWS_SCOUT and (
+		capacity_radius < HabitatNeed.RADIUS_MIN or capacity_radius > HabitatNeed.RADIUS_MAX
+	):
+		problems.append("`capacity_radius` %d is outside the %d-%d band; use %d to follow `scout_radius`." % [
+			capacity_radius, HabitatNeed.RADIUS_MIN, HabitatNeed.RADIUS_MAX,
+			CAPACITY_RADIUS_FOLLOWS_SCOUT
 		])
 	if capacity_radius < 0:
 		problems.append("`capacity_radius` %d is negative." % capacity_radius)
@@ -454,6 +507,27 @@ func validate(known_ids: PackedStringArray = PackedStringArray()) -> Array[Strin
 		for i in range(fact_text_pool.size()):
 			if fact_text_pool[i].begins_with(PLACEHOLDER_MARKER):
 				problems.append("`fact_text_pool[%d]` is still a placeholder — awaiting step-8 sign-off." % i)
+
+	for tier: HabitatTier in effective_tiers():
+		for problem: String in tier.validate():
+			problems.append(problem)
+		for need: HabitatNeed in tier.needs:
+			if not HABITAT_TAGS.has(need.tag):
+				problems.append("tier \"%s\" need tag \"%s\" is not in the shared vocabulary." % [tier.id, need.tag])
+		for limit: HabitatLimit in tier.limits:
+			if not HABITAT_TAGS.has(limit.tag):
+				problems.append("tier \"%s\" limit tag \"%s\" is not in the shared vocabulary." % [tier.id, limit.tag])
+
+	for tag: String in emits_tags:
+		if not HABITAT_TAGS.has(tag):
+			problems.append("`emits_tags` entry \"%s\" is not in the shared vocabulary." % tag)
+
+	# A species matching no category is a WARNING, not an error: it means design intent is
+	# unclear, not that the data is broken.
+	if category() == "":
+		problems.append(
+			"matches none of person/wild/domesticated — design intent unclear (warning, not a defect)."
+		)
 
 	if not known_ids.is_empty():
 		for entry: String in unresolved_avoids(known_ids):
