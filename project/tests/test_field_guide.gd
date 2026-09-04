@@ -52,6 +52,7 @@ func _process(_delta: float) -> bool:
 	_check_departed_species_still_shows()
 	_check_whole_roster_shows_real_names()
 	_check_every_species_shows_its_recipe()
+	_check_cow_names_both_barn_and_silo()
 
 	finish()
 	return true
@@ -97,23 +98,45 @@ func _check_whole_roster_shows_real_names() -> void:
 ## The successor to `_check_field_guide_never_shows_a_habitat_preference()` — the line
 ## `field_guide.gd`'s old header called "the line that must never move". Moving it IS the
 ## change; the safety property it protected now lives in test_field_guide_reachability.gd.
-## Final review finding #5: the old version of this check compared `FieldGuide.recipe_button_ids_for()`
-## against `HabitatRecipe.recipe_for()` — but `_recipe_ids` is written FROM the same loop that
-## builds the chips, so the two sides were guaranteed to agree regardless of whether a chip
-## actually rendered (`card.add_child(chips)` could be deleted outright and this still passed).
-## This version reads the chip `Label` text back out of the LIVE SCENE TREE
-## (`recipe_chip_texts_for()`) and compares that against text independently rendered from
-## `recipe_for()`'s entries via the same `CHIP_TEMPLATE`, so an actual rendering regression
-## (a chip silently not added, or naming the wrong button — see finding #7) turns this red.
-## Verified by mutation: temporarily commented out `card.add_child(chips)` in field_guide.gd
-## and reran this suite — every one of these checks failed as expected (see the final fix
-## report), then the line was restored and the suite went green again.
+##
+## REWRITTEN, habitat-tiers Task 10 fix round 1 (human-ruled, not a silent adjustment — see
+## the fix report). This used to compare `recipe_chip_texts_for()`'s rendered chips against
+## `HabitatRecipe.recipe_for()`'s entries: correct at the time, but `recipe_for()` reads the
+## flat, pre-tier `habitat_needs` field, which is byte-identical for Cow/Bull
+## (`["cultivated","open_grass"]`) and for Horse/Alpaca (`["open_grass","cultivated"]`) — the
+## exact "these species look the same" defect the whole habitat-tiers branch exists to fix,
+## which a passing chip-vs-`recipe_for()` comparison could never catch because both sides of
+## the comparison shared the same blind spot. `field_guide.gd` no longer renders those chips
+## at all (see that file's own header for the full reasoning — a GATE_ONLY need has no tile
+## count a chip's "×N" shape can honestly show, so the chip row was removed rather than
+## repointed under this fix). This version reads the TIER lines back out of the LIVE SCENE
+## TREE (`tier_line_texts_for()`) and compares them against `HabitatRecipe.describe_tiers()`
+## — the function that actually reads `effective_tiers()`, not the flat field — so a
+## rendering regression (a line silently not added, or the wrong text) turns this red, and a
+## return of the old flat-field defect would too, since `describe_tiers()` is what Task 10
+## exists to prove distinguishes these species. Verified by mutation: temporarily commented
+## out `card.add_child(tier_box)` in field_guide.gd and reran this suite — every one of these
+## checks failed as expected, then the line was restored and the suite went green again.
 func _check_every_species_shows_its_recipe() -> void:
 	for species: AnimalDefinition in _world.roster.species():
-		var rendered: Array[String] = _guide.recipe_chip_texts_for(species.id)
-		check(not rendered.is_empty(), "%s's card shows at least one recipe chip" % species.id)
-		var expected: Array[String] = []
-		for entry: Dictionary in (HabitatRecipe.recipe_for(species, _world)["entries"] as Array):
-			expected.append(FieldGuide.CHIP_TEMPLATE % [entry["display_name"], entry["count"]])
+		var rendered: Array[String] = _guide.tier_line_texts_for(species.id)
+		check(not rendered.is_empty(), "%s's card shows at least one tier line" % species.id)
+		var expected: Array[String] = HabitatRecipe.describe_tiers(species, _world)
 		check_eq(rendered, expected,
-			"%s's rendered chip text matches its derived recipe exactly" % species.id)
+			"%s's rendered tier text matches describe_tiers() exactly" % species.id)
+
+
+## THE REGRESSION FIX ROUND 1 EXISTS TO CATCH: Cow's real tiers need BOTH `barn` and `silo` —
+## two different buildings that happen to share the "Farm Building" palette button — and the
+## pre-fix dedup (keyed on the shared button, not the resolved building) silently dropped
+## whichever was seen second. A player would build a Barn, wait, and nothing on screen would
+## explain why no cow arrived. This asserts the rendered card actually names BOTH.
+func _check_cow_names_both_barn_and_silo() -> void:
+	var cow: AnimalDefinition = _world.roster.by_id("cow")
+	if not check(cow != null, "the roster carries cow"):
+		return
+	var rendered: Array[String] = _guide.tier_line_texts_for("cow")
+	if not check(not rendered.is_empty(), "cow's card shows at least one tier line"):
+		return
+	for line: String in rendered:
+		check(line.contains("silo"), "cow's tier line names Silo, not just Barn: '%s'" % line)

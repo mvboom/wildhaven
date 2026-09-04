@@ -45,9 +45,30 @@ const WOOD_COST_WEIGHT: float = 10.0
 
 
 ## `{tag: String -> Array[Dictionary]}` — every source that emits each tag, in catalog order.
-## A source is `{"id", "kind", "display_name", "cost"}` where `id` is the PALETTE OPTION the
-## player presses: a terrain's own id, or a placeable's `hotbar_category` when it has one
-## (so a grouped button like Farm Building is named once, not once per member).
+## A source is `{"id", "resolved_id", "kind", "display_name", "cost"}`. `id` is the PALETTE
+## OPTION the player presses: a terrain's own id, or a placeable's `hotbar_category` when it
+## has one (so a grouped button like Farm Building is named once, not once per member).
+## `resolved_id` is the SPECIFIC thing that actually carries the tag — a terrain's own id
+## again, or a specific placeable's own id inside a group. The two agree everywhere except a
+## grouped placeable, where they can genuinely differ: `id` says which button to press,
+## `resolved_id` says which real building answers this exact tag. `recipe_for()` (below) dedupes
+## chips by `id`, matching the palette row's own button-per-press model; `describe_tiers()`
+## dedupes by `resolved_id`, because two DIFFERENT buildings behind one button (Cow's `barn`
+## and `silo`) must never collapse into a single mention.
+##
+## FINDING #7'S RULING REVERSED, 2026-09-04 (fix round 1, human-authorized). `display_name`/
+## `cost` used to come from the group's CURRENT style default (`world.get_style_default()`),
+## on the theory that the chip should describe what pressing the button does RIGHT NOW. That
+## was survivable while it was purely a fixture-only edge case (no real placeable's
+## `emitted_tags` diverged from its siblings). It stopped being survivable the moment
+## `barn.tres`/`open_barn.tres`/`windmill.tres`/`farmhouse.tres` were given real, DIFFERENT
+## tags: `farm_building`'s style default resolves alphabetically to Barn, so Horse's `stable`
+## (only Open Barn carries it), Sheep's `mill` (only Windmill) and Human's `large_house`
+## (only Farmhouse) all mislabeled as "a barn" — and worse, Cow's `barn` AND `silo` needs both
+## resolved to the SAME group id and silently deduped to one, erasing the silo requirement
+## outright. `display_name`/`cost` now come from the actual tag-emitting placeable, matching
+## `resolved_id` — see `test_habitat_recipe.gd`'s `_check_grouped_button_names_the_resolved_member()`
+## for the fixture this reverses (rewritten, not deleted, to pin the corrected reading).
 static func tag_sources(world: WorldRoot) -> Dictionary:
 	var out: Dictionary = {}
 	if world == null:
@@ -56,56 +77,24 @@ static func tag_sources(world: WorldRoot) -> Dictionary:
 		for tag: String in terrain.emitted_tags:
 			_add_source(out, tag, {
 				"id": terrain.id,
+				"resolved_id": terrain.id,
 				"kind": "terrain",
 				"display_name": terrain.display_name,
 				"cost": terrain.cost,
 			})
-	# Final review finding #7: a grouped button's `display_name`/`cost` must come from the SAME
-	# resolution `game_hud.gd::_placeable_group_row()` uses to paint the actual button — the
-	# style the player currently has selected via `world.get_style_default(group_key)` — not
-	# from whichever group member happened to emit the tag being looked up. Barn and Silo can
-	# both carry `hotbar_category = "farm_building"`; if Silo is the resolved default, the
-	# button reads "Silo" and places a silo, so the recipe chip must say "Silo ×5", never
-	# "Barn ×5", regardless of which member's `emitted_tags` matched. Indexed by id once, up
-	# front, so every placeable in this loop can resolve its group's CURRENT member in O(1)
-	# rather than re-scanning `placeable_options()` per tag.
-	var placeables_by_id: Dictionary = {}
-	for placeable: PlaceableDefinition in world.placeable_options():
-		placeables_by_id[placeable.id] = placeable
-
 	for placeable: PlaceableDefinition in world.placeable_options():
 		var button_id: String = placeable.hotbar_category
 		if button_id.is_empty():
 			button_id = placeable.id
-		var shown: PlaceableDefinition = _resolve_group_member(
-			world, button_id, placeables_by_id, placeable
-		)
 		for tag: String in placeable.emitted_tags:
 			_add_source(out, tag, {
 				"id": button_id,
+				"resolved_id": placeable.id,
 				"kind": "placeable",
-				"display_name": shown.display_name,
-				"cost": shown.cost,
+				"display_name": placeable.display_name,
+				"cost": placeable.cost,
 			})
 	return out
-
-
-## The placeable a grouped button actually shows/places right now — mirrors
-## `game_hud.gd::_placeable_group_row()`'s own rule exactly (see that function's header):
-## `button_id` is either a real placeable's own id (a single-member "group" — House today,
-## `hotbar_category` left blank) or a true shared `hotbar_category` (Farm Building), and the
-## two are told apart the identical way: a real id is a key in `placeables_by_id` directly, a
-## true category is not, and resolves through `world.get_style_default(button_id)` instead.
-## Falls back to `member` itself if resolution somehow lands on nothing (a category with no
-## style default yet) rather than returning null into a caller that assumes a display name.
-static func _resolve_group_member(
-	world: WorldRoot, button_id: String, placeables_by_id: Dictionary, member: PlaceableDefinition = null
-) -> PlaceableDefinition:
-	var resolved_id: String = button_id
-	if not placeables_by_id.has(button_id):
-		resolved_id = world.get_style_default(button_id)
-	var resolved: Variant = placeables_by_id.get(resolved_id, null)
-	return (resolved as PlaceableDefinition) if resolved != null else member
 
 
 ## `{"satisfiable": bool, "entries": Array[Dictionary]}`, one entry per distinct palette
@@ -223,15 +212,19 @@ static func describe(species: AnimalDefinition, world: WorldRoot) -> String:
 ## player-facing tier naming was explicitly ruled out of scope (spec § 13). Every line
 ## below describes REQUIREMENTS, never the tier's own name.
 ##
-## KEYED BY PALETTE BUTTON WHEN A `world` IS AVAILABLE — the same discipline `recipe_for()`
-## uses (see this file's own header) and for the same two reasons: Rock supplies both
-## `cover` and `rocks`, so a tier needing both must read as ONE requirement, not two; and a
-## button-resolved phrase is closer to what the player actually presses than a raw tag name
-## a six-year-old has never seen. `world` defaults to null because the one caller wired up
-## so far (the Field Guide card) is not necessarily the only one — a future tooltip or a
-## fixture-only test may have no `WorldRoot` to hand. Without one, each tag degrades to its
-## own name, spaced out ("open_grass" -> "open grass") — readable, if less precise about
-## which button solves it.
+## KEYED BY THE RESOLVED BUILDING (`resolved_id`), NOT THE PALETTE BUTTON (`id`), WHEN A
+## `world` IS AVAILABLE — `tag_sources()`'s own doc comment explains the distinction. This
+## reads like `recipe_for()`'s "keyed by palette button" discipline (see this file's own
+## header) for terrain, where the two agree, but deliberately DIVERGES from it for a grouped
+## placeable: Rock supplies both `cover` and `rocks` from the SAME tile, so a tier needing
+## both must read as ONE requirement, not two — but Cow needs both `barn` and `silo`, TWO
+## DIFFERENT buildings that merely share one palette button, and those must never collapse
+## into one. Deduping by `id` (the button) would silently drop the second — the exact
+## regression fix round 1 found and this now avoids. `world` defaults to null because the
+## one caller wired up so far (the Field Guide card) is not necessarily the only one — a
+## future tooltip or a fixture-only test may have no `WorldRoot` to hand. Without one, each
+## tag degrades to its own name, spaced out ("open_grass" -> "open grass") — readable, if
+## less precise about which real building solves it.
 ##
 ## TERRAIN IS DELIBERATELY *NOT* MERGED INTO THE "Grasslands" PALETTE GROUP HERE, even
 ## though `game_hud.gd` merges Grass/Wild Grass/Meadow/Scrub behind one button to save
@@ -292,23 +285,29 @@ static func _describe_tier(tier: HabitatTier, world: WorldRoot) -> String:
 
 
 ## The readable phrase for one need's tag, deduped against `seen` by whichever identity
-## actually decides whether two needs are solved the SAME way: a resolved palette button id
-## when `world` can resolve one — mirroring `recipe_for()`'s own dedup, so Rock's `cover`
-## and `rocks` collapse into one "rocky cover" phrase here exactly as they do there — or the
-## bare tag itself when there is no `world` to resolve against (or no source is catalogued
-## for it — an unsourced tag still deserves a readable line rather than a blank one; that
-## honesty lives in `recipe_for()`'s `satisfiable` flag, not here). Returns "" for an
-## already-seen key, which the caller drops instead of rendering the same requirement twice.
+## actually decides whether two needs are solved the SAME way. Keyed on `resolved_id`
+## (`tag_sources()`'s own doc comment), NOT `id` — a fix-round-1 correction: `id` is the
+## palette BUTTON (e.g. "farm_building"), and Cow needs both `barn` and `silo`, two
+## DIFFERENT buildings sharing that one button. Deduping on `id` silently dropped whichever
+## of the two was seen second — the exact regression this file's own header now warns
+## about. `resolved_id` is the specific building (or terrain, where the two already agree),
+## so Rock's `cover` and `rocks` still collapse into one "rocky cover" phrase (both resolve
+## to `resolved_id == "rock"`), while Cow's `barn` and `silo` — different buildings, same
+## button — both survive. Falls back to the bare tag itself when there is no `world` to
+## resolve against, or no source is catalogued for it (an unsourced tag still deserves a
+## readable line rather than a blank one; that honesty lives in `recipe_for()`'s
+## `satisfiable` flag, not here). Returns "" for an already-seen key, which the caller drops
+## instead of rendering the same requirement twice.
 static func _need_phrase(tag: String, world: WorldRoot, seen: Dictionary) -> String:
 	if world != null:
 		var candidates: Array = (tag_sources(world) as Dictionary).get(tag, []) as Array
 		if not candidates.is_empty():
 			var chosen: Dictionary = _cheapest(candidates)
-			var button_id: String = chosen["id"] as String
-			if seen.has(button_id):
+			var dedup_key: String = chosen["resolved_id"] as String
+			if seen.has(dedup_key):
 				return ""
-			seen[button_id] = true
-			var phrase: String = SOURCE_PHRASES.get(button_id, "") as String
+			seen[dedup_key] = true
+			var phrase: String = SOURCE_PHRASES.get(chosen["id"] as String, "") as String
 			if phrase.is_empty():
 				phrase = (chosen["display_name"] as String).to_lower()
 			return phrase

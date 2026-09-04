@@ -21,7 +21,22 @@ extends Control
 ## NO PORTRAITS. `AnimalDefinition` carries no portrait texture (only `model_scenes`, a 3D
 ## asset) — `FactCard`'s own "portrait" is an empty coloured frame, not an image, and this
 ## screen matches that precedent rather than inventing an art asset this dispatch was not
-## given. Every card is text and the real palette glyphs on its recipe chips, nothing more.
+## given. Every card is text.
+##
+## NO RECIPE CHIPS AS OF TASK 10 FIX ROUND 1 (removed, not repointed — see
+## `HabitatRecipe.describe_tiers()`'s own header for the full reasoning). The palette-glyph
+## chips this screen used to show came from `HabitatRecipe.recipe_for()`, which reads the
+## flat, legacy `habitat_needs`/`tiles_per_individual` fields — the SAME fields that made
+## Horse/Cow/Bull/Alpaca render identically before the habitat-tiers branch, and Cow/Bull
+## (`["cultivated","open_grass"]`) and Horse/Alpaca (`["open_grass","cultivated"]`) still do,
+## directly above the tier block that exists specifically to fix that. Repointing the chips
+## to per-tier data instead of removing them was considered and set aside: a GATE_ONLY need
+## (a stable, present-or-not) has no meaningful tile COUNT the way a scaling need does, and
+## `CHIP_TEMPLATE`'s "%s ×%d" shape assumes every requirement has one — inventing a second
+## chip shape for gate needs under this fix is a UI decision, not a code fix, so this task
+## dropped the chips rather than guess at one. The tier block (`describe_tiers()`) is now the
+## sole on-screen recipe; it carries every requirement, correctly, in plain text — it just
+## has no icon glyphs. Flagged as a proposal, not a decision, in the fix report.
 ##
 ## NOT READ-ALOUD. spec.md -> Screen Layouts: "wider coverage (News Reports, Field Guide) is
 ## deferred (future.md)" — no 🔊 button here, by design, not omission.
@@ -50,14 +65,6 @@ const UNDISCOVERED_GLYPH: String = "???"
 ## of this species are living in the world. Rendered only when that count is >= 1.
 const HERE_TEMPLATE: String = "Resident · %d"
 
-## Final review finding #3 ruling: NOT `[COPY]`-marked, and deliberately so, despite being
-## player-facing. `"Forest ×5"` is a DATA FORMAT — a source's name and a target tile count —
-## not prose awaiting a content-writer's approval. There is no alternate wording for a
-## reviewer to sign off on; marking it as a stub would be marking a number format as
-## unfinished copy, which it structurally cannot become.
-## `%s` is a source's display name, `%d` its target tile count.
-const CHIP_TEMPLATE: String = "%s ×%d"
-
 ## PROPOSED — human owns this. This screen's own type scale, deliberately NOT UiPalette's
 ## shared FONT_CARD_BODY/FONT_NOTICE_LINE/FONT_HUD_SECONDARY: those are also read by FactCard,
 ## NotificationFeed and DisplacementNotice, so shrinking them here would resize screens this
@@ -67,18 +74,14 @@ const FONT_SPECIES_NAME: int = 22
 const FONT_SPECIES_BODY: int = 18
 const FONT_SPECIES_COUNT: int = 16
 
-## PROPOSED — human owns this. Pixels, pre-scale. Small enough to read as inline punctuation
-## in a sentence rather than as a second hotbar.
-const CHIP_ICON_SIZE: float = 22.0
+## The name given to each card's tier-lines container, so `tier_line_texts_for()` can find it
+## in the live scene tree by name rather than by position — same discipline `card.name =
+## species.id` already uses one level up.
+const TIER_BOX_NAME: String = "Tiers"
 
 @onready var _species_hosted_value: Label = %SpeciesHostedValue
 @onready var _resident_list: VBoxContainer = %ResidentList
 @onready var _empty_label: Label = %EmptyLabel
-
-## `{species_id: String -> Array[String]}` — the palette option ids rendered on that species'
-## card, in rendered order. Populated by `_make_species_card()` alongside the chips themselves
-## so `recipe_button_ids_for()` never has to re-derive the recipe or walk the scene tree.
-var _recipe_ids: Dictionary = {}
 
 
 ## Rebuilds the list in place, without changing open/closed state — called on every arrival
@@ -87,12 +90,11 @@ var _recipe_ids: Dictionary = {}
 ## continues" reads as a live document, not a snapshot).
 func refresh_from(world: WorldRoot) -> void:
 	_clear_list()
-	# Final review minor: both cleared/set UNCONDITIONALLY, above the empty-roster guard below.
-	# The old order returned early on an empty/null roster before either ran, so a screen that
-	# had shown real data and then lost its roster (or the very first refresh against a
-	# config problem) kept showing the LAST non-empty count and the last recipe's chip ids —
-	# stale in both directions, for as long as the guard kept tripping.
-	_recipe_ids.clear()
+	# Final review minor: cleared/set UNCONDITIONALLY, above the empty-roster guard below. The
+	# old order returned early on an empty/null roster before either ran, so a screen that had
+	# shown real data and then lost its roster (or the very first refresh against a config
+	# problem) kept showing the LAST non-empty count — stale, for as long as the guard kept
+	# tripping.
 	_species_hosted_value.text = str(0 if world == null else world.species_hosted_count())
 	if world == null or world.roster == null or world.roster.species().is_empty():
 		_set_empty_state(true)
@@ -123,41 +125,25 @@ func species_row_texts() -> Array[String]:
 	return out
 
 
-## Palette option ids of the chips on `species_id`'s card, in rendered order. TEST ACCESSOR
-## ONLY: populated by `_make_species_card()` alongside the chips it describes, purely so this
-## file's own suite can assert against the derived recipe without re-deriving it or walking
-## the scene tree. No other caller — Task 7's coach targets buttons through its own
-## `current_target_id()` plus `GameHud.palette_button_for()` and never reaches this method.
-func recipe_button_ids_for(species_id: String) -> Array[String]:
-	var out: Array[String] = []
-	var ids: Variant = _recipe_ids.get(species_id, null)
-	if ids != null:
-		out.assign(ids as Array)
-	return out
-
-
-## Final review finding #5: `recipe_button_ids_for()` above mirrors `recipe_for()`'s entries by
-## construction — `_recipe_ids` is written from the SAME loop that builds the chips, so a test
-## comparing one against the other proves nothing about whether the chips actually rendered
-## (delete the `chips.add_child()` call below and that comparison still passes). This accessor
-## instead reads the chip `Label` TEXT back OUT OF THE LIVE SCENE TREE — the same discipline
-## `species_row_texts()` already uses for the header — so a rendering regression (a chip that
-## silently stops being added, or renders the wrong text) actually turns this red. TEST ACCESSOR
-## ONLY, same as `recipe_button_ids_for()` above.
-func recipe_chip_texts_for(species_id: String) -> Array[String]:
+## The tier lines rendered on `species_id`'s card, in rendered order. TEST ACCESSOR ONLY
+## (Task 10 fix round 1, replacing the retired `recipe_button_ids_for()`/
+## `recipe_chip_texts_for()` pair — see this file's own header for why the chips they read
+## are gone). Reads the `Label` TEXT back OUT OF THE LIVE SCENE TREE, the same discipline
+## `species_row_texts()` already uses for the header: this proves the card actually rendered
+## `HabitatRecipe.describe_tiers()`'s output, not merely that the two would agree in theory.
+func tier_line_texts_for(species_id: String) -> Array[String]:
 	var out: Array[String] = []
 	if _resident_list == null:
 		return out
 	var card: Node = _resident_list.get_node_or_null(species_id)
 	if card == null:
 		return out
-	for section: Node in card.get_children():
-		if not (section is HFlowContainer):
-			continue
-		for chip: Node in section.get_children():
-			for piece: Node in chip.get_children():
-				if piece is Label:
-					out.append((piece as Label).text)
+	var tier_box: Node = card.get_node_or_null(TIER_BOX_NAME)
+	if tier_box == null:
+		return out
+	for line: Node in tier_box.get_children():
+		if line is Label:
+			out.append((line as Label).text)
 	return out
 
 
@@ -172,7 +158,7 @@ func _make_species_card(species: AnimalDefinition, world: WorldRoot) -> VBoxCont
 	# event falls through to `CameraRig._unhandled_input()` and zooms the world while the
 	# player is trying to scroll the list (human report, 2026-09-01).
 	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	# Named after the species id (final review finding #5) so `recipe_chip_texts_for()` below
+	# Named after the species id (final review finding #5) so `tier_line_texts_for()` below
 	# can find THIS card in the live scene tree by id, rather than by position — every authored
 	# id so far is a bare snake_case word, which Godot accepts as a node name outright.
 	card.name = species.id
@@ -200,24 +186,10 @@ func _make_species_card(species: AnimalDefinition, world: WorldRoot) -> VBoxCont
 		header.add_child(count_label)
 	card.add_child(header)
 
-	var description := Label.new()
-	description.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	description.text = HabitatRecipe.describe(species, world)
-	description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	description.add_theme_font_size_override("font_size", FONT_SPECIES_BODY)
-	description.add_theme_color_override("font_color", UiPalette.BARK)
-	card.add_child(description)
-
-	var recipe: Dictionary = HabitatRecipe.recipe_for(species, world)
-	var ids: Array[String] = []
-	if recipe["satisfiable"] as bool:
-		var chips := HFlowContainer.new()
-		chips.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		for entry: Dictionary in (recipe["entries"] as Array):
-			chips.add_child(_make_chip(entry))
-			ids.append(entry["id"] as String)
-		card.add_child(chips)
-	_recipe_ids[species.id] = ids
+	# NOTE: no flat `describe()` sentence and no `recipe_for()` chip row here any more (Task 10
+	# fix round 1). Both read `species.habitat_needs`, the pre-tier flat field that still makes
+	# Cow/Bull and Horse/Alpaca indistinguishable — see this file's own header for the full
+	# reasoning. The tier block below (`describe_tiers()`) is the card's sole recipe display now.
 
 	# The single most useful line on this screen: the only place the game ever explains why a
 	# correctly-built habitat stayed empty.
@@ -236,17 +208,13 @@ func _make_species_card(species: AnimalDefinition, world: WorldRoot) -> VBoxCont
 	# horses into a herd). Every species presents at least one tier — `effective_tiers()`
 	# synthesises one from the legacy flat fields when `tiers` is empty — so this renders
 	# for the whole roster, not just the handful re-authored onto real tiers so far.
-	# ADDITIVE, not a replacement of `description`/`chips` above: those two are still
-	# pinned exactly by `test_field_guide.gd`'s `_check_every_species_shows_its_recipe()`
-	# and by `test_habitat_recipe.gd`'s own `describe()` checks, and this file's job is to
-	# extend the card, not to demolish tested rendering to make room.
-	# DELIBERATELY a `VBoxContainer`, NOT an `HFlowContainer`: `recipe_chip_texts_for()`
-	# (this file's own TEST ACCESSOR) reads Label text only out of HFlowContainer children
-	# (see that method's own header) — a VBoxContainer here stays invisible to it, so this
-	# addition cannot perturb that pinned exact-match check against `recipe_for()`.
+	# As of fix round 1, this IS the card's recipe display (the flat `description`/`chips`
+	# block that used to sit above it is gone — see this file's own header). Named
+	# `TIER_BOX_NAME` so `tier_line_texts_for()` can find it in the live scene tree by name.
 	var tier_lines: Array[String] = HabitatRecipe.describe_tiers(species, world)
 	if not tier_lines.is_empty():
 		var tier_box := VBoxContainer.new()
+		tier_box.name = TIER_BOX_NAME
 		tier_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		for line: String in tier_lines:
 			var tier_label := Label.new()
@@ -261,42 +229,13 @@ func _make_species_card(species: AnimalDefinition, world: WorldRoot) -> VBoxCont
 	# Human direction 2026-09-01: one rule per species, so the cards read as distinct
 	# entries rather than one run-on column. Deliberately the LAST child of the card rather
 	# than a sibling in `_resident_list`: a sibling would make the list's children alternate
-	# card/rule, and both `species_row_texts()` and `recipe_chip_texts_for()` index
+	# card/rule, and both `species_row_texts()` and `tier_line_texts_for()` index
 	# `_resident_list`'s children as one-node-per-species.
 	var rule := HSeparator.new()
 	rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_child(rule)
 
 	return card
-
-
-## One requirement: the real palette glyph, then "Forest ×5".
-##
-## CHIPS RATHER THAN ICONS INLINE IN A SENTENCE. `TileIcon` draws vectorially in `_draw()`
-## with no backing texture, so it cannot go inside a `RichTextLabel` without inventing an art
-## asset; an alternating Label/TileIcon HBox wraps badly. An `HFlowContainer` of chips wraps
-## correctly, needs no art — and looks like the hotbar the player is being pointed at.
-func _make_chip(entry: Dictionary) -> HBoxContainer:
-	var chip := HBoxContainer.new()
-	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-	var icon_kind: Variant = entry["icon_kind"]
-	if icon_kind != null:
-		var icon := TileIcon.new()
-		icon.kind = icon_kind as TileIcon.Kind
-		icon.custom_minimum_size = Vector2(
-			UiPalette.scaled(CHIP_ICON_SIZE), UiPalette.scaled(CHIP_ICON_SIZE)
-		)
-		chip.add_child(icon)
-
-	var label := Label.new()
-	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	label.text = CHIP_TEMPLATE % [entry["display_name"], entry["count"]]
-	label.add_theme_font_size_override("font_size", FONT_SPECIES_BODY)
-	label.add_theme_color_override("font_color", UiPalette.BARK)
-	chip.add_child(label)
-
-	return chip
 
 
 func _clear_list() -> void:

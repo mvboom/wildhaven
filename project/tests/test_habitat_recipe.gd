@@ -27,6 +27,9 @@ const FOX_PATH: String = "res://data/animals/fox.tres"
 const STAG_PATH: String = "res://data/animals/stag.tres"
 const DEER_PATH: String = "res://data/animals/deer.tres"
 const HORSE_PATH: String = "res://data/animals/horse.tres"
+const COW_PATH: String = "res://data/animals/cow.tres"
+const SHEEP_PATH: String = "res://data/animals/sheep.tres"
+const HUMAN_PATH: String = "res://data/animals/human.tres"
 
 var _world: WorldRoot = null
 var _frames: int = 0
@@ -63,10 +66,11 @@ func _process(_delta: float) -> bool:
 	_check_avoids_unions_both_directions()
 	_check_starter_prefers_free_terrain()
 	_check_unsatisfiable_species_describes_honestly()
-	_check_grouped_button_names_the_resolved_member()
+	_check_grouped_button_names_the_tag_carrying_member()
 	_check_tiers_are_presented()
 	_check_built_limit_reads_as_plain_english()
 	_check_grasslands_tags_stay_distinct()
+	_check_grouped_building_tags_name_the_carrying_member()
 
 	finish()
 	return true
@@ -190,21 +194,30 @@ func _check_unsatisfiable_species_describes_honestly() -> void:
 		"an unsatisfiable species says so rather than describing a partial habitat")
 
 
-## Final review finding #7: `tag_sources()` used to take a grouped placeable's `display_name`
-## and `cost` from whichever MEMBER happened to emit the tag being looked up, rather than from
-## the member `world.get_style_default(group_key)` says the player currently has selected —
-## the same member `game_hud.gd::_placeable_group_row()` actually renders on the button and
-## `TapRouter` actually places on a tap. LATENT with the real roster today (every
-## `farm_building` member ships `emitted_tags = []`), so this is a fixture: Barn (cost 30,
-## carrying the tag) and Silo (cost 15, carrying nothing) both share
-## `hotbar_category = "farm_building"`, with "silo" set as the resolved default — the exact
-## shape the header comment above predicts for "the day barn.tres gains an emitted_tags".
+## REWRITTEN, habitat-tiers Task 10 fix round 1 (human-ruled, not a silent adjustment — see
+## the fix report). Final review finding #7 originally ruled that a grouped placeable's
+## `display_name`/`cost` should come from `world.get_style_default(group_key)` — the group's
+## CURRENT default — not from whichever member actually carries the tag being looked up,
+## reasoning that the chip should describe what pressing the button does RIGHT NOW. That was
+## survivable while it was purely a fixture-only edge case (no real placeable's
+## `emitted_tags` diverged from its siblings). It stopped being survivable once
+## `barn.tres`/`open_barn.tres`/`windmill.tres`/`farmhouse.tres` were given real, DIFFERENT
+## tags: `farm_building`'s style default resolves alphabetically to Barn, so Horse's
+## `stable` (only Open Barn carries it), Sheep's `mill` (only Windmill) and Human's
+## `large_house` (only Farmhouse) all mislabeled as "a barn" — and Cow's `barn` AND `silo`
+## needs, sharing the one group button, deduped to a single mention and silently DROPPED the
+## silo requirement outright. `display_name`/`cost` now come from the actual tag-emitting
+## placeable, and a new `resolved_id` field carries that placeable's own id for callers (like
+## `HabitatRecipe.describe_tiers()`) that must dedupe by BUILDING, not by button. This fixture
+## still proves the same two-tag-one-button shape (Barn, cost 30, carrying `farm_supply`;
+## Silo, cost 15, carrying nothing; both `hotbar_category = "farm_building"`, with "silo" set
+## as the group's current default) — only the expected reading changed.
 ##
-## Verified by mutation (see the final fix report): reverted `tag_sources()` to read
-## `placeable.display_name`/`placeable.cost` directly instead of resolving through
-## `_resolve_group_member()`, reran this suite, watched `display_name`/`cost` fail (both read
-## back as Barn's), then restored the fix and reran to confirm green.
-func _check_grouped_button_names_the_resolved_member() -> void:
+## Verified by mutation (original finding #7 fix report, preserved for context): reverting
+## `tag_sources()` to read `placeable.display_name`/`placeable.cost` directly (which is what
+## this fix round 1 now does PERMANENTLY) used to turn this red under the OLD assertions;
+## under the NEW ones below it is the correct, expected behaviour instead.
+func _check_grouped_button_names_the_tag_carrying_member() -> void:
 	var barn := PlaceableDefinition.new()
 	barn.id = "barn"
 	barn.display_name = "Barn"
@@ -233,12 +246,14 @@ func _check_grouped_button_names_the_resolved_member() -> void:
 	if check(not entries.is_empty(), "the fixture farm_supply tag has a source"):
 		var entry: Dictionary = entries[0] as Dictionary
 		check_eq(entry["id"], "farm_building",
-			"the source is keyed by the shared button, not by whichever member emitted the tag")
-		check_eq(entry["display_name"], "Silo",
-			"the chip names Silo — the player's CURRENT default — not Barn, whose emitted_tags "
-			+ "happened to match")
-		check_eq(entry["cost"], 15,
-			"...and prices it at Silo's cost, not Barn's more expensive one")
+			"the PALETTE BUTTON is still the shared group key, unaffected by this fix")
+		check_eq(entry["resolved_id"], "barn",
+			"the RESOLVED BUILDING is Barn — the member that actually carries farm_supply")
+		check_eq(entry["display_name"], "Barn",
+			"the chip names Barn, the tag-carrying member, not Silo, the group's current "
+			+ "default, whose emitted_tags never matched")
+		check_eq(entry["cost"], 30,
+			"...and prices it at Barn's real cost, not Silo's cheaper one")
 
 	# Restore the real fixtures — every check dispatched after this one expects them.
 	_world.buildings = real_buildings
@@ -388,3 +403,69 @@ func _check_grasslands_tags_stay_distinct() -> void:
 		check(both_lines[0] != browse_lines[0],
 			"the combined line is not just the browse-only line with open_grass silently "
 			+ "dropped: '%s'" % both_lines[0])
+
+
+## FIX ROUND 1, CRITICAL. `farm_building`'s style default resolves alphabetically to
+## `barn.tres`, so before this fix ANY farm-building tag Barn does not itself carry
+## mislabeled as "a barn" in the tier line — four real species were affected: Horse
+## (`stable`, only Open Barn), Sheep (`mill`, only Windmill), Human (`large_house`, only
+## Farmhouse), and worst of all Cow, whose tiers need BOTH `barn` AND `silo` — two DIFFERENT
+## buildings sharing one palette button — which the old button-keyed dedup silently
+## collapsed to one mention, erasing the silo requirement entirely rather than merely
+## mislabeling it. This asserts all four read the ACTUAL building against real `.tres` data
+## and the real world catalog, and that Cow specifically names both.
+##
+## COW'S "barn" TAG RESOLVES TO "open barn", NOT LITERALLY "Barn" — flagged for the human,
+## not silently forced otherwise. THREE placeables carry `barn` (Barn cost 30, Small Barn
+## and Open Barn both cost 15), and `_cheapest()` — this file's one, consistent tie-break
+## rule, used everywhere else in this file (`easiest_species()`, `recipe_for()`) — picks the
+## cheapest, ties broken by catalog order (`open_barn.tres` sorts before `small_barn.tres`).
+## This is arguably a BETTER answer than the literal "Barn" ("cheaper barn-family option
+## exists") but is not what was assumed when this fix was scoped, so it is pinned here
+## explicitly rather than glossed over.
+func _check_grouped_building_tags_name_the_carrying_member() -> void:
+	var horse: AnimalDefinition = load(HORSE_PATH) as AnimalDefinition
+	var cow: AnimalDefinition = load(COW_PATH) as AnimalDefinition
+	var sheep: AnimalDefinition = load(SHEEP_PATH) as AnimalDefinition
+	var human: AnimalDefinition = load(HUMAN_PATH) as AnimalDefinition
+	if not check(
+		horse != null and cow != null and sheep != null and human != null,
+		"horse.tres, cow.tres, sheep.tres and human.tres all load"
+	):
+		return
+
+	var horse_lines: Array[String] = HabitatRecipe.describe_tiers(horse, _world)
+	if check(horse_lines.size() >= 1, "horse presents at least one tier"):
+		check(horse_lines[0].contains("open barn"),
+			"Horse's gate need (stable) names Open Barn, the only real source: '%s'"
+			% horse_lines[0])
+		check(not horse_lines[0].contains("a barn"),
+			"...and NOT the group's alphabetical default, Barn, which does not carry "
+			+ "stable: '%s'" % horse_lines[0])
+
+	var sheep_lines: Array[String] = HabitatRecipe.describe_tiers(sheep, _world)
+	if check(sheep_lines.size() >= 2, "sheep presents its base and flock tiers"):
+		check(sheep_lines[1].contains("windmill"),
+			"Sheep's flock-tier gate need (mill) names Windmill, the only real source: '%s'"
+			% sheep_lines[1])
+
+	var human_lines: Array[String] = HabitatRecipe.describe_tiers(human, _world)
+	if check(human_lines.size() >= 2, "human presents its single and family tiers"):
+		check(human_lines[1].contains("farmhouse"),
+			"Human's family-tier gate need (large_house) names Farmhouse, the only real "
+			+ "source: '%s'" % human_lines[1])
+
+	# COW: THE REGRESSION THIS FIX EXISTS TO CATCH. Both tiers need `barn` AND `silo` — two
+	# different buildings behind the SAME "Farm Building" palette button. The pre-fix
+	# button-keyed dedup silently dropped whichever was seen second; a child would build a
+	# barn-family building, wait, and nothing on screen would explain why no cow arrived.
+	var cow_lines: Array[String] = HabitatRecipe.describe_tiers(cow, _world)
+	if check(cow_lines.size() >= 2, "cow presents its pair and herd tiers"):
+		for line: String in cow_lines:
+			check(line.contains("silo"),
+				"cow's tier line names Silo — the requirement a button-keyed dedup would "
+				+ "have silently erased: '%s'" % line)
+			check(line.contains("barn"),
+				"...and still names a barn-family building too (open barn, tied-cheapest "
+				+ "with small barn — see the doc comment above) — two different buildings, "
+				+ "one button, BOTH rendered: '%s'" % line)
