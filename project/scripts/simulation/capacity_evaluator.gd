@@ -81,7 +81,13 @@ static func tag_counts(
 	var fallback: int = species.effective_capacity_radius()
 	# Each bucket: the keys to accumulate into (radius-keyed, plus a bare-tag alias when
 	# resolved via the legacy fallback above), the tag to match, and its squared radius.
-	var buckets: Array[Dictionary] = []
+	# PARALLEL ARRAYS, NOT AN ARRAY OF DICTIONARIES. These are read once per bucket per tile
+	# in the walk below; a `Dictionary` field access there is a String hash on every read,
+	# which at `radius^2 x buckets` is real money. Index `i` means the same bucket in all four.
+	var b_keys: Array = []                              # Array[Array[String]]
+	var b_tags: PackedStringArray = PackedStringArray() # the tag, for the unknown-tag fallback
+	var b_r2: PackedInt64Array = PackedInt64Array()     # this bucket's own squared radius
+	var b_bits: PackedInt64Array = PackedInt64Array()   # its vocabulary bit, or 0 if unknown
 	for need: HabitatNeed in use_tier.needs:
 		var nr: int = need.effective_radius(fallback)
 		var nkey: String = count_key(need.tag, nr)
@@ -90,7 +96,10 @@ static func tag_counts(
 		if legacy_mode:
 			counts[need.tag] = 0
 			nkeys.append(need.tag)
-		buckets.append({"keys": nkeys, "tag": need.tag, "r_squared": nr * nr})
+		b_keys.append(nkeys)
+		b_tags.append(need.tag)
+		b_r2.append(nr * nr)
+		b_bits.append(WorldGrid.tag_bit(need.tag))
 	for limit: HabitatLimit in use_tier.limits:
 		var lr: int = limit.effective_radius(fallback)
 		var lkey: String = count_key(limit.tag, lr)
@@ -99,9 +108,44 @@ static func tag_counts(
 		if legacy_mode:
 			counts[limit.tag] = 0
 			lkeys.append(limit.tag)
-		buckets.append({"keys": lkeys, "tag": limit.tag, "r_squared": lr * lr})
-	if buckets.is_empty():
+		b_keys.append(lkeys)
+		b_tags.append(limit.tag)
+		b_r2.append(lr * lr)
+		b_bits.append(WorldGrid.tag_bit(limit.tag))
+	var bucket_count: int = b_bits.size()
+	if bucket_count == 0:
 		return counts
+
+	# The union of every tag this tier reads, as a bitmask, so one `&` per tile answers
+	# "could this tile possibly matter?" — see `WorldGrid.tile_tag_mask()` for why the tile
+	# side of that test is cached rather than derived per read.
+	# A bucket whose tag is OUTSIDE the vocabulary has no bit of its own, so it takes
+	# `UNKNOWN_TAG_BIT` here and is resolved against the real tag array in the loop below.
+	# That keeps an unknown tag exactly as countable as it was before this cache existed —
+	# see `WorldGrid.UNKNOWN_TAG_BIT` for why that matters.
+	var tier_mask: int = 0
+	var has_unknown_bucket: bool = false
+	for i in bucket_count:
+		var bit: int = b_bits[i]
+		if bit == 0:
+			has_unknown_bucket = true
+			tier_mask |= WorldGrid.UNKNOWN_TAG_BIT
+		else:
+			tier_mask |= bit
+
+	# COULD A RESIDENT CONTRIBUTE ANYTHING THIS TIER READS? Resident-emitted tags do not come
+	# from the grid, so they are the one thing the tile mask cannot rule out — this resolves
+	# them ONCE per call (O(sites)), not once per tile, and the answer is almost always no:
+	# only two species in the whole roster emit anything at all.
+	var resident_mask: int = 0
+	if registry != null:
+		for resident_site: HomeSite in registry.sites():
+			if resident_site == self_site or resident_site.population() < 1:
+				continue
+			resident_mask |= resident_site.resident_tag_mask
+	var check_residents: bool = registry != null and (resident_mask & tier_mask) != 0
+	# Shared empty stand-in, so the common (no-resident) tile allocates no Dictionary.
+	var no_residents: Dictionary = {}
 
 	var r: int = use_tier.max_radius(fallback)
 	var r_squared: int = r * r
@@ -113,14 +157,31 @@ static func tag_counts(
 			var tile: Vector2i = origin + Vector2i(dx, dz)
 			if not grid.tile_in_bounds(tile):
 				continue
+			var tile_mask: int = grid.tile_tag_mask(tile.x, tile.y)
+			# Residents live at their site's own tile, so "could a resident contribute HERE?"
+			# is a per-tile question, not a per-tier one. Asking it per tier would disable the
+			# early out below across the whole walk the moment any deer or villager existed
+			# anywhere — and sites are sparse, so almost every tile still answers no.
+			# Short-circuits, so the lookup costs nothing on a world where nobody emits.
+			var tile_has_site: bool = check_residents and registry.has_sites_at(tile)
+			# THE EARLY OUT. This tile emits nothing this tier reads, and no resident sits on
+			# it, so it cannot change any bucket by any amount. Skipping here also skips the
+			# two exclusivity lookups below, which are the next most expensive thing in this
+			# loop. Most of a world is exactly this tile.
+			if tile_mask & tier_mask == 0 and not tile_has_site:
+				continue
 			if not _tile_counts_for(registry, tile, origin, d_squared, self_site, species):
 				continue
-			var tile_tags: Array = grid.get_tile_tags(tile.x, tile.y)
 			# Resident-emitted tags, counted PER INDIVIDUAL. A house holding four villagers
 			# contributes people=4. Counting this per-tile instead would silently turn
 			# "one pug per five people" into "one pug per five houses".
-			var resident_counts: Dictionary = {}
-			if registry != null:
+			# Only materialised when a bucket's tag has no bit — never in shipped data.
+			var tile_tags: Array = (
+				grid.get_tile_tags(tile.x, tile.y) if has_unknown_bucket else []
+			)
+			var resident_counts: Dictionary = no_residents
+			if tile_has_site:
+				resident_counts = {}
 				for resident_site: HomeSite in registry.sites_at(tile):
 					if resident_site == self_site:
 						continue
@@ -129,19 +190,23 @@ static func tag_counts(
 						continue
 					for emitted: String in resident_site.resident_tags:
 						resident_counts[emitted] = int(resident_counts.get(emitted, 0)) + population
-			for bucket: Dictionary in buckets:
-				if d_squared > int(bucket["r_squared"]):
+			for i in bucket_count:
+				if d_squared > b_r2[i]:
 					continue
-				var bucket_tag: String = bucket["tag"]
 				var added: int = 0
-				if tile_tags.has(bucket_tag):
+				var bucket_bit: int = b_bits[i]
+				if bucket_bit == 0:
+					if tile_tags.has(b_tags[i]):
+						added += 1
+				elif tile_mask & bucket_bit != 0:
 					added += 1
-				added += int(resident_counts.get(bucket_tag, 0))
+				if tile_has_site:
+					added += int(resident_counts.get(b_tags[i], 0))
 				if added > 0:
 					# Reaches EVERY key shape this bucket emits -- both the radius-keyed entry
 					# and, in legacy mode, the bare-tag alias -- so a resident contribution is
 					# never invisible to a legacy-mode caller.
-					for key: String in (bucket["keys"] as Array[String]):
+					for key: String in (b_keys[i] as Array[String]):
 						counts[key] = int(counts[key]) + added
 	return counts
 

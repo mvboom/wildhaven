@@ -68,6 +68,16 @@ var _owner: Dictionary = {}
 ## with population instead of linear in it: 16,326us -> 221us at 110 residents.
 var _structure_by_position: Dictionary = {}
 
+## Vector2i -> Array[HomeSite], EVERY site keyed by its own position (not just structures).
+## Rebuilt beside `_structure_by_position`, by the same single writer, for the same reason.
+##
+## WHY IT EXISTS. `sites_at()` was a linear scan of `_sites`, called once per tile inside
+## `CapacityEvaluator.tag_counts()` — so an evaluation cost `radius^2 x tiers x sites`, and
+## the habitat-tiers branch pushed every one of those three factors up at once. The evaluator
+## now skips that call entirely on worlds where no resident emits a tag the tier reads, but
+## when it does run it should not also be linear in the population.
+var _sites_by_position: Dictionary = {}
+
 ## **SPECIES HOSTED, AND IT IS PERMANENT.** gdd.md -> Gentle Displacement: "Species Hosted and
 ## the Field Guide entry stay permanent" — "a departure never erases the record that the
 ## species was hosted", and gdd.md -> Economy: "Species Hosted (all-time, never decreases)".
@@ -364,9 +374,13 @@ static func _scopes_of(before: String, after: String) -> Array[String]:
 
 func _refresh_structure_index() -> void:
 	_structure_by_position = {}
+	_sites_by_position = {}
 	for site: HomeSite in _sites:
 		if site.is_structure():
 			_structure_by_position[site.position] = site
+		var at: Array = _sites_by_position.get(site.position, [])
+		at.append(site)
+		_sites_by_position[site.position] = at
 
 
 ## Every site whose radius covers `tile` — the "affected neighbourhood" of an edit at that
@@ -384,11 +398,17 @@ func sites_covering(tile: Vector2i) -> Array[HomeSite]:
 ## Distinct from `sites_covering()`, which returns sites whose RADIUS reaches a tile.
 ## Residents live at their site's own position, so resident-tag counting needs this
 ## tile-exact form.
+## Is there ANY site at exactly this tile? The allocation-free form of `sites_at()`, for the
+## evaluator's per-tile gate: on all but a handful of tiles the answer is no, and no answer
+## should cost an Array.
+func has_sites_at(position: Vector2i) -> bool:
+	return _sites_by_position.has(position)
+
+
 func sites_at(position: Vector2i) -> Array[HomeSite]:
 	var found: Array[HomeSite] = []
-	for site: HomeSite in _sites:
-		if site.position == position:
-			found.append(site)
+	for site: Variant in _sites_by_position.get(position, []):
+		found.append(site as HomeSite)
 	return found
 
 

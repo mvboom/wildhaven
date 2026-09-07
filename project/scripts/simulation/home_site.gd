@@ -40,7 +40,16 @@ var structure_tags: Array[String] = []
 ##
 ## Cached here rather than looked up because `CapacityEvaluator` holds no roster and so
 ## cannot map `species_id` back to an `AnimalDefinition`.
-var resident_tags: Array[String] = []
+var resident_tags: Array[String] = []:
+	set(value):
+		resident_tags = value
+		resident_tag_mask = WorldGrid.tags_mask(value)
+
+## `resident_tags` as a bitmask, kept in step by the setter above so the two can never
+## disagree. Read by `CapacityEvaluator.tag_counts()` once per site per call to answer
+## "could any resident contribute a tag this tier reads?" without walking strings — see
+## `WorldGrid.tile_tag_mask()` for the same bargain on the terrain side.
+var resident_tag_mask: int = 0
 
 ## The radius this site allocates tiles over (`covers()`, and therefore
 ## `HomeSiteRegistry.sites_covering()` / the exclusivity ownership walk) — the WIDEST radius

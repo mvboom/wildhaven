@@ -77,6 +77,26 @@ var _terrain_ids: PackedStringArray = PackedStringArray()
 var _building_defs: Array = []          # PlaceableDefinition or null, per tile
 var _building_origins: Array[Vector2i] = []  # footprint anchor, or Vector2i(-1, -1)
 
+## Per-tile habitat-tag BITMASK, one bit per `AnimalDefinition.HABITAT_TAGS` entry, kept in
+## lockstep with `_terrain_ids` / `_building_defs` by `_refresh_tag_mask()`.
+##
+## WHY IT EXISTS. `get_tile_tags()` is a String round trip — a `String` out of a
+## `PackedStringArray`, then a `Dictionary` hash to resolve the `TerrainDefinition` — and the
+## capacity evaluator runs it once per tile in radius, per tier, per species. Profiled at the
+## 128x128 cap that single call was 56% of a full-roster evaluation. A tile's tags are a pure
+## function of what occupies it (-> D-25), so the answer is derivable once per EDIT rather
+## than once per READ, which is the same incremental-index bargain `_forest_tile_count` and
+## `HomeSiteRegistry._structure_by_position` already make.
+##
+## The vocabulary is closed and human-gated, and `TerrainDefinition.validate()` /
+## `PlaceableDefinition.validate()` both reject an `emitted_tags` entry outside it, so every
+## shipped tag has a bit and no tag can go silently unrepresented.
+##
+## THE ONE RULE: every write to `_terrain_ids` or `_building_defs` must be followed by a
+## `_refresh_tag_mask()` for the tiles it touched. There are five such writers and they are
+## all in this file.
+var _tile_tag_masks: PackedInt64Array = PackedInt64Array()
+
 var _terrain_by_id: Dictionary = {}     # String id -> TerrainDefinition
 var _terrain_defs: Array[TerrainDefinition] = []
 var _forest_tile_count: int = 0
@@ -85,6 +105,50 @@ var _forest_tile_count: int = 0
 ## again — see `grow()`'s header for why a live recomputation would be a visible bug (every
 ## already-placed tile sliding half a growth-band sideways the instant the mist unfurls).
 var _origin_offset: Vector2 = Vector2.ZERO
+
+
+## Tag -> bit, built once from the shared vocabulary. `HABITAT_TAGS` is a `const`, so this
+## table can never drift from it at runtime.
+static var _tag_bits: Dictionary = _build_tag_bits()
+
+## "This tile carries at least one tag OUTSIDE the shared vocabulary."
+##
+## The vocabulary is closed and both `TerrainDefinition.validate()` and
+## `PlaceableDefinition.validate()` reject an entry outside it — but validation is a
+## NON-FATAL report, not a load barrier, so a mis-authored `.tres` can still reach the
+## simulation, and synthetic fixtures in the test suite use invented tags freely. Without
+## this bit such a tag would map to no bit at all and be silently uncountable, turning a
+## loud data error into a wrong capacity. With it, a tile carrying any unknown tag always
+## survives the evaluator's early-out and is resolved against the real tag array instead.
+##
+## Bit 62, not 63: these masks live in a `PackedInt64Array`, whose values are signed.
+const UNKNOWN_TAG_BIT: int = 1 << 62
+
+
+static func _build_tag_bits() -> Dictionary:
+	var out: Dictionary = {}
+	var tags: PackedStringArray = AnimalDefinition.HABITAT_TAGS
+	for i in tags.size():
+		out[tags[i]] = 1 << i
+	return out
+
+
+## The single bit standing for `tag`, or 0 for a tag outside the vocabulary. A 0 bit can
+## never match, which is the safe direction: an unknown tag counts for nothing rather than
+## aliasing onto another tag's bit.
+static func tag_bit(tag: String) -> int:
+	return int(_tag_bits.get(tag, 0))
+
+
+## The OR of every bit in `tags`, with `UNKNOWN_TAG_BIT` set if any entry is outside the
+## vocabulary. Takes any string container (`Array[String]`, `PackedStringArray`) so callers
+## need not convert.
+static func tags_mask(tags) -> int:
+	var mask: int = 0
+	for tag: String in tags:
+		var bit: int = int(_tag_bits.get(tag, 0))
+		mask |= UNKNOWN_TAG_BIT if bit == 0 else bit
+	return mask
 
 
 func _ready() -> void:
@@ -118,10 +182,17 @@ func build(terrain_defs: Array, new_width: int = DEFAULT_WIDTH, new_depth: int =
 	_building_defs.resize(count)
 	_building_origins = []
 	_building_origins.resize(count)
+	_tile_tag_masks = PackedInt64Array()
+	_tile_tag_masks.resize(count)
+	# Every tile starts as the same terrain with no building, so the mask is the same one
+	# value everywhere — resolved once, not per tile.
+	var start_def: TerrainDefinition = terrain_definition(START_TERRAIN_ID)
+	var start_mask: int = 0 if start_def == null else tags_mask(start_def.emitted_tags)
 	for i in count:
 		_terrain_ids[i] = START_TERRAIN_ID
 		_building_defs[i] = null
 		_building_origins[i] = Vector2i(-1, -1)
+		_tile_tag_masks[i] = start_mask
 	_forest_tile_count = 0
 
 
@@ -166,6 +237,7 @@ func grow(requested_width: int, requested_depth: int, world_seed: int) -> Array[
 	var old_terrain: PackedStringArray = _terrain_ids
 	var old_buildings: Array = _building_defs
 	var old_origins: Array[Vector2i] = _building_origins
+	var old_masks: PackedInt64Array = _tile_tag_masks
 
 	width = new_width
 	depth = new_depth
@@ -176,6 +248,8 @@ func grow(requested_width: int, requested_depth: int, world_seed: int) -> Array[
 	_building_defs.resize(count)
 	_building_origins = []
 	_building_origins.resize(count)
+	_tile_tag_masks = PackedInt64Array()
+	_tile_tag_masks.resize(count)
 
 	var new_tiles: Array[Vector2i] = []
 	for x in width:
@@ -186,12 +260,15 @@ func grow(requested_width: int, requested_depth: int, world_seed: int) -> Array[
 				_terrain_ids[i] = old_terrain[old_i]
 				_building_defs[i] = old_buildings[old_i]
 				_building_origins[i] = old_origins[old_i]
+				# A carried-over tile's occupancy is unchanged, so its mask is too.
+				_tile_tag_masks[i] = old_masks[old_i]
 			else:
 				# The revealed terrain is always wild grass (`MistReveal`'s own header explains
 				# why), so it can never be Forest — no `_forest_tile_count` bookkeeping needed.
 				_terrain_ids[i] = MistReveal.reveal_terrain_id(world_seed, x, z)
 				_building_defs[i] = null
 				_building_origins[i] = Vector2i(-1, -1)
+				_tile_tag_masks[i] = _tag_mask_for_tile(x, z)
 				new_tiles.append(Vector2i(x, z))
 
 	grown.emit(new_tiles)
@@ -293,6 +370,36 @@ func get_tile_tags(x: int, z: int) -> Array[String]:
 	return terrain.emitted_tags
 
 
+## THE SAME DERIVATION AS `get_tile_tags()`, as a bitmask, read straight out of the cache.
+##
+## This is the form the capacity evaluator's tile walk uses: one array index and a bit test
+## instead of a String lookup and an `Array.has()` per tag. Out-of-bounds reads 0, matching
+## `get_tile_tags()`'s empty array — a tile that is not there emits nothing.
+##
+## `get_tile_tags()` stays the readable form and remains the source of truth for the mask
+## (`_tag_mask_for_tile()` derives one from the other), so the two can never disagree about
+## what a tile emits; `test_tile_tag_mask.gd` pins that equivalence over the whole grid.
+func tile_tag_mask(x: int, z: int) -> int:
+	if not in_bounds(x, z):
+		return 0
+	return _tile_tag_masks[_index(x, z)]
+
+
+## Derives one tile's mask from `get_tile_tags()` — the one place the two representations
+## are tied together.
+func _tag_mask_for_tile(x: int, z: int) -> int:
+	return tags_mask(get_tile_tags(x, z))
+
+
+## Recomputes one tile's cached mask. Called by every writer that changes what a tile holds.
+func _refresh_tag_mask(x: int, z: int) -> void:
+	if not in_bounds(x, z):
+		return
+	var i: int = _index(x, z)
+	if i < _tile_tag_masks.size():
+		_tile_tag_masks[i] = _tag_mask_for_tile(x, z)
+
+
 ## Forest tiles currently on the map, maintained incrementally so the economy never scans
 ## the world. A building footprint suppresses the tile's terrain tags but does not remove
 ## the terrain, and Forest is not in the House's `allowed_terrain`, so this counts terrain.
@@ -319,6 +426,7 @@ func set_terrain(x: int, z: int, terrain_id: String) -> bool:
 	if normalized == FOREST_TERRAIN_ID:
 		_forest_tile_count += 1
 	_terrain_ids[i] = normalized
+	_refresh_tag_mask(x, z)
 	tile_changed.emit(x, z)
 	return true
 
@@ -335,6 +443,7 @@ func set_building(origin: Vector2i, def: PlaceableDefinition) -> bool:
 		var i: int = _index(tile.x, tile.y)
 		_building_defs[i] = def
 		_building_origins[i] = origin
+		_refresh_tag_mask(tile.x, tile.y)
 		tile_changed.emit(tile.x, tile.y)
 	return true
 
@@ -359,6 +468,7 @@ func clear_building(origin: Vector2i) -> bool:
 		var i: int = _index(tile.x, tile.y)
 		_building_defs[i] = null
 		_building_origins[i] = Vector2i(-1, -1)
+		_refresh_tag_mask(tile.x, tile.y)
 		tile_changed.emit(tile.x, tile.y)
 	return true
 
