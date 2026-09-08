@@ -1,0 +1,146 @@
+extends QATestCase
+## TERRAIN-AWARE ROAMING (game-design/roaming.md). A resident may only walk where its species
+## belongs, and that area GROWS as the player paints more of the terrain it likes.
+##
+## THE FIXTURE IDIOM: `build(TerrainDefinition.load_all(), W, H)` with no mix fills everything
+## with `wild_grass`, whose `emitted_tags` is deliberately empty. So a fresh grid qualifies
+## NOTHING and every region below is built out of terrain the test painted itself. That makes
+## each check state its own preconditions instead of inheriting them from world generation.
+##
+## Run:
+##   $GODOT_PATH --headless --path project --import
+##   $GODOT_PATH --headless --path project --script res://tests/test_roam_region.gd
+
+const HOME := Vector2i(5, 5)
+const RADIUS: int = 6
+
+var _grid: WorldGrid = null
+var _navigation: WorldNavigation = null
+
+
+## A grid of `wild_grass` (no tags, so nothing qualifies) with `grass` painted over `rect`.
+func _grid_with_grass(rect: Rect2i) -> WorldGrid:
+	var grid := WorldGrid.new()
+	grid.build(TerrainDefinition.load_all(), 16, 16)
+	root.add_child(grid)
+	for x in range(rect.position.x, rect.end.x):
+		for z in range(rect.position.y, rect.end.y):
+			grid.set_terrain(x, z, "grass")
+	return grid
+
+
+func _grass_mask() -> int:
+	return WorldGrid.tags_mask(["open_grass"] as Array[String])
+
+
+func _initialize() -> void:
+	begin("roam region")
+	_navigation = WorldNavigation.new()
+
+	_check_liked_tiles_are_included()
+	_check_adjacent_tiles_are_included()
+	_check_unliked_tiles_are_excluded()
+	_check_blocked_tiles_are_excluded()
+	_check_region_stays_within_radius()
+	_check_region_is_contiguous()
+	_check_home_is_always_present()
+	_check_small_region_is_not_usable()
+
+	_navigation.free_navigation()
+	finish()
+
+
+func _check_liked_tiles_are_included() -> void:
+	var grid := _grid_with_grass(Rect2i(3, 3, 5, 5))
+	var region := RoamRegion.new(grid, _navigation, HOME, _grass_mask(), RADIUS)
+	check(region.has_tile(Vector2i(4, 4)), "a liked tile inside the patch is in the region", "")
+	check(region.tile_count() >= 25, "the whole painted patch is reachable",
+		"only %d tiles" % region.tile_count())
+	grid.queue_free()
+
+
+func _check_adjacent_tiles_are_included() -> void:
+	# One grass tile beside home. The tile on its far side is NOT grass, but touches grass,
+	# so the adjacency half of the predicate must let it in (roaming.md §3.2 — this is what
+	# puts a fox on the forest fringe instead of leaving it with nowhere to go).
+	var grid := _grid_with_grass(Rect2i(5, 5, 1, 1))
+	var region := RoamRegion.new(grid, _navigation, HOME, _grass_mask(), RADIUS)
+	check(region.has_tile(Vector2i(6, 5)),
+		"a tile that merely TOUCHES liked terrain is in the region", "")
+	grid.queue_free()
+
+
+func _check_unliked_tiles_are_excluded() -> void:
+	var grid := _grid_with_grass(Rect2i(5, 5, 1, 1))
+	var region := RoamRegion.new(grid, _navigation, HOME, _grass_mask(), RADIUS)
+	check(not region.has_tile(Vector2i(8, 5)),
+		"a tile neither liked nor touching liked terrain is excluded", "")
+	grid.queue_free()
+
+
+func _check_blocked_tiles_are_excluded() -> void:
+	# Forest emits `forest` and sets blocks_movement. Under a `open_grass` mask it is not
+	# liked anyway, so paint grass around it and assert the BLOCK is what keeps it out.
+	var grid := _grid_with_grass(Rect2i(3, 3, 5, 5))
+	grid.set_terrain(6, 5, "forest")
+	var region := RoamRegion.new(grid, _navigation, HOME, _grass_mask(), RADIUS)
+	check(not region.has_tile(Vector2i(6, 5)),
+		"a blocked tile is excluded even while surrounded by liked terrain", "")
+	grid.queue_free()
+
+
+func _check_region_stays_within_radius() -> void:
+	var grid := _grid_with_grass(Rect2i(0, 0, 16, 16))
+	var region := RoamRegion.new(grid, _navigation, HOME, _grass_mask(), RADIUS)
+	var breaches: int = 0
+	for tile: Vector2 in region.tiles():
+		if Vector2i(int(tile.x), int(tile.y)).distance_squared_to(HOME) > RADIUS * RADIUS:
+			breaches += 1
+	check_eq(breaches, 0, "no region tile lies outside the radius")
+	grid.queue_free()
+
+
+func _check_region_is_contiguous() -> void:
+	# Two grass patches separated by a wide band of wild_grass. Only the one containing home
+	# may appear: the fill crosses qualifying tiles only, which is what makes every point in
+	# the region reachable on foot (roaming.md §3.3).
+	#
+	# The gap must be at least 3 empty columns: under §4.2's predicate the column right next
+	# to EACH patch already qualifies as fringe (touches a liked tile), so a 2-column gap has
+	# both its columns independently qualify and, being adjacent to each other, bridge straight
+	# through. A middle column with a non-qualifying neighbour on both sides is what actually
+	# breaks the fill.
+	var grid := _grid_with_grass(Rect2i(4, 4, 3, 3))
+	for x in range(10, 13):
+		for z in range(4, 7):
+			grid.set_terrain(x, z, "grass")
+	var region := RoamRegion.new(grid, _navigation, HOME, _grass_mask(), RADIUS)
+	check(region.has_tile(Vector2i(5, 5)), "the home patch is in the region", "")
+	check(not region.has_tile(Vector2i(10, 5)),
+		"a disconnected patch of liked terrain is NOT in the region", "")
+	grid.queue_free()
+
+
+func _check_home_is_always_present() -> void:
+	# A den tile carries a navigation reservation, so home is BLOCKED. The resident still
+	# stands on it, so it must be in its own region regardless (roaming.md §4.3).
+	var grid := _grid_with_grass(Rect2i(3, 3, 5, 5))
+	_navigation.set_den_tile_blocked(HOME, true)
+	var region := RoamRegion.new(grid, _navigation, HOME, _grass_mask(), RADIUS)
+	check(region.has_tile(HOME), "the home tile is in the region even when blocked", "")
+	_navigation.set_den_tile_blocked(HOME, false)
+	grid.queue_free()
+
+
+func _check_small_region_is_not_usable() -> void:
+	# Nothing painted: only home qualifies. Too small to roam, so the roamer must fall back
+	# to its disc rather than pin an animal to one tile (roaming.md §4.6).
+	var grid := WorldGrid.new()
+	grid.build(TerrainDefinition.load_all(), 16, 16)
+	root.add_child(grid)
+	var region := RoamRegion.new(grid, _navigation, HOME, _grass_mask(), RADIUS)
+	check(region.tile_count() < RoamRegion.MIN_REGION_TILES,
+		"an unpainted world yields a region below the usable floor",
+		"got %d tiles" % region.tile_count())
+	check(not region.is_usable(), "and it reports itself unusable", "")
+	grid.queue_free()
