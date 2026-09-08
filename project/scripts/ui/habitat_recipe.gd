@@ -49,7 +49,7 @@ extends RefCounted
 ## sentence, which doesn't care whether its object carries an article or not — so some
 ## entries got one baked in ("a house", "a farm field") and others didn't ("open grass",
 ## "woods"). `describe_tiers()`'s templates DO care: `_gate_line()` puts an article in front
-## of what it gets (`_with_article()`), so a baked-in one produced two ("needs an a house"),
+## of what it gets (`with_article()`), so a baked-in one produced two ("needs an a house"),
 ## and `_need_line()` puts a NUMBER in front of it, where an article is simply wrong.
 ## Same root cause both times: THE GRAMMAR IS THIS FILE'S JOB, NOT THE CONTENT WRITER'S — a
 ## phrase here is a noun, full stop, and each template decides for itself what belongs in
@@ -516,7 +516,7 @@ static func _describe_tier(
 
 	var lead: String = LEAD_ALT
 	if previous == null:
-		lead = LEAD % _with_article(noun)
+		lead = LEAD % with_article(noun)
 
 	var block: Array[String] = [lead]
 	block.append_array(gates)
@@ -597,7 +597,7 @@ static func _gate_line(tag: String, world: WorldRoot, seen: Dictionary) -> Strin
 		if not names.has(display):
 			names.append(display)
 	if not all_placeable or names.size() < 2:
-		return _with_article(resolved["phrase"] as String)
+		return with_article(resolved["phrase"] as String)
 
 	var shared: String = names[0].get_slice(" ", names[0].get_slice_count(" ") - 1)
 	for display: String in names:
@@ -605,11 +605,11 @@ static func _gate_line(tag: String, world: WorldRoot, seen: Dictionary) -> Strin
 			shared = ""
 			break
 	if not shared.is_empty():
-		return "%s (any kind)" % _with_article(shared)
+		return "%s (any kind)" % with_article(shared)
 
 	var articled: Array[String] = []
 	for display: String in names:
-		articled.append(_with_article(display))
+		articled.append(with_article(display))
 	return _join_or(articled)
 
 
@@ -754,12 +754,16 @@ static func _bare_noun(phrase: String) -> String:
 
 
 ## "a stable", "an open barn", "an alpaca" — the indefinite article a gate-only need, or a
-## lead-in's species name, reads with. A plain first-letter-is-a-vowel heuristic, adequate
-## for the tag and roster vocabulary this reads over; not a general-purpose English rule
-## (it would say "an hour" wrong, and "a unicorn" wrong the other way — neither is a word
-## this file can reach). Safe to apply unconditionally: every phrase it receives has already
-## passed through `_resolve_need()`'s `_bare_noun()` normalization.
-static func _with_article(phrase: String) -> String:
+## lead-in's species name, reads with. PUBLIC, not private: `NewsReportContent.hint_line()`
+## articles a species' display name for `GENERIC_OPENING` the same way this file already
+## articles a gate noun, so the two files share the one heuristic rather than each growing
+## their own. A plain first-letter-is-a-vowel heuristic, adequate for the tag and roster
+## vocabulary this reads over; not a general-purpose English rule (it would say "an hour"
+## wrong, and "a unicorn" wrong the other way — neither is a word this file can reach). Safe
+## to apply unconditionally to this file's own callers: every phrase THEY pass has already
+## gone through `_resolve_need()`'s `_bare_noun()` normalization; a caller outside this file
+## is responsible for its own input.
+static func with_article(phrase: String) -> String:
 	if phrase.is_empty():
 		return phrase
 	var first: String = phrase.substr(0, 1).to_lower()

@@ -16,6 +16,9 @@ extends QATestCase
 ##      terrain-bias weighting is measurably more likely to name a species whose habitat
 ##      already exists more of, without ever letting a species with none of it go completely
 ##      unreachable (gdd.md -> Discovery: "a hint is an invitation, not an assignment").
+##      `hint_line()` then composes the report itself: an authored (or generic) opening plus
+##      needs derived live from `HabitatRecipe`, so a divisor retune updates every report with
+##      no copy edit, and no rendered report ever carries an imperative or a raw tag.
 ##   4. THE SETTING PERSISTS. `GameplaySettings` defaults ON, round-trips through its own
 ##      `user://` file independently of any world save, and `SettingsOverlay` reads/writes it
 ##      rather than keeping a second copy of the value.
@@ -86,6 +89,8 @@ func _process(_delta: float) -> bool:
 	_check_content_tag_tile_counts()
 	_check_content_candidates_and_lines()
 	_check_content_terrain_bias()
+	_check_hint_line_composes_opening_and_needs()
+	_check_authored_opening_is_preferred()
 	_check_gameplay_settings_persistence()
 	_check_settings_overlay_reads_and_writes_the_one_source_of_truth()
 	_check_toast_behaviour()
@@ -355,6 +360,77 @@ func _check_content_terrain_bias() -> void:
 		+ "assignment toward only the land the player already has (rich=%d, scarce=%d)"
 			% [rich_picks, scarce_picks])
 	grid.free()
+
+
+## THE COMPOSER. An authored opening plus needs derived live, so a divisor retune updates
+## every report with no copy edit. A species with NO authored opening still produces a whole,
+## grammatical report — which is what lets the hint layer cover all fifteen species on day
+## one instead of the three that happen to carry copy.
+func _check_hint_line_composes_opening_and_needs() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = SEED
+
+	var fox: AnimalDefinition = load(FOX_PATH) as AnimalDefinition
+	if not check(fox != null, "fox.tres loads"):
+		return
+	var line: String = NewsReportContent.hint_line(fox, _world, rng)
+	check(not line.is_empty(), "a species with no authored opening still yields a report")
+	check(line.contains("fox"), "the report names the species: '%s'" % line)
+	check(line.contains("4 tiles of forest"), "...and carries the real divisor: '%s'" % line)
+	check(line.contains("far from any buildings"),
+		"...and the starter tier's limit: '%s'" % line)
+	check(line.ends_with("."), "the report is a finished sentence: '%s'" % line)
+
+	# The register rules from the spec, on real roster data. Word-boundary regexes, not
+	# substring checks — five species (deer, donkey, fox, rabbit, stag) render the limit
+	# phrase "away from buildings" / "far from any buildings", and a plain
+	# `.contains("build")` substring check flags the NOUN "buildings" as if it were the
+	# imperative verb "build". `\bbuild\b` / `\btap\b` catch the verb without ever matching
+	# inside a longer word.
+	var imperative_patterns: Dictionary = {
+		"build": RegEx.new(),
+		"tap": RegEx.new(),
+	}
+	for word: String in imperative_patterns:
+		(imperative_patterns[word] as RegEx).compile("\\b%s\\b" % word)
+
+	for species: AnimalDefinition in _world.roster.species():
+		var rendered: String = NewsReportContent.hint_line(species, _world, rng)
+		check(not rendered.is_empty(), "%s renders a report" % species.id)
+		check(not rendered.contains("_"),
+			"%s's report leaks no raw tag: '%s'" % [species.id, rendered])
+		var lowered: String = rendered.to_lower()
+		for word: String in imperative_patterns:
+			var pattern: RegEx = imperative_patterns[word]
+			check(pattern.search(lowered) == null,
+				"%s's report carries no imperative ('%s'): '%s'" % [species.id, word, rendered])
+		check(not lowered.contains("you should"),
+			"%s's report carries no imperative ('you should'): '%s'" % [species.id, rendered])
+
+
+## An authored opening is used verbatim as the first half; the generic one is used only when
+## the species has none.
+func _check_authored_opening_is_preferred() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = SEED
+	var ghost := AnimalDefinition.new()
+	ghost.id = "ghost"
+	ghost.display_name = "Ghost"
+	ghost.discovery_openings = ["Word has it a ghost is looking for somewhere quiet"] as Array[String]
+	var tier := HabitatTier.new()
+	tier.id = "only"
+	tier.max_individuals = 4
+	var need := HabitatNeed.new()
+	need.tag = "open_grass"
+	need.tiles_per_individual = 5
+	tier.needs = [need]
+	ghost.tiers = [tier]
+
+	var line: String = NewsReportContent.hint_line(ghost, _world, rng)
+	check(line.begins_with("Word has it a ghost is looking for somewhere quiet"),
+		"the authored opening leads the sentence verbatim: '%s'" % line)
+	check(line.contains("5 tiles of open grass"),
+		"...and the derived half follows it: '%s'" % line)
 
 
 # --- 4. The setting persists ---------------------------------------------------------------

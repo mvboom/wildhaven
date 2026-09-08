@@ -103,3 +103,55 @@ static func pick_line(species: AnimalDefinition, rng: RandomNumberGenerator) -> 
 	if species == null or species.news_reports.is_empty():
 		return ""
 	return species.news_reports[rng.randi_range(0, species.news_reports.size() - 1)]
+
+
+## [COPY] — content-writer's. The opening for a species with no authored `discovery_openings`
+## entry. `%s` is the species, articled. Deliberately the same shape as the authored
+## openings so the composed sentence reads identically either way.
+const GENERIC_OPENING: String = "Word has it %s is looking for a home"
+
+## [COPY] — content-writer's. Joins the two halves. `%s` is the opening (no trailing
+## punctuation), then the needs clause.
+const HINT_TEMPLATE: String = "%s — it'd want %s."
+
+
+## THE COMPOSER — an authored opening plus needs derived live from `HabitatRecipe`.
+##
+## The derived half is generated per render rather than authored, so retuning a divisor
+## updates every report in the game with no copy edit, and rewording an opening needs no code
+## change. That split is the whole point of the design: the numbers have one source, shared
+## with the Field Guide card.
+##
+## Returns "" only for a null species or one whose starter tier yields no phrases at all —
+## never for a species that merely lacks authored copy, which is the common case and the
+## reason `GENERIC_OPENING` exists.
+static func hint_line(
+	species: AnimalDefinition, world: WorldRoot, rng: RandomNumberGenerator
+) -> String:
+	if species == null:
+		return ""
+	var phrases: Array[String] = HabitatRecipe.starter_need_phrases(species, world)
+	if phrases.is_empty():
+		return ""
+	phrases.append_array(HabitatRecipe.starter_limit_phrases(species))
+
+	var opening: String = ""
+	if not species.discovery_openings.is_empty():
+		opening = species.discovery_openings[
+			rng.randi_range(0, species.discovery_openings.size() - 1)
+		]
+	else:
+		opening = GENERIC_OPENING % HabitatRecipe.with_article(species.display_name.to_lower())
+
+	return HINT_TEMPLATE % [opening, _join_and(phrases)]
+
+
+## "a, b and c" — the same joiner shape `HabitatRecipe` uses, kept local so this file has no
+## reason to reach into another's private helper.
+static func _join_and(parts: Array[String]) -> String:
+	if parts.is_empty():
+		return ""
+	if parts.size() == 1:
+		return parts[0]
+	var head: Array[String] = parts.slice(0, parts.size() - 1)
+	return ", ".join(head) + " and " + parts[parts.size() - 1]
