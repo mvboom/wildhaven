@@ -139,6 +139,19 @@ func free_navigation() -> void:
 	NavigationServer3D.free_rid(_map)
 
 
+## Whether a resident may stand on this tile — the PUBLIC form of `_tile_blocked()`, and the
+## one `RoamRegion` uses.
+##
+## Shared deliberately rather than reimplemented: roaming picks waypoints and pathing walks to
+## them, so if the two disagreed about what "walkable" means, a resident would pick a waypoint
+## `find_path()` refuses to reach and fall back to walking there in a straight line — through
+## whatever was in the way. One definition makes that impossible.
+func is_tile_walkable(grid: WorldGrid, x: int, z: int) -> bool:
+	if grid == null or not grid.in_bounds(x, z):
+		return false
+	return not _tile_blocked(grid, x, z)
+
+
 func _tile_blocked(grid: WorldGrid, x: int, z: int) -> bool:
 	if grid.is_occupied(x, z):
 		return true
