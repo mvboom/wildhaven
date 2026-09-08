@@ -841,13 +841,20 @@ func _check_resident_needs_are_never_buildable() -> void:
 		"...and never the raw tag: '%s'" % pig_line)
 	check(not pig_line.contains("tiles of villagers"),
 		"...and is not measured in tiles: '%s'" % pig_line)
-	# Compared against the WHOLE rendered lead-in, not a prefix: both lead-ins open "To
-	# invite ", so a prefix comparison would pass against either one and check nothing.
-	check(pig_line.begins_with(HabitatRecipe.LEAD_NEED % "a pig"),
-		"a species needing villagers is told it NEEDS them, not that it can build them: '%s'"
-		% pig_line)
-	check(not pig_line.contains(HabitatRecipe.LEAD_BUILD % "a pig"),
-		"...and never carries the buildable lead-in: '%s'" % pig_line)
+	# REPLACED 2026-09-08, when `LEAD_BUILD`/`LEAD_NEED` collapsed into the single `LEAD`.
+	# This used to assert Pig took the "you'll need these nearby" lead-in and not the "build
+	# these nearby" one — the old guard against telling a child to build a villager. That
+	# lead-in pair is gone: "A good home for a pig has:" is true of a tile and a villager
+	# alike, so there is no longer a lie for a second lead-in to avoid. The property the old
+	# pair protected did NOT go away, though; it just lives entirely in the bullet now, which
+	# is where the three checks above already pin it ("2 villagers", never "people", never
+	# "tiles of villagers"). What is added here is the half those three cannot see: that no
+	# imperative survives anywhere in the block. A future rewording that reintroduces "build"
+	# into `LEAD` would sail past a bullet-only check and fail this one.
+	check(not pig_line.to_lower().contains("build"),
+		"a species needing villagers is never told to build one: '%s'" % pig_line)
+	check(pig_line.begins_with(HabitatRecipe.LEAD % "a pig"),
+		"...and takes the same lead-in every other species takes: '%s'" % pig_line)
 
 	var stag_line: String = stag_lines[0]
 	check(stag_line.contains("4 deer"),

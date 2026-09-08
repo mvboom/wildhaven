@@ -222,7 +222,7 @@ static func _cheapest(candidates: Array) -> Dictionary:
 ## half-recipe is worse than an honest "not yet", because a child would build it and wait
 ## forever (`recipe_for()`'s `satisfiable` flag, same reasoning). No fail framing, nothing
 ## the player did wrong, and "yet" keeps the door open.
-const DESCRIBE_UNKNOWN: String = "We don't know how to invite these yet."
+const DESCRIBE_UNKNOWN: String = "We don't know what makes a good home for these yet."
 
 ## Content-writer's, approved 2026-09-01. `describe()`'s and `describe_tier_needs()`'s
 ## lead-in — still live on the onboarding coach's beat 2, which is why it is here and not
@@ -375,11 +375,31 @@ static func describe_tiers(species: AnimalDefinition, world: WorldRoot = null) -
 
 
 ## Content-writer's. `%s` is the species, articled — "an alpaca", "a shiba inu".
-## Two forms, chosen by whether every requirement is something a player can actually place:
-## Husky needs `people`, and no amount of tapping the palette builds a villager, so telling a
-## child to "build" one would be a plain lie. `LEAD_NEED` covers both kinds at once.
-const LEAD_BUILD: String = "To invite %s, build these nearby:"
-const LEAD_NEED: String = "To invite %s, you'll need these nearby:"
+##
+## THE LAND IS THE SUBJECT OF THIS SENTENCE, AND THAT IS THE WHOLE POINT (human ruling,
+## 2026-09-08, replacing "To invite %s, build these nearby:"). Two problems with "invite".
+## It is not the project's word: gdd.md's own success criterion is "an animal genuinely
+## MOVES IN", Pillar 4 says "an animal moving in", buildings.md says "a villager moves in
+## when its habitat is met", and `DisplacementCopy.MOVE_HUMAN` already ships "moved into a
+## house with more room to grow" — the GDD spends "invitation" only on hints ("a hint is an
+## invitation, not an assignment"), never on animals. And it inverts the agency the design
+## runs on: an invitation makes the player the host and the animal a guest, when what
+## actually happens is that the player shapes land and the animal decides. "A good home for
+## an alpaca has" states a property of the place, which is what the player can actually
+## change.
+##
+## "GOOD", NOT "RIGHT" — Pillar 1. "The right home" implies a wrong one, and this screen is
+## a status indicator, never a target. It also chains into `CAP_MANY` ("Room for up to 6
+## here.") as one thought about one place.
+##
+## ONE FORM, WHERE THERE USED TO BE TWO. The old pair existed solely because "build these
+## nearby" is a lie for Husky/Pig/Pug/Sheep/Shiba Inu (`people`) and Stag (`deer`) — no
+## amount of tapping the palette builds a villager — so a second lead-in said "you'll need"
+## instead. "has" is true of a tile and a villager alike, so the branch is gone. What keeps
+## the living requirements honest is `RESIDENT_PHRASES` and `_need_line()`'s "tiles of"
+## suppression, which is where that check belonged all along; `test_habitat_recipe.gd`'s
+## `_check_resident_needs_are_never_buildable()` still pins it there.
+const LEAD: String = "A good home for %s has:"
 
 ## Content-writer's. A second tier that is NOT a superset of the first — Horse (its grass
 ## divisor changes, 6 each to 4 each), Villager (`house` becomes `large_house`), Deer (its
@@ -391,8 +411,10 @@ const LEAD_NEED: String = "To invite %s, you'll need these nearby:"
 ## file, `FieldGuide.HERE_TEMPLATE` proves `·` has a glyph in Godot's built-in face, and
 ## nothing proves `—` does. Every rendered string in this file stays inside ASCII plus that
 ## one measured codepoint, so a full stop does the work the dash would have.
-const LEAD_ALT_BUILD: String = "Or here's another way. Build these nearby instead:"
-const LEAD_ALT_NEED: String = "Or here's another way. You'll need these nearby instead:"
+## Collapsed from a build/need pair for the same reason as `LEAD` above: "another kind of
+## good home" is true whether the requirement is a tile or a villager. "Another KIND of"
+## carries the load "instead" used to — a different home, not an extension of the one above.
+const LEAD_ALT: String = "Or here's another kind of good home:"
 
 ## Content-writer's. A second tier that IS the first plus more, with every shared number
 ## unchanged — Cow (add water), Sheep (add a windmill), Rabbit (add flowers). `%d` is the new
@@ -480,10 +502,7 @@ static func _describe_tier(
 	var seen: Dictionary = {}
 	var gates: Array[String] = []
 	var scaling: Array[String] = []
-	var all_buildable: bool = true
 	for need: HabitatNeed in tier.needs:
-		if RESIDENT_PHRASES.has(need.tag):
-			all_buildable = false
 		var bullet: String = _need_line(need, noun, shows_each, world, seen)
 		if bullet.is_empty():
 			continue
@@ -495,16 +514,9 @@ static func _describe_tier(
 	if gates.is_empty() and scaling.is_empty():
 		return DESCRIBE_UNKNOWN
 
-	var lead: String = ""
+	var lead: String = LEAD_ALT
 	if previous == null:
-		var lead_first: String = LEAD_NEED
-		if all_buildable:
-			lead_first = LEAD_BUILD
-		lead = lead_first % _with_article(noun)
-	elif all_buildable:
-		lead = LEAD_ALT_BUILD
-	else:
-		lead = LEAD_ALT_NEED
+		lead = LEAD % _with_article(noun)
 
 	var block: Array[String] = [lead]
 	block.append_array(gates)
@@ -678,7 +690,7 @@ static func _resolve_need(tag: String, world: WorldRoot, seen: Dictionary) -> Di
 ## So the test is exact on all three axes: same limits, and every previous need matched on
 ## (tag, radius, divisor) — radius included because Deer's herd tier keeps every divisor and
 ## moves every radius, which a (tag, divisor) comparison would wave straight through. A tier
-## that fails any of it renders in full, under `LEAD_ALT_*`'s "instead".
+## that fails any of it renders in full, under `LEAD_ALT`'s "another kind of good home".
 static func _upgrade_needs(tier: HabitatTier, previous: HabitatTier) -> Array[HabitatNeed]:
 	var none: Array[HabitatNeed] = []
 	if previous == null or tier.max_individuals <= previous.max_individuals:
