@@ -161,9 +161,12 @@ static func pick_species(
 	return pool[pool.size() - 1]
 
 
-## One line from a species' pool, or "" if it has none (never errors on an empty pool — a
-## species with no copy yet simply cannot be picked by `pick_species()` in the first place,
-## via `candidates_with_pools()`, so this is a defensive fallback, not the expected path).
+## One line from a species' pool, or "" if it has none (never errors on an empty pool). DEAD
+## IN PRODUCTION as of Task 7: `NewsReportPresenter._fire_report()` composes through
+## `hint_line()` now, not this — `candidates_with_pools()` no longer gates what
+## `pick_species()` can return (see that function's own header), so the old premise here
+## ("a species with no copy yet simply cannot be picked in the first place") no longer holds.
+## Kept for its own test coverage (`test_news_report.gd`), which is now its only caller.
 static func pick_line(species: AnimalDefinition, rng: RandomNumberGenerator) -> String:
 	if species == null or species.news_reports.is_empty():
 		return ""

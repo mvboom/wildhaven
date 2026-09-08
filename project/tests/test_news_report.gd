@@ -809,13 +809,19 @@ func _check_presenter_fires_a_composed_hint() -> void:
 	check(not line.contains("_"), "...with no raw tag: '%s'" % line)
 
 
-## Activity reaches the pacer from the same call sites the coach already uses, so there is no
-## second input path to keep in sync.
+## Activity reaches the pacer from the same call site the coach already uses
+## (`TapRouter.tile_painted`), so there is no second input path to keep in sync. Fires the
+## REAL signal — `_ui.tap_router.tile_painted.emit()` — rather than calling
+## `presenter.notice_activity()` directly, because a direct call only proves the presenter's
+## own method chain works; it cannot catch `game_ui.gd`'s wiring being dropped or its closure
+## capturing a stale presenter. Round-1 fix (2026-09-08): confirmed non-vacuous by temporarily
+## deleting the `notice_activity()` call from `game_ui.gd`'s `tile_painted` lambda, seeing this
+## check fail, then restoring it — see task-7-report.md.
 func _check_activity_reaches_the_pacer() -> void:
 	var presenter: NewsReportPresenter = _ui.news_report_presenter()
 	if not check(presenter != null, "GameUI exposes its presenter"):
 		return
-	presenter.notice_activity()
+	_ui.tap_router.tile_painted.emit()
 	check(presenter.built_recently(),
 		"a placement marks the player as building for pacing purposes")
 

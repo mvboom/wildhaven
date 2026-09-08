@@ -117,9 +117,19 @@ func compose_next_report() -> String:
 	)
 	if species == null:
 		return ""
+	var line: String = NewsReportContent.hint_line(species, _world, _content_rng)
+	if line.is_empty():
+		# `hint_line()`'s own guard: a starter tier with no NEEDS at all composes nothing, and
+		# `_fire_report()` correctly shows nothing for it. A species that was never actually
+		# named to the player must not be recorded as if it had been — recording it here would
+		# both spend a no-repeat cycle (`_last_species_id`) on a report nobody saw and plant a
+		# false entry in `_hinted_species_ids`, which is reserved for a future Field Guide
+		# "hinted at" column and documents itself as species a report has NAMED.
+		return ""
+	# Recorded together, in the one place both are known true, so the two can never diverge.
 	_last_species_id = species.id
 	_hinted_species_ids[species.id] = true
-	return NewsReportContent.hint_line(species, _world, _content_rng)
+	return line
 
 
 func _fire_report() -> void:
