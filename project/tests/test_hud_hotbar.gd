@@ -90,6 +90,7 @@ func _process(delta: float) -> bool:
 	_check_popup_indicator_exists_only_on_multi_style_picker_buttons()
 	_check_long_press_opens_style_picker_and_swallows_the_release()
 	_check_style_picker_lists_every_style_with_current_highlighted()
+	_check_house_style_picker_offers_the_three_culled_looks()
 	_check_style_picker_selection_updates_default_and_button_chrome()
 	_check_style_picker_selection_immediately_activates_the_choice()
 	_check_style_picker_reselecting_current_still_activates_it()
@@ -952,6 +953,63 @@ func _check_style_picker_lists_every_style_with_current_highlighted() -> void:
 		popup.close()
 
 
+## The three House looks the 2026-09-07 cull left wired, with the labels the human named them
+## by. DELIBERATELY HARDCODED HERE rather than read from `StylePickerPopup._HOUSE_LABELS`:
+## `_expected_style_label()` below is a MIRROR of `_label_for()`'s logic, so a mirror that
+## sourced its strings from the implementation would agree with any typo the implementation
+## made. This constant is the independent copy — the thing that actually fails if someone edits
+## a label without meaning to.
+##
+## The dash is the whole reason a label map exists at all: `String.capitalize()`, which every
+## other derived-id category uses, produces "House Large" and cannot produce "House - Large".
+const HOUSE_STYLE_LABELS: Dictionary = {
+	"house_large": "House - Large",
+	"house_medium": "House - Medium",
+	"house_small": "House - Small",
+}
+
+
+## The House picker offers EXACTLY the three culled-down looks, in house.tres's own order, each
+## under its authored label — the player-visible half of the 2026-09-07 house cull. The loop in
+## `_check_style_picker_lists_every_style_with_current_highlighted()` above already checks every
+## category's rows against `style_ids_for_category()`, but it derives its expectations the same
+## way the code does; this pins the actual strings and the actual count so a re-wired variant or
+## a renamed asset folder has to be typed here too.
+func _check_house_style_picker_offers_the_three_culled_looks() -> void:
+	var button: Button = _hud.palette_button_for("house")
+	if not check(button != null, "house has a palette button to anchor the popup to"):
+		return
+	_hud.open_style_picker("house", button)
+	var popup: StylePickerPopup = _hud.style_picker()
+	if not check(popup != null and popup.is_open(), "the House style picker opens"):
+		return
+
+	var expected_ids: PackedStringArray = ["house_large", "house_medium", "house_small"]
+	var actual_ids: PackedStringArray = PackedStringArray()
+	var actual_labels: PackedStringArray = PackedStringArray()
+	for i in popup.row_count():
+		actual_ids.append(popup.row_style_id(i))
+		actual_labels.append(popup.row_label(i))
+
+	check_eq(popup.row_count(), 3,
+		"the House picker offers exactly 3 looks after the 2026-09-07 cull (was 18)")
+	check_eq(actual_ids, expected_ids,
+		"...large, medium, small — house.tres's own model_scenes order, index 0 first")
+	check_eq(actual_labels,
+		PackedStringArray(["House - Large", "House - Medium", "House - Small"]),
+		"...each under its authored label, dash included — `capitalize()` cannot produce these")
+
+	# The unwired 15 must not leak back in through some other path. Named explicitly rather than
+	# asserted as "count == 3" alone, because the failure this guards is a re-wire, and a re-wire
+	# is exactly the edit that would come with a matching count bump somewhere.
+	for gone: String in ["house", "house_tower_firstage", "house_secondage_1_level_1",
+			"house_firstage_2_level2", "house_tower_secondage"]:
+		check(not actual_ids.has(gone),
+			"the culled look '%s' is not offered to the player" % gone)
+
+	popup.close()
+
+
 ## Whatever `UiPalette.paint_button(button, true)` actually sets, checked the same way this
 ## codebase already reads that mechanism (`paint_button()`'s own doc comment: "selection is
 ## carried by fill colour plus font colour") — the row's `normal` stylebox fill is `LEAF`
@@ -973,6 +1031,8 @@ func _expected_style_label(category: String, style_id: String) -> String:
 			if terrain.id == style_id:
 				return terrain.display_name
 		return style_id.capitalize()
+	if category == "house" and HOUSE_STYLE_LABELS.has(style_id):
+		return HOUSE_STYLE_LABELS[style_id] as String
 	return style_id.capitalize()
 
 
@@ -1322,14 +1382,43 @@ func _check_style_picker_outside_tap_dismisses_with_no_change_and_does_not_leak_
 ## misplaced and running off-screen. Proves the fix directly against `Panel`'s own `.size`,
 ## not just its (unaffected) minimum size.
 ##
-## RE-POINTED (habitat-tiers Task 8b): the short list was "wild_grass" (2 rows at the time this
-## test was written, 1 today post-revert) — no longer a standalone button. `TERRAIN_GROUP_ID`
-## takes over as the short list (4 rows, still comfortably shorter than House's 18), which
-## keeps the SAME long-then-short shrink shape this check exists to prove.
+## RE-POINTED TWICE, and the second time is why this now picks its two categories at runtime
+## instead of naming them. (1) habitat-tiers Task 8b: the short list was "wild_grass", which
+## stopped having a button of its own, so `TERRAIN_GROUP_ID` took over. (2) The 2026-09-07 house
+## cull dropped House from 18 rows to 3 — House had been the hardcoded LONG list since this test
+## was written, and at 3 rows it is now SHORTER than the terrain group's 4, so the assertion
+## inverted and went red.
+##
+## Both re-points were the same failure: this check does not care WHICH categories it uses, only
+## that one list is longer than the other, and hardcoding that made a content decision able to
+## break a layout regression test. So it now asks `style_ids_for_category()` which picker
+## category currently has the most rows and which has the fewest, and skips with an explicit
+## message if a catalog change ever collapses that distinction — a real "cannot run" rather than
+## a silent pass or a confusing red.
 func _check_style_picker_panel_shrinks_back_down_after_a_longer_list() -> void:
-	_hud.open_style_picker("house", _hud.palette_button_for("house"))
+	var longest: String = ""
+	var shortest: String = ""
+	var most: int = -1
+	var fewest: int = -1
+	for category: String in _PICKER_CATEGORIES:
+		if _hud.palette_button_for(category) == null:
+			continue
+		var rows: int = _world.style_ids_for_category(category).size()
+		if most < 0 or rows > most:
+			most = rows
+			longest = category
+		if fewest < 0 or rows < fewest:
+			fewest = rows
+			shortest = category
+	if not check(longest != "" and shortest != "" and most > fewest,
+			"setup: two picker categories with different row counts exist to compare",
+			"longest=%s(%d) shortest=%s(%d)" % [longest, most, shortest, fewest]):
+		return
+
+	_hud.open_style_picker(longest, _hud.palette_button_for(longest))
 	var popup: StylePickerPopup = _hud.style_picker()
-	if not check(popup != null and popup.is_open(), "house: opens for the panel-size check"):
+	if not check(popup != null and popup.is_open(),
+			"%s: opens for the panel-size check" % longest):
 		return
 	var panel: Control = popup.find_child("Panel", true, false) as Control
 	if not check(panel != null, "the popup has its Panel node"):
@@ -1338,13 +1427,13 @@ func _check_style_picker_panel_shrinks_back_down_after_a_longer_list() -> void:
 	var long_list_height: float = panel.size.y
 	popup.close()
 
-	_hud.open_style_picker(GameHud.TERRAIN_GROUP_ID, _hud.palette_button_for(GameHud.TERRAIN_GROUP_ID))
+	_hud.open_style_picker(shortest, _hud.palette_button_for(shortest))
 	var short_list_height: float = panel.size.y
 	check(short_list_height < long_list_height,
-		"the panel shrinks back down for the grass-family group's short list after showing "
-		+ "House's long one, instead of staying stuck at the longer list's size",
-		"long(house)=%.1f short(%s)=%.1f"
-			% [long_list_height, GameHud.TERRAIN_GROUP_ID, short_list_height])
+		"the panel shrinks back down for the shortest picker category's list after showing the "
+		+ "longest one, instead of staying stuck at the longer list's size",
+		"long(%s, %d rows)=%.1f short(%s, %d rows)=%.1f"
+			% [longest, most, long_list_height, shortest, fewest, short_list_height])
 	popup.close()
 
 

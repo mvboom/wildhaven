@@ -43,6 +43,33 @@ const _ROW_SPACING: float = 6.0
 const _POPUP_MAX_HEIGHT: float = 320.0
 const _SCREEN_MARGIN: float = 8.0
 
+## Player-facing labels for the three House looks (house cull, 2026-09-07). The ONLY place a
+## style id gets an authored label instead of a derived one — every other picker category either
+## reads a real `display_name` off its definition (`farm_building`, the grass-family group) or
+## humanizes its id with `String.capitalize()`.
+##
+## WHY A MAP AND NOT A RENAME: `capitalize()` cannot produce the " - " the human's names carry
+## ("House - Large", not "House Large"), and a style id is DERIVED FROM A FILENAME
+## (`WorldRoot._style_id_from_scene_path()`), so no filename can spell one. The asset folders were
+## still renamed alongside this (`house_secondage_1_level1` -> `house_large`, and its two
+## siblings) so the stored id, the scene on disk and this label all say the same word; the map
+## exists only for the punctuation.
+##
+## WHY NOT `PlaceableDefinition.display_name`: that field names the BUILDABLE ("House"), one per
+## `.tres`. These three are `model_scenes` entries of that single buildable — variants have no
+## definition of their own to carry a name, which is the same reason `_label_for()` derives
+## forest/wild_grass labels rather than reading them.
+##
+## A MISS FALLS THROUGH, it does not break: an id not listed here (a re-wired variant from the 15
+## the cull left unwired on disk, say) still renders via `capitalize()` below, so this map can go
+## stale without ever producing an empty row. Keep it in step with `data/buildings/house.tres`'s
+## `model_scenes` — see that file's "LOOK POOL CUT" header note for the other half of this fact.
+const _HOUSE_LABELS: Dictionary = {
+	"house_large": "House - Large",
+	"house_medium": "House - Medium",
+	"house_small": "House - Small",
+}
+
 var _world: WorldRoot = null
 var _category: String = ""
 
@@ -186,7 +213,10 @@ func _rebuild_rows() -> void:
 	_panel.reset_size()
 
 
-## Forest/Wild Grass/House: humanize the derived style id (`"birch_tree"` -> `"Birch Tree"` —
+## House: an authored label from `_HOUSE_LABELS` (the three looks the 2026-09-07 cull left
+## wired), falling through to the humanized id for anything not listed there.
+##
+## Forest/Wild Grass: humanize the derived style id (`"birch_tree"` -> `"Birch Tree"` —
 ## `String.capitalize()` is exactly this rule: underscores become spaces, each word's first
 ## letter uppercases). Farm Building AND the grass-family terrain group (habitat-tiers Task
 ## 8b): the resolved definition's own real `display_name` — already real human-authored copy,
@@ -204,6 +234,8 @@ func _label_for(style_id: String) -> String:
 			if terrain.id == style_id:
 				return terrain.display_name
 		return style_id.capitalize()
+	if _category == "house" and _HOUSE_LABELS.has(style_id):
+		return _HOUSE_LABELS[style_id] as String
 	return style_id.capitalize()
 
 

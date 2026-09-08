@@ -138,7 +138,7 @@ func _check_building(id: String, origin: Vector2i, expected_footprint: Vector2i)
 
 ## STYLE-DEFAULT RESOLUTION (sub-project B2, Task 5): a House placed AFTER
 ## `style_defaults["house"]` names a non-default look must render THAT look, not
-## `model_scenes[0]`'s shipped default (HousesFirstAge1Level1/"House") — proves
+## `model_scenes[0]`'s shipped default (`house_large`) — proves
 ## `TerrainView._resolve_building_variant()` actually consults `WorldRoot.
 ## resolve_style_scene()` rather than the pre-feature unconditional `model_scenes[0]`.
 ##
@@ -147,17 +147,24 @@ func _check_building(id: String, origin: Vector2i, expected_footprint: Vector2i)
 ## by name, because `_check_building("house", HOUSE_PAD, ...)` already placed an earlier
 ## House with the default look — a name search scoped to the whole world would find that
 ## unrelated node and prove nothing about this one.
+## RE-POINTED 2026-09-07 (house cull): the non-default look driven here was
+## `house_tower_firstage`, which the cull unwired — a style id no longer in `model_scenes` gets
+## silently replaced by `get_style_default()`'s stale-id fallback, so the old assertion would
+## have tested the fallback while claiming to test resolution, and passed for the wrong reason
+## only because the expected node name would then also have been wrong. `house_small` is used
+## instead: still a real, wired, NON-index-0 variant, which is the only property this check
+## needs.
 func _check_house_style_default_variant() -> void:
-	_world.style_defaults["house"] = "house_tower_firstage"
+	_world.style_defaults["house"] = "house_small"
 	if not check(_world.place_building(STYLE_PAD.x, STYLE_PAD.y, "house"),
 			"house places at %s for the style-default check" % STYLE_PAD):
 		return
 	var visual: Node3D = _world.view._building_visuals.get(STYLE_PAD, null) as Node3D
 	if not check(visual != null, "the style-default house has a tracked visual"):
 		return
-	check_eq(String(visual.name), "HouseTowerFirstage",
-		"style_defaults[\"house\"] = \"house_tower_firstage\" renders HouseTowerFirstage.tscn "
-		+ "(the tower variant), not model_scenes[0]'s shipped default look (\"House\")")
+	check_eq(String(visual.name), "HouseSmall",
+		"style_defaults[\"house\"] = \"house_small\" renders HouseSmall.tscn "
+		+ "(the \"House - Small\" look), not model_scenes[0]'s default (\"HouseLarge\")")
 
 
 ## The building visual `TerrainView` built for `def`, found by the wrapper scene's root name

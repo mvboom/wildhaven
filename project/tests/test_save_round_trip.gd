@@ -1472,7 +1472,14 @@ func _check_an_old_save_with_no_style_defaults_falls_back_cleanly() -> void:
 		"...falling back to the forest category's first catalog entry")
 	check_eq(world.get_style_default("wild_grass"), "wild_grass",
 		"...and the wild_grass category's first catalog entry")
-	check_eq(world.get_style_default("house"), "house",
+	# RE-POINTED 2026-09-07 (house cull) — was "house". This is the same fallback, reading a
+	# different answer because the catalog changed underneath it: the House's `model_scenes[0]`
+	# used to be `house/House.tscn` (deriving the id "house") and is now
+	# `house_large/HouseLarge.tscn`. Worth noting that the OLD expected value made this assertion
+	# read as though it were checking the category name; it never was, and the new value makes
+	# that plain. A v3 save predates `style_defaults` entirely, so this is the no-key path — the
+	# stale-id path a post-cull load of a v4+ save takes is covered in `test_style_defaults.gd`.
+	check_eq(world.get_style_default("house"), "house_large",
 		"...and the house category's first catalog entry")
 	check_eq(world.get_style_default("farm_building"), "barn",
 		"...and the farm_building category's first catalog entry, the other id \"flavor\"")

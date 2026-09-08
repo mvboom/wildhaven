@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://bqdnv4gcx46mn"
-path="res://.godot/imported/HousesSecondAge1Level3.gltf-d3351b1b3b506091e61b60195d166134.scn"
+uid="uid://cs4usw5txlk3l"
+path="res://.godot/imported/HousesSecondAge1Level2.gltf-b891c72b87ce543ecc0908c01b957d03.scn"
 
 [deps]
 
-source_file="res://assets/buildings/house_secondage_1_level3/HousesSecondAge1Level3.gltf"
-dest_files=["res://.godot/imported/HousesSecondAge1Level3.gltf-d3351b1b3b506091e61b60195d166134.scn"]
+source_file="res://assets/buildings/house_small/HousesSecondAge1Level2.gltf"
+dest_files=["res://.godot/imported/HousesSecondAge1Level2.gltf-b891c72b87ce543ecc0908c01b957d03.scn"]
 
 [params]
 

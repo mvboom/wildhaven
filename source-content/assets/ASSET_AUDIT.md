@@ -151,6 +151,12 @@ packs**, not in any new download:
   `_2_Level2` and `_2_Level3` are imported but **deliberately not wired**: they are
   multi-building compounds that flatten to 0.53 and 0.43 tile-heights inside a 1×1 footprint,
   and a variant cannot declare its own footprint (human ruling, 2026-08-29).
+  **Update 2026-09-07 (house cull, human ruling):** this tier is now the House's *whole* look
+  pool, and only its `_1_` sub-family — `SecondAge_1_Level{1,2,3}` are the three variants
+  wired, renamed on disk to `project/assets/buildings/house_{large,medium,small}/`. Every
+  other house wrapper (all 10 FirstAge/tower, the rest of SecondAge) stays imported but
+  unwired. Each source `.gltf` kept its pack filename inside the renamed folder, so
+  `scripts/asset-manifest.py`'s basename matching still reads all of them as used.
 - **`Animated Men/Women Characters - Feb 2019` were never unusable — they were never looked
   at.** The shipped `human_man/Man.glb` **is** `Male_Casual` from the men's pack, re-downloaded
   from poly.pizza as a standalone `.glb` (verified material-by-material: 318/892/96/28/222

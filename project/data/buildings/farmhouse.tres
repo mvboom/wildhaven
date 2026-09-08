@@ -41,10 +41,21 @@
 ; fact_text is Content Pipeline step 5 (content-writer's job, not tech-art's) — left as
 ; PLACEHOLDER, the correct interim state PlaceableDefinition.pending_signoff() already
 ; expects and handles, matching barn.tres's convention exactly.
+; MODEL PATH UPDATED 2026-09-07 (house cull): the scene this file points at did not change —
+; the same Houses_SecondAge_1_Level3 mesh — but its wrapper moved from
+; `house_secondage_1_level3/HouseSecondage1Level3.tscn` to `house_medium/HouseMedium.tscn` when
+; the House's look pool was cut 18 -> 3 and the three survivors were renamed for the player (see
+; house.tres's own "LOOK POOL CUT" note). The two prose references below still name the OLD path
+; and are left as written — they are the record of how this model was CHOSEN, not a live pointer;
+; the live pointer is the `ext_resource` line. NOTE the shared-asset coupling this creates: the
+; Farmhouse (2x2) and the House's "House - Medium" look (1x1) now render the SAME mesh at two
+; different footprints. That was already true before the cull; it is simply easier to notice now
+; that the House pool is three entries instead of eighteen. Raised, not decided.
+;
 [gd_resource type="Resource" script_class="PlaceableDefinition" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/definitions/placeable_definition.gd" id="1_schema"]
-[ext_resource type="PackedScene" path="res://assets/buildings/house_secondage_1_level3/HouseSecondage1Level3.tscn" id="2_model"]
+[ext_resource type="PackedScene" path="res://assets/buildings/house_medium/HouseMedium.tscn" id="2_model"]
 
 [resource]
 script = ExtResource("1_schema")

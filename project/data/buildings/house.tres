@@ -189,27 +189,56 @@
 ;
 ; The unresolved (a)/(b)/(c) height-rule question in the FirstAge sign-off aid above is
 ; unchanged by this pass and now spans 18 entries rather than 10.
-[gd_resource type="Resource" script_class="PlaceableDefinition" load_steps=20 format=3]
+;
+; ------------------------------------------------------------------------------------
+; LOOK POOL CUT 18 -> 3 (2026-09-07, human ruling — "remove all houses except" the three
+; Houses_SecondAge_1_Level{1,2,3} models). This supersedes the 2026-08-26 and 2026-08-29
+; growth passes recorded above and BELOW-THE-LINE resolves the (a)/(b)/(c) height-rule
+; question they left open: the question was "how do we reconcile 18 variants spanning 2.66x
+; in height"; the answer taken here is "we do not ship 18." The three survivors are the same
+; SecondAge_1 sub-family — one artist, one palette, one silhouette language — so the height
+; spread the sign-off aids flagged (0.3469 .. 0.9540 across 18) narrows to 0.7060 .. 0.9092,
+; a 1.29x span, and reads as "three sizes of the same house" rather than as an inconsistency.
+;
+;   idx  id             label            height   x-foot  z-foot   source glTF
+;    0   house_large    "House - Large"  0.7722   0.8900  0.8645   Houses_SecondAge_1_Level1
+;    1   house_medium   "House - Medium" 0.9092   0.6599  0.8693   Houses_SecondAge_1_Level3
+;    2   house_small    "House - Small"  0.7060   0.8215  0.8693   Houses_SecondAge_1_Level2
+;
+; ORDER IS DESCENDING BY THE HUMAN'S OWN SIZE NAMES, and index 0 is `house_large` ON PURPOSE:
+; index 0 is what `get_style_default()` falls back to for a save that names an unknown style
+; (see `WorldRoot.get_style_default()`), so it is what every existing save's House becomes.
+; The retiring default was `house/House.tscn` (Houses_FirstAge_1_Level1) at height 0.7645, and
+; `house_large` at 0.7722 is the closest of the three to it — the fallback therefore changes a
+; placed House's look as little as the cull allows. Note the LABEL "Large" is the human's name
+; for the model, not a height ranking: `house_medium` is in fact the tallest of the three
+; (0.9092) and the narrowest (0.6599 x-foot). NOT A BUG, NOT TO BE "FIXED" — the names describe
+; how the buildings read on screen, which is the human's call, and `footprint` is 1x1 for all
+; three regardless.
+;
+; RENAMED ON DISK, and this is load-bearing: the three wrappers moved from
+; `house_secondage_1_level{1,2,3}/HouseSecondage1Level{1,2,3}.tscn` to
+; `house_{large,small,medium}/House{Large,Small,Medium}.tscn`, because
+; `WorldRoot._style_id_from_scene_path()` derives a style id from the FILENAME — the old names
+; put "Secondage 1 Level 2" in front of the player. Each source `.gltf` KEPT its pack filename
+; inside the renamed folder, so CREDITS.md and `quaternius_ultimate_fantasy_rts.tres`'s
+; `assets_used` still name files that exist. The player-facing labels carry a dash, which
+; `String.capitalize()` cannot produce, so `StylePickerPopup._HOUSE_LABELS` maps the three ids
+; to their labels; that map and this array are the two halves of one fact and must move together.
+;
+; THE OTHER 15 WRAPPERS STAY ON DISK, UNWIRED — same posture (and the same reason) as the
+; `house_secondage_2_level{2,3}` hold-out the 2026-08-29 note above describes: unwiring is a
+; content decision, and their import tests, attribution entries and CREDITS lines are still
+; correct statements about what this repo contains. `test_house_import.gd` and
+; `test_house_variants_import.gd` still cover them and still pass. Re-wiring any of them is a
+; one-line edit here plus a count bump in `test_placeable_schema.gd`.
+; ------------------------------------------------------------------------------------
+[gd_resource type="Resource" script_class="PlaceableDefinition" load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://scripts/definitions/placeable_definition.gd" id="1_schema"]
-[ext_resource type="PackedScene" path="res://assets/buildings/house/House.tscn" id="2_model"]
-[ext_resource type="PackedScene" path="res://assets/buildings/house_firstage_1_level2/HouseFirstage1Level2.tscn" id="3_model"]
-[ext_resource type="PackedScene" path="res://assets/buildings/house_firstage_1_level3/HouseFirstage1Level3.tscn" id="4_model"]
-[ext_resource type="PackedScene" path="res://assets/buildings/house_firstage_2_level1/HouseFirstage2Level1.tscn" id="5_model"]
-[ext_resource type="PackedScene" path="res://assets/buildings/house_firstage_2_level2/HouseFirstage2Level2.tscn" id="6_model"]
-[ext_resource type="PackedScene" path="res://assets/buildings/house_firstage_2_level3/HouseFirstage2Level3.tscn" id="7_model"]
-[ext_resource type="PackedScene" path="res://assets/buildings/house_firstage_3_level1/HouseFirstage3Level1.tscn" id="8_model"]
-[ext_resource type="PackedScene" path="res://assets/buildings/house_firstage_3_level2/HouseFirstage3Level2.tscn" id="9_model"]
-[ext_resource type="PackedScene" path="res://assets/buildings/house_firstage_3_level3/HouseFirstage3Level3.tscn" id="10_model"]
-[ext_resource type="PackedScene" path="res://assets/buildings/house_tower_firstage/HouseTowerFirstage.tscn" id="11_model"]
-[ext_resource type="PackedScene" path="res://assets/buildings/house_secondage_1_level1/HouseSecondage1Level1.tscn" id="12_model"]
-[ext_resource type="PackedScene" path="res://assets/buildings/house_secondage_1_level2/HouseSecondage1Level2.tscn" id="13_model"]
-[ext_resource type="PackedScene" path="res://assets/buildings/house_secondage_1_level3/HouseSecondage1Level3.tscn" id="14_model"]
-[ext_resource type="PackedScene" path="res://assets/buildings/house_secondage_2_level1/HouseSecondage2Level1.tscn" id="15_model"]
-[ext_resource type="PackedScene" path="res://assets/buildings/house_secondage_3_level1/HouseSecondage3Level1.tscn" id="16_model"]
-[ext_resource type="PackedScene" path="res://assets/buildings/house_secondage_3_level2/HouseSecondage3Level2.tscn" id="17_model"]
-[ext_resource type="PackedScene" path="res://assets/buildings/house_secondage_3_level3/HouseSecondage3Level3.tscn" id="18_model"]
-[ext_resource type="PackedScene" path="res://assets/buildings/house_tower_secondage/HouseTowerSecondage.tscn" id="19_model"]
+[ext_resource type="PackedScene" path="res://assets/buildings/house_large/HouseLarge.tscn" id="2_model"]
+[ext_resource type="PackedScene" path="res://assets/buildings/house_medium/HouseMedium.tscn" id="3_model"]
+[ext_resource type="PackedScene" path="res://assets/buildings/house_small/HouseSmall.tscn" id="4_model"]
 
 [resource]
 script = ExtResource("1_schema")
@@ -219,5 +248,5 @@ cost = 15
 footprint = Vector2i(1, 1)
 allowed_terrain = Array[String](["grass"])
 emitted_tags = Array[String](["built", "house"])
-model_scenes = Array[PackedScene]([ExtResource("2_model"), ExtResource("3_model"), ExtResource("4_model"), ExtResource("5_model"), ExtResource("6_model"), ExtResource("7_model"), ExtResource("8_model"), ExtResource("9_model"), ExtResource("10_model"), ExtResource("11_model"), ExtResource("12_model"), ExtResource("13_model"), ExtResource("14_model"), ExtResource("15_model"), ExtResource("16_model"), ExtResource("17_model"), ExtResource("18_model"), ExtResource("19_model")])
+model_scenes = Array[PackedScene]([ExtResource("2_model"), ExtResource("3_model"), ExtResource("4_model")])
 fact_text = "This simple house is ready to be someone's new home. Plant a field close by, and a family will settle in before long."

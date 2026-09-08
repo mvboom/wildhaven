@@ -124,8 +124,36 @@ villagers exactly as a birdhouse is for birds).
 buildables beyond House is a **proposal, not a decision** — each `.tres` says so in its
 own header, per the project rule that all tuning values are the human's. Farmhouse's
 `cost = 30` and `footprint = 2×2` were copied from Barn's own unresolved proposal, and its
-model (`HouseSecondage1Level3`) was picked as the largest already-wired House variant so it
-reads as bigger than the 1×1 House.
+model (`HouseSecondage1Level3`, now `HouseMedium` — see the look-pool note below) was picked
+as the largest already-wired House variant so it reads as bigger than the 1×1 House.
+
+**House look pool cut 18 → 3 (2026-09-07, human ruling).** The House buildable offered
+eighteen interchangeable looks in its `model_scenes`; it now offers three, all from the
+`Houses_SecondAge_1_Level{1,2,3}` sub-family, renamed for the player:
+
+| `model_scenes` idx | style id | picker label | source glTF |
+|---|---|---|---|
+| 0 | `house_large` | House - Large | `Houses_SecondAge_1_Level1` |
+| 1 | `house_medium` | House - Medium | `Houses_SecondAge_1_Level3` |
+| 2 | `house_small` | House - Small | `Houses_SecondAge_1_Level2` |
+
+This closes the unresolved height-rule question the 2026-08-26 and 2026-08-29 growth passes
+left open (how to reconcile eighteen variants spanning 2.66× in height) by not shipping
+eighteen: the three survivors span 1.29×. The other fifteen wrappers **stay on disk, unwired** —
+same posture as the `house_secondage_2_level{2,3}` hold-out — so their import tests, attribution
+entries and CREDITS lines remain true statements about what the repo contains.
+
+Note the labels are the human's names for how each building *reads*, not a height ranking:
+`house_medium` is in fact the tallest of the three. Note also that Farmhouse (2×2) and the
+House's `house_medium` look (1×1) now render the **same mesh at two footprints** — already true
+before the cull, merely easier to notice at three variants than at eighteen. Raised, not decided.
+
+Three model-centring corrections landed with the cull: all three of these meshes were off-centre
+on their own origin in the source glTF (`house_medium`/`house_small` by 0.1622 units in Z), so a
+placed House overhung its neighbouring tile. Each wrapper now carries a translation that is
+exactly the negation of its measured AABB centre — a measurement, not a tuning value. It went
+unnoticed for the same reason a lot of variant defects do: `test_building_footprint_alignment.gd`
+only spill-checks `model_scenes[0]`, and index 0 used to be a different model.
 
 ## Open Questions Touching Buildings
 

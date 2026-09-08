@@ -73,17 +73,27 @@ func _process(_delta: float) -> bool:
 		"wild_grass also degrades a genuinely unknown stale stored id to its sole catalog entry (plain grass)")
 
 	# --- house: never chosen returns the shipped default --------------------------------
-	# CORRECTED from the brief's assumed "house_firstage_1_level1": house.tres's index-0
-	# model_scenes entry is res://assets/buildings/house/House.tscn (filename "House"), not
-	# a HouseFirstage1Level1.tscn file — no such filename exists on disk. "House".to_snake_case()
-	# is "house". Confirmed against house.tres directly (2026-08-26 comment: "index 0 stays
-	# ExtResource("2_model") (HousesFirstAge1Level1)" refers to the WRAPPED model's source name,
-	# not the wrapper .tscn's own filename, which is what _style_id_from_scene_path() derives from.
-	check_eq(_world.get_style_default("house"), "house",
-		"house, never chosen, returns the original shipped variant")
+	# RE-POINTED 2026-09-07 (house cull) — was "house". Before the cull, model_scenes[0] was
+	# res://assets/buildings/house/House.tscn, whose filename "House" derives the style id
+	# "house" (identical to the CATEGORY name, which made this assertion read as a tautology
+	# it never was). The human's ruling cut the pool to three Houses_SecondAge_1_Level{1,2,3}
+	# models renamed for the player, so index 0 is now HouseLarge.tscn -> "house_large".
+	#
+	# The second half of this check is the one the cull makes load-bearing rather than
+	# hypothetical: EVERY save written before 2026-09-07 holds a house style id that no longer
+	# exists ("house", "house_tower_firstage", "house_secondage_1_level_2", ...). The stale-id
+	# fallback below is what makes those saves open and play with a House that renders, and it
+	# is the entire migration — see house.tres's "LOOK POOL CUT" note for why no save-version
+	# bump was written for this.
+	check_eq(_world.get_style_default("house"), "house_large",
+		"house, never chosen, returns model_scenes[0]'s derived id")
+	_world.set_style_default("house", "house_secondage_1_level_2")
+	check_eq(_world.get_style_default("house"), "house_large",
+		"a REAL pre-cull id (house_secondage_1_level_2) degrades to the first catalog entry — "
+		+ "the exact path every existing save takes now")
 	_world.set_style_default("house", "not_a_real_house_variant")
-	check_eq(_world.get_style_default("house"), "house",
-		"house also degrades a stale stored id to its first catalog entry, not a crash")
+	check_eq(_world.get_style_default("house"), "house_large",
+		"house also degrades an arbitrary stale stored id to its first catalog entry, not a crash")
 
 	# --- a category with zero picker options: "" always, never a crash -----------------
 	# "rock" is a real terrain id, but not one of the 4 picker categories

@@ -14,7 +14,13 @@ const HOUSE_PATH: String = "res://data/buildings/house.tres"
 ## model's facing under the fixed ~45 degree camera is still unconfirmed by a human), so
 ## the path is pinned: a silent swap in either direction is a look-pass decision, not a
 ## data-entry one, and must be visible in a diff.
-const MODEL_PATH: String = "res://assets/buildings/house/House.tscn"
+##
+## RE-POINTED 2026-09-07 (house cull) — was res://assets/buildings/house/House.tscn
+## (Houses_FirstAge_1_Level1), which is no longer in `model_scenes` at all. The human's ruling
+## cut the look pool to the three Houses_SecondAge_1_Level{1,2,3} models, so index 0 is now
+## `house_large`. That file still exists on disk and `test_house_import.gd` still covers it;
+## it simply is not what the House renders any more.
+const MODEL_PATH: String = "res://assets/buildings/house_large/HouseLarge.tscn"
 
 ## buildings.md -> Already-Defined Buildings, floor (Tier 1) row: 1x1, grass only,
 ## ~15 Wood. `cost` and `footprint` are PLACEHOLDERS at those stated baselines (Open
@@ -99,23 +105,32 @@ func _init() -> void:
 		"unresolved: %s" % str(unresolved))
 
 	# --- model_scenes ------------------------------------------------------------------------
-	# PINNED AT 18. History: 1 -> 10 (Task 2, the 9 FirstAge/tower variants) -> 18, the
-	# 2026-08-29 asset-audit sweep appending 8 RTS SecondAge house variants to the tail.
-	# Exact-value pin on purpose: it is what makes an unreviewed content edit to house.tres
-	# surface here as a failure. Re-point it deliberately when a sanctioned growth lands;
-	# never relax it to a `>=`.
+	# PINNED AT 3. History: 1 -> 10 (Task 2, the 9 FirstAge/tower variants) -> 18 (the
+	# 2026-08-29 asset-audit sweep appending 8 RTS SecondAge variants) -> 3, the 2026-09-07
+	# human ruling that cut the pool to the three Houses_SecondAge_1_Level{1,2,3} models and
+	# renamed them for the player. Exact-value pin on purpose: it is what makes an unreviewed
+	# content edit to house.tres surface here as a failure. Re-point it deliberately when a
+	# sanctioned change lands; never relax it to a `>=`.
 	#
-	# 18 IS NOT "EVERY WRAPPER ON DISK", AND MUST NOT BECOME THAT ASSERTION. Two further
-	# SecondAge wrappers exist under project/assets/buildings/ and are deliberately unwired:
-	# house_secondage_2_level2 and house_secondage_2_level3 are multi-building compounds that
-	# flatten below villager height when squeezed into a 1x1 footprint. A "wrappers on disk ==
-	# model_scenes.size()" check would encode a false invariant and go red on a correct repo.
+	# THIS IS THE FIRST TIME THE PIN HAS GONE DOWN, and that is the whole point of pinning it
+	# rather than deriving it: a cull is exactly as much a content decision as a growth, and it
+	# should have to be typed here too.
 	#
-	# [0] gets its own assertion beyond the count: "the shipped default stays first" is
-	# load-bearing for saves and for world_root.gd's style defaults.
-	check_eq(house.model_scenes.size(), 18, "18 house look variants")
+	# 3 IS NOT "EVERY WRAPPER ON DISK", AND MUST NOT BECOME THAT ASSERTION — the cull made this
+	# far more true than it already was. Eighteen House wrappers still sit under
+	# project/assets/buildings/ (all 10 FirstAge/tower, seven of the SecondAge tier, plus the
+	# two house_secondage_2_level{2,3} compounds held out back in 2026-08-29); they keep their
+	# import tests, their attribution entries and their CREDITS.md lines because they are still
+	# things this repo contains. A "wrappers on disk == model_scenes.size()" check would encode
+	# a false invariant and go red on a correct repo.
+	#
+	# [0] gets its own assertion beyond the count: "index 0 is the fallback" is load-bearing for
+	# saves, because WorldRoot.get_style_default() resolves an unknown stored style id to
+	# model_scenes[0]. Every pre-cull save names a style id that no longer exists, so index 0 is
+	# what those saves' Houses now render.
+	check_eq(house.model_scenes.size(), 3, "3 house look variants")
 	check_eq(house.model_scenes[0].resource_path, MODEL_PATH,
-		"model_scenes[0] is STILL the shipped default (HousesFirstAge1Level1), unchanged by the 2026-08-29 growth")
+		"model_scenes[0] is house_large — the stale-style-id fallback every pre-cull save lands on")
 	var variant_paths: PackedStringArray = PackedStringArray()
 	for scene: PackedScene in house.model_scenes:
 		check(scene is PackedScene, "every model_scenes entry is a PackedScene")
@@ -123,31 +138,22 @@ func _init() -> void:
 		variant_paths.append(scene.resource_path)
 
 	# The ORDER is pinned for the same reason test_human_schema.gd pins human's: a count
-	# plus an [0] check lets a reorder of entries 1..17 -- or a swap of one wrapper for
-	# another at equal count -- land silently. Mirrors that file's existing pattern rather
-	# than inventing a second shape. Re-point deliberately; never relax to a prefix match.
+	# plus an [0] check lets a reorder -- or a swap of one wrapper for another at equal
+	# count -- land silently. Mirrors that file's existing pattern rather than inventing a
+	# second shape. Re-point deliberately; never relax to a prefix match.
+	#
+	# Order is large -> medium -> small, which is NOT height order (house_medium is the tallest
+	# of the three at 0.9092; see house.tres's own table). The names are the human's description
+	# of how each building reads, not a measurement, and index 0 is house_large because it is the
+	# closest of the three to the retiring default's height -- both deliberate, both explained in
+	# house.tres's "LOOK POOL CUT" header note.
 	var expected_paths: PackedStringArray = [
-		"res://assets/buildings/house/House.tscn",
-		"res://assets/buildings/house_firstage_1_level2/HouseFirstage1Level2.tscn",
-		"res://assets/buildings/house_firstage_1_level3/HouseFirstage1Level3.tscn",
-		"res://assets/buildings/house_firstage_2_level1/HouseFirstage2Level1.tscn",
-		"res://assets/buildings/house_firstage_2_level2/HouseFirstage2Level2.tscn",
-		"res://assets/buildings/house_firstage_2_level3/HouseFirstage2Level3.tscn",
-		"res://assets/buildings/house_firstage_3_level1/HouseFirstage3Level1.tscn",
-		"res://assets/buildings/house_firstage_3_level2/HouseFirstage3Level2.tscn",
-		"res://assets/buildings/house_firstage_3_level3/HouseFirstage3Level3.tscn",
-		"res://assets/buildings/house_tower_firstage/HouseTowerFirstage.tscn",
-		"res://assets/buildings/house_secondage_1_level1/HouseSecondage1Level1.tscn",
-		"res://assets/buildings/house_secondage_1_level2/HouseSecondage1Level2.tscn",
-		"res://assets/buildings/house_secondage_1_level3/HouseSecondage1Level3.tscn",
-		"res://assets/buildings/house_secondage_2_level1/HouseSecondage2Level1.tscn",
-		"res://assets/buildings/house_secondage_3_level1/HouseSecondage3Level1.tscn",
-		"res://assets/buildings/house_secondage_3_level2/HouseSecondage3Level2.tscn",
-		"res://assets/buildings/house_secondage_3_level3/HouseSecondage3Level3.tscn",
-		"res://assets/buildings/house_tower_secondage/HouseTowerSecondage.tscn",
+		"res://assets/buildings/house_large/HouseLarge.tscn",
+		"res://assets/buildings/house_medium/HouseMedium.tscn",
+		"res://assets/buildings/house_small/HouseSmall.tscn",
 	]
 	check_eq(variant_paths, expected_paths,
-		"model_scenes lists exactly these 18 paths, in this order")
+		"model_scenes lists exactly these 3 paths, in this order")
 
 	# --- validate(): must be clean, WITH the placeholder fact_text in place ----
 	# FIXED-COUNT: problems are printed, never iterated with check().
