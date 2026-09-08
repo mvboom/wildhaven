@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://d00n13aqo66nm"
-path="res://.godot/imported/Leaves_TwistedTree_C.png-5d7b75c339cbb4e8a469a8730ca7724a.ctex"
+uid="uid://ctt017vof3n0t"
+path="res://.godot/imported/Leaves_Bush_C.png-59418d9f0f34a17a8282d32acbc9886e.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/terrain/bush_common/Leaves_TwistedTree_C.png"
-dest_files=["res://.godot/imported/Leaves_TwistedTree_C.png-5d7b75c339cbb4e8a469a8730ca7724a.ctex"]
+source_file="res://assets/terrain/bush_common/Leaves_Bush_C.png"
+dest_files=["res://.godot/imported/Leaves_Bush_C.png-59418d9f0f34a17a8282d32acbc9886e.ctex"]
 
 [params]
 

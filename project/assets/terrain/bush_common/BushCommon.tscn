@@ -22,6 +22,16 @@
 ; Quaternius, CC0 1.0 Universal — License.txt re-checked per asset-import-pipeline.md's audit
 ; gate. See project/attribution/sources/quaternius_stylized_nature_megakit.tres.
 ;
+; RECOLOURED GREEN 2026-09-08 (human ruling: "the Bush needs to be green not red. there is just
+; too much red with this. The twisted tree being red is ok"). The MegaKit ships Bush_Common.gltf
+; pointing at the TWISTED TREE's leaf atlas — the pack's own wiring, not an import slip — which
+; made this bush rgb(167,23,23) red. Every leaf texture in this kit is a flat single colour plus
+; an alpha cutout, so the recolour is exact: `Leaves_Bush_C.png` here is that identical alpha mask
+; with its RGB set to rgb(88,123,0), the pack's own `Leaves_NormalTree_C` green that CommonTree1/2/3
+; already wear. The gltf's image and material names were renamed to match; the red original is gone
+; from this folder. TwistedTree1 keeps its own untouched red copy and stays the autumn accent.
+; Scrub/ScrubBrush/ScrubSparse instance this same gltf, so they turn green with it — intended.
+;
 ; SLAB AND FLOOR PATCHES ARE COPIED VERBATIM FROM CommonTree1.tscn — same forest green
 ; Color(0.16, 0.4, 0.22), same 1.0 x 0.2 x 1.0 geometry (the 1.0 width is the established
 ; cross-tile seam-gap fix, do not narrow it), same 3 moss/leaf-litter PlaneMesh patches at
