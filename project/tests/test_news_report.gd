@@ -77,6 +77,7 @@ func _process(_delta: float) -> bool:
 	_ui.bind_world()
 
 	_check_schema_field_exists()
+	_check_discovery_openings_field_exists()
 	_check_floor_roster_pools()
 	_check_scheduler_nudge_timing()
 	_check_scheduler_cadence_timing()
@@ -120,6 +121,24 @@ func _check_schema_field_exists() -> void:
 	fresh.fact_text_pool = ["A critter fact."]
 	check(fresh.validate().is_empty(),
 		"validate() is clean with news_reports left at its empty default — the field is optional")
+
+
+## The opening pool is a SEPARATE field from `news_reports`, not a re-purposing of it.
+## `fox.tres` mixes three discovery lines with six flavour lines in one flat array today —
+## the exact interleaving `fox-news-report-pool.md` said "must not be drawn
+## interchangeably". Composing a build list onto "A fox was spotted curled up in a sunbeam"
+## is incoherent, so the registers get their own fields rather than one shared one.
+func _check_discovery_openings_field_exists() -> void:
+	var fox: AnimalDefinition = load(FOX_PATH) as AnimalDefinition
+	if not check(fox != null, "fox.tres loads"):
+		return
+	check(fox.discovery_openings is Array, "`discovery_openings` exists and is an Array")
+	check(fox.discovery_openings.is_empty(),
+		"...and starts empty — authoring openings is follow-on work, outside this plan")
+	check(not fox.news_reports.is_empty(),
+		"...while `news_reports` keeps its existing flavour copy untouched")
+	check_eq(fox.validate().size(), 0,
+		"a species with an empty `discovery_openings` still validates clean")
 
 
 func _check_floor_roster_pools() -> void:

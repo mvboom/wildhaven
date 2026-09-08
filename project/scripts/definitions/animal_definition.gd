@@ -236,6 +236,21 @@ const DEFAULT_MAX_INDIVIDUALS: int = 6
 @export var news_reports: Array[String] = []
 
 
+## Discovery-register OPENINGS — the first half of a composed News Report build hint, which
+## `NewsReportContent.hint_line()` completes with needs derived live from `HabitatRecipe`.
+## Optional; a species with none falls back to `NewsReportContent.GENERIC_OPENING`, so the
+## hint layer covers the whole roster with or without authored copy.
+##
+## SEPARATE FROM `news_reports` ON PURPOSE. `news_reports` holds STANDALONE ambient flavour,
+## drawn whole and never composed ("A fox was spotted curled up in a sunbeam with its tail
+## draped over its nose like a blanket."). An opening is a sentence FRAGMENT that must read
+## correctly with a build list bolted onto it. The source pools said as much before the
+## import flattened them — `docs/content/fox-news-report-pool.md`: "These fire at different
+## moments and must not be drawn interchangeably — that structure is part of what the
+## eventual schema field needs to support." This is that field.
+@export var discovery_openings: Array[String] = []
+
+
 ## Normalizes a species id to the roster convention. Use at every lookup boundary so a
 ## hand-authored `"Rabbit"` still resolves to `rabbit` instead of silently missing.
 static func normalize_id(raw_id: String) -> String:
