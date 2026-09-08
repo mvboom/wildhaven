@@ -1,10 +1,24 @@
 # Human (Villager) — News Report copy pool
 
-**Status: written, checklist-passed, and HOMELESS.** `AnimalDefinition` has no field for News
-Report copy — the same schema gap `fox-news-report-pool.md` and `rabbit-news-report-pool.md`
-are waiting on (tier1-status.md row 12: "copy exists and is homeless... No nudge, no toggle,
-no Discovery layer built"). This is now the **third** species of copy with nowhere to live.
-Move it into data once the schema gains a field.
+**Status: written, checklist-passed, and imported (corrected 2026-09-08 — this header was
+stale).** `AnimalDefinition.news_reports` now exists and `project/data/animals/human.tres`
+carries **9** of these lines: the three Discovery/hint lines plus all six Ambient/flavor
+lines. Move-in was **not** imported into `news_reports`; it fires on a different trigger row
+12's cadence never reaches. This header previously read "HOMELESS" and said to move this file
+into data "once the schema gains a field" — the schema gained the field and the move happened
+some time ago; the header was simply never updated, and that staleness once misled another
+design document into asserting this pool was still empty, and separately into overstating its
+imported line count as 15 rather than the actual 9 (see `2026-09-08-news-report-hints-
+design.md` §1 and `tier1-status.md` row 12).
+
+**The import flattened the sub-pool structure this file states a rule for.** The "Sub-pools"
+section below is explicit: "these fire at different moments and must not be drawn
+interchangeably, matching the fox/rabbit files' own rule." `human.tres`'s `news_reports`
+array holds the three Discovery/hint lines followed by the six Ambient/flavor lines in one
+flat array, drawn from uniformly — exactly what that rule forbids. That flattening (the same
+defect `fox-news-report-pool.md` documents in detail) is why `discovery_openings`, a second,
+separate field carrying openings only, had to be added rather than reusing this one
+(`2026-09-08-news-report-hints-design.md` §7.3–§7.4).
 
 Produced by `content-writer`, 2026-08-06, filling the gap tier1-status.md row 12 names
 explicitly: fox and rabbit have a pool, human does not.

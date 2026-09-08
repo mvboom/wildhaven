@@ -1,8 +1,23 @@
 # Rabbit — News Report copy pool
 
-**Status: written, source-verified, and HOMELESS.** `AnimalDefinition` has no field for News
-Report copy. This is now the **second** species of verified copy with nowhere to live — see
-`fox-news-report-pool.md` and the schema gap in `costs.md`.
+**Status: written, source-verified, and imported (corrected 2026-09-08 — this header was
+stale).** `AnimalDefinition.news_reports` now exists and `project/data/animals/rabbit.tres`
+carries all **9** lines below — the three Discovery/hint lines plus all six Ambient/flavor
+lines; nothing here was excluded. Move-in was **not** imported into `news_reports`; it fires
+on a different trigger row 12's cadence never reaches. This header previously read
+"HOMELESS" and pointed at a schema gap that no longer exists — the field was added and the
+copy moved into data some time ago; the header was simply never updated, and that staleness
+once misled another design document into asserting this pool was still empty (see
+`2026-09-08-news-report-hints-design.md` §1 and `tier1-status.md` row 12).
+
+**The import flattened the sub-pool structure below.** `human-news-report-pool.md` states
+the rule this file's own Sub-pools should also be read under — "these fire at different
+moments and must not be drawn interchangeably, matching the fox/rabbit files' own rule" —
+but `rabbit.tres`'s `news_reports` array holds the three Discovery/hint lines followed by the
+six Ambient/flavor lines in one flat array, drawn from uniformly, exactly the mixing that
+rule forbids. That flattening (the same defect `fox-news-report-pool.md` documents in detail)
+is why `discovery_openings`, a second, separate field carrying openings only, had to be added
+rather than reusing this one (`2026-09-08-news-report-hints-design.md` §7.3–§7.4).
 
 Produced by `content-writer` during the pilot-3b Add-a-Rabbit run, 2026-07-20. Unlike the fox
 pool, this copy was **drafted and verified in a single pass** — sources were reachable
