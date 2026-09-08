@@ -89,8 +89,16 @@ extends RefCounted
 ## inventing looks there would be actively wrong: it would change how an existing village looks
 ## the first time it is opened on the new build.
 ##
-## (row 13's mist extent takes v6 — v5 is spent here.)
-const SAVE_VERSION: int = 5
+## v5 -> v6 (habitat-tiers, Task 6): `home_sites` is unchanged, but `arrivals[]` entries grow
+## a `"count"` key — how many individuals this pending arrival lands as a group (deer as a
+## small herd, a fox alone), read off the qualifying tier's `arrival_group_size`. PURE
+## VERSION-BUMP BOOKKEEPING, same shape as v3 -> v4 and v4 -> v5: `ArrivalQueue.restore()`
+## already reads a missing `"count"` as 1 — never 0, which would silently drop the pending
+## arrival — and 1 is exactly what every pre-v6 file's implicit group size always was. No
+## migration step invents anything; see `ArrivalQueue.restore()`'s own comment.
+##
+## (row 13's mist extent takes v7 — v6 is spent here on habitat-tiers group arrivals.)
+const SAVE_VERSION: int = 7
 
 
 ## The live world as a JSON-native dictionary.
@@ -107,6 +115,15 @@ static func capture(
 		for x in range(grid.width):
 			terrain.append(grid.get_terrain_id(x, z))
 
+	# CAPTURED STYLES, one entry per tile, built with the SAME z-then-x walk as `terrain` above
+	# so the two arrays index identically and a human reading the file can line them up. NOT
+	# taken from a WorldGrid helper on purpose: the grid stores tiles x-major internally, and a
+	# snapshot helper returning that order would silently transpose the world on reload.
+	var tile_styles: Array[String] = []
+	for z in range(grid.depth):
+		for x in range(grid.width):
+			tile_styles.append(grid.get_tile_style(x, z))
+
 	# ONE ENTRY PER BUILDING, not per covered tile — recorded at the footprint origin, so a
 	# future 2x2 House restores as one building rather than four.
 	var buildings: Array[Dictionary] = []
@@ -120,7 +137,13 @@ static func capture(
 			if seen_origins.has(origin):
 				continue
 			seen_origins[origin] = true
-			buildings.append({"origin": [origin.x, origin.y], "id": def.id})
+			buildings.append({
+				"origin": [origin.x, origin.y],
+				"id": def.id,
+				# v7: the look this building was PLACED with (-> D-57). Absent/"" on every older
+				# save, which correctly restores as `model_scenes[0]` — the pre-feature look.
+				"style": grid.get_building_style(origin),
+			})
 
 	# SORTED BY SEQUENCE, and that is load-bearing: `HomeSiteRegistry.rebuild_ownership()`
 	# breaks distance ties by lower sequence, so restoring in this order is what makes tile
@@ -174,6 +197,7 @@ static func capture(
 		"width": grid.width,
 		"depth": grid.depth,
 		"terrain": terrain,
+		"tile_styles": tile_styles,
 		"buildings": buildings,
 		"wood": world.get_wood(),
 		"home_sites": home_sites,
@@ -338,6 +362,21 @@ static func migrate(data: Dictionary) -> Dictionary:
 	if version < 5:
 		out["save_version"] = 5
 
+	# v5 -> v6 (habitat-tiers, Task 6): pure version-bump bookkeeping, for the same reason the
+	# two steps above are. `arrivals[].count` is additive and `ArrivalQueue.restore()` already
+	# reads a missing one as 1, which is exactly what a pre-v6 file's group size always was —
+	# uniformly 1, before `HabitatTier.arrival_group_size` existed. Nothing needs inventing here.
+	if version < 6:
+		out["save_version"] = 6
+
+	# v6 -> v7 IS PURE VERSION-BUMP BOOKKEEPING, the same shape as v3 -> v4, v4 -> v5 and
+	# v5 -> v6. v7 added `tile_styles` and a per-building `style` (-> D-57); both are ADDITIVE
+	# and both have a correct meaning when absent (no captured style -> `pick_variant()` for
+	# terrain, `model_scenes[0]` for a building), which is exactly the look a pre-v7 world
+	# already had. So there is nothing to migrate beyond stamping the number.
+	if version < 7:
+		out["save_version"] = 7
+
 	# THE SEED IS REPAIRED AT ANY VERSION, and the rule differs by version on purpose:
 	#
 	#   * **At v1**, `seed` was written as a constant 0 in every file that build ever saved, so
@@ -371,8 +410,9 @@ static func migrate(data: Dictionary) -> Dictionary:
 		# worse than deleting, which is the exact failure an earlier fix wave on this row closed.
 		out["seed"] = seed_from_name(text_or(out.get("name", ""), ""))
 
-	# (row 13 adds "mist" and its own migration step here — a v5 -> v6, now that v4 is taken by
-	# style_defaults and v5 by the resident-look field of the villager-variety fix)
+	# (row 13 adds "mist" and its own migration step here — a v6 -> v7, now that v4 is taken by
+	# style_defaults, v5 by the resident-look field of the villager-variety fix, and v6 by
+	# habitat-tiers' arrival-group-size count field)
 	return out
 
 
@@ -466,6 +506,20 @@ static func apply(world: WorldRoot, data: Dictionary) -> bool:
 				id = WorldGrid.START_TERRAIN_ID
 			grid.set_terrain(x, z, id)
 
+	# 1b. CAPTURED TILE STYLES (v7, -> D-57), restored AFTER terrain and never before:
+	# `set_terrain()` deliberately clears a tile's style, so doing this first would wipe
+	# everything just written. A missing/short array is the normal case for any save written
+	# before v7 and is not a warning — those tiles correctly carry "" and render exactly as
+	# they always did, through `pick_variant()`.
+	var tile_styles: Array = array_field(data, "tile_styles")
+	if not tile_styles.is_empty():
+		for z in range(depth):
+			for x in range(width):
+				var si: int = z * width + x
+				if si >= tile_styles.size():
+					continue
+				grid.set_tile_style(x, z, text_or(tile_styles[si], ""))
+
 	# 2. Buildings, one per footprint origin.
 	for entry: Variant in array_field(data, "buildings"):
 		if typeof(entry) != TYPE_DICTIONARY:
@@ -481,6 +535,14 @@ static func apply(world: WorldRoot, data: Dictionary) -> bool:
 		if def == null:
 			push_warning("Save names unknown building `%s`; skipped." % str(b.get("id", "")))
 			continue
+		# STYLE BEFORE `set_building()`, for the same reason `WorldRoot.place_building()` does it
+		# in that order: `set_building()` emits `tile_changed`, and anything listening resolves
+		# the look right then. Nothing listens during a load today (the view attaches afterwards
+		# and builds from scratch), but the two call sites agreeing costs nothing and stops this
+		# becoming a latent bug the day that changes.
+		# `text_or()` treats a non-String as absent, so a hand-edited or pre-v7 file degrades to
+		# "" -> `model_scenes[0]`, never a crash.
+		grid.set_building_style(origin, text_or(b.get("style", ""), ""))
 		grid.set_building(origin, def)
 
 	# 3. Removal receipts (v3, bug fix) — see the header's "REMOVAL RECEIPTS JOINED AT v3" note.

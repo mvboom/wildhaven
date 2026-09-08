@@ -12,14 +12,30 @@ extends QATestCase
 ## rendered spilling ~0.3 units outside the tiles it reserves on two sides while the far half
 ## of its own reserved footprint showed empty ground.
 ##
-## Every building model in the catalog is authored centered on its own local origin (verified
-## by measuring all of them), which is what makes "center the node on the footprint" the
-## correct rule rather than a per-asset nudge.
+## CORRECTED 2026-09-07 — this header used to claim "every building model in the catalog is
+## authored centered on its own local origin (verified by measuring all of them)". THAT WAS
+## FALSE, and it was false because this suite only ever placed TWO of the ten buildables, so
+## "all of them" was never actually measured through this code path. A full audit found EIGHT
+## off-centre wrappers, and `windmill` was live-spilling 0.0675 units onto its neighbouring
+## tile. Each was corrected in its own `.tscn` by a translation equal to the negation of its
+## measured AABB centre (see any wrapper's header); the rule "centre the node on the footprint"
+## is right, but it only holds once the mesh is centred on its own origin, which is an asset
+## fact this suite must verify rather than assume.
 ##
-## Asserted for BOTH cases so the 1x1 path is pinned as a no-op, not just the 2x2 fix:
+## SO THIS NOW PLACES EVERY BUILDABLE, not a hand-picked two. That is the whole fix: a
+## per-asset defect class cannot be covered by a per-asset opt-in list, because the asset
+## nobody added to the list is exactly the one that rots. The catalog is read from
+## `placeable_options()` at runtime, so a buildable added later is covered the day it lands
+## without anyone remembering to come back here.
+##
+## Two cases still carry named, pinned expectations on top of the generic sweep, because they
+## are what the ORIGINAL 2x2 bug was about and a re-ruling of either would silently gut the
+## coverage:
 ##   * house (1x1)  -> visual lands exactly on its single reserved tile's center.
 ##   * barn  (2x2)  -> visual lands exactly on the 2x2 block's center, and the whole mesh
 ##                     stays inside the four tiles the building reserves.
+## Both are pinned by ID (in `EXPECTED_FOOTPRINTS`), never by catalog position — see the pad
+## comment below for why an earlier draft's position-pinning was wrong.
 ##
 ## Run:
 ##   $GODOT_PATH --headless --path project --import
@@ -27,12 +43,39 @@ extends QATestCase
 
 const WORLD_PATH: String = "res://scenes/Main.tscn"
 
-## Two well-separated grass pads, each cleared to grass and large enough for a 2x2 plus a
-## one-tile margin, so neither placement can be refused for terrain or occupancy reasons.
-const HOUSE_PAD := Vector2i(6, 6)
-const BARN_PAD := Vector2i(16, 16)
-const STYLE_PAD := Vector2i(26, 6)
+## Well-separated grass pads, each cleared to grass and large enough for a 2x2 plus a one-tile
+## margin, so no placement can be refused for terrain or occupancy reasons. Pads are GENERATED
+## on a 6-by-8 lattice (`_pad_for()`) rather than listed, because the count now follows the
+## catalog size rather than a hand-maintained list.
+##
+## No buildable gets a NAMED pad any more. An earlier draft of this rewrite kept HOUSE_PAD and
+## BARN_PAD and asserted that house and barn landed on them; that pinned a buildable's INDEX in
+## `placeable_options()`, which is not a fact this suite has any business defending — reordering
+## the catalog is not a bug, and the assertion failed the moment the real order was read. What
+## actually needs pinning about those two is their FOOTPRINTS (`EXPECTED_FOOTPRINTS` below) and
+## their presence in the catalog at all (the sweep's own missing-buildable check), both of which
+## are asserted by name and neither of which cares where the building was put down.
 const PAD_MARGIN: int = 3
+
+## The style-default check needs its own pad, taken from the far end of the lattice so it can
+## never collide with a catalog pad however long the catalog grows.
+const STYLE_PAD := Vector2i(28, 28)
+
+## Pinned footprints for the whole catalog — the fixture premise, stated once. A human
+## re-ruling any of these fails HERE, loudly, rather than quietly changing what this suite
+## thinks it is covering (the original reason `barn`'s 2x2 was pinned; generalised 2026-09-07).
+const EXPECTED_FOOTPRINTS: Dictionary = {
+	"house": Vector2i(1, 1),
+	"farmhouse": Vector2i(2, 2),
+	"barn": Vector2i(2, 2),
+	"small_barn": Vector2i(1, 1),
+	"open_barn": Vector2i(1, 1),
+	"chicken_coop": Vector2i(1, 1),
+	"silo": Vector2i(1, 1),
+	"windmill": Vector2i(1, 1),
+	"water_tower": Vector2i(1, 1),
+	"well": Vector2i(1, 1),
+}
 
 ## Placement is centered to well under a millimetre; the tolerance only absorbs float noise.
 const EPSILON: float = 0.001
@@ -65,14 +108,30 @@ func _process(_delta: float) -> bool:
 	if _frames < 3:
 		return false
 
-	# Buildings cost Wood; the default start (50) does not cover both placements.
-	_world.wood.add(1000)
-	_clear_pad(HOUSE_PAD)
-	_clear_pad(BARN_PAD)
-	_clear_pad(STYLE_PAD)
+	# Buildings cost Wood; the default start (50) does not cover the whole catalog.
+	_world.wood.add(100000)
 
-	_check_building("house", HOUSE_PAD, Vector2i(1, 1))
-	_check_building("barn", BARN_PAD, Vector2i(2, 2))
+	# EVERY buildable, on its own pad. Order follows placeable_options() so the pad a given
+	# building lands on is stable across runs, which keeps a failure message reproducible.
+	var options: Array[PlaceableDefinition] = _world.placeable_options()
+	check(options.size() >= EXPECTED_FOOTPRINTS.size(),
+		"the catalog has at least the %d buildables this suite pins footprints for (got %d)"
+			% [EXPECTED_FOOTPRINTS.size(), options.size()])
+	var seen: Array[String] = []
+	for i in options.size():
+		var def: PlaceableDefinition = options[i]
+		var pad: Vector2i = _pad_for(i)
+		_clear_pad(pad)
+		seen.append(def.id)
+		_check_building(def.id, pad, EXPECTED_FOOTPRINTS.get(def.id, def.footprint) as Vector2i)
+
+	# A buildable this suite pins but the catalog no longer offers would otherwise vanish
+	# silently — the sweep above can only check what it is handed.
+	for id: String in EXPECTED_FOOTPRINTS.keys():
+		check(seen.has(id),
+			"the pinned buildable '%s' is still in the catalog and was placed" % id)
+
+	_clear_pad(STYLE_PAD)
 	_check_house_style_default_variant()
 
 	finish()
@@ -111,7 +170,7 @@ func _check_building(id: String, origin: Vector2i, expected_footprint: Vector2i)
 		origin.x + def.footprint.x - 1, origin.y + def.footprint.y - 1)
 	var block_center: Vector3 = (low + high) * 0.5
 
-	var visual: Node3D = _find_visual(def)
+	var visual: Node3D = _find_visual(origin)
 	if not check(visual != null, "%s has a visual under the buildings root" % id):
 		return
 
@@ -138,7 +197,7 @@ func _check_building(id: String, origin: Vector2i, expected_footprint: Vector2i)
 
 ## STYLE-DEFAULT RESOLUTION (sub-project B2, Task 5): a House placed AFTER
 ## `style_defaults["house"]` names a non-default look must render THAT look, not
-## `model_scenes[0]`'s shipped default (HousesFirstAge1Level1/"House") — proves
+## `model_scenes[0]`'s shipped default (`house_large`) — proves
 ## `TerrainView._resolve_building_variant()` actually consults `WorldRoot.
 ## resolve_style_scene()` rather than the pre-feature unconditional `model_scenes[0]`.
 ##
@@ -147,24 +206,43 @@ func _check_building(id: String, origin: Vector2i, expected_footprint: Vector2i)
 ## by name, because `_check_building("house", HOUSE_PAD, ...)` already placed an earlier
 ## House with the default look — a name search scoped to the whole world would find that
 ## unrelated node and prove nothing about this one.
+## RE-POINTED 2026-09-07 (house cull): the non-default look driven here was
+## `house_tower_firstage`, which the cull unwired — a style id no longer in `model_scenes` gets
+## silently replaced by `get_style_default()`'s stale-id fallback, so the old assertion would
+## have tested the fallback while claiming to test resolution, and passed for the wrong reason
+## only because the expected node name would then also have been wrong. `house_small` is used
+## instead: still a real, wired, NON-index-0 variant, which is the only property this check
+## needs.
 func _check_house_style_default_variant() -> void:
-	_world.style_defaults["house"] = "house_tower_firstage"
+	_world.style_defaults["house"] = "house_small"
 	if not check(_world.place_building(STYLE_PAD.x, STYLE_PAD.y, "house"),
 			"house places at %s for the style-default check" % STYLE_PAD):
 		return
 	var visual: Node3D = _world.view._building_visuals.get(STYLE_PAD, null) as Node3D
 	if not check(visual != null, "the style-default house has a tracked visual"):
 		return
-	check_eq(String(visual.name), "HouseTowerFirstage",
-		"style_defaults[\"house\"] = \"house_tower_firstage\" renders HouseTowerFirstage.tscn "
-		+ "(the tower variant), not model_scenes[0]'s shipped default look (\"House\")")
+	check_eq(String(visual.name), "HouseSmall",
+		"style_defaults[\"house\"] = \"house_small\" renders HouseSmall.tscn "
+		+ "(the \"House - Small\" look), not model_scenes[0]'s default (\"HouseLarge\")")
 
 
-## The building visual `TerrainView` built for `def`, found by the wrapper scene's root name
-## (each wrapper's root is named after the scene file, e.g. `Barn`, `House`).
-func _find_visual(def: PlaceableDefinition) -> Node3D:
-	var want: String = def.model_scenes[0].resource_path.get_file().get_basename()
-	return _search(_world, want)
+## Pads on a 6-by-8 lattice, five to a row. Spacing is what keeps two `_clear_pad()` squares
+## (each 4x4, from pad-1 to pad+2) from overlapping, so no building can be refused placement
+## because a neighbour's pad already reserved its tiles.
+func _pad_for(index: int) -> Vector2i:
+	return Vector2i(4 + (index % 5) * 6, 4 + (index / 5) * 8)
+
+
+## The building visual `TerrainView` built for the placement at `origin` — looked up by ORIGIN
+## in `_building_visuals`, the exact node that placement created.
+##
+## CHANGED 2026-09-07 from a search-the-tree-by-node-name lookup. That was safe while this suite
+## placed two buildings; with the whole catalog down it is not, because a name search is not
+## scoped to the placement under test and `farmhouse`/`house` in particular draw their meshes
+## from the same renamed House family. `_check_house_style_default_variant()` below already used
+## this exact-lookup shape, and for the same stated reason.
+func _find_visual(origin: Vector2i) -> Node3D:
+	return _world.view._building_visuals.get(origin, null) as Node3D
 
 
 func _search(node: Node, want: String) -> Node3D:

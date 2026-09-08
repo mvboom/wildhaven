@@ -127,11 +127,18 @@ func on_grown(new_tiles: Array[Vector2i]) -> void:
 ## (e.g. "barn"), never the "farm_building" category label, so
 ## `WorldRoot.resolve_style_scene("barn")` correctly finds no scenes for that id and falls
 ## through to `model_scenes[0]` — this file never needs to know the category label exists.
-func _resolve_building_variant(def: PlaceableDefinition) -> PackedScene:
-	if _world != null:
-		var resolved: PackedScene = _world.resolve_style_scene(def.id)
-		if resolved != null:
-			return resolved
+## CHANGED 2026-09-08 (-> D-57): resolves the style this building was PLACED with, read from
+## `WorldGrid`, rather than the category's CURRENT default. The old version made a picker change
+## restyle every house already standing — the building half of the behaviour the human rejected.
+## An empty captured style (every pre-D-57 save, every placeable with no picker) falls through
+## to `model_scenes[0]`, which is exactly the pre-feature behaviour.
+func _resolve_building_variant(def: PlaceableDefinition, origin: Vector2i) -> PackedScene:
+	if _world != null and _grid != null:
+		var captured: String = _grid.get_building_style(origin)
+		if not captured.is_empty():
+			var resolved: PackedScene = _world.resolve_style_scene_id(def.id, captured)
+			if resolved != null:
+				return resolved
 	return null if def.model_scenes.is_empty() else def.model_scenes[0]
 
 
@@ -145,7 +152,7 @@ func _refresh_building_visual(origin: Vector2i) -> void:
 		return
 	if existing != null and is_instance_valid(existing):
 		return
-	var variant: PackedScene = _resolve_building_variant(def)
+	var variant: PackedScene = _resolve_building_variant(def, origin)
 	if variant == null:
 		return
 	var node: Node3D = variant.instantiate() as Node3D
@@ -170,11 +177,41 @@ func _refresh_building_visual(origin: Vector2i) -> void:
 	_building_visuals[origin] = node
 
 
+## `WorldGrid.tile_changed`'s handler. Redraws the tile's ground, then reconciles the building
+## layer with what the grid now says stands there.
+##
+## THE CLEARED-FOOTPRINT CASE IS WHY THIS IS NOT JUST THE `origin` BRANCH (2026-09-08, reported
+## from play as "the erase button does not work with Buildings, only terrain"). A removal is
+## announced through `tile_changed` like every other edit, but `WorldGrid.clear_building()`
+## writes `Vector2i(-1, -1)` into each footprint tile BEFORE it emits, so a freed tile can no
+## longer name the building that just left it — `get_building_origin()` answers -1 and the
+## refresh below, the only code that frees a building node, was skipped on exactly the edit that
+## needed it. `WorldRoot.remove_at()` had already done everything else correctly (tiles freed,
+## refund paid, habitat re-run); the mesh simply stayed standing, so the tool read as broken.
+##
+## Terraforming was never affected — ground is redrawn from the tile itself by `TerrainChunkLod`
+## — which is why the failure looked like "buildings only".
 func _on_tile_changed(x: int, z: int) -> void:
 	_chunk_lod.refresh_tile(x, z)
 	var origin: Vector2i = _grid.get_building_origin(x, z)
 	if origin.x >= 0:
 		_refresh_building_visual(origin)
+		return
+	_free_orphan_building_visuals()
+
+
+## Frees every tracked building visual whose building is no longer in the grid.
+##
+## A sweep rather than a targeted lookup because the tile that changed cannot name what left it
+## (see `_on_tile_changed()`), and a tile->origin index kept here would be a second copy of
+## `WorldGrid`'s own footprint bookkeeping to keep in sync. It costs one dictionary walk over
+## the buildings STANDING — tens, in a village — on tile changes that have no building, and it
+## is self-healing: any visual orphaned by a path nobody thought of is collected by the next
+## edit rather than stranded forever.
+func _free_orphan_building_visuals() -> void:
+	for tracked: Vector2i in _building_visuals.keys():
+		if _grid.get_building(tracked.x, tracked.y) == null:
+			_refresh_building_visual(tracked)
 
 
 ## Maps a screen position to grid coordinates by raycasting the single picking body, then

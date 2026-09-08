@@ -58,6 +58,7 @@ func _process(_delta: float) -> bool:
 
 	_check_bind_content_at_beat_one_names_no_species()
 	_check_bind_content_at_beat_two_names_the_derived_starter()
+	_check_bind_content_beat_two_uses_rabbits_real_tier_not_the_stale_flat_fields()
 	_check_bind_content_falls_through_to_done_when_unsatisfiable()
 
 	finish()
@@ -184,14 +185,34 @@ func _check_bind_content_at_beat_one_names_no_species() -> void:
 ## come entirely from `HabitatRecipe`, live, so a later roster retune changes what the coach
 ## says with no code change here. Asserting against `HabitatRecipe`'s own answer (rather than
 ## hardcoding "rabbit"/"grass") is what keeps this test honoring that same promise, and what
-## keeps it passing the day the human retunes the roster.
+## keeps it passing the day the human retunes the roster's tier costs — it is NOT what pins
+## Rabbit specifically; that is the `check_eq(starter.id, "rabbit", ...)` line below, which
+## hardcodes the id on purpose (see that line's own comment).
+##
+## REWRITTEN AGAIN, starter-pin fix (2026-09-04, not a silent adjustment — see the fix
+## report). `bind_content()` now calls `HabitatRecipe.starter_species()` (pinned to Rabbit),
+## not `easiest_species_by_tier()` (the derived cost score, which real tier data now picks
+## Deer from — correct arithmetic, wrong lesson; see `PINNED_STARTER_SPECIES_ID`'s doc
+## comment for the human's reasoning). Asserting against the SAME function `bind_content()`
+## actually calls is not independent of the implementation on its own — see
+## `_check_bind_content_beat_two_uses_rabbits_real_tier_not_the_stale_flat_fields()` below for
+## the independently-derived regression pin over Rabbit's actual tier needs — but the
+## `starter.id == "rabbit"` assertion here IS independent: it is a literal hardcoded against
+## today's FULL, untouched live roster, and it is exactly the assertion that would have
+## caught the derived score's silent switch to Deer, because `starter_species()` calling
+## through to `easiest_species_by_tier()` unconditionally (the pre-pin bug) would fail it.
 func _check_bind_content_at_beat_two_names_the_derived_starter() -> void:
-	var starter: AnimalDefinition = HabitatRecipe.easiest_species(_world)
+	var starter: AnimalDefinition = HabitatRecipe.starter_species(_world)
 	if not check(starter != null, "a starter species is derivable from the live roster"):
 		return
-	var recipe: Dictionary = HabitatRecipe.recipe_for(starter, _world)
+	check_eq(starter.id, "rabbit",
+		"the coach's starter is pinned to Rabbit against the full, untouched live roster — "
+		+ "not whatever species the cost score currently favours (Deer, once real tier data "
+		+ "replaced the retired flat fields — see PINNED_STARTER_SPECIES_ID)")
+	var tier: HabitatTier = HabitatRecipe.starter_tier(starter)
+	var recipe: Dictionary = HabitatRecipe.recipe_for_tier(tier, _world)
 	var entries: Array = recipe["entries"] as Array
-	if not check(not entries.is_empty(), "the starter's recipe has at least one chip"):
+	if not check(not entries.is_empty(), "the starter's tier recipe has at least one chip"):
 		return
 	var first: Dictionary = entries[0] as Dictionary
 
@@ -202,13 +223,80 @@ func _check_bind_content_at_beat_two_names_the_derived_starter() -> void:
 	coach.bind_content(_world)
 
 	check_eq(coach.current_target_id(), first["id"] as String,
-		"beat 2 targets the same first palette button HabitatRecipe.recipe_for() derives")
+		"beat 2 targets the same first palette button HabitatRecipe.recipe_for_tier() derives")
 	check(coach.current_text().contains(starter.display_name),
-		"beat 2's text names the derived starter's display name")
-	check(coach.current_text().contains(HabitatRecipe.describe(starter, _world)),
-		"beat 2's text carries HabitatRecipe.describe()'s own sentence verbatim")
+		"beat 2's text names the pinned starter's display name")
+	check(coach.current_text().contains(HabitatRecipe.describe_tier_needs(tier, _world)),
+		"beat 2's text carries HabitatRecipe.describe_tier_needs()'s own sentence verbatim")
 	check(coach.current_text().contains(first["display_name"] as String),
 		"beat 2's text names the derived first palette button's display name")
+
+
+## FINDING C1'S OWN REGRESSION PIN (final whole-branch review, 2026-09-04): the concrete
+## defect was Rabbit's onboarding line telling a player to place Grass then Rock ("rocky
+## cover"), Rabbit's STALE flat `habitat_needs`, while Rabbit's REAL base tier
+## (`rabbit.tres`) is `open_grass/4` + `cultivated/4` — no rock, no cover, at all. The two
+## PRE-FIX tests over this path (this file's old `_check_bind_content_at_beat_two_...` above,
+## and `test_habitat_recipe.gd`'s `_check_starter_prefers_free_terrain`) both asserted the
+## coach's output against another `HabitatRecipe` call that read the SAME stale field, so
+## they agreed with the bug instead of catching it.
+##
+## INDEPENDENTLY DERIVED: the expected tags below come from reading `rabbit.tres` directly
+## (transcribed in the comment, checked again by the `check_eq` immediately below against the
+## live resource, so this fixture's premise cannot go stale unnoticed), and the expected
+## phrases come from `HabitatRecipe.SOURCE_PHRASES` — a DATA table, not a derivation, the
+## same class of ground truth `test_habitat_recipe.gd`'s
+## `_check_description_never_repeats_a_shared_source()` already trusts directly. Nothing here
+## calls `recipe_for()` / `describe()` (the flat functions) or re-derives the expected
+## sentence through any other `HabitatRecipe` call.
+func _check_bind_content_beat_two_uses_rabbits_real_tier_not_the_stale_flat_fields() -> void:
+	var rabbit: AnimalDefinition = load("res://data/animals/rabbit.tres") as AnimalDefinition
+	if not check(rabbit != null, "rabbit.tres loads"):
+		return
+	# Pins this fixture's own premise. If rabbit.tres's flat fields are ever brought back in
+	# sync with its real tier (or removed), this fails LOUDLY rather than this whole check
+	# silently proving nothing.
+	#
+	# `cover` was RETIRED 2026-09-07 (habitat-tiers re-spec), which also dropped it from this
+	# stale flat field, so the pre-tier pair is now the single entry `['open_grass']` — still
+	# stale relative to the real base tier (which also needs `cultivated`), so the premise
+	# below still holds.
+	check_eq(rabbit.habitat_needs, ["open_grass"] as Array[String],
+		"rabbit.tres's flat `habitat_needs` is still the stale pre-tier ['open_grass'] "
+		+ "value (left in place only 'so a rollback is a one-line edit' — rabbit.tres's own "
+		+ "header) — this fixture's whole premise depends on that field staying stale")
+
+	var real_roster: SpeciesRoster = _world.roster
+	# A single-entry roster makes Rabbit the starter unambiguously, regardless of how the
+	# rest of the live roster's costs are tuned.
+	_world.roster = SpeciesRoster.new([rabbit])
+
+	var coach: OnboardingCoach = _fresh()
+	coach.advance(IDLE)
+	coach.notice_guide_opened()
+	coach.notice_guide_closed()
+	coach.bind_content(_world)
+	var text: String = coach.current_text()
+
+	_world.roster = real_roster
+
+	var cover_phrase: String = HabitatRecipe.SOURCE_PHRASES["rock"] as String
+	var farm_phrase: String = HabitatRecipe.SOURCE_PHRASES["cultivated_field"] as String
+	var grass_phrase: String = HabitatRecipe.SOURCE_PHRASES["grass"] as String
+
+	check(not text.contains(cover_phrase),
+		("beat 2 no longer tells a player to place Rock — Rabbit's STALE flat need ('%s'), "
+		+ "the literal misinstruction finding C1 reported: '%s'") % [cover_phrase, text])
+	check(text.contains(grass_phrase),
+		("beat 2 names open_grass ('%s'), which Rabbit's REAL base tier shares with the "
+		+ "stale flat fields — present in both, so on its own this would not catch the "
+		+ "regression: '%s'") % [grass_phrase, text])
+	check(text.contains(farm_phrase),
+		("beat 2 names cultivated ('%s', Rabbit's REAL second base-tier need) that the "
+		+ "stale flat fields never mentioned at all: '%s'") % [farm_phrase, text])
+	check_eq(coach.current_target_id(), "grass",
+		"beat 2 targets the Grass button — the first need in Rabbit's REAL base tier "
+		+ "(open_grass) — not Rock, the stale flat fields' second need")
 
 
 ## A roster where nothing is satisfiable makes `HabitatRecipe.easiest_species()` return

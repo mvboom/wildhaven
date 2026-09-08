@@ -151,9 +151,25 @@ func _sync_structure_site(tile: Vector2i) -> void:
 	_registry.register_structure(origin, def.emitted_tags, radius)
 
 
-## The radius a building's home site allocates over: the widest `scout_radius` among the
-## species this building is actually a home for — that is, species with one of its
-## `emitted_tags` in `habitat_needs`.
+## The radius a building's home site allocates over.
+##
+## ## RULE: for every species this building is actually a home for — that is, every
+## `(species, tier)` pair where one of the tier's `needs` names one of this building's
+## `emitted_tags` (`HomeSite.serves()`'s own test) — take that TIER's `max_radius()`, which
+## spans every need's and limit's radius, falling back to the species' `scout_radius` where a
+## need or limit follows it. The site's radius is the widest of those across every matching
+## species and tier.
+##
+## Reads through `AnimalDefinition.effective_tiers()`, never raw `habitat_needs`, for the
+## same reason `HomeSite.serves()` does — see its header.
+##
+## WHY THE TIER'S FULL `max_radius()` AND NOT JUST `scout_radius`: the site's radius is what
+## `_mark_neighbourhood_dirty()` uses to decide which edits re-evaluate this site (via
+## `HomeSiteRegistry.sites_covering()`), so a tier whose OWN need or limit reaches wider than
+## the species' `scout_radius` (an authored radius, not the sentinel) needs the site to notice
+## an edit out at that distance too — a narrower site radius would silently miss it. Every
+## need/limit in the shipped roster today follows `scout_radius` via the sentinel, so this
+## degrades to `scout_radius` in practice, but nothing here special-cases that.
 ##
 ## Derived from data rather than declared as a constant, deliberately. A "building home-site
 ## radius" constant would be a fourth tuning number for the human to rule on, and it would
@@ -164,10 +180,34 @@ func _home_site_radius_for(def: PlaceableDefinition) -> int:
 	if _roster == null or def == null:
 		return best
 	for species: AnimalDefinition in _roster.species():
-		for tag: String in species.habitat_needs:
-			if def.emitted_tags.has(tag):
-				best = max(best, species.scout_radius)
-				break
+		for tier: HabitatTier in species.effective_tiers():
+			var matches: bool = false
+			for need: HabitatNeed in tier.needs:
+				if def.emitted_tags.has(need.tag):
+					matches = true
+					break
+			if matches:
+				best = max(best, tier.max_radius(species.scout_radius))
+	return best
+
+
+## THE WILD (non-structure) SITE'S COUNTERPART TO `_home_site_radius_for()` — final review
+## finding I2 (2026-09-04). Reuses the exact same `tier.max_radius(species.scout_radius)`
+## call that function maxes across every MATCHING species/tier for a building's site; this
+## one maxes it across a single species' OWN `effective_tiers()` for a settled/claimed site,
+## since here the species is already known and every one of its tiers is a candidate, not
+## just the ones matching one building's tags.
+##
+## WHY THIS MATTERS: `_move_in()` used to register and claim every site at a bare
+## `species.scout_radius`, even though a tier's own need or limit can reach wider
+## (`HabitatTier.max_radius()`) — Deer's herd tier counts `browse` out to 14 while
+## `scout_radius` is 10, and grass painted 11-14 tiles out never marked the site dirty
+## (`HomeSiteRegistry.sites_covering()` -> `HomeSite.covers()`, both keyed on `site.radius`).
+## Reading `_species_widest_radius()` here instead is what makes that edit re-evaluate.
+func _species_widest_radius(species: AnimalDefinition) -> int:
+	var best: int = species.scout_radius
+	for tier: HabitatTier in species.effective_tiers():
+		best = maxi(best, tier.max_radius(species.scout_radius))
 	return best
 
 
@@ -277,53 +317,79 @@ func population_at(position: Vector2i, species: AnimalDefinition) -> int:
 
 
 ## One evaluation: this candidate position against the whole roster.
+##
+## Reads `CapacityEvaluator.evaluate()` ONCE per species, not `capacity()` then `best_tier()`
+## — that pairing would run `species.effective_tiers()`'s `tag_counts()` grid walk twice per
+## species, doubling the cost of this hot path for no new information (`capacity()` IS
+## `tier_capacity(best_tier)`). See `CapacityEvaluator.evaluate()`'s header.
 func _evaluate(position: Vector2i) -> void:
 	if _grid == null or _roster == null:
 		return
 	evaluations_run += 1
 	for species: AnimalDefinition in _roster.species():
 		var site: HomeSite = _site_for(position, species)
-		var cap: int = CapacityEvaluator.capacity(_grid, _registry, position, species, site)
+		var result: Dictionary = CapacityEvaluator.evaluate(_grid, _registry, position, species, site)
+		var cap: int = int(result["capacity"])
 		capacity_evaluated.emit(position, species.id, cap)
 		var population: int = 0 if site == null else site.population()
 		# THE ARRIVAL PREDICATE, gdd.md verbatim: "an arrival is enqueued only where
 		# capacity(h, S) >= population(h, S) + 1 — one read, not two systems."
 		if cap >= population + 1:
-			_arrivals.enqueue(position, species.id)
+			var tier: HabitatTier = result["tier"] as HabitatTier
+			var group: int = 1 if tier == null else tier.arrival_group_size
+			# Never queue more than the site can actually hold right now; the due-time
+			# re-check may still trim it further (`_land_or_drop()`'s partial landing).
+			_arrivals.enqueue(position, species.id, mini(group, cap - population))
 
 
 func _resolve_due_arrivals(delta: float) -> void:
 	if _arrivals == null:
 		return
 	for entry: Dictionary in _arrivals.advance(delta):
-		_land_or_drop(entry["position"] as Vector2i, entry["species_id"] as String)
+		_land_or_drop(
+			entry["position"] as Vector2i,
+			entry["species_id"] as String,
+			int(entry.get("count", 1))
+		)
 
 
 ## The due-time re-check. The land may have changed since the enqueue, so capacity is read
 ## again — and if it no longer supports one more, the arrival is **silently dropped, never
 ## warned**. Nothing had moved in, so there is nothing to explain.
-func _land_or_drop(position: Vector2i, species_id: String) -> void:
+##
+## PARTIAL LANDING IS DELIBERATE: a group of three into room for two lands two, not zero.
+## All-or-nothing would make herds feel arbitrary, and would interact badly with the tap
+## burst the arrival delay exists to absorb. The re-check happens INSIDE the loop, once per
+## individual, because each `_move_in()` changes the population the next iteration tests
+## against — checking capacity once outside the loop would land the whole group or none of
+## it, which is exactly the all-or-nothing behaviour this rule forbids.
+func _land_or_drop(position: Vector2i, species_id: String, count: int = 1) -> void:
 	var species: AnimalDefinition = _roster.by_id(species_id)
 	if species == null:
 		return
-	var site: HomeSite = _site_for(position, species)
-	var cap: int = CapacityEvaluator.capacity(_grid, _registry, position, species, site)
-	var population: int = 0 if site == null else site.population()
-	if cap < population + 1:
-		return  # silently dropped
-	_move_in(position, species)
+	for i in range(maxi(count, 1)):
+		var site: HomeSite = _site_for(position, species)
+		var cap: int = CapacityEvaluator.capacity(_grid, _registry, position, species, site)
+		var population: int = 0 if site == null else site.population()
+		if cap < population + 1:
+			return  # silently dropped — the rest of the group simply never arrives
+		_move_in(position, species)
 
 
-## Group size is 1 per arrival (spec.md #7 -> D-25: "v1 ships a uniform group size of 1 —
-## the arrival predicate `capacity >= population + 1` already encodes this, so v1 needs no
-## new field"). A neighbourhood with room for several fills gradually: landing re-marks the
-## neighbourhood dirty, which enqueues the next one.
+## Lands exactly one individual. `_land_or_drop()` calls this once per member of a landing
+## group (habitat-tiers, `HabitatTier.arrival_group_size`) — a lone fox arrives alone, a
+## small deer group lands together, each `_move_in()` re-checked against the population it
+## just changed. A neighbourhood with room for more beyond the group also fills gradually:
+## landing re-marks the neighbourhood dirty, which enqueues the next arrival.
 func _move_in(position: Vector2i, species: AnimalDefinition) -> void:
 	var site: HomeSite = _site_for(position, species)
 	if site == null:
-		site = _registry.register(position, species.id, species.scout_radius)
+		site = _registry.register(position, species.id, _species_widest_radius(species))
 	elif site.is_vacant():
-		_registry.claim(site, species.id, species.scout_radius)
+		_registry.claim(site, species.id, _species_widest_radius(species))
+	# Derived, not persisted -- re-copied here and in `restore_site()` so a retuned `.tres`
+	# takes effect immediately instead of being frozen into an old save.
+	site.resident_tags = species.emits_tags.duplicate()
 	var world_position: Vector3 = _grid.tile_to_world(position.x, position.y)
 
 	# WHICH LOOK THIS VILLAGER WEARS. Dealt from the per-species shuffle bag, so every look in
@@ -412,6 +478,9 @@ func restore_site(
 		push_warning("Save names unknown species `%s`; its home is dropped." % species_id)
 		_registry.unregister(site)
 		return null
+	# Derived, not persisted -- a save loaded without this re-derivation would silently
+	# drop every `people`/`deer` contribution until the next move-in.
+	site.resident_tags = species.emits_tags.duplicate()
 
 	for i in resident_positions.size():
 		var entry: Variant = resident_positions[i]

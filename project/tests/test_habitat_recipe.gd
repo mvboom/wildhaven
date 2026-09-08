@@ -3,10 +3,15 @@ extends QATestCase
 ## copy, avoids, and starter-species selection built on top of it.
 ##
 ## The two arithmetic traps this suite exists to pin:
-##   * Rock emits BOTH `cover` and `rocks`, so Stag's three needs must collapse to TWO
-##     chips, not three;
-##   * and a rock tile qualifies for both tags independently, so the merged chip's count is
-##     `tiles_per_individual` (8), NOT double it.
+##   * a single source serving two of a species' needs must collapse to ONE chip, not two
+##     (was: Rock emitting BOTH `cover` and `rocks` collapsed Stag's three legacy needs to
+##     two chips — no longer exercisable by real data since `cover` was RETIRED 2026-09-07,
+##     leaving Rock a single-tag terrain; `_check_rock_is_the_source_of_rocks()` below pins
+##     the retirement itself, and `_check_stag_no_longer_dedupes_after_cover_retirement()`
+##     pins that Stag's now-two legacy needs resolve to two DISTINCT chips instead);
+##   * and a shared tile qualifies for both tags independently, so a merged chip's count is
+##     `tiles_per_individual`, NOT doubled — still checked per-entry below even though no
+##     shipped species currently exercises the merge itself.
 ##
 ## It also pins three more traps once `describe()`, `avoids_for()` and `easiest_species()`
 ## landed on top of `recipe_for()`:
@@ -25,6 +30,11 @@ extends QATestCase
 const WORLD_PATH: String = "res://scenes/Main.tscn"
 const FOX_PATH: String = "res://data/animals/fox.tres"
 const STAG_PATH: String = "res://data/animals/stag.tres"
+const DEER_PATH: String = "res://data/animals/deer.tres"
+const HORSE_PATH: String = "res://data/animals/horse.tres"
+const COW_PATH: String = "res://data/animals/cow.tres"
+const SHEEP_PATH: String = "res://data/animals/sheep.tres"
+const HUMAN_PATH: String = "res://data/animals/human.tres"
 
 var _world: WorldRoot = null
 var _frames: int = 0
@@ -53,45 +63,65 @@ func _process(_delta: float) -> bool:
 	if _frames < 3:
 		return false
 
-	_check_rock_is_the_source_of_both_its_tags()
-	_check_stag_dedupes_to_two_chips_at_single_count()
-	_check_fox_reads_forest_and_rock()
+	_check_rock_is_the_source_of_rocks()
+	_check_stag_no_longer_dedupes_after_cover_retirement()
+	_check_fox_reads_forest()
 	_check_unsourced_need_is_unsatisfiable()
 	_check_description_never_repeats_a_shared_source()
 	_check_avoids_unions_both_directions()
 	_check_starter_prefers_free_terrain()
+	_check_starter_species_prefers_the_pinned_id_over_the_cost_score()
+	_check_starter_species_falls_back_when_the_pinned_id_is_missing()
 	_check_unsatisfiable_species_describes_honestly()
-	_check_grouped_button_names_the_resolved_member()
+	_check_grouped_button_names_the_tag_carrying_member()
+	_check_tiers_are_presented()
+	_check_built_limit_reads_as_plain_english()
+	_check_grasslands_tags_stay_distinct()
+	_check_grouped_building_tags_name_the_carrying_member()
+	_check_no_article_defects_across_the_roster()
 
 	finish()
 	return true
 
 
-func _check_rock_is_the_source_of_both_its_tags() -> void:
+## `cover` RETIRED 2026-09-07 (habitat-tiers re-spec moved every shipped consumer off it):
+## Rock's job is now `rocks` alone. Pins both halves of the retirement — `rocks` still
+## resolves, and `cover` resolves to nothing at all, not merely to an unconsumed tag.
+func _check_rock_is_the_source_of_rocks() -> void:
 	var sources: Dictionary = HabitatRecipe.tag_sources(_world)
-	for tag: String in ["cover", "rocks"]:
-		var entries: Array = sources.get(tag, []) as Array
-		if not check(not entries.is_empty(), "tag '%s' has a source" % tag):
-			continue
-		check_eq((entries[0] as Dictionary)["id"], "rock", "'%s' resolves to the Rock button" % tag)
+	var rocks_entries: Array = sources.get("rocks", []) as Array
+	if not check(not rocks_entries.is_empty(), "tag 'rocks' has a source"):
+		return
+	check_eq((rocks_entries[0] as Dictionary)["id"], "rock", "'rocks' resolves to the Rock button")
+	check(rocks_entries.size() >= 2,
+		"'rocks' has more than one source now (Rock and Scrub both emit it)")
+	check(not sources.has("cover"), "'cover' no longer resolves to any source at all")
 
 
-func _check_stag_dedupes_to_two_chips_at_single_count() -> void:
+## Stag's legacy `habitat_needs` used to be `["forest", "cover", "rocks"]`, and Rock's
+## shared `cover`+`rocks` emission collapsed the last two into one chip. `cover` was
+## RETIRED 2026-09-07, leaving Stag's legacy field `["forest", "rocks"]` — two needs with
+## two DISTINCT terrain sources (Forest, Rock), so no dedup fires any more. This pins the
+## new, un-collapsed shape rather than silently losing the regression coverage.
+func _check_stag_no_longer_dedupes_after_cover_retirement() -> void:
 	var stag: AnimalDefinition = load(STAG_PATH) as AnimalDefinition
 	if not check(stag != null, "stag.tres loads"):
 		return
 	var recipe: Dictionary = HabitatRecipe.recipe_for(stag, _world)
 	check(recipe["satisfiable"] as bool, "stag is satisfiable")
 	var entries: Array = recipe["entries"] as Array
-	check_eq(entries.size(), 2, "stag's 3 needs collapse to 2 chips (Rock serves two tags)")
+	check_eq(entries.size(), 2, "stag's 2 legacy needs resolve to 2 distinct chips (no shared source left)")
 	for entry: Dictionary in entries:
 		check_eq(entry["count"], stag.tiles_per_individual,
 			"chip '%s' counts tiles_per_individual, not a per-tag multiple" % entry["id"])
-		if (entry["id"] as String) == "rock":
-			check_eq((entry["tags"] as Array).size(), 2, "the Rock chip carries both its tags")
+		check_eq((entry["tags"] as Array).size(), 1,
+			"chip '%s' carries exactly one tag — nothing is deduped any more" % entry["id"])
 
 
-func _check_fox_reads_forest_and_rock() -> void:
+## Fox's legacy `habitat_needs` used to be `["forest", "cover"]`, resolving to Forest + Rock.
+## `cover` was RETIRED 2026-09-07 (habitat-tiers re-spec), dropping it from this legacy field
+## too, so Fox's legacy needs now resolve to Forest alone.
+func _check_fox_reads_forest() -> void:
 	var fox: AnimalDefinition = load(FOX_PATH) as AnimalDefinition
 	if not check(fox != null, "fox.tres loads"):
 		return
@@ -100,7 +130,7 @@ func _check_fox_reads_forest_and_rock() -> void:
 	for entry: Dictionary in (recipe["entries"] as Array):
 		ids.append(entry["id"] as String)
 	ids.sort()
-	check_eq(ids, ["forest", "rock"] as Array[String], "fox resolves to Forest + Rock")
+	check_eq(ids, ["forest"] as Array[String], "fox resolves to Forest alone")
 
 
 func _check_unsourced_need_is_unsatisfiable() -> void:
@@ -118,7 +148,10 @@ func _check_description_never_repeats_a_shared_source() -> void:
 	if not check(stag != null, "stag.tres loads"):
 		return
 	var text: String = HabitatRecipe.describe(stag, _world)
-	# Rock supplies both of stag's rock-ish needs; its phrase must appear ONCE.
+	# Rock supplies stag's `rocks` need; its phrase must appear exactly once regardless.
+	# (Before `cover`'s 2026-09-07 retirement, Rock supplied BOTH of stag's rock-ish legacy
+	# needs from one tile — see `_check_stag_no_longer_dedupes_after_cover_retirement()` for
+	# where that dedup-arithmetic coverage now lives.)
 	var phrase: String = HabitatRecipe.SOURCE_PHRASES["rock"] as String
 	check_eq(text.count(phrase), 1, "the Rock phrase appears once, not once per tag")
 	# The `[COPY]` stub marker was retired 2026-09-01 when the human approved this wording.
@@ -176,6 +209,46 @@ func _check_starter_prefers_free_terrain() -> void:
 			"the starter's recipe is entirely free terrain (chip '%s')" % entry["id"])
 
 
+## THE STARTER PIN (human ruling, 2026-09-04): `starter_species()` names Rabbit explicitly
+## via `PINNED_STARTER_SPECIES_ID` rather than deriving it from `easiest_species_by_tier()`'s
+## cost score — real tier data scores Deer cheaper (free terrain vs. Rabbit's Wood-costing
+## `cultivated` need), which is correct arithmetic but the wrong first animal (Deer is Shy;
+## Rabbit is Bold and visible). Against the full, untouched live roster this must be Rabbit.
+func _check_starter_species_prefers_the_pinned_id_over_the_cost_score() -> void:
+	var starter: AnimalDefinition = HabitatRecipe.starter_species(_world)
+	if not check(starter != null, "the pinned starter is derivable from the live roster"):
+		return
+	check_eq(starter.id, "rabbit",
+		"starter_species() returns the pinned id ('%s'), not whatever the cost score "
+		% [HabitatRecipe.PINNED_STARTER_SPECIES_ID]
+		+ "currently favours")
+
+
+## GRACEFUL DEGRADATION: a roster that does not carry `PINNED_STARTER_SPECIES_ID` (a typo
+## in the constant, or the pinned species retired later) must never return `null` or crash —
+## `starter_species()` falls back to `easiest_species_by_tier()`'s derived pick instead, so
+## the onboarding path never hard-fails or shows an empty coach over a stale id. Swaps in a
+## fixture roster that deliberately omits "rabbit" entirely.
+func _check_starter_species_falls_back_when_the_pinned_id_is_missing() -> void:
+	var deer: AnimalDefinition = load(DEER_PATH) as AnimalDefinition
+	if not check(deer != null, "%s loads" % DEER_PATH):
+		return
+
+	var real_roster: SpeciesRoster = _world.roster
+	_world.roster = SpeciesRoster.new([deer])
+
+	var expected_fallback: AnimalDefinition = HabitatRecipe.easiest_species_by_tier(_world)
+	var starter: AnimalDefinition = HabitatRecipe.starter_species(_world)
+
+	_world.roster = real_roster
+
+	check(expected_fallback != null,
+		"the fallback roster (Deer only) still derives a species via the cost score")
+	check_eq(starter, expected_fallback,
+		"a roster missing the pinned id falls back to easiest_species_by_tier()'s pick "
+		+ "instead of returning null")
+
+
 func _check_unsatisfiable_species_describes_honestly() -> void:
 	var ghost := AnimalDefinition.new()
 	ghost.id = "ghost"
@@ -185,21 +258,30 @@ func _check_unsatisfiable_species_describes_honestly() -> void:
 		"an unsatisfiable species says so rather than describing a partial habitat")
 
 
-## Final review finding #7: `tag_sources()` used to take a grouped placeable's `display_name`
-## and `cost` from whichever MEMBER happened to emit the tag being looked up, rather than from
-## the member `world.get_style_default(group_key)` says the player currently has selected —
-## the same member `game_hud.gd::_placeable_group_row()` actually renders on the button and
-## `TapRouter` actually places on a tap. LATENT with the real roster today (every
-## `farm_building` member ships `emitted_tags = []`), so this is a fixture: Barn (cost 30,
-## carrying the tag) and Silo (cost 15, carrying nothing) both share
-## `hotbar_category = "farm_building"`, with "silo" set as the resolved default — the exact
-## shape the header comment above predicts for "the day barn.tres gains an emitted_tags".
+## REWRITTEN, habitat-tiers Task 10 fix round 1 (human-ruled, not a silent adjustment — see
+## the fix report). Final review finding #7 originally ruled that a grouped placeable's
+## `display_name`/`cost` should come from `world.get_style_default(group_key)` — the group's
+## CURRENT default — not from whichever member actually carries the tag being looked up,
+## reasoning that the chip should describe what pressing the button does RIGHT NOW. That was
+## survivable while it was purely a fixture-only edge case (no real placeable's
+## `emitted_tags` diverged from its siblings). It stopped being survivable once
+## `barn.tres`/`open_barn.tres`/`windmill.tres`/`farmhouse.tres` were given real, DIFFERENT
+## tags: `farm_building`'s style default resolves alphabetically to Barn, so Horse's
+## `stable` (only Open Barn carries it), Sheep's `mill` (only Windmill) and Human's
+## `large_house` (only Farmhouse) all mislabeled as "a barn" — and Cow's `barn` AND `silo`
+## needs, sharing the one group button, deduped to a single mention and silently DROPPED the
+## silo requirement outright. `display_name`/`cost` now come from the actual tag-emitting
+## placeable, and a new `resolved_id` field carries that placeable's own id for callers (like
+## `HabitatRecipe.describe_tiers()`) that must dedupe by BUILDING, not by button. This fixture
+## still proves the same two-tag-one-button shape (Barn, cost 30, carrying `farm_supply`;
+## Silo, cost 15, carrying nothing; both `hotbar_category = "farm_building"`, with "silo" set
+## as the group's current default) — only the expected reading changed.
 ##
-## Verified by mutation (see the final fix report): reverted `tag_sources()` to read
-## `placeable.display_name`/`placeable.cost` directly instead of resolving through
-## `_resolve_group_member()`, reran this suite, watched `display_name`/`cost` fail (both read
-## back as Barn's), then restored the fix and reran to confirm green.
-func _check_grouped_button_names_the_resolved_member() -> void:
+## Verified by mutation (original finding #7 fix report, preserved for context): reverting
+## `tag_sources()` to read `placeable.display_name`/`placeable.cost` directly (which is what
+## this fix round 1 now does PERMANENTLY) used to turn this red under the OLD assertions;
+## under the NEW ones below it is the correct, expected behaviour instead.
+func _check_grouped_button_names_the_tag_carrying_member() -> void:
 	var barn := PlaceableDefinition.new()
 	barn.id = "barn"
 	barn.display_name = "Barn"
@@ -228,12 +310,14 @@ func _check_grouped_button_names_the_resolved_member() -> void:
 	if check(not entries.is_empty(), "the fixture farm_supply tag has a source"):
 		var entry: Dictionary = entries[0] as Dictionary
 		check_eq(entry["id"], "farm_building",
-			"the source is keyed by the shared button, not by whichever member emitted the tag")
-		check_eq(entry["display_name"], "Silo",
-			"the chip names Silo — the player's CURRENT default — not Barn, whose emitted_tags "
-			+ "happened to match")
-		check_eq(entry["cost"], 15,
-			"...and prices it at Silo's cost, not Barn's more expensive one")
+			"the PALETTE BUTTON is still the shared group key, unaffected by this fix")
+		check_eq(entry["resolved_id"], "barn",
+			"the RESOLVED BUILDING is Barn — the member that actually carries farm_supply")
+		check_eq(entry["display_name"], "Barn",
+			"the chip names Barn, the tag-carrying member, not Silo, the group's current "
+			+ "default, whose emitted_tags never matched")
+		check_eq(entry["cost"], 30,
+			"...and prices it at Barn's real cost, not Silo's cheaper one")
 
 	# Restore the real fixtures — every check dispatched after this one expects them.
 	_world.buildings = real_buildings
@@ -246,3 +330,238 @@ func _check_grouped_button_names_the_resolved_member() -> void:
 	# (this whole suite runs inside one `_process()` call, so a queued free would never run
 	# before `finish()` quits the tree).
 	fixture_buildings.free()
+
+
+## Task 10's own failing test (habitat-tiers task-10-brief.md, Step 1): a species with two
+## tiers must present BOTH — the one currently met, and the one above it — or nothing tells
+## the player a stable would turn a pair into a herd.
+func _check_tiers_are_presented() -> void:
+	var horse := AnimalDefinition.new()
+	horse.id = "horse"
+	horse.display_name = "Horse"
+	horse.scout_radius = 8
+
+	var pair := HabitatTier.new()
+	pair.id = "pair"
+	pair.max_individuals = 2
+	var stable := HabitatNeed.new()
+	stable.tag = "stable"
+	stable.tiles_per_individual = HabitatNeed.GATE_ONLY
+	var grass := HabitatNeed.new()
+	grass.tag = "open_grass"
+	grass.tiles_per_individual = 6
+	pair.needs = [stable, grass]
+
+	var herd := HabitatTier.new()
+	herd.id = "herd"
+	herd.max_individuals = 12
+	var wide := HabitatNeed.new()
+	wide.tag = "open_grass"
+	wide.radius = 14
+	wide.tiles_per_individual = 4
+	var water := HabitatNeed.new()
+	water.tag = "water"
+	water.radius = 12
+	water.tiles_per_individual = 2
+	herd.needs = [stable, wide, water]
+
+	horse.tiers = [pair, herd]
+
+	check_eq(horse.effective_tiers().size(), 2, "the horse presents two tiers")
+	var lines: Array[String] = HabitatRecipe.describe_tiers(horse)
+	check_eq(lines.size(), 2, "one description line per tier")
+	check(lines[1].contains("water"), "the herd line names water, the need that unlocks it")
+	check(not lines[0].contains("herd"), "internal tier ids never reach player copy")
+
+
+## `built` is emitted by EVERY placeable (nine buildings and counting — see
+## `AnimalDefinition.BUILDING_TAGS`), so a `built` limit must read as a place a player
+## avoids, never a specific building, and Deer's real two tiers use two different
+## tolerances (`max_count` 1, then 0) that must read as two different sentences, not the
+## same "built <= N" formula with the number swapped — the human-readability half of Task
+## 10's brief.
+func _check_built_limit_reads_as_plain_english() -> void:
+	var deer: AnimalDefinition = load(DEER_PATH) as AnimalDefinition
+	if not check(deer != null, "deer.tres loads"):
+		return
+	var lines: Array[String] = HabitatRecipe.describe_tiers(deer)
+	check_eq(lines.size(), 2, "deer presents its base and herd tiers")
+	if lines.size() != 2:
+		return
+	for line: String in lines:
+		check(not line.contains("built"), "the raw tag 'built' never reaches '%s'" % line)
+		check(line.contains("buildings"), "the limit reads as a place, not a formula: '%s'" % line)
+	check(lines[0].contains("away from buildings"),
+		"the base tier (max_count 1, a distant cottage is tolerated) reads as tolerant: '%s'"
+		% lines[0])
+	check(lines[1].contains("far from any buildings"),
+		"the herd tier (max_count 0, genuinely wild land) reads stricter than the base "
+		+ "tier: '%s'" % lines[1])
+
+
+## Grass, Wild Grass, Meadow and Scrub now share one palette button ("Grasslands" —
+## `GameHud.TERRAIN_GROUP_ID`), but `open_grass` (Grass/Meadow) and `browse` (Scrub) remain
+## DIFFERENT terrain underneath: placing one never satisfies the other. A tier line must
+## therefore never collapse the two into the same generic "Grasslands" wording, and a tier
+## needing BOTH (Deer's real herd tier does exactly this) must name both rather than
+## silently dropping one as "already covered by Grasslands".
+func _check_grasslands_tags_stay_distinct() -> void:
+	var grass_species := AnimalDefinition.new()
+	grass_species.id = "grass_test"
+	grass_species.display_name = "Grass Test"
+	var grass_tier := HabitatTier.new()
+	grass_tier.id = "only"
+	grass_tier.max_individuals = 4
+	var grass_need := HabitatNeed.new()
+	grass_need.tag = "open_grass"
+	grass_need.tiles_per_individual = 5
+	grass_tier.needs = [grass_need]
+	grass_species.tiers = [grass_tier]
+
+	var browse_species := AnimalDefinition.new()
+	browse_species.id = "browse_test"
+	browse_species.display_name = "Browse Test"
+	var browse_tier := HabitatTier.new()
+	browse_tier.id = "only"
+	browse_tier.max_individuals = 4
+	var browse_need := HabitatNeed.new()
+	browse_need.tag = "browse"
+	browse_need.tiles_per_individual = 5
+	browse_tier.needs = [browse_need]
+	browse_species.tiers = [browse_tier]
+
+	var grass_lines: Array[String] = HabitatRecipe.describe_tiers(grass_species, _world)
+	var browse_lines: Array[String] = HabitatRecipe.describe_tiers(browse_species, _world)
+	if not check(grass_lines.size() == 1 and browse_lines.size() == 1,
+		"both single-need fixtures present exactly one tier"):
+		return
+	check(not grass_lines[0].contains("Grasslands"),
+		"the cosmetic palette-group name never leaks into the line: '%s'" % grass_lines[0])
+	check(not browse_lines[0].contains("Grasslands"),
+		"the cosmetic palette-group name never leaks into the line: '%s'" % browse_lines[0])
+	check(grass_lines[0] != browse_lines[0],
+		"open_grass and browse read as different requirements even though both currently "
+		+ "sit behind the same palette button")
+
+	# A tier needing BOTH open_grass and browse must name both — Deer's real herd tier is
+	# exactly this shape.
+	var both_species := AnimalDefinition.new()
+	both_species.id = "both_test"
+	both_species.display_name = "Both Test"
+	var both_tier := HabitatTier.new()
+	both_tier.id = "only"
+	both_tier.max_individuals = 4
+	var need_a := HabitatNeed.new()
+	need_a.tag = "open_grass"
+	need_a.tiles_per_individual = 5
+	var need_b := HabitatNeed.new()
+	need_b.tag = "browse"
+	need_b.tiles_per_individual = 5
+	both_tier.needs = [need_a, need_b]
+	both_species.tiers = [both_tier]
+	var both_lines: Array[String] = HabitatRecipe.describe_tiers(both_species, _world)
+	if check(both_lines.size() == 1, "the combined fixture presents one tier"):
+		check(both_lines[0].contains("scrub"),
+			("browse's only real source (Scrub) is still named when open_grass is ALSO "
+			+ "needed: '%s'") % both_lines[0])
+		check(both_lines[0] != browse_lines[0],
+			"the combined line is not just the browse-only line with open_grass silently "
+			+ "dropped: '%s'" % both_lines[0])
+
+
+## FIX ROUND 1, CRITICAL. `farm_building`'s style default resolves alphabetically to
+## `barn.tres`, so before this fix ANY farm-building tag Barn does not itself carry
+## mislabeled as "a barn" in the tier line — four real species were affected: Horse
+## (`stable`, only Open Barn), Sheep (`mill`, only Windmill), Human (`large_house`, only
+## Farmhouse), and worst of all Cow, whose tiers need BOTH `barn` AND `silo` — two DIFFERENT
+## buildings sharing one palette button — which the old button-keyed dedup silently
+## collapsed to one mention, erasing the silo requirement entirely rather than merely
+## mislabeling it. This asserts all four read the ACTUAL building against real `.tres` data
+## and the real world catalog, and that Cow specifically names both.
+##
+## COW'S "barn" TAG RESOLVES TO "open barn", NOT LITERALLY "Barn" — flagged for the human,
+## not silently forced otherwise. THREE placeables carry `barn` (Barn cost 30, Small Barn
+## and Open Barn both cost 15), and `_cheapest()` — this file's one, consistent tie-break
+## rule, used everywhere else in this file (`easiest_species()`, `recipe_for()`) — picks the
+## cheapest, ties broken by catalog order (`open_barn.tres` sorts before `small_barn.tres`).
+## This is arguably a BETTER answer than the literal "Barn" ("cheaper barn-family option
+## exists") but is not what was assumed when this fix was scoped, so it is pinned here
+## explicitly rather than glossed over.
+func _check_grouped_building_tags_name_the_carrying_member() -> void:
+	var horse: AnimalDefinition = load(HORSE_PATH) as AnimalDefinition
+	var cow: AnimalDefinition = load(COW_PATH) as AnimalDefinition
+	var sheep: AnimalDefinition = load(SHEEP_PATH) as AnimalDefinition
+	var human: AnimalDefinition = load(HUMAN_PATH) as AnimalDefinition
+	if not check(
+		horse != null and cow != null and sheep != null and human != null,
+		"horse.tres, cow.tres, sheep.tres and human.tres all load"
+	):
+		return
+
+	var horse_lines: Array[String] = HabitatRecipe.describe_tiers(horse, _world)
+	if check(horse_lines.size() >= 1, "horse presents at least one tier"):
+		check(horse_lines[0].contains("open barn"),
+			"Horse's gate need (stable) names Open Barn, the only real source: '%s'"
+			% horse_lines[0])
+		check(not horse_lines[0].contains("a barn"),
+			"...and NOT the group's alphabetical default, Barn, which does not carry "
+			+ "stable: '%s'" % horse_lines[0])
+
+	var sheep_lines: Array[String] = HabitatRecipe.describe_tiers(sheep, _world)
+	if check(sheep_lines.size() >= 2, "sheep presents its base and flock tiers"):
+		check(sheep_lines[1].contains("windmill"),
+			"Sheep's flock-tier gate need (mill) names Windmill, the only real source: '%s'"
+			% sheep_lines[1])
+
+	var human_lines: Array[String] = HabitatRecipe.describe_tiers(human, _world)
+	if check(human_lines.size() >= 2, "human presents its single and family tiers"):
+		check(human_lines[1].contains("farmhouse"),
+			"Human's family-tier gate need (large_house) names Farmhouse, the only real "
+			+ "source: '%s'" % human_lines[1])
+
+	# COW: THE REGRESSION THIS FIX EXISTS TO CATCH. Both tiers need `barn` AND `silo` — two
+	# different buildings behind the SAME "Farm Building" palette button. The pre-fix
+	# button-keyed dedup silently dropped whichever was seen second; a child would build a
+	# barn-family building, wait, and nothing on screen would explain why no cow arrived.
+	var cow_lines: Array[String] = HabitatRecipe.describe_tiers(cow, _world)
+	if check(cow_lines.size() >= 2, "cow presents its pair and herd tiers"):
+		for line: String in cow_lines:
+			check(line.contains("silo"),
+				"cow's tier line names Silo — the requirement a button-keyed dedup would "
+				+ "have silently erased: '%s'" % line)
+			check(line.contains("barn"),
+				"...and still names a barn-family building too (open barn, tied-cheapest "
+				+ "with small barn — see the doc comment above) — two different buildings, "
+				+ "one button, BOTH rendered: '%s'" % line)
+
+
+## FIX ROUND 2, CRITICAL. `SOURCE_PHRASES` used to bake an article into some entries ("a
+## house", "a farm field") because they were written for `describe()`'s "Likes X" sentence,
+## which never minded either way. `describe_tiers()`'s two templates DID mind, and
+## disagreed with each other: the scaling clause never adds its own article, so a baked-in
+## one produced NOTHING ("more a farm field means room for more" — Human's cultivated
+## scaling need, also Bull/Pig/Rabbit); the gate clause always adds one, so a baked-in one
+## produced TWO ("needs an a house" — Human/Pug/Shiba Inu's `house`/`large_house` gate).
+##
+## Scans EVERY roster species' rendered tier lines for both symptom patterns, rather than
+## pinning six hardcoded strings — a single check that would also catch this defect
+## reappearing for a SEVENTH species (or the fifteen-and-growing roster's sixteenth) that
+## six literals never would. `" a a "`/`" a an "`/`" an a "`/`" an an "` catch article
+## doubling anywhere in the line, not just at "needs "; `"more a "`/`"more an "` catch the
+## scaling clause's missing-article symptom specifically.
+func _check_no_article_defects_across_the_roster() -> void:
+	if not check(_world.roster != null and not _world.roster.species().is_empty(),
+		"the roster loaded and is non-empty"):
+		return
+	var doubling_patterns: Array[String] = ["a a ", "a an ", "an a ", "an an "]
+	var scaling_patterns: Array[String] = ["more a ", "more an "]
+	for species: AnimalDefinition in _world.roster.species():
+		for line: String in HabitatRecipe.describe_tiers(species, _world):
+			for pattern: String in doubling_patterns:
+				check(not line.contains(pattern),
+					"%s's tier line has no article doubling ('%s'): '%s'"
+					% [species.id, pattern, line])
+			for pattern: String in scaling_patterns:
+				check(not line.contains(pattern),
+					"%s's tier line has no missing-article scaling clause ('%s'): '%s'"
+					% [species.id, pattern, line])

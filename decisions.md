@@ -733,6 +733,14 @@ is a new decision, not an extension of this one.
 
 ### D-41 · Iso camera + selective occlusion fade replaces the first-person walk camera (reverses D-33)
 
+> **THE OCCLUSION-FADE HALF IS SUPERSEDED BY [D-59] (2026-09-08).** The iso camera, the pan/zoom
+> model and every safety rail below still stand and are still in force. What does not is
+> `OcclusionFader`: the fade shipped, flickered in play, and was removed outright. Read the
+> camera reasoning below as current; read "a bounded, per-resident transparency fade solves it
+> directly" as history — and note that this entry's *measured* finding that camera angle alone
+> does NOT fix occlusion is unaffected, so the underlying problem is now OPEN, not solved.
+
+
 **Decision (2026-08-14):** The camera becomes a fixed orthographic camera at
 `yaw = 45°`, `pitch ≈ -26.565°` (`IsoCameraFraming.YAW_DEGREES`/`PITCH_DEGREES`) —
 matching the original 2D mockups' isometric convention — replacing D-33's
@@ -1341,3 +1349,492 @@ in-game screen renders changed.
 **Tests:** `test_credits_screen.gd` rewritten to assert against `load_entries()` (all 7)
 rather than `binding_entries()` (1), plus an explicit check that the Sherkiz
 `required_notice` still appears verbatim in the rendered list.
+
+---
+
+### D-52 · Habitat tiers replace the flat one-recipe habitat model
+
+**Decision:** a species no longer carries one flat habitat recipe. It carries an ordered
+list of **tiers**, each with its own needs, its own exclusion limits, its own population
+cap and its own arrival group size. Capacity becomes `max` over tiers of the existing
+Liebig `min` within a tier. Each **need** carries its own radius and its own divisor, where
+a divisor of 0 means *gate-only* — must be present, contributes no cap. Each **limit** says
+*"at most N of tag X within radius R"* and gates rather than scales. A species may also
+declare `emits_tags`, so a **resident** contributes tags to its own tile, counted per
+individual.
+
+**Why:** the shipped roster had a measurable distinctness defect. Horse, Cow, Bull and
+Alpaca all carried the identical recipe `open_grass, cultivated` — and because different
+species never compete for tiles (D-46), a single pasture attracted **all four at once**.
+The human's framing was *"more distinct on what animals will appear, when… so they don't
+all compete for the same land."* Tiers make animals want different *amounts* of land;
+exclusion limits make them want different *land*. Fifteen species now have fifteen distinct
+habitat signatures.
+
+The design also unlocked eight buildings that were already imported, licence-cleared,
+costed and hotbar-categorised but emitted **nothing** — placeable decoration with no
+simulation meaning. They now have a job.
+
+**The six open questions ruled the same day:**
+
+- **A — Stag.** A stag appears only where deer already live: *"it can't be a herd if there
+  is no stag with the deer."* Expressed as `Deer.emits_tags = ["deer"]` plus a `deer/4`
+  need on Stag, so four deer support one stag. **No new machinery** — an ordinary need
+  against a resident-emitted tag. Rarity stopped being a hand-tuned `max_individuals` and
+  became something the player earns.
+- **B — Radius band.** Per-need radii run **2–16**, replacing the old ~8–12. The band had
+  to move: this design's own central cases sit outside it (a building gate close in — the shipped
+  stable gate is 5 — and Stag at 14).
+- **C — Values.** The shipped table stands as a starting point, expected to move in
+  playtest.
+- **D — Villager families.** A family needs the larger house plus cultivated land at ≥2
+  tiles per person. "Larger house" had to become a *tag*, which is why **Farmhouse** is now
+  its own placeable rather than a 2×2 "form" of House.
+- **E — Snowfield.** Snow may border grass; the game is not restricted to real-world
+  climate adjacency. No placement or neighbour gating.
+- **F — `quiet` retired.** It had no source and no consumer, and a `built` exclusion limit
+  does its job strictly better — it is actually enforced and needs no terrain to emit it.
+
+**`cover` retired too (2026-09-07).** The doc fold-back surfaced that the tier re-spec had
+left `cover` with a source but **no consumer**: Fox moved to `forest`/`open_grass`/`water`
+and Rabbit to `open_grass`/`cultivated`, so nothing asked for it any more. The human ruled
+it retired on the same grounds as `quiet`. Rock now emits `rocks` alone, which Donkey,
+Alpaca, Shiba Inu and Stag all need, so Rock's place is unchanged and there is no gameplay
+effect.
+
+This does retire a piece of stated design along with the tag. The GDD, spec and terrain
+docs had all carried the same line — *"Rock, not forest, is the `cover` source, so Fox
+habitat is always a two-brushstroke composition (forest near rock), never a side effect of
+painting forest for Wood"* — which was the reason Fox was called the hardest habitat on the
+floor roster. That composition argument no longer describes any shipped species. It is kept
+in the docs as history rather than deleted, because it still explains why the idea mattered.
+
+One consequence worth recording: the legacy flat `habitat_needs` fields were retained on
+all 15 species so a rollback would be a one-line edit. For Fox, Rabbit and Stag that
+rollback is **no longer faithful**, because the `cover` they named is gone from the
+vocabulary. The affordance is void for those three either way.
+
+**Also ruled during execution**, where review found the plan itself wrong:
+
+- **The legacy tier preserves the radius sentinel** rather than baking a concrete radius.
+  The original instruction to bake was withdrawn: baking into a *cached* tier meant a later
+  `scout_radius` retune stopped being tracked, and `capacity_from_counts()` could then
+  return 0 for every need — surfacing as "unsuitable" rather than as an error.
+- **The Terraform palette groups Grass, Wild Grass, Meadow and Scrub behind one button;
+  Snowfield stays standalone.** Three new terrains took the palette from 8 buttons to 11,
+  overflowing the HUD band into the Rotate/Erase cluster. Grouping returns it to 8.
+- **The onboarding starter species is pinned to Rabbit**, not derived from a cost score.
+  Reading real tier data made the derived pick Deer (free terrain beats Rabbit's Wood-costed
+  field). Rabbit is Bold, so a child's first animal is one they can actually see; Deer is
+  Shy and its tier carries a `!built≤1` limit, which would teach a constraint first. A
+  derived starter also changes silently whenever tuning moves.
+
+**Not a predation change.** Limits describe *disturbance*, not danger: a wild species keeps
+its distance from buildings, never from another animal. The Avoids system is untouched, and
+the no-predation invariant holds by construction.
+
+**Tests:** 128 suites, 5,049 assertions, 0 failures. The invariants that no single change
+owned were verified end to end: the inert-land invariant (wild grass still emits nothing),
+`qualifies ≡ capacity ≥ 1` still one function, no lower clamp, an acyclic emission graph,
+and a human-gated vocabulary.
+
+**What is NOT decided here.** The mechanic above is decided. What remains open is
+**tuning**: every habitat value across the fifteen species, and Farmhouse's cost, footprint
+and model, are still **proposals awaiting sign-off** — each `.tres` says so in its own
+header. Suite-green confirms the mechanics work as specified; it
+does not confirm the numbers are final. No ✅ has been recorded in
+`content-pipeline-status.md` or `tier1-status.md` on the strength of this work.
+
+**Open for playtest** (neither is headless-checkable): that a tier fall reads as a herd
+*thinning* rather than a vanishing, and that a two-level cascade (`deer → stag`,
+`human → people → dogs`) produces **one** warning per settled gesture rather than a chain.
+
+---
+
+### D-53 · The three New Game cards build three different worlds (Open Question #10, second half)
+
+**Decision:** `WorldPreset` gains a `terrain_mix` field — terrain id -> relative weight —
+and `WorldGrid.build()` fills a new world from it. The shipped values:
+
+| | Barren | Meadow Start | Forested |
+|---|---|---|---|
+| wild_grass | 100% | 10% | 15% |
+| meadow | — | 40% | 15% |
+| forest | — | 20% | 40% |
+| scrub | — | 20% | 15% |
+| water | — | 10% | 15% |
+
+**Forested's forest share was ruled down from 60% to 40% on 2026-09-08**, one day after the
+rest of this entry, on the movement-blocking concern flagged below; the freed 20% was split
+evenly across the other four terrains. The 60% figure survives only in this sentence.
+
+Placement is **clumped**, not per-tile independent: each terrain is ranked by its own
+seeded noise field and takes the highest-scoring tiles, so a share arrives as ponds and
+stands. Counts are **exact**, fixed as integer quotas by largest-remainder before any tile
+is placed, so 10% water on a 36x36 is exactly 130 tiles at every seed.
+
+**Why:** the three cards existed from the 2026-08-24 New Game redesign but all three built
+identical tag-inert wild grass — each `.tres` header said terrain differentiation was
+"deferred to a separate, deliberate ruling." "Choose a starting land" with one land behind
+three labels is a promise the build did not keep. This is that ruling.
+
+**What this deliberately relaxes.** A Meadow or Forested start **emits habitat tags from
+frame one** — Rabbit can qualify on the meadow, the water species on the ponds, before the
+player has touched anything. That is the point of the card, not an oversight. The
+inert-land invariant still holds everywhere it was written for: revealed mist land
+(`MistReveal` is unchanged), `wild_grass` itself (`TerrainDefinition.validate()` still
+refuses to let it emit), and `base_terrain_id`, which stays tag-inert on all three presets
+and is asserted per-preset in `test_world_preset.gd`. **Barren is the control** — an empty
+mix, byte-identical to the world every build before this one produced, and the suite fails
+if it ever gains an entry.
+
+**Two things authored and not delivered as asked**, both accepted at ruling time:
+
+- **"10% bush" has no terrain to point at.** Bush and BushBerries are two of `forest.tres`'s
+  eight equal-weight `model_scenes`, so bushes were folded into the forest share and appear
+  via `pick_variant()`'s stable hash (D-42) at roughly 2/8 of forest tiles. Meadow Start
+  therefore reads ~15% trees / 5% bushes against an authored 10/10, and Forested ~45%/15%
+  against an authored 50%/10%. Splitting them exactly needs a real `bush` terrain with its
+  own tag and `blocks_movement` ruling — deliberately not this change.
+- **Forested was 60% impassable as authored, and is now 40%.** `blocks_movement` is a terrain
+  flag, not a per-variant one, so a bush tile blocks like a pine. Clumping keeps the walkable
+  remainder connected where a uniform draw would shred it into pockets, but 60% was dense
+  enough that the human ruled it down the next day (see the table). `TerrainScatter.
+  CLUMP_FREQUENCY` (0.09), which sets blob size, remains proposed rather than decided.
+
+**The one gate that is not cosmetic:** the mix is applied **only on a real `"new"` intent**.
+The `"none"` path — every other suite in the project, and an editor F6 — resolves to
+`meadow_start`, which now carries a mix; passing it unconditionally would rewrite the
+starting world of every suite at once. A load doesn't want it either, since `WorldSnapshot.apply()` restores terrain per tile.
+
+**Not decided here:** Open Question **#10**'s own wording in `spec.md`, left for the human to
+close in their own words.
+
+---
+
+### D-54 · "Mixed" is a real style, and it is what an unchosen terrain style means
+
+> **FULLY SUPERSEDED — D-57 then D-58 (both 2026-09-08).** Nothing in this entry is current.
+> D-57 took its retroactive premise: a style is captured at PAINT time and stored per tile, so it
+> governs only new ground. D-58 then retired `mixed` itself, the subject of this entry — a style
+> catalog is now one id per real scene, and a new map's variety is stamped as concrete per-tile
+> state at world generation instead of re-rolled at render time. **Kept for the reasoning, not
+> the conclusion:** the bug it describes (every forest tile rendering CommonTree1, because
+> "unchosen" collapsed onto "chose the first one") is real, still worth understanding, and is
+> what `_randomise_initial_styles()` now prevents by a different route.
+
+
+**Decision:** `WorldRoot.MIXED_STYLE_ID` (`"mixed"`) leads the style catalog for any picker
+category that is a terrain with more than one `model_scenes` entry — today, exactly `forest`.
+It is a style id that resolves to **no scene**: `resolve_style_scene()` returns null for it by
+design, and the caller falls through to `TerrainDefinition.pick_variant()`'s per-tile hash
+(D-42). Since `get_style_default()` degrades an unchosen category to its first catalog entry,
+a brand-new world's forest style is now `mixed`, and forest tiles show all eight of
+`forest.tres`'s variants — six trees plus Bush and BushBerries.
+
+**Why: this fixes a reported bug.** Every forest tile in the world was rendering CommonTree1.
+Both halves were behaving exactly as written — `TerrainChunkLod._resolve_variant()` routes the
+picker categories through the chosen style and falls back to `pick_variant()` only on a null,
+and `get_style_default()`'s documented contract is that it *never* returns "". So on a world
+where the player had chosen nothing, forest resolved to the first tree in the catalog, every
+tile, and the `pick_variant()` fallback was unreachable code. The gap was that there was no way
+to say *"no single tree — mix them"*, so "unchosen" collapsed onto "chose the first one".
+
+Making `mixed` a real catalog entry rather than a special case in the resolver means
+`get_style_default()` is untouched, the picker gets its new row for free (it builds from
+`style_ids_for_category()`), the choice saves and loads like any other style, and — the part a
+narrower fix would have missed — a player who picks a specific tree can pick **Mixed** back.
+
+**Two conditions, both necessary, for a category to offer it:**
+
+- **More than one scene.** `wild_grass` ships a single variant; a `mixed` row there would be a
+  second name for the one look it already has, and would move its unchosen default for no gain.
+- **Terrain, not a building.** `PlaceableDefinition` deliberately has no `pick_variant()` —
+  every placed instance of a buildable wears the same look — so `TerrainView` falls back to
+  `model_scenes[0]`. `mixed` on `house` would mean "always the first house": a duplicate of an
+  existing row that also silently moves that category's default onto it. The first draft of
+  this fix gated only on scene count and did exactly that; `test_hud_hotbar.gd` caught it.
+
+**Consequence for existing saves, accepted:** a world saved before this with no explicit forest
+choice loads as `mixed` rather than CommonTree1 — it gains the variety it previously had no way
+to express. A world with an explicit choice is unaffected. `test_save_round_trip.gd` pins this.
+
+**Not a content change.** No asset was added, removed or re-wired; `forest.tres` shipped all
+eight variants since the 2026-08-16 look pass. This is only about which of them the game asks
+for.
+
+---
+
+### D-55 · The reference look is lighting, not materials — warm, lifted ambient over a lower key
+
+**Decision:** `Main.tscn`'s Environment goes warm and bright in the fill while the key comes down
+to compensate — `ambient_light_color` (0.6, 0.63, 0.68) → **(0.78, 0.74, 0.66)**,
+`ambient_light_energy` 0.6 → **0.95**, `DirectionalLight3D.light_energy` 1.1 → **0.75**. The three
+move together or not at all. Alongside it, the Quaternius Farm Buildings pack's four neutrals get
+a shared albedo override in `project/assets/materials/farm/` (one `.tres` per colour, wired into
+all eight `.fbx.import` files via `_subresources` → `use_external`).
+
+**The reported problem:** the farm buildings' whites "seem very white, like we're lacking some
+greys," and later — after a first albedo pass — "overly grey, greyer than the example images."
+
+**What the measurements found, in order.** Three separate causes, and only the third was the one
+that mattered:
+
+1. **The whites were literally clipping.** A sun-facing face sees `light_energy` plus ambient,
+   which at the old values was a ×1.46–1.51 multiplier, and the Environment carries no
+   `tonemap_mode` — so Godot's default LINEAR tonemapper *clamps* rather than rolling off.
+   Anything above ~0.663 linear albedo pinned to a literal `#ffffff`: the farm pack's `White`
+   (0.8210) and the RTS houses' `Stone_Light` (0.7042) both did, against art.md's stated
+   "no pure black or pure white."
+2. **The pack's neutral range was compressed and pale.** Its darkest neutral is *named*
+   `RoofBlack` and measured `#979797` — a mid grey. Nothing anchored the bottom of the value
+   range, which is what "lacking some greys" describes.
+3. **The scene was lit cold, and that is where the grey actually lived.** Under a fixed ~45°
+   camera most of a building is SHADED, and a shaded face sees ambient only (~×0.38, against
+   ~×1.5 for a lit one). The old ambient was (0.6, 0.63, 0.68) — *blue*-leaning. So shadows
+   landed cold and dark regardless of what any material said.
+
+**Why materials could not fix it, proven by trying twice.** Pass 1 cut the neutrals hard; that
+removed the clipping but crushed the set and made every neutral *exactly* neutral, producing the
+"overly grey" report. Pass 2 lifted them back toward the clip ceiling with a warm lean. Between
+those two passes a shaded `White` moved from `#82858a` to `#868789` — **four levels,
+imperceptible.** The albedo simply cannot reach the shadows.
+
+**The evidence that settled it.** The pack ships its own `Preview.png`, and sampling it shows its
+cream trim, its olive roofs and its grey water tank all share one warm ratio (G/R ≈ 0.78–0.80,
+B/R ≈ 0.44–0.54) *despite having very different albedos* — while the pack's FBX materials measure
+as perfectly neutral. One warm **light** explains all three surfaces at once. The look the
+reference images have is a lighting property, which is exactly why it was unreachable from a
+materials file.
+
+**What the change does, measured.** On `White`: sun-facing `#fbfaf6` → `#fdf8ec` (no clipping
+either way — the ceiling even rises 0.663 → 0.671), shaded `#868789` → **`#bab3a6`**.
+`RoofBlack` shaded `#484847` → `#666258`. Key-to-fill contrast goes from about 4:1 to about 2:1.
+The lit faces are deliberately near-identical; the entire visible change is in the shadows.
+
+**Alternatives considered and rejected:**
+
+- **A tonemapper (Filmic).** Tried and dropped. Godot's filmic is a per-channel curve, so it
+  desaturated the pack's reds from ~0.58 to ~0.42 saturation and *narrowed* the neutral spread
+  (0.759 → 0.562) — working against both art.md's "saturated but gentle" and the added greys that
+  were the whole point. It also became redundant: once the albedos are legal, nothing exceeds 1.0
+  and the clamp is never reached. ACES was never modelled (matrix-based; could not be predicted
+  as reliably as filmic) and remains the untested fallback.
+- **Baking the reference's warmth into each albedo.** Rejected as structurally dishonest: the
+  warmth is one light, not eight materials, and faking it per-material would have to be undone
+  the moment the lighting changed.
+- **Leaving `light_energy` at 1.1 and only raising ambient.** Rejected — it pushes sun-facing
+  faces back into clipping. Dropping the key is what buys the headroom.
+
+**Accepted consequences:**
+
+- **This is scene-wide.** Terrain, animals, houses, trees and the mist all shift warm; the farm
+  buildings were only where the problem was diagnosed. Judged in an A/B and kept.
+- **Flatter shadows.** Halving the key-to-fill ratio is what fixes the coldness, and it also
+  reduces form-reading. If it ever reads too flat, `light_energy` back up toward 0.85–0.90 keeps
+  most of the warmth with more shape.
+- **No headroom.** With linear tonemapping and no clipping margin to spare, raising
+  `light_energy` or importing a pack with brighter albedos puts the hard clip straight back. That
+  is when to revisit ACES.
+- **`background_color` is untouched** at (0.53, 0.72, 0.86) — still a cool blue sky behind a now
+  warmer world. Deliberately left for a separate look at whether it wants to follow.
+
+**Not decided here:** the farm palette's four values are tuning and remain the human's to move —
+they live in one file per colour precisely so retuning is a one-file edit rather than a hunt
+through eight importers.
+
+---
+
+### D-56 · Wild grass ships exactly one visual variant, and that is a behaviour decision
+
+**Decision:** `wild_grass.tres` carries exactly one `model_scenes` entry and keeps carrying one.
+This is a standing constraint, not the current state of an unfinished look pass — a future
+richness pass may not add a second variant here without a fresh human ruling.
+
+**Why this needed a ruling at all, when Meadow and Scrub did not.** The 2026-09-08 grass-family
+rework took Grass to 4 variants and Meadow and Scrub to 3, so that a painted field alternates
+per tile via D-42's stable hash instead of stamping one identical tile. Wild grass is the only
+member of the family left doing the stamping, which makes "give it variants too" the obvious
+next move. It is not, because for this terrain `model_scenes.size()` is wired into behaviour:
+
+- `wild_grass` is one of only TWO style-picker categories (`WorldRoot._model_scenes_for_category()`
+  handles `house`, `forest` and `wild_grass` and nothing else). `meadow` and `scrub` have no style
+  ids at all, which is why their variant counts were a pure look call and needed no ruling.
+- A second entry makes `WorldRoot._supports_mixed()` true, which puts `mixed` at the HEAD of
+  wild grass's style catalog.
+- `get_style_default()` degrades an unchosen category to `valid_ids[0]`, so that head position
+  moves the unchosen default off `"wild_grass"` and onto `"mixed"` — for every existing save,
+  not just new ones. This is precisely the consequence **D-54** accepted for Forest, where it was
+  a fix; here nobody had ruled on it.
+
+**Four assertions pin the single-variant state deliberately, and they stay pinned:**
+`test_hud_hotbar.gd`'s `style_ids_for_category("wild_grass").size() == 1`, two stale-id fallback
+checks in `test_style_defaults.gd`, and one in `test_save_round_trip.gd`. They are not stale
+scaffolding to be re-pointed by whoever next touches this terrain — they are the guard on this
+decision. A change that turns them red is doing the thing this entry forbids.
+
+**What this does NOT decide.** Wild grass's own look is untouched by this and stays open:
+`WildGrass.tscn` was rebuilt through the shared grass-family generator on 2026-09-08 with every
+value carried over unchanged (olive-khaki slab, 3 bare-dirt patches, 32 blades at the 0.065
+baseline, seed 20260816, 4 uneven clusters — the state the human's 2026-08-16 density/height
+feedback settled). **Open Question #29** — does wild grass read as "something to claim" without
+reading as broken — is unaffected and still open. Improving that look is fair game; adding a
+variant to do it is not.
+
+**Consequence accepted:** wild grass will keep tiling more visibly than the other three
+grass-family terrains. The terrain is transitional by design — one free Terraform tap converts
+it to true grass — so the repetition is on land the player is being invited to change, and the
+tag-inert "unclaimed" read matters more than the variety.
+
+---
+
+### D-57 · A style is captured at paint time, not applied to the whole world
+
+**Decision:** A style choice is a **brush setting**, not a world setting. `WorldRoot.paint_tile()`
+and `place_building()` stamp the style default current at that moment onto the tile
+(`WorldGrid._tile_styles`) or the footprint origin (`WorldGrid._building_styles`), and rendering
+reads that captured value. Changing a style default afterwards has **no effect on ground already
+placed** — it governs only what the next paint puts down. This covers buildings as well as
+terrain (human: "houses need fixing too").
+
+**This overturns D-54's premise, and D-54 should be read with that in mind.** D-54 made the
+style default a world-wide look setting resolved at *render* time. Everything it says about
+`mixed` remains true and in force — `mixed` is still a real, storable, selectable style id that
+resolves to no scene so `pick_variant()` runs, it still leads the catalog, and it is still what
+an unchosen terrain means. What does *not* survive is the retroactive half: "the choice applies
+to every tile of that terrain, everywhere."
+
+**How the premise came to be tested.** D-54's behaviour was invisible in practice, because
+nothing repainted when the default changed — the world only caught up when a near/far LOD flip
+happened to rebuild a chunk. That surfaced as a bug report ("change the tree style, zoom out,
+zoom back in, and only THEN does every tree flip"), and the fix made the repaint immediate. Made
+visible, the behaviour was rejected on sight: *"when you switch the type of tree, ALL trees
+switch to that tree."* The morning's `TerrainView.restyle_category()` /
+`TerrainChunkLod.restyle_terrain()` were therefore deleted the same day they were written. **The
+bug they fixed cannot return:** it was "the world does not match the setting", and the setting no
+longer has authority over standing ground.
+
+**Save format, `save_version` 7.** `tile_styles` (row-major, one entry per tile, alongside
+`terrain`) and a per-building `style` key. Both are additive and both have a correct meaning when
+absent, which is why v6 -> v7 is a version stamp and nothing else: no captured style means
+`pick_variant()` for terrain and `model_scenes[0]` for a building — exactly what a pre-v7 world
+already looked like. **Existing saves therefore load unchanged**, and every tile in them stays
+free to vary, which is the outcome to prefer given `mixed` is the default.
+
+**Three invariants worth stating, because all three are easy to break by accident:**
+
+- **`""` and `mixed` are the same answer at the resolver** and must stay that way. `""` is a
+  terrain with no picker, a pre-v7 save, and a mist-revealed tile; `mixed` is a deliberate
+  player choice. Both mean "no single look — hash it".
+- **The save is written z-major; `WorldGrid` stores tiles x-major.** `tile_styles` is built with
+  the same walk as `terrain` rather than from a grid-order helper, because a helper returning
+  internal order would reload a silently transposed world. `test_save_round_trip.gd` asserts an
+  off-diagonal tile specifically, since a diagonal-only check cannot see a transpose.
+- **The style must be captured BEFORE the draw, and the draw happens inside the mutator.** Both
+  `WorldGrid.set_terrain()` and `set_building()` emit `tile_changed` SYNCHRONOUSLY, and that
+  signal is what makes `TerrainView` build the visual — so a style written on the line *after*
+  either call arrives too late and the tile or building is drawn with an empty style, falling
+  through to `pick_variant()` / `model_scenes[0]`.
+  **This was gotten wrong twice, once on each side, and the second one shipped.** The building
+  case was caught immediately by `test_building_footprint_alignment.gd`; the terrain case was
+  not, because every test painted and then forced a tier rebuild, which re-resolved the tile
+  against the by-then-correct stored value — they were measuring the repair, not the paint. It
+  surfaced in play as "it still cycles through different tree styles randomly when I select and
+  place trees".
+  `set_terrain()` therefore TAKES the style as a parameter so the write and the draw are atomic;
+  `place_building()` stamps before placing and restores the previous value if refused;
+  `WorldSnapshot.apply()` orders it the same way.
+  `test_terrain_lod.gd`'s `_check_a_painted_tile_draws_its_style_immediately()` is the guard, and
+  it paints into an ALREADY near-tier chunk with no rebuild afterwards — that absence is the
+  whole point of the check. It also asserts a SECOND tile under a different style, because the
+  first coincidentally passed against the broken code when `pick_variant()` happened to land on
+  the chosen tree for that coordinate.
+
+**Not decided here:** whether re-styling an existing area should be possible at all as a separate
+deliberate gesture. It is not implemented, nobody has asked for it, and D-54's deleted machinery
+is not a head start on it — the useful part of that idea would be a scoped, player-initiated
+action, not a silent global rewrite.
+
+---
+
+### D-58 · "Mixed" is retired; a style is a brush, and new worlds stamp their variety
+
+**Decision:** `WorldRoot.MIXED_STYLE_ID` and `_supports_mixed()` are **deleted**. A style catalog
+is now one id per real scene and nothing else, so an unchosen category falls back to the first
+actual tree. The variety a freshly generated map wants is stamped instead:
+`WorldRoot._randomise_initial_styles()` writes a randomly-chosen **concrete** style id onto every
+tile of every multi-variant picker terrain (today, Forest alone) at world generation. Gated on
+`is_new_world` — the same D-53 gate the terrain mix uses — and derived from `world_seed`, so a
+seed still reproduces its world exactly.
+
+**This fully supersedes D-54.** Nothing of that entry is left standing: D-57 took its retroactive
+premise, and this takes `mixed` itself.
+
+**Why `mixed` had to go rather than be kept alongside paint-time capture.** It made a style a
+MODE. Even after D-57 stored a style per tile, a tile stamped `mixed` still meant "re-roll me at
+render time", so a generated map's forest was an assortment that no choice could govern and that
+nothing recorded — the player picked a tree, the world went on showing something else, and the
+reasonable reading was that the picker was broken: *"now the trees randomly change, like they are
+all set to mixed no matter what I choose."* The human's framing is the design in one line:
+**"what we want to work, is how buildings work — you pick what you want to put down, and what you
+put down stays the same."**
+
+**The variety is not lost, it changed kind.** It used to be a render-time decision recomputed on
+every draw; it is now authored state written once. Consequences, all of them wanted:
+
+- A starting map still looks varied, and now that variety **survives a save**, because
+  `save_version` 7 already stores `tile_styles`. Nothing re-rolls on load.
+- Every forest tile holds a real catalog id, so nothing anywhere depends on an absent style
+  meaning "be random". `""` now means only *a terrain with no style catalog* or *a pre-v7 save*.
+- `TerrainDefinition.pick_variant()` survives as the fallback for exactly those two cases. It is
+  no longer how a new world gets its look.
+
+**Deliberately not reusing `pick_variant()`'s hash to pick the stamped id.** They serve different
+purposes — one is a rendering fallback, the other is authored state — and tying them would mean a
+later tweak to the fallback silently rewrote the stored ids of every map already generated.
+
+**Consequence for existing saves, accepted:** a save that stored `"mixed"` as its forest choice
+takes the ordinary stale-id road and comes back as the first catalog entry. No migration, no
+crash; that player's brush changes, and their already-painted tiles are untouched.
+`test_style_defaults.gd` pins this specific case so it stays a silent degradation rather than
+becoming an error later.
+
+**Unaffected:** `wild_grass` never qualified for `mixed` (one variant), so **D-56 stands**
+unchanged. And the paint-time capture contract of D-57 is untouched — this entry removes a style
+*value*, not the mechanism.
+
+
+---
+
+### D-59 · The occlusion fade is removed; tree occlusion goes back to being an open problem
+
+**Decision:** `OcclusionFader` is deleted — the script, its `Main.tscn` node, and both of its test
+suites. No transparency is applied to anything at runtime any more. A resident standing behind a
+tree is simply hidden.
+
+**Why: it did not work, and the failure was the one its own design anticipated.** The fader faded
+only a forest tile actually blocking a real resident's line of sight to the camera, and it
+carried a hysteresis guard (`FADE_HYSTERESIS_FRAMES`) written specifically against "a wobbling
+detection boundary causing visible flutter". It flickered anyway. The human's report was that the
+trees "flash", and that it "doesn't really work" — a shipped guard that did not hold, not an
+untuned constant, which is why this is a removal rather than a retune.
+
+**This partly supersedes [D-41].** That entry paired the iso camera with the fade as a package.
+The camera half is untouched and current. The fade half is gone.
+
+**THE PROBLEM IS NOW OPEN, AND D-41'S MEASUREMENT STILL STANDS.** D-41 recorded, as a measured
+finding rather than an assumption, that **camera angle alone does not fix tree occlusion** — a
+low-pitch spike was built and it did not solve it. So nothing about removing the fade solves the
+original problem; it accepts it. Anyone reaching for a fix later should start from that
+measurement, not re-run it, and should not assume the answer is "fade again but tuned better" —
+that is precisely what was just removed.
+
+**What was kept, and why it looks vestigial but is not.** `TerrainChunkLod`'s per-tile container
+requirement was originally justified BY the fader's name-based lookup. It outlived it:
+`_tile_containers` is how that file finds, repaints and frees a single tile without rescanning
+the grid, and the reuse-don't-recreate rule is what keeps its documented same-frame node-rename
+race from biting. The `"Slab"` node in all 33 terrain scenes was the fade EXEMPTION (fading the
+ground plane would have opened a hole in the world) and is now a grouping convention with no
+behaviour attached — kept because every terrain scene is built around it and removing it would
+restructure all 33 for nothing. Every one of those scenes carries a stamped note saying so, since
+their headers still describe the exemption mechanism as if it were live.

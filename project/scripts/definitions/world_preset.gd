@@ -8,10 +8,13 @@ extends Resource
 ## **no species field, no unlock field and no gate field on this resource**, and adding one
 ## would be a pillar-level change, not a data change.
 ##
-## v1 ships exactly one preset. Open Question **#10** owns the real list; this file is the shape
-## the answer gets authored into.
+## Open Question **#10** owns the preset list. Its first half (which presets exist) closed
+## 2026-08-24 with three cards; its second half (what terrain each one actually builds) closed
+## 2026-09-07 -> **D-53**, which is `terrain_mix` below. Before D-53 all three presets built the
+## same tag-inert wild grass and the difference between the cards was a label.
 ##
 ## `base_terrain_id` MUST name a terrain that emits no tags — see `test_world_preset.gd`.
+## `terrain_mix` deliberately need not; see its own comment.
 
 const DATA_DIR: String = "res://data/presets"
 
@@ -27,16 +30,37 @@ const DEFAULT_PRESET_ID: String = "meadow_start"
 @export var width: int = WorldGrid.DEFAULT_WIDTH
 @export var depth: int = WorldGrid.DEFAULT_DEPTH
 
-## The terrain every tile starts as. Wild grass: visually grass-family, tag-inert, one free
-## Terraform tap from true grass (gdd.md -> World Structure).
+## The terrain a tile starts as when `terrain_mix` is empty. Wild grass: visually
+## grass-family, tag-inert, one free Terraform tap from true grass (gdd.md -> World Structure).
 ##
-## **NOT YET APPLIED — declared, schema-validated, and read by nobody.** `WorldGrid.build()` fills
-## every tile with `WorldGrid.START_TERRAIN_ID` unconditionally, so changing this value on the
-## shipped preset changes NOTHING about the world a New Game produces. It is harmless today only
-## because the two happen to be the same id. Whoever authors the second preset (Open Question
-## **#10**) must wire it up first — deliberately not done here, because the obvious wiring puts
-## ~1,296 `set_terrain()` calls into the `_ready()` that all 57 suites run through.
+## MUST STAY TAG-INERT (`test_world_preset.gd`). `terrain_mix` below is the field that may
+## name tag-emitting terrain; this one is the floor a preset falls back to, and a preset whose
+## FLOOR emits tags would hand the player capacity on frame one with nothing to fall back to.
 @export var base_terrain_id: String = WorldGrid.START_TERRAIN_ID
+
+## THE STARTING TERRAIN MIX — terrain id -> relative weight. Open Question **#10**'s second
+## half, closed 2026-09-07 (-> D-53).
+##
+## **EMPTY IS THE DEFAULT AND IS LOAD-BEARING**, not an unfinished entry: an empty mix means
+## "`base_terrain_id` everywhere", which is byte-identical to the world every build before this
+## one produced. `barren_start` ships empty deliberately, and so does every preset a test or an
+## editor F6 run resolves to, because `WorldRoot` applies the mix ONLY on a real `"new"` intent
+## — see the comment at its `grid.build()` call for why that gate is not optional.
+##
+## Weights are RELATIVE. The shipped presets are authored as fractions because that reads best
+## in the `.tres`, but nothing requires them to total 1.0; `TerrainScatter.quotas()` normalizes.
+##
+## WHERE the tiles land is `TerrainScatter`'s job, not this file's — clumped by a seeded noise
+## field, so a share arrives as ponds and stands rather than scattered single tiles.
+##
+## **THIS FIELD MAY NAME TAG-EMITTING TERRAIN, AND THAT IS THE POINT.** It is the one place in
+## the project where the inert-land invariant is deliberately not in force: D-53 ruled that a
+## Meadow or Forested start hands the player live habitat from frame one (Rabbit can qualify on
+## the meadow, the water species on the ponds) because "choose a starting land" is meaningless
+## if every choice builds the same tag-inert grass. The invariant still holds everywhere it was
+## written for — revealed mist land (`MistReveal`), `wild_grass` itself
+## (`TerrainDefinition.validate()`), and `base_terrain_id` above.
+@export var terrain_mix: Dictionary = {}
 
 
 static func load_all() -> Array[WorldPreset]:

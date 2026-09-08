@@ -16,7 +16,7 @@
 The roster is the set of species that can inhabit the world — wild animals and
 villagers alike, since **villagers are just another species** (Pillar: Design Pillars
 in [gdd.md](gdd.md)). Animals are pure data: a species is one `AnimalDefinition`
-entry, so the roster is unlimited by architecture. It ships **8 species — floor: 3
+entry, so the roster is unlimited by architecture. It ships **15 species — floor: 3
 (Human, Fox, Rabbit)** for the 7-week deadline. Adding a species is a repeatable
 pipeline, not bespoke code (**Add-an-Animal**, in gdd.md → AI Architecture → Content
 Pipelines).
@@ -29,13 +29,22 @@ One `AnimalDefinition` per species, villagers included (ground truth: [spec.md](
 |---|---|
 | `id` | unique species id |
 | `display_name` | player-facing name |
-| `habitat_needs` | list of required habitat tags (drawn from the shared vocabulary — see gdd.md → Habitat Suitability) |
+| `tiers` | **the live habitat data** (2026-09-04, → D-52) — an ordered `Array[HabitatTier]`. Capacity is the `max` over them. Empty is legal and means "synthesise one tier from the legacy flat fields below" |
+| `emits_tags` | tags a **resident** of this species contributes to the tile it lives on, counted per individual. Only Human (`people`) and Deer (`deer`) emit anything |
+| `habitat_needs` | **legacy, now inert** — `effective_tiers()` prefers `tiers` when non-empty. Retained on all 15 species so a rollback is a one-line edit rather than a re-authoring |
 | `personality` | `Shy` \| `Bold` — a **visibility trait only**, stored as a String so the `.tres` self-documents; never gates whether an animal moves in |
 | `avoids` | animal ids to keep mutual distance from (optional; symmetric). Stored as ids, never resource references — a bad id degrades to inert text rather than a hard load failure, which is behaviorally correct since avoids never gates a move-in |
 | `farm_tolerant` | bool — can live on cultivated land |
-| `scout_radius` | tiles; the radius over which habitat needs are scored (~8–12; Open Question #20) |
-| `capacity_radius` | tiles; the radius over which carrying capacity counts tags (v1 default: equal to `scout_radius`; may diverge per species — Open Question #23) |
-| `tiles_per_individual` | the capacity formula's divisor — no lower clamp, so `capacity = 0` is expressible (the formula itself lives in gdd.md → Habitat Suitability) |
+| `scout_radius` | tiles; the fallback radius a need uses when it does not carry its own (band **2–16**, human ruling 2026-09-04; was ~8–12) |
+| `capacity_radius` | tiles; default `CAPACITY_RADIUS_FOLLOWS_SCOUT` (0) meaning "equal to `scout_radius`", expressed as the relation rather than a copied number |
+| `tiles_per_individual` | **legacy, now inert** — the per-need divisor lives on `HabitatNeed` instead. No lower clamp, so `capacity = 0` is still expressible |
+
+**A tier** (`HabitatTier`) carries `needs`, `limits`, its own `max_individuals`, and its own
+`arrival_group_size`. **A need** (`HabitatNeed`) carries `tag`, its own `radius` (0 = follow
+the species) and its own `tiles_per_individual` (**0 = gate-only**: must be present,
+contributes no population cap — which is what stops a one-tile Stable from capping a herd at
+one horse). **A limit** (`HabitatLimit`) carries `tag`, `radius` and `max_count`: limits
+**gate**, they never scale, so a violated limit zeroes its whole tier.
 | `max_individuals` | hard per-home-site cap — a readability bound, never the normal-play limit |
 | `model_scenes` | `Array[PackedScene]` — one or more interchangeable look variants, stably picked per resident by `pick_variant(index)` (2026-08-26; was the single-scene `model_scene`). `human.tres` ships 5 equal-weight villager looks; every other species ships one. See spec.md → Data Schemas for the stability contract |
 | `fact_text` | fact-card copy |
@@ -43,9 +52,15 @@ One `AnimalDefinition` per species, villagers included (ground truth: [spec.md](
 *(No field holds the model's world scale or footprint: scale lives in the model's own
 wrapper scene, and animals occupy no tiles.)*
 
-**Floor placeholders for the three tuning constants** (proposed from ecology, decided
-by the human — tunable, #6 #20 #23): `capacity_radius` = `scout_radius` (~8–12 tiles);
-`tiles_per_individual` — **Human 1**, Fox 5, Rabbit 4; `max_individuals` ~6. Human's
+**Radius band, ruled 2026-09-04:** per-need radii run **2–16**, replacing the old 8–12.
+The band had to move because this design's own central cases sit outside it — a building
+gate counting close in (the shipped stable gate is 5), and Stag counting at 14. Cost scales as `radius² × roster × tiers`, so the
+ceiling is the performance budget; the widest radius the shipped roster actually uses is
+**14**, and 47 of the 60 need/limit entries use the follow-scout sentinel rather than an
+explicit number.
+
+*Superseded floor placeholders, kept for history* (#6 #20 #23): `capacity_radius` =
+`scout_radius`; `tiles_per_individual` — **Human 1**, Fox 5, Rabbit 4; `max_individuals` ~6. Human's
 divisor is 1 because the House is the scarce need and the floor House is a single
 tile; the 2×2 form supports up to four families, given fields to match.
 
@@ -89,7 +104,7 @@ the Add-an-Animal pipeline whenever a species gains an `avoids` entry.
 
 Another entry in the animal system, no separate people/economy simulation. A villager
 needs `house` plus carrying capacity: cultivated tiles in radius set how many families
-a house supports (floor: the 1×1 House supports one; the 2×2 form lets a broad farm
+a house supports (the 1×1 House supports one; a **Farmhouse** lets a broad farm
 support several — see [buildings.md](buildings.md)). **No hunger, starvation, or
 consumption mechanic** — the requirement is static, read when a family moves in or
 out, never a draining stock (Pillar 1 intact). **Towns are emergent, not a system:**
@@ -103,42 +118,67 @@ where "just another species" would quietly stop being true. That makes Human the
 Add-an-Animal run whose step-5 copy has no easy answer — the fact must be real,
 source-verified, upbeat, and teach a six-year-old something they don't already know
 about their own kind — so it keys off the villager's own habitat needs, `house` and
-`cultivated`, exactly as a fox card keys off cover and quiet (Open Question #31).
+`cultivated`, exactly as a fox card keys off its own needs — `forest`, `open_grass` and
+`water` since D-52 (Open Question #31).
 Human's structural predation risk, by contrast, is already closed by data rather than
 by copy: Human ships with no `avoids` entry, and the predation check runs only when a
 species gains one.
 
 ## Already-Defined Roster
 
-| Animal | Habitat needs | Personality | Avoids | Farm-tolerant | `tiles_per_individual` |
-|---|---|---|---|---|---|
-| **Rabbit** | **open_grass, cover** | **Bold** | **Fox** | **Yes** | **4** |
-| **Fox** | **forest, cover** | **Shy** | **Rabbit** | **No** | **5** |
-| **Human (Villager)** | **house, cultivated** | **Bold** | **—** | **Yes** | **1** |
-| Chicken | cultivated, open_grass | Bold | — | Yes | *proposed* |
-| Duck | water, cover | Bold | — | No | *proposed* |
-| Deer | open_grass, forest | Shy | — | No | 6 |
-| Stag | forest, cover, rocks | Shy | — | No | 8 |
-| Horse | open_grass, cultivated | Bold | — | Yes | 5 |
-| Donkey | cultivated, rocks | Bold | — | Yes | 4 |
-| Cow | cultivated, open_grass | Bold | — | Yes | 5 |
-| Bull | cultivated, open_grass | Bold | — | Yes | 6 |
-| Alpaca | open_grass, cultivated | Bold | — | Yes | 5 |
-| Husky | house, open_grass | Bold | Shiba Inu | Yes | 2 |
-| Shiba Inu | house, open_grass | Shy | Husky | Yes | 2 |
+**Superseded 2026-09-04 (→ D-52).** The table below is the shipped roster after the
+habitat-tiers ruling. It replaces the old flat-needs table, which listed 14 species with a
+single recipe each — and in which **Horse, Cow, Bull and Alpaca all carried the identical
+recipe `open_grass, cultivated`**. Since different species never compete for tiles (D-46),
+one pasture attracted all four at once. That defect is what tiers exist to fix.
 
-*Bold rows are the floor roster; the Avoids column declares game-world relationships
-only.* On the floor the Fox is the hardest habitat, two tags from two terrains (forest +
-rock — see [terrain.md](terrain.md)). The nine cleared-pool rows below Chicken/Duck were
-ruled 2026-08-16 (D-43) — decided design values, now built (`.tres` files landed);
-`scout_radius`/`max_individuals` for each are 8/6 except Stag (12/**3**, a deliberate
-rarity choice) and Deer (10/6) — see D-43 for full per-species rationale. **Alpaca's
-`tiles_per_individual` was revised from D-43's original 3 to 5** by D-45
-(2026-08-17), a live-playtest correction — see D-45 in [decisions.md](../decisions.md).
+**Fifteen species ship, and each has a habitat signature no other species has.** `pig`,
+`sheep` and `pug` were already built but had never been tabled here. **Chicken and Duck do
+not ship** — their assets resolve to a purchase never made — so `coop` currently has no
+consuming species.
 
-Chicken and Duck are designed but unbuilt: their assets resolve to a Synty SIMPLE purchase
-that has not been made, and **whether to make it at all is a velocity-review call** now that
-a free cleared pool exists (below).
+Notation: `tag/divisor` is a scaling need · `tag*` is gate-only (must be present,
+contributes no cap) · `!tag≤N` is an exclusion limit · `@n` is an explicit radius; needs
+without one follow `scout_radius`.
+
+| Animal | Base tier | Group tier | Personality | Avoids |
+|---|---|---|---|---|
+| **Rabbit** | `open_grass/4` `cultivated/4` `!built≤2` | warren: + `flowers/5`, arrive 4 | **Bold** | **Fox** |
+| **Fox** | `forest/4` `open_grass/5` `water/6` `!built≤0` | — | **Shy** | **Rabbit** |
+| **Human (Villager)** | `house*` `cultivated/1` | family: `large_house*` `cultivated/2`, max 4, arrive 3 | **Bold** | — |
+| Deer | `open_grass/5` `forest/4` `!built≤1` | herd: `open_grass`/`forest`/`browse` all re-declared `@14`, `!built≤0`, arrive 3 | Shy | — |
+| Stag | `open_grass/5` `forest/3` **`deer/4`** `!built≤0` `@14` | — (max 2) | Shy | — |
+| Donkey | `browse/5` `rocks/4` `!built≤1` | — | Bold | — |
+| Cow | `barn*` `silo*` `open_grass/5` | + `water/3`, arrive 2 | Bold | — |
+| Bull | `large_barn*` `cultivated/6` | — (max 1) | Bold | — |
+| Horse | `stable*` `open_grass/6` (max 2) | herd: `stable*` `open_grass/4@14` `water/2@12`, max 12, arrive 3 | Bold | — |
+| Alpaca | `barn*` `open_grass/5` `rocks/6` | — | Bold | — |
+| Pig | `cultivated/4` `people/2` | — | Bold | — |
+| Sheep | `open_grass/4` `people/3` | flock: + `mill*`, arrive 4 | Bold | — |
+| Husky | `snow/6` `people/2` | — | Bold | Shiba Inu |
+| Pug | `house*` `people/5` | — | Bold | — |
+| Shiba Inu | `house*` `rocks/4` `people/3` | — | Shy | Husky |
+
+*Bold rows are the floor roster; the Avoids column declares game-world relationships only.*
+
+**Two species emit tags of their own** — the mechanic that makes `people` and `deer`
+ordinary habitat tags rather than a second system. **Human emits `people`**, which is how a
+dog needs an actual person rather than an empty house, and how Pug's "one per five people"
+is expressed as an ordinary divisor. **Deer emits `deer`**, which is what gates Stag: four
+deer support one stag, so a stag cannot appear until a real deer population already lives
+there. Rarity stopped being a hand-tuned `max_individuals` and became something the player
+earns. Resident tags are counted **per individual, not per home tile** — a house holding
+four villagers reads as `people = 4`.
+
+**Every habitat value above is a PROPOSAL awaiting sign-off**, stated in each `.tres`
+header, per the project rule that all tuning values are the human's. Suite-green confirms
+the mechanics work as specified; it does not confirm the numbers are final.
+
+The three categories are structurally checkable, not just labels — `AnimalDefinition.category()`
+tests them in this order: **Person** (needs *or emits* `people`), **Wild** (no building tag
+in any need, and carries a limit), **Domesticated** (a building tag as a gate-only need, no
+`built` limit). Person is tested first because Villager emits `people` without consuming it,
+and because the dogs gate on `house*` and would otherwise read as Domesticated.
 
 The mix varies Bold/Shy, farm-tolerant/wild-only, and 2–3 habitat needs — at least two
 tags each, since one would make single-brushstroke habitat, and the inert-land

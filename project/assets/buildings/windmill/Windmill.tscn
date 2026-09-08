@@ -35,6 +35,37 @@
 ;
 ; FACING: left as authored (identity transform, no rotation) — unconfirmed by a human eye
 ; pass. FLAG FOR HUMAN SIGN-OFF.
+; RECENTRED 2026-09-07 (farm-buildings centring pass), and this is a CORRECTION, not a new
+; judgment call. MEASURED: this wrapper's world-composed mesh AABB centred on (+0.132851, _,
+; -0.000000) in the wrapper's own space rather than on (0, 0) — the mesh is off-centre on its own
+; origin in the source asset. A building is positioned by its TILE CENTRE, so an off-centre mesh
+; sits off-centre on its plot and eats into its margin on one side.
+;
+; The `Model` node's translation below is exactly the negation of that measured centre
+; (-0.132851, 0, +0.000000) — a number read off the mesh, not chosen, so nothing here needs a
+; human ruling. X and Z only: Y is untouched because the model already sits on the ground plane
+; and vertical placement is not what a footprint reserves. THE SCALE FACTOR IS UNCHANGED —
+; recentring moves the mesh, it does not resize it, so every fit decision this file already
+; records still stands exactly as written.
+;
+; WHY THIS SURFACED NOW: `test_building_footprint_alignment.gd` used to place only `barn` and
+; `house`, so eight of the ten buildables were never checked against the tiles they reserve. The
+; 2026-09-07 house cull hit the same defect in three House wrappers, which prompted auditing the
+; rest; that suite now covers EVERY buildable, so this class of defect cannot return unnoticed.
+; CORRECTION TO THIS FILE'S OWN SCALE NOTE, and the one real spill in the catalog:
+; THIS ONE WAS ACTUALLY SPILLING: the mesh ran to x=+0.5675 against a half-tile of 0.500,
+; so 0.0675 of it hung over the neighbouring tile. Centring is what fixes that, and the
+; per-node measurement corrects this file's own header note in passing. The header says the
+; blades "project sideways, well past the base tower" and so "set the x axis" — measured,
+; only half of that is true. `Windmill_Blades` spans x[-0.3018, +0.3018] and is ALREADY
+; centred; the `Windmill` tower body spans x[-0.1364, +0.5675]. The blades set the MINUS
+; side, the TOWER sets the plus side, and it is the tower that overhung. Centring the tower
+; instead (offset -0.2156) would push the blades to -0.5174 and simply move the spill to the
+; other side, so centring the combined envelope is not a preference here — it is the only
+; spill-free placement this rigid mesh allows. NOTE the blades are consequently no longer
+; centred on the tile (they sit at x[-0.4347, +0.1690]); if the header's own open question
+; about an overhang treatment is ever answered the other way, revisit this offset with it.
+;
 [gd_scene load_steps=2 format=3]
 
 [ext_resource type="PackedScene" uid="uid://ctv8uignhlsrq" path="res://assets/buildings/windmill/Windmill.fbx" id="1_model"]
@@ -42,4 +73,4 @@
 [node name="Windmill" type="Node3D"]
 
 [node name="Model" parent="." instance=ExtResource("1_model")]
-transform = Transform3D(0.133582, 0, 0, 0, 0.133582, 0, 0, 0, 0.133582, 0, 0, 0)
+transform = Transform3D(0.133582, 0, 0, 0, 0.133582, 0, 0, 0, 0.133582, -0.132851, 0, 0.000000)

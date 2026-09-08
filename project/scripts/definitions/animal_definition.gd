@@ -25,22 +25,38 @@ const PERSONALITY_SHY: String = "Shy"
 const PERSONALITY_BOLD: String = "Bold"
 const PERSONALITIES: PackedStringArray = [PERSONALITY_SHY, PERSONALITY_BOLD]
 
-## The shared habitat tag vocabulary (gdd.md -> Data Schemas -> Shared patterns).
-## Extending this vocabulary is a system-wide design decision reserved for the human
-## (gdd.md -> Content Pipelines -> Add-a-Terrain, "extra human gate"), so this list is
-## used only to REPORT unknown tags — never to reject or drop them at load.
+## The shared habitat tag vocabulary. Extending it is a system-wide design decision
+## reserved for the human (gdd.md -> Content Pipelines -> Add-a-Terrain, "extra human
+## gate"); this list is used only to REPORT unknown tags, never to reject or drop them.
+##
+## Extended 2026-09-04 by the habitat-tiers ruling. `quiet` was RETIRED: it had no source
+## and no consumer, and a `built` limit does its job strictly better because it is actually
+## enforced and needs no terrain to emit it.
+##
+## `cover` RETIRED 2026-09-07: the habitat-tiers re-spec moved every shipped consumer off
+## it (Fox -> forest/open_grass/water, Rabbit -> open_grass/cultivated), leaving it a
+## source (Rock) with no consumer — the same shape `quiet` had when it was retired above.
 const HABITAT_TAGS: PackedStringArray = [
-	"water",
-	"forest",
-	"open_grass",
-	"quiet",
-	"cover",
-	"flowers",
-	"sand",
-	"rocks",
-	"cultivated",
-	"house",
+	# Terrain-emitted
+	"water", "forest", "open_grass", "browse", "flowers", "sand", "rocks",
+	"cultivated", "snow",
+	# Building-emitted
+	"built", "house", "large_house", "barn", "large_barn", "stable", "coop", "silo", "mill",
+	# Resident-emitted
+	"people", "deer",
 ]
+
+## The subset of HABITAT_TAGS emitted by placeables rather than terrain. Used by
+## `category()` to tell a Domesticated species (which gates on a building) from a Wild one
+## (which does not). `built` is deliberately included: it is emitted by every placeable.
+const BUILDING_TAGS: PackedStringArray = [
+	"built", "house", "large_house", "barn", "large_barn", "stable", "coop", "silo", "mill",
+]
+
+## Category names returned by `category()`.
+const CATEGORY_PERSON: String = "person"
+const CATEGORY_WILD: String = "wild"
+const CATEGORY_DOMESTICATED: String = "domesticated"
 
 ## PLACEHOLDER pending Open Question #5 (tag-source mapping) — human owns this. The tags
 ## that UNTOUCHED revealed land emits.
@@ -52,12 +68,18 @@ const HABITAT_TAGS: PackedStringArray = [
 ## MUST BECOME DERIVED. Once terrain definitions carry an emitted-tags mapping, compute
 ## this from that mapping instead of listing it here. A hardcoded copy silently rots the
 ## first time emission changes — which is the exact failure this invariant exists to
-## prevent.
+## prevent. `TerrainDefinition.derive_bare_tags()` is that derivation (over real data it
+## returns EMPTY — wild_grass.tres emits nothing); this hardcoded set stays a strict
+## SUPERSET of it, so the species-side check below is over-enforced, never under-enforced —
+## the safe direction to err for a load-bearing pillar. Reconciling the two (making this
+## field read the derivation) is Tier 1 row 6's work, not this task's (test_bare_tags_
+## derivation.gd tracks it).
 ##
-## `quiet` is included deliberately while OQ#5 is open: if bare land turns out not to emit
-## it, the invariant is merely stricter than necessary, which is the safe direction to err
-## for a load-bearing pillar.
-const BARE_TAGS: PackedStringArray = ["open_grass", "quiet"]
+## `quiet` RETIRED 2026-09-04 by the habitat-tiers ruling (spec OQ-F): it had no source and
+## no consumer, and a `built` `HabitatLimit` does its job strictly better. Retiring it here
+## too keeps this constant a subset of `HABITAT_TAGS` — every entry in this array must
+## resolve inside the shared vocabulary, and `quiet` no longer does.
+const BARE_TAGS: PackedStringArray = ["open_grass"]
 
 ## Roster-wide id convention: lowercase bare species name, no spaces. `avoids` entries
 ## must match this form exactly so a pair resolves symmetrically (gdd.md:207).
@@ -160,6 +182,28 @@ const DEFAULT_MAX_INDIVIDUALS: int = 6
 ## `min`, and the reason an arbitrarily rich neighbourhood still reads legibly.
 ## TUNING — the human owns the per-species value.
 @export_range(1, 64, 1) var max_individuals: int = DEFAULT_MAX_INDIVIDUALS
+
+## Ordered habitat tiers — the ways this species can qualify, each with its own needs,
+## limits, population cap and arrival group size. `capacity()` takes the MAX over them.
+##
+## EMPTY IS LEGAL AND IS THE MIGRATION PATH: a species with no tiers synthesises one from
+## the flat `habitat_needs` / `tiles_per_individual` / `max_individuals` fields above, so
+## the shipped roster converts one `.tres` at a time and a half-converted roster still runs.
+## Read through `effective_tiers()`; never read this array raw.
+@export var tiers: Array[HabitatTier] = []
+
+## Tags a RESIDENT of this species contributes to the tile it lives on.
+##
+## This is what makes `people` an ordinary habitat tag rather than a second mechanic: a
+## villager emits `people`, so a pug needing `people/5` is counted by the same formula as
+## a fox needing `forest/4`. Deer emit `deer`, which is what gates Stag.
+##
+## Tags are counted PER INDIVIDUAL, not per home tile — a house holding four villagers
+## reads as `people = 4`. See `CapacityEvaluator.tag_counts()`.
+##
+## Every entry here adds an edge to the graph `HabitatGraph.find_cycle()` checks: a cycle
+## would make capacity oscillate forever across the dirty queue.
+@export var emits_tags: Array[String] = []
 
 ## The 3D model scene variant(s) for this species. A species with one look (most of the
 ## current roster) carries a single-entry array; a species with several looks (e.g. the
@@ -294,6 +338,98 @@ func pick_variant(index: int) -> PackedScene:
 	return variant_scene(legacy_variant_index(index))
 
 
+## The tiers capacity actually evaluates — authored tiers, or a single synthesised tier
+## built from the legacy flat fields. **Every capacity read must go through this**, the
+## same contract `effective_capacity_radius()` establishes for the radius sentinel.
+##
+## Returns an EMPTY array when the legacy fields cannot form a valid tier (see
+## `legacy_tier()`), which correctly yields capacity 0.
+func effective_tiers() -> Array[HabitatTier]:
+	if not tiers.is_empty():
+		return tiers
+	var synthesised: HabitatTier = legacy_tier()
+	if synthesised == null:
+		return []
+	return [synthesised]
+
+
+## Which of the three design categories this species' DATA says it belongs to, or `""`
+## when it matches none.
+##
+## PRECEDENCE MATTERS and is not arbitrary. Person is tested first because Villager emits
+## `people` without consuming it, and because Pug and Shiba Inu gate on `house*` and would
+## otherwise read as Domesticated. The categories are not disjoint sets; this is an ordered
+## test.
+func category() -> String:
+	var tiers_to_read: Array[HabitatTier] = effective_tiers()
+	var needs_people: bool = false
+	var has_building_gate: bool = false
+	var has_building_need: bool = false
+	var has_limit: bool = false
+	for tier: HabitatTier in tiers_to_read:
+		for need: HabitatNeed in tier.needs:
+			if need.tag == "people":
+				needs_people = true
+			if BUILDING_TAGS.has(need.tag):
+				has_building_need = true
+				if need.is_gate_only():
+					has_building_gate = true
+		if not tier.limits.is_empty():
+			has_limit = true
+
+	if needs_people or emits_tags.has("people"):
+		return CATEGORY_PERSON
+	if not has_building_need and has_limit:
+		return CATEGORY_WILD
+	if has_building_gate:
+		return CATEGORY_DOMESTICATED
+	return ""
+
+
+## The single tier equivalent to this species' flat legacy fields, or `null` when they
+## cannot form one.
+##
+## RETURNS NULL WHEN `tiles_per_individual < 1`, and that is load-bearing. The pre-tier
+## `capacity_from_counts()` returned 0 for a sub-1 divisor, and `test_capacity_formula.gd`
+## pins it. Under the new schema divisor 0 means `GATE_ONLY` — the OPPOSITE meaning — so
+## synthesising a tier here would silently convert "unsuitable" into "always qualifies".
+##
+## Note the radius: every synthesised need is left at `HabitatNeed.RADIUS_FOLLOWS_SCOUT`
+## (the sentinel), NOT a baked `effective_capacity_radius()`. This is what makes the cache
+## below safe: every consumer of a `HabitatNeed` (`CapacityEvaluator.tag_counts()`,
+## `tier_capacity_from_counts()`, and `capacity_from_counts()`'s rekey) resolves the
+## sentinel by computing its OWN `fallback` fresh as `effective_capacity_radius()` at call
+## time, so a baked concrete radius would go stale the moment `scout_radius` (or
+## `capacity_radius`) is retuned after the cache is first populated — and the sentinel
+## resolves to exactly the value the pre-tier tile walk used, so behaviour is unchanged.
+##
+## Cached: the evaluator calls this inside the dirty-queue drain, so it must not allocate
+## per call. The sentinel radius is what makes that caching safe rather than stale.
+func legacy_tier() -> HabitatTier:
+	if tiles_per_individual < 1:
+		return null
+	if _legacy_tier_cache != null:
+		return _legacy_tier_cache
+	var tier := HabitatTier.new()
+	tier.id = "legacy"
+	tier.max_individuals = max_individuals
+	tier.arrival_group_size = 1
+	var built: Array[HabitatNeed] = []
+	for tag: String in habitat_needs:
+		var need := HabitatNeed.new()
+		need.tag = tag
+		need.radius = HabitatNeed.RADIUS_FOLLOWS_SCOUT
+		need.tiles_per_individual = tiles_per_individual
+		built.append(need)
+	tier.needs = built
+	_legacy_tier_cache = tier
+	return _legacy_tier_cache
+
+
+## Backing store for `legacy_tier()`. Not exported — it is derived, never authored.
+var _legacy_tier_cache: HabitatTier = null
+
+
 ## Non-fatal schema check. Returns human-readable problems; an empty array means clean.
 ## Never raises and never mutates — a bad entry degrades to a reported warning so one
 ## malformed `.tres` cannot take down a load.
@@ -324,18 +460,21 @@ func validate(known_ids: PackedStringArray = PackedStringArray()) -> Array[Strin
 		if not HABITAT_TAGS.has(tag):
 			problems.append("`habitat_needs` tag \"%s\" is not in the shared vocabulary." % tag)
 
-	# The inert-land invariant (gdd.md -> Data Schemas; -> D-22). A species whose needs are
-	# ALL satisfiable by untouched revealed land would settle ground the player never made,
-	# breaking the mist no-reward pillar and the rule that every resident was attracted.
-	if not habitat_needs.is_empty():
+	# THE INERT-LAND INVARIANT (gdd.md -> Data Schemas; -> D-22), now tier-aware.
+	# POSITIVE NEEDS ONLY: a `HabitatLimit` may never be what makes a species non-bare,
+	# because a limit describes what must be ABSENT and absence is what bare land is made of.
+	for tier: HabitatTier in effective_tiers():
+		if tier.needs.is_empty():
+			continue
 		var only_bare: bool = true
-		for tag: String in habitat_needs:
-			if not BARE_TAGS.has(tag):
+		for need: HabitatNeed in tier.needs:
+			if not BARE_TAGS.has(need.tag):
 				only_bare = false
 				break
 		if only_bare:
 			problems.append(
-				"`habitat_needs` %s is satisfiable by untouched revealed land (bare tags: %s) — breaks the inert-land invariant." % [str(habitat_needs), str(BARE_TAGS)]
+				"tier \"%s\" is satisfiable by untouched revealed land (bare tags: %s) — breaks the inert-land invariant."
+				% [tier.id, str(BARE_TAGS)]
 			)
 
 	for entry: String in avoids:
@@ -346,15 +485,21 @@ func validate(known_ids: PackedStringArray = PackedStringArray()) -> Array[Strin
 	if normalized_avoids().has(normalize_id(id)):
 		problems.append("`avoids` lists this species itself.")
 
-	if scout_radius < 8 or scout_radius > 12:
-		problems.append("`scout_radius` %d sits outside the GDD's ~8-12 tile band (gdd.md:354)." % scout_radius)
-
-	# `capacity_radius` is checked against the SAME band as `scout_radius`, because the band is
-	# a statement about how far a neighborhood reaches, not about which system is reading it.
-	# The sentinel is exempt: it resolves to `scout_radius`, which is banded one check above.
-	if capacity_radius != CAPACITY_RADIUS_FOLLOWS_SCOUT and (capacity_radius < 8 or capacity_radius > 12):
-		problems.append("`capacity_radius` %d sits outside the GDD's ~8-12 tile band (gdd.md:354); use %d to follow `scout_radius`." % [
-			capacity_radius, CAPACITY_RADIUS_FOLLOWS_SCOUT
+	# THE RADIUS BAND, replaced 2026-09-04 (spec OQ-B). The old 8-12 band predates
+	# per-need radii and would hard-fail this design's own central cases: a close-in
+	# building gate (the shipped stable gate is 5) and Stag counting at radius 14.
+	# Cost scales as `max_radius^2 * roster * tiers`, so RADIUS_MAX is the performance
+	# budget, not a style preference.
+	if scout_radius < HabitatNeed.RADIUS_MIN or scout_radius > HabitatNeed.RADIUS_MAX:
+		problems.append("`scout_radius` %d is outside the %d-%d band." % [
+			scout_radius, HabitatNeed.RADIUS_MIN, HabitatNeed.RADIUS_MAX
+		])
+	if capacity_radius != CAPACITY_RADIUS_FOLLOWS_SCOUT and (
+		capacity_radius < HabitatNeed.RADIUS_MIN or capacity_radius > HabitatNeed.RADIUS_MAX
+	):
+		problems.append("`capacity_radius` %d is outside the %d-%d band; use %d to follow `scout_radius`." % [
+			capacity_radius, HabitatNeed.RADIUS_MIN, HabitatNeed.RADIUS_MAX,
+			CAPACITY_RADIUS_FOLLOWS_SCOUT
 		])
 	if capacity_radius < 0:
 		problems.append("`capacity_radius` %d is negative." % capacity_radius)
@@ -378,6 +523,40 @@ func validate(known_ids: PackedStringArray = PackedStringArray()) -> Array[Strin
 		for i in range(fact_text_pool.size()):
 			if fact_text_pool[i].begins_with(PLACEHOLDER_MARKER):
 				problems.append("`fact_text_pool[%d]` is still a placeholder — awaiting step-8 sign-off." % i)
+
+	for tier: HabitatTier in effective_tiers():
+		for problem: String in tier.validate():
+			problems.append(problem)
+		for need: HabitatNeed in tier.needs:
+			if not HABITAT_TAGS.has(need.tag):
+				problems.append("tier \"%s\" need tag \"%s\" is not in the shared vocabulary." % [tier.id, need.tag])
+		for limit: HabitatLimit in tier.limits:
+			if not HABITAT_TAGS.has(limit.tag):
+				problems.append("tier \"%s\" limit tag \"%s\" is not in the shared vocabulary." % [tier.id, limit.tag])
+
+	# THE DOUBLE-COUNT GUARD — final review finding #4 (2026-09-04). `CapacityEvaluator.
+	# tag_counts()` reads a resident site's `resident_tags` (copied verbatim from `emits_tags`
+	# at claim time) with a plain `for emitted: String in resident_site.resident_tags:` loop
+	# that adds `population` once PER ENTRY — a duplicate tag in this array is not deduped
+	# anywhere downstream, so a site would silently contribute its population twice (or more)
+	# toward that one tag's count, inflating every OTHER species' need or limit that reads it.
+	var seen_emitted_tags: Dictionary = {}
+	for tag: String in emits_tags:
+		if not HABITAT_TAGS.has(tag):
+			problems.append("`emits_tags` entry \"%s\" is not in the shared vocabulary." % tag)
+		if seen_emitted_tags.has(tag):
+			problems.append(
+				"`emits_tags` lists \"%s\" more than once — a resident site would double-count "
+				% tag + "itself for that tag."
+			)
+		seen_emitted_tags[tag] = true
+
+	# A species matching no category is a WARNING, not an error: it means design intent is
+	# unclear, not that the data is broken.
+	if category() == "":
+		problems.append(
+			"matches none of person/wild/domesticated — design intent unclear (warning, not a defect)."
+		)
 
 	if not known_ids.is_empty():
 		for entry: String in unresolved_avoids(known_ids):

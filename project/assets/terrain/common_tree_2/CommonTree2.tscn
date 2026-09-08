@@ -26,6 +26,32 @@
 ; SLAB WIDENED 0.94 -> 1.0 (2026-08-16, human-reported cross-tile seam gap) — same fix,
 ; same reasoning, same exact-1.0-match approach as CommonTree1.tscn; see that scene's
 ; header for the full explanation. X/Z only, Y (0.2) untouched.
+;
+; SHORTENED TO 2.2 TILE-UNITS (2026-09-08, human ruling: "make Common Tree 2 a little shorter so
+; we get some simple variety"). Scale 0.327 -> 0.28785 against a raw mesh AABB height of
+; 7.642996 (0.28785 x 7.642996 = 2.200), about 12% down from the 2.5 it shared with every other
+; tree in the terrain.
+;
+; THIS DELIBERATELY BREAKS THE "HEIGHT IS A CONTROL VARIABLE" RULE the rest of the Forest
+; scenes state, and the break is the point. Every variant sitting at exactly 2.5 meant the only
+; difference between neighbouring tiles was silhouette and foliage; one shorter tree gives a
+; forest an uneven canopy line for free, with no new asset. CommonTree1 and CommonTree3 are
+; UNCHANGED at 2.5 — the rule still holds for them, and for any variant added later. If a second
+; variant is ever shortened, revisit this comment rather than quietly making 2.2 the new default.
+;
+; 2.2 IS NOT AN ARBITRARY NUMBER: it is the height DeadTree.tscn used for exactly this purpose
+; ("deliberately shorter than the living-canopy trees") before the 2026-09-08 cull unwired it,
+; so the terrain has one short tier rather than two competing ones.
+;
+; STILL A FIRST-PASS PROPOSAL in the sense every scale here is — no GDD number exists for tree
+; height — but the RATIO is now a human ruling, not tech-art's guess.
+;
+; OCCLUSIONFADER REMOVED 2026-09-08 — ANY MENTION OF IT BELOW IS HISTORY. The per-resident
+; transparency fade (D-41 §4) flickered in play and was cut outright; the script, its scene node
+; and its two suites are gone. The "Slab" node stays, because every terrain scene is built
+; around it and removing it would restructure all 33 for no gain — but NO CODE LOOKS THAT NAME
+; UP ANY MORE. It is a grouping convention now, with no behaviour attached, so nothing breaks if
+; a new scene groups differently and nothing is gained by "restoring" the exemption.
 [gd_scene load_steps=8 format=3]
 
 [ext_resource type="PackedScene" uid="uid://0j14s5eg2fo4" path="res://assets/terrain/common_tree_2/CommonTree_2.gltf" id="1_model"]
@@ -76,4 +102,4 @@ mesh = SubResource("PlaneMesh_patch3")
 material_override = SubResource("StandardMaterial3D_patch_moss")
 
 [node name="Model" parent="." instance=ExtResource("1_model")]
-transform = Transform3D(0.327, 0, 0, 0, 0.327, 0, 0, 0, 0.327, 0, 0, 0)
+transform = Transform3D(0.28785, 0, 0, 0, 0.28785, 0, 0, 0, 0.28785, 0, 0, 0)

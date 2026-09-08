@@ -1,0 +1,64 @@
+; Snowfield — NEW TerrainDefinition (habitat-tiers ruling, 2026-09-04 -> task-8-brief.md).
+; VALUES BELOW ARE A PROPOSAL AWAITING HUMAN SIGN-OFF (same posture as every other
+; terrain's cost/scale/model choices in this codebase; see barn.tres for the same
+; convention on the buildings side).
+;
+; WHY IT EXISTS: Husky habitat — the roster's first cold-climate species needs a `snow`
+; tag source, and no terrain emitted it before this task.
+;
+; emitted_tags = ["snow"] is DECIDED by the habitat-tiers ruling (task-8-brief.md's table).
+; No radius, no weight, no threshold — the v1 tag model (-> D-25) applies unchanged.
+;
+; SNOWFIELD MAY BORDER GRASS — human ruling (spec OQ-E): the game is not restricted to
+; real-world climate adjacency. This schema entry deliberately carries no placement
+; restriction, allowed-neighbour list, or climate gate, and none should be added here.
+;
+; cost = 0 — natural terrain, "nature is free" (terrain.md's one pricing rule, unchanged by
+; this task).
+;
+; MODEL_SCENE: Snowfield.tscn (CC0, Ultimate Nature Pack's dedicated snow variant set) —
+; see that scene's own header for full sourcing/scale detail. Single variant; a
+; multi-variant look-pass is out of scope here, same posture Grass/Rock/Wild grass all
+; started with before their own later passes.
+;
+; PLAYER-VISIBLE CONSEQUENCE: Snowfield is a new, free-to-paint entry in the Terraform
+; palette — flagged prominently per this task's brief, not buried in a count bump.
+;
+; No `fact_text` copy yet — Content Pipeline step 5 (Content Writer), explicitly out of
+; scope for this task.
+; SNOWFIELD REBUILT AND GROWN TO 3 VARIANTS (2026-09-08). The human asked for a replacement
+; outright ("I don't actually like what we have for Snowfield anyway") and proposed the approach:
+; "take what we end up using for grass, and just put a blanket of snow on it."
+;
+; THAT WAS NOT ONLY A PREFERENCE, IT WAS THE ONLY ROUTE. The Stylized Nature MegaKit — the pack
+; Grass, Meadow, Wild grass, Scrub, Rock and Forest all standardised on — ships ZERO snow
+; content: no snow mesh and no snow texture, verified across all 68 meshes and all 20 textures of
+; the free Standard set. A snow terrain therefore cannot be SOURCED from it; it has to be MADE
+; from what the family already uses.
+;
+; Both meshes are already in the repo, so this pass adds NO imports and NO attribution entries:
+; Grass_Common_Short as buried snow-white blades, and Grass_Wispy_Short as dead gold tufts poking
+; through. See Snowfield.tscn's header for the two-layer height relationship that carries the
+; effect, and for why the dead tufts deliberately carry no `uv1_offset`.
+;
+; RETIRED FROM THIS TERRAIN: BirchTree_Snow_3 and Bush_Snow_1 (Ultimate Nature Pack) — the last
+; snow assets from the old pack. Unwired, not deleted.
+;
+; NO PICKER CONSEQUENCE: `snowfield` is not a style-picker category, so the 1 -> 3 growth is pure
+; per-tile variety via pick_variant(). `emitted_tags` is unchanged and still `snow` alone — read
+; from THIS file, never from which variant a tile draws.
+[gd_resource type="Resource" script_class="TerrainDefinition" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/terrain_definition.gd" id="1_schema"]
+[ext_resource type="PackedScene" path="res://assets/terrain/snowfield/Snowfield.tscn" id="2_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/snowfield_drifts/SnowfieldDrifts.tscn" id="3_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/snowfield_tufts/SnowfieldTufts.tscn" id="4_model"]
+
+[resource]
+script = ExtResource("1_schema")
+id = "snowfield"
+display_name = "Snowfield"
+emitted_tags = Array[String](["snow"])
+cost = 0
+model_scenes = Array[PackedScene]([ExtResource("2_model"), ExtResource("3_model"), ExtResource("4_model")])
+harvestable = null

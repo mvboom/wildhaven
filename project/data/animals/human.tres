@@ -202,7 +202,32 @@
 ; while the Smooth set does have SmoothMaleCasual, so the two sets are 6-vs-7 rather than a
 ; clean pairing. That is a property of the source pack as imported, not of this wiring, but it
 ; means the in-engine comparison is not perfectly like-for-like. FLAG FOR HUMAN SIGN-OFF.
-[gd_resource type="Resource" script_class="AnimalDefinition" load_steps=20 format=3]
+; TIERS — RE-SPEC 2026-09-04 (habitat tiers). CONVERTED LAST, deliberately, alongside
+; deer.tres — both are the roster's two `emits_tags` carriers, so converting them last
+; means `HabitatGraph.find_cycle()` first runs green against the fullest possible graph.
+;
+; PROPOSAL, NOT A DECISION. Every divisor and cap below is this design's own first-pass
+; proposal awaiting human sign-off, per the project rule that all tuning values are the
+; human's. Source: docs/superpowers/specs/2026-09-04-habitat-tiers-design.md § 9, § 12
+; (OQ-D, ruled 2026-09-04).
+;
+; `emits_tags = ["people"]`: a villager is a RESIDENT that contributes the `people` tag to
+; its neighbourhood, which is what lets a dog need an actual person rather than an empty
+; house. The Villager itself does NOT need `people` — it EMITS it without consuming it,
+; which is why `category()`'s Person test reads "needs OR emits" and is checked first,
+; before Domesticated (the Villager's own `house*` gate would otherwise also match that
+; signature).
+;
+; TWO TIERS: "single" (`house*` `cultivated/1`, max 1 — roster.md's decided divisor: the
+; House is the scarce need and the floor House is a single tile) and "family" (OQ-D's
+; ruling — `large_house*` `cultivated/2`, max 4, arriving in groups of 3). INTERPRETATION
+; FLAG (OQ-D): "cultivated at >=2 tiles per person" is read as the DIVISOR (2 tiles per
+; villager), not as a flat 2-tile minimum — say so if the other reading was meant.
+;
+; The legacy flat fields (habitat_needs / tiles_per_individual / max_individuals) are LEFT
+; IN PLACE and are now inert: `effective_tiers()` prefers `tiers` when non-empty. They are
+; retained so a rollback is a one-line edit rather than a re-authoring.
+[gd_resource type="Resource" script_class="AnimalDefinition" load_steps=27 format=3]
 
 [ext_resource type="Script" path="res://scripts/definitions/animal_definition.gd" id="1_schema"]
 [ext_resource type="PackedScene" path="res://assets/animals/human_adventurer/Adventurer.tscn" id="2_model"]
@@ -223,6 +248,48 @@
 [ext_resource type="PackedScene" path="res://assets/animals/human_smooth_female_casual/SmoothFemaleCasual.tscn" id="17_model"]
 [ext_resource type="PackedScene" path="res://assets/animals/human_smooth_female_dress/SmoothFemaleDress.tscn" id="18_model"]
 [ext_resource type="PackedScene" path="res://assets/animals/human_smooth_female_tanktop/SmoothFemaleTankTop.tscn" id="19_model"]
+[ext_resource type="Script" path="res://scripts/definitions/habitat_need.gd" id="20_need"]
+[ext_resource type="Script" path="res://scripts/definitions/habitat_tier.gd" id="21_tier"]
+
+[sub_resource type="Resource" id="need_single_house"]
+script = ExtResource("20_need")
+tag = "house"
+radius = 0
+tiles_per_individual = 0
+
+[sub_resource type="Resource" id="need_single_cultivated"]
+script = ExtResource("20_need")
+tag = "cultivated"
+radius = 0
+tiles_per_individual = 1
+
+[sub_resource type="Resource" id="tier_single"]
+script = ExtResource("21_tier")
+id = "single"
+needs = Array[Resource]([SubResource("need_single_house"), SubResource("need_single_cultivated")])
+limits = Array[Resource]([])
+max_individuals = 1
+arrival_group_size = 1
+
+[sub_resource type="Resource" id="need_family_large_house"]
+script = ExtResource("20_need")
+tag = "large_house"
+radius = 0
+tiles_per_individual = 0
+
+[sub_resource type="Resource" id="need_family_cultivated"]
+script = ExtResource("20_need")
+tag = "cultivated"
+radius = 0
+tiles_per_individual = 2
+
+[sub_resource type="Resource" id="tier_family"]
+script = ExtResource("21_tier")
+id = "family"
+needs = Array[Resource]([SubResource("need_family_large_house"), SubResource("need_family_cultivated")])
+limits = Array[Resource]([])
+max_individuals = 4
+arrival_group_size = 3
 
 [resource]
 script = ExtResource("1_schema")
@@ -236,6 +303,8 @@ scout_radius = 8
 capacity_radius = 0
 tiles_per_individual = 1
 max_individuals = 6
+tiers = Array[Resource]([SubResource("tier_single"), SubResource("tier_family")])
+emits_tags = Array[String](["people"])
 model_scenes = Array[PackedScene]([ExtResource("2_model"), ExtResource("3_model"), ExtResource("4_model"), ExtResource("5_model"), ExtResource("6_model"), ExtResource("7_model"), ExtResource("8_model"), ExtResource("9_model"), ExtResource("10_model"), ExtResource("11_model"), ExtResource("12_model"), ExtResource("13_model"), ExtResource("14_model"), ExtResource("15_model"), ExtResource("16_model"), ExtResource("17_model"), ExtResource("18_model"), ExtResource("19_model")])
 fact_text_pool = Array[String](["Long ago, people moved from place to place instead of staying in one home. About 10,000 to 12,000 years ago they learned to grow their own food, and little by little they settled down in one place."])
 news_reports = Array[String](["Word has it a family is looking for a new home — somewhere with room for a house and good soil close by to grow their own food…", "A family has been spotted looking over an empty patch of ground, picturing a house there and a field beside it.", "Rumor down the lane: a family wants a snug house with a little farmland close by, room enough to grow what they need…", "Smoke's been curling from the chimney most evenings this week.", "Someone's been out working the field again this morning, whistling while they go.", "A family brought a basket of vegetables in from the field today.", "There's a new fence post out by the field that wasn't there last week.", "More families have been moving in around here, little by little.", "Whoever visited today says every family seems to have a look all its own."])

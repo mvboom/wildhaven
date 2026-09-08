@@ -31,7 +31,7 @@ extends Control
 ## entries on disk — not the expected state today (seven sources currently ship), but a
 ## screen that silently renders nothing on an empty list would look broken rather than
 ## "nothing is owed right now."
-const EMPTY_STATE_TEXT: String = "[COPY] Nothing to credit yet."
+const EMPTY_STATE_TEXT: String = "Nothing to credit yet."
 
 @onready var _entry_list: VBoxContainer = %EntryList
 @onready var _empty_label: Label = %EmptyLabel

@@ -17,7 +17,7 @@ license_file = "res://assets/licenses/Quaternius_UltimateAnimatedAnimals_License
 attribution_required = false
 required_notice = ""
 conditions = ""
-assets_used = PackedStringArray("WoodLog_Moss", "Rock_Moss_3", "Bush_1", "Rock_1", "BirchTree_1", "BushBerries_1", "Rock_Moss_2", "Rock_Moss_5", "Lilypad", "Cactus_1", "PalmTree_1")
+assets_used = PackedStringArray("WoodLog_Moss", "Rock_Moss_3", "Bush_1", "Rock_1", "BirchTree_1", "BushBerries_1", "Rock_Moss_2", "Rock_Moss_5", "Lilypad", "Cactus_1", "PalmTree_1", "BirchTree_Snow_3", "Bush_Snow_1")
 per_file_licensing = false
 notes = "CC0 — crediting is courtesy, not compliance. Pack ships its own License.txt at
 `source-content/assets/Ultimate Nature Pack - Jun 2019.../License.txt`, byte-identical boilerplate
@@ -86,6 +86,15 @@ wire in later. The 3rd variant this pass tried, a Coconut prop sourced from the 
 Crops Pack, was rejected outright ("does not look good at all") and fully deleted rather
 than deferred — see quaternius_nature_crops_pack.tres for that one's removal note.
 
-The pack ships many more trees/rocks/grass pieces beyond these eleven; append to
+Seventh use (2026-09-04, habitat-tiers Task 8): BirchTree_Snow_3.fbx and Bush_Snow_1.fbx
+newly imported as res://assets/terrain/birch_tree_snow/BirchTree_Snow_3.fbx and
+res://assets/terrain/bush_snow/Bush_Snow_1.fbx, composed into the new Snowfield terrain's
+sole model_scenes entry (project/assets/terrain/snowfield/Snowfield.tscn — see that
+scene's own header for sourcing/scale detail; project/data/terrain/snowfield.tres emits
+the new `snow` habitat tag). Both pieces are the pack's dedicated snow-season variants of
+trees/bushes already used elsewhere in this file (BirchTree_1, Bush_1) — a deliberate
+different-season pick, not a duplicate import of the same file.
+
+The pack ships many more trees/rocks/grass pieces beyond these thirteen; append to
 assets_used as each is imported, do NOT create a second entry for this pack (same
 convention as quaternius_ultimate_animated_animals.tres)."

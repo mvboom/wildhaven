@@ -30,7 +30,9 @@ extends QATestCase
 ##
 ## WHY A SYNTHETIC FIXTURE. Sections 1-5 drive a real `WorldGrid`, `HomeSiteRegistry`,
 ## `HabitatSimulation`, `SettlementWindow` and `GentleDisplacement` against a one-species
-## roster whose only need is `cover` at 4 tiles per individual, so the numbers here do not move
+## roster whose only need is `rocks` at 4 tiles per individual (`cover` RETIRED
+## 2026-09-07, habitat-tiers re-spec — re-pointed to `rocks`, which the `rock` terrain
+## painted below still emits), so the numbers here do not move
 ## when the shipped roster is retuned. The three public edit entry points that feed this
 ## machinery are exercised on the real `WorldRoot` in `test_gentle_displacement.gd`.
 ##
@@ -144,14 +146,14 @@ func _check_arithmetic_is_immediate_and_only_the_consequence_waits() -> void:
 	var species: AnimalDefinition = f["species"]
 	var home := Vector2i(10, 10)
 
-	_lay_cover(f, home, 8)                                   # 8 cover tiles / 4 -> capacity 2
+	_lay_rocks(f, home, 8)                                   # 8 rock tiles / 4 -> capacity 2
 	var site: HomeSite = _settle(f, home, 2)                  # ...and two residents in it
 
 	check_eq(sim.capacity_at(home, species), 2, "the settled neighbourhood supports 2")
 	check_eq(site.population(), 2, "...and 2 live there — capacity == population, nothing armed")
 	check(displacement.is_idle(), "no gesture is pending before the edit")
 
-	# THE EDIT. One cover tile taken away: 7 / 4 -> capacity 1, which is below population.
+	# THE EDIT. One rock tile taken away: 7 / 4 -> capacity 1, which is below population.
 	var before_evaluations: int = sim.evaluations_run
 	_edit(f, Vector2i(17, 10), "grass")
 
@@ -200,7 +202,7 @@ func _check_every_edit_restarts_the_window_and_restarts_are_uncapped() -> void:
 	var window: SettlementWindow = displacement.window()
 	var home := Vector2i(10, 10)
 
-	_lay_cover(f, home, 8)
+	_lay_rocks(f, home, 8)
 	var site: HomeSite = _settle(f, home, 2)
 	var key: String = GentleDisplacement.neighbourhood_key(site)
 
@@ -274,7 +276,7 @@ func _check_reverting_inside_the_window_means_it_never_happened() -> void:
 	displacement.resident_relocated.connect(
 		func(sid: String, _f: Vector2i, _t: Vector2i, _p: Vector3) -> void: relocations.append(sid))
 
-	_lay_cover(f, home, 8)
+	_lay_rocks(f, home, 8)
 	var site: HomeSite = _settle(f, home, 2)
 
 	# FREE TERRAIN, stated as data rather than assumed: both ends of this edit cost nothing.
@@ -328,7 +330,7 @@ func _check_the_negative_control_for_the_revert() -> void:
 	var warnings: Array[Dictionary] = []
 	displacement.displacement_warned.connect(func(w: Dictionary) -> void: warnings.append(w))
 
-	_lay_cover(f, home, 8)
+	_lay_rocks(f, home, 8)
 	var site: HomeSite = _settle(f, home, 2)
 	_edit(f, edited, "grass")
 	displacement.tick(6.0)
@@ -355,7 +357,7 @@ func _check_warnings_attach_to_the_gesture_never_to_a_tile() -> void:
 	var warnings: Array[Dictionary] = []
 	displacement.displacement_warned.connect(func(w: Dictionary) -> void: warnings.append(w))
 
-	_lay_cover(f, home, 12)                                   # 12 / 4 -> capacity 3
+	_lay_rocks(f, home, 12)                                   # 12 / 4 -> capacity 3
 	var site: HomeSite = _settle(f, home, 2)
 
 	# A SIX-YEAR-OLD'S BURST: five taps in the same neighbourhood, in quick succession.
@@ -387,7 +389,7 @@ func _check_warnings_attach_to_the_gesture_never_to_a_tile() -> void:
 	# and this time the neighbourhood is stripped to capacity 0, which gdd.md names explicitly
 	# as an ordinary value of the trigger ("including to 0").
 	var already_gone: int = site.population()
-	_lay_cover(f, home, 12)
+	_lay_rocks(f, home, 12)
 	for i in 7:
 		_edit(f, Vector2i(10 + i, 10), "grass")
 	displacement.tick(PAST_WINDOW)
@@ -418,7 +420,7 @@ func _check_arrivals_sit_outside_the_window() -> void:
 	var species: AnimalDefinition = f["species"]
 	var home := Vector2i(10, 10)
 
-	_lay_cover(f, home, 4)                                    # 4 / 4 -> capacity 1
+	_lay_rocks(f, home, 4)                                    # 4 / 4 -> capacity 1
 	var site: HomeSite = _settle(f, home, 1)                  # ...full
 	check_eq(sim.capacity_at(home, species), 1, "the neighbourhood supports 1 and 1 lives there")
 
@@ -515,7 +517,7 @@ func _check_an_idle_world_opens_no_window_at_all() -> void:
 	check_eq(displacement.warnings_raised, 0, "...and warned nobody")
 
 	# NON-VACUITY: put one resident on the map and the very next edit does open a window.
-	_lay_cover(f, Vector2i(10, 10), 8)
+	_lay_rocks(f, Vector2i(10, 10), 8)
 	_settle(f, Vector2i(10, 10), 1)
 	_edit(f, Vector2i(17, 10), "grass")
 	check_eq(displacement.pending_gestures(), 1,
@@ -545,10 +547,10 @@ func _check_multiple_simultaneous_settlements_are_bounded_per_tick() -> void:
 	# Three independent, well-separated neighbourhoods (scout_radius 8, so >15 tiles apart is
 	# safely independent) all armed in the same instant, before any tick runs.
 	for home: Vector2i in homes:
-		_lay_cover(f, home, 8)
+		_lay_rocks(f, home, 8)
 		_settle(f, home, 2)
 	for home: Vector2i in homes:
-		_edit(f, home + Vector2i(7, 0), "grass")  # 8 -> 7 cover: capacity 2 -> 1, below population
+		_edit(f, home + Vector2i(7, 0), "grass")  # 8 -> 7 rock: capacity 2 -> 1, below population
 	check_eq(displacement.pending_gestures(), 3, "setup: all three neighbourhoods armed a gesture")
 
 	displacement.tick(PAST_WINDOW)  # all three gestures' windows expire on this same call
@@ -583,7 +585,7 @@ func _check_multiple_simultaneous_settlements_are_bounded_per_tick() -> void:
 # --- fixture ------------------------------------------------------------------------------------
 
 ## A world with no scene: real grid, registry, simulation, removal ledger and displacement node,
-## against a one-species SYNTHETIC roster (`cover`, 4 tiles per individual, radius 8) so nothing
+## against a one-species SYNTHETIC roster (`rocks`, 4 tiles per individual, radius 8) so nothing
 ## here moves when the shipped roster is retuned.
 func _fixture() -> Dictionary:
 	var grid := WorldGrid.new()
@@ -592,7 +594,7 @@ func _fixture() -> Dictionary:
 	var species := AnimalDefinition.new()
 	species.id = "critter"
 	species.display_name = "Critter"
-	species.habitat_needs = ["cover"] as Array[String]
+	species.habitat_needs = ["rocks"] as Array[String]
 	species.tiles_per_individual = 4
 	species.scout_radius = 8
 	species.model_scenes = [load("res://assets/placeholder/grass/Grass.tscn") as PackedScene]
@@ -633,8 +635,10 @@ func _edit(f: Dictionary, tile: Vector2i, terrain_id: String) -> void:
 	(f["displacement"] as GentleDisplacement).on_edit(tile)
 
 
-## Lays `count` `cover` tiles in a row starting at the home tile, all inside radius 8.
-func _lay_cover(f: Dictionary, home: Vector2i, count: int) -> void:
+## Lays `count` `rock` tiles in a row starting at the home tile, all inside radius 8.
+## Named `_lay_rocks` since `cover` was RETIRED 2026-09-07 — this fixture's species used to
+## need `cover`, satisfied by the same painted `rock` terrain now read as `rocks`.
+func _lay_rocks(f: Dictionary, home: Vector2i, count: int) -> void:
 	var grid: WorldGrid = f["grid"]
 	for i in count:
 		grid.set_terrain(home.x + i, home.y, "rock")

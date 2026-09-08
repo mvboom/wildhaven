@@ -204,7 +204,7 @@ func _on_delete_pressed() -> void:
 		return
 	var entry: Dictionary = _selected_entry()
 	if not entry.is_empty():
-		_delete_confirm.dialog_text = "[COPY] This can't be undone. (%s)" % entry["name"]
+		_delete_confirm.dialog_text = "This can't be undone. (%s)" % entry["name"]
 	_delete_confirm.popup_centered()
 
 

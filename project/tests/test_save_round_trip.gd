@@ -42,9 +42,10 @@ const WORLD_PATH: String = "res://scenes/Main.tscn"
 const _REAL_SAVE_DIR: String = "user://saves"
 const _TEST_SAVE_DIR: String = "user://test_saves_round_trip"
 
-## The rabbit's habitat: a row of grass (`open_grass`) beside a row of rock (`cover`). Both
-## needs must be present or capacity is 0 forever — `wild_grass`, the world's default tile, is
-## deliberately tag-inert.
+## The rabbit's habitat: a row of grass (`open_grass`) beside a row of cultivated field
+## (`cultivated`) — RE-POINTED 2026-09-04, habitat-tiers ruling: rabbit.tres's base tier needs
+## `open_grass/4` + `cultivated/4`, not `cover`. Both needs must be present or capacity is 0
+## forever — `wild_grass`, the world's default tile, is deliberately tag-inert.
 const GRASS_Z: int = 4
 const GRASS_X_FROM: int = 4
 const GRASS_X_TO: int = 10
@@ -179,6 +180,8 @@ func _process(_delta: float) -> bool:
 	_check_a_world_with_no_residents_arms_no_gesture_on_load()
 	_check_style_defaults_survive_a_reload()
 	_check_an_old_save_with_no_style_defaults_falls_back_cleanly()
+	_check_captured_tile_styles_survive_a_reload()
+	_check_the_migration_chain_stamps_the_current_version()
 	_report_the_measurements()
 
 	_teardown()
@@ -231,8 +234,13 @@ func _check_the_session_hand_off() -> void:
 
 # --- The real causal path -------------------------------------------------------------------
 
-## Paint rock beside grass until a rabbit really moves in, then place a House and let a villager
-## in beside a cultivated field — the two arrivals the vertical slice proved.
+## Paint cultivated field beside grass until a rabbit really moves in, then place a House and
+## let a villager in beside a cultivated field — the two arrivals the vertical slice proved.
+##
+## RE-POINTED 2026-09-04 (habitat-tiers ruling): `capacity_at()` now reads
+## `AnimalDefinition.effective_tiers()`, which prefers the real `tiers` rabbit.tres now
+## carries — base tier needs `open_grass/4` + `cultivated/4`, not `cover`. The `ROCK_*` row
+## (names unchanged so the diff stays small) is painted `cultivated_field`, not `rock`.
 func _build_a_world_through_the_real_causal_path() -> void:
 	# Driven by hand from here on, so nothing depends on how many real frames elapse.
 	_source.wood.set_process(false)
@@ -243,7 +251,7 @@ func _build_a_world_through_the_real_causal_path() -> void:
 	for x in range(GRASS_X_FROM, GRASS_X_TO):
 		_source.paint_tile(x, GRASS_Z, "grass")
 	for x in range(ROCK_X_FROM, ROCK_X_TO):
-		_source.paint_tile(x, ROCK_Z, "rock")
+		_source.paint_tile(x, ROCK_Z, "cultivated_field")
 
 	# A House builds on grass only (buildings.md), and the world's default tile is `wild_grass`.
 	# Terraforming first is what a player does; without it `place_building` declines silently and
@@ -478,10 +486,12 @@ func _check_a_pending_arrival_survives_a_reload_with_no_home_site_yet() -> void:
 	root.add_child(unsettled)
 	_take_off_process(unsettled)
 
+	# RE-POINTED 2026-09-04 (habitat-tiers ruling): rabbit.tres's base tier needs `open_grass/4`
+	# + `cultivated/4`, not `cover` — the `ROCK_*` row is painted `cultivated_field`, not `rock`.
 	for x in range(GRASS_X_FROM, GRASS_X_TO):
 		unsettled.paint_tile(x, GRASS_Z, "grass")
 	for x in range(ROCK_X_FROM, ROCK_X_TO):
-		unsettled.paint_tile(x, ROCK_Z, "rock")
+		unsettled.paint_tile(x, ROCK_Z, "cultivated_field")
 
 	# Enough ticks to DRAIN the dirty queue (4 evaluations/frame) but nowhere near enough
 	# simulated time to spend the 20-60 s delay — which is exactly the state a child quits in.
@@ -1405,10 +1415,10 @@ func _reload_through_the_real_load_path(world: WorldRoot, label: String) -> Worl
 func _check_style_defaults_survive_a_reload() -> void:
 	# A non-default choice, or this check would pass even if the restore always fell back to the
 	# category's first catalog entry.
-	_source.set_style_default("forest", "birch_tree")
+	_source.set_style_default("forest", "twisted_tree_1")
 	var captured: Dictionary = WorldSnapshot.capture(_source, "Styled", "meadow_start", 4242)
 	check_eq(
-		(captured["style_defaults"] as Dictionary).get("forest", ""), "birch_tree",
+		(captured["style_defaults"] as Dictionary).get("forest", ""), "twisted_tree_1",
 		"setup: the non-default forest choice is captured"
 	)
 
@@ -1422,7 +1432,7 @@ func _check_style_defaults_survive_a_reload() -> void:
 	_take_off_process(reloaded)
 
 	check_eq(
-		reloaded.get_style_default("forest"), "birch_tree",
+		reloaded.get_style_default("forest"), "twisted_tree_1",
 		"the chosen forest default survives the real load path, not just the catalog's first entry"
 	)
 	# ...and a category never touched still falls through to its own first catalog entry, exactly
@@ -1460,11 +1470,22 @@ func _check_an_old_save_with_no_style_defaults_falls_back_cleanly() -> void:
 	# THE FALLBACK, one per picker "flavor" (a derived filename-slug and a real placeable id —
 	# see `WorldRoot.get_style_default()`'s own doc comment), each category's FIRST catalog entry,
 	# not a crash and not an invented choice.
+	# RE-POINTED 2026-09-08 (forest-variety fix) — was "common_tree_1". Same fallback rule,
+	# reading a different answer because the catalog now leads with `mixed` for a multi-variant
+	# terrain category. A pre-fix save that stored no forest choice therefore loads as *mixed*,
+	# which is the variety it visually had no way to express before.
 	check_eq(world.get_style_default("forest"), "common_tree_1",
-		"...falling back to the forest category's first catalog entry")
+		"...falling back to the forest category's first catalog entry (D-58 retired `mixed`)")
 	check_eq(world.get_style_default("wild_grass"), "wild_grass",
 		"...and the wild_grass category's first catalog entry")
-	check_eq(world.get_style_default("house"), "house",
+	# RE-POINTED 2026-09-07 (house cull) — was "house". This is the same fallback, reading a
+	# different answer because the catalog changed underneath it: the House's `model_scenes[0]`
+	# used to be `house/House.tscn` (deriving the id "house") and is now
+	# `house_large/HouseLarge.tscn`. Worth noting that the OLD expected value made this assertion
+	# read as though it were checking the category name; it never was, and the new value makes
+	# that plain. A v3 save predates `style_defaults` entirely, so this is the no-key path — the
+	# stale-id path a post-cull load of a v4+ save takes is covered in `test_style_defaults.gd`.
+	check_eq(world.get_style_default("house"), "house_large",
 		"...and the house category's first catalog entry")
 	check_eq(world.get_style_default("farm_building"), "barn",
 		"...and the farm_building category's first catalog entry, the other id \"flavor\"")
@@ -1528,3 +1549,63 @@ func _clean_the_scratch_directory() -> void:
 		return
 	for filename: String in dir.get_files():
 		dir.remove(filename)
+
+
+# --- v7: captured per-tile / per-building styles survive a reload ----------------------------
+#
+# D-57 moved style from a world-wide setting read at render time to state CAPTURED AT PAINT TIME
+# and stored per tile. That makes it save state for the first time, so it has to round-trip: a
+# world reloaded must show the styles its ground was painted with, not whatever the picker
+# happens to be set to afterwards.
+func _check_captured_tile_styles_survive_a_reload() -> void:
+	var packed: PackedScene = load(WORLD_PATH) as PackedScene
+	GameSession.clear()
+	var source: WorldRoot = packed.instantiate() as WorldRoot
+	root.add_child(source)
+	_take_off_process(source)
+	# Two tiles painted under two DIFFERENT styles, so the assertion cannot pass by everything
+	# happening to share one value.
+	source.set_style_default("forest", "twisted_tree_1")
+	check(source.paint_tile(4, 4, "forest"), "setup: a tile paints under `birch_tree`")
+	source.set_style_default("forest", "common_tree_1")
+	check(source.paint_tile(6, 6, "forest"), "setup: a second tile paints under `common_tree_1`")
+	# ...and the picker left somewhere else entirely, so a reload that read the DEFAULT instead
+	# of the captured value would come back wrong rather than coincidentally right.
+	source.set_style_default("forest", "common_tree_3")
+
+	check_eq(source.grid.get_tile_style(4, 4), "twisted_tree_1",
+		"the tile captured the style current when it was PAINTED, not the one set afterwards")
+	check_eq(source.grid.get_tile_style(6, 6), "common_tree_1", "...and so did the second tile")
+
+	var reloaded: WorldRoot = _reload_through_the_real_load_path(source, "Captured styles")
+	if not check(reloaded != null, "the world reloads"):
+		return
+	check_eq(reloaded.grid.get_tile_style(4, 4), "twisted_tree_1",
+		"a captured tile style survives the round trip")
+	check_eq(reloaded.grid.get_tile_style(6, 6), "common_tree_1",
+		"...independently of its neighbour — the array is not collapsed to one value")
+	# THE TRANSPOSE GUARD. The grid stores tiles x-major internally while the save is written
+	# z-major; capturing through a grid-order helper would reload a mirrored world, and with two
+	# tiles on the diagonal that mistake is invisible. (4,4) and (6,6) are both on the diagonal,
+	# so this third tile is deliberately OFF it.
+	check_eq(reloaded.grid.get_tile_style(9, 3), source.grid.get_tile_style(9, 3),
+		"an off-diagonal tile keeps its own style — proves the save is not transposed")
+
+
+## Every migration step stamps `save_version` and they run in ASCENDING order, each overwriting
+## the last — so a step added out of order silently DOWNGRADES the stamp of every older file
+## that passes through it. That is a real bug this suite caught during the v7 work (the v7 step
+## was first written above `if version < 4`, so a v2 file came out stamped 4). Asserted from the
+## oldest version forward rather than at v6 only, because the failure needs a file old enough to
+## fall through every step to show up at all.
+func _check_the_migration_chain_stamps_the_current_version() -> void:
+	for from_version in [1, 2, 3, 4, 5, 6]:
+		var old: Dictionary = _captured.duplicate(true)
+		old["save_version"] = from_version
+		var migrated: Variant = WorldSnapshot.migrate(old)
+		if not check(typeof(migrated) == TYPE_DICTIONARY,
+				"a v%d file migrates to a dictionary" % from_version):
+			continue
+		check_eq(int((migrated as Dictionary).get("save_version", -1)), WorldSnapshot.SAVE_VERSION,
+			"a v%d file comes out stamped at the CURRENT version, not an intermediate one"
+				% from_version)

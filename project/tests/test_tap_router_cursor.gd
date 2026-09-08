@@ -246,14 +246,15 @@ func _check_far_resident_tap_is_no_longer_range_refused() -> void:
 	_hud.set_mode(GameHud.Mode.INSPECT)
 	check_eq(_router.handle_tap(screen), TapRouter.RESULT_RESIDENT,
 		"a far resident opens its fact card instead of being range-refused (Fix 2)")
-	# REPOINTED (Task 5, notification-surfaces): the replay routes to the feed now, never the
-	# big card — see `test_fact_card.gd`'s `_check_tap_to_replay_in_inspect()` for the same
-	# pattern.
-	check(not _ui.fact_card.is_open(),
-		"...and the fact card does NOT open — the replay routes to the feed instead")
-	var feed: NotificationFeed = _ui.notification_feed
-	check_eq(feed.entry_texts()[0], "%s. %s" % [species.display_name, species.effective_fact_text()],
-		"...the feed gains the replay entry instead, with the same verbatim copy")
+	# REPOINTED (remove-notification-feed): the replay opens the FACT CARD again — the rolling
+	# feed it briefly routed to is deleted. See `test_fact_card.gd`'s
+	# `_check_tap_to_replay_in_inspect()` for the same pattern, and note the dismiss below: a
+	# tap with the card up dismisses it, so every later tap in this check needs a closed card.
+	check(_ui.fact_card.is_open(),
+		"...and the fact card DOES open — the replay is the card again")
+	check_eq(_ui.fact_card.spoken_text(), "%s. %s" % [species.display_name, species.effective_fact_text()],
+		"...with the same verbatim copy")
+	_ui.fact_card.dismiss()
 
 	site.residents.clear()
 	_world.registry.unregister(site)

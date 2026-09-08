@@ -46,16 +46,31 @@ func _init() -> void:
 	# --- violations are caught -------------------------------------------------
 	check(_has_invariant_problem(_make(["open_grass"] as Array[String])),
 		"a species needing only `open_grass` is REJECTED (the original Rabbit bug)")
-	check(_has_invariant_problem(_make(["quiet"] as Array[String])),
-		"a species needing only `quiet` is REJECTED")
-	check(_has_invariant_problem(_make(["open_grass", "quiet"] as Array[String])),
-		"a species needing exactly the bare set is REJECTED")
+
+	# RE-POINTED 2026-09-04 (habitat-tiers ruling, spec OQ-F): `quiet` was RETIRED from
+	# `HABITAT_TAGS` entirely — a `built` `HabitatLimit` does its job strictly better — and
+	# `AnimalDefinition.BARE_TAGS` shrank from `["open_grass", "quiet"]` to `["open_grass"]`
+	# to follow (every BARE_TAGS entry must resolve inside the shared vocabulary, asserted
+	# above). A retired tag can never again be genuinely bare, so these two fixtures no
+	# longer demonstrate a rejection BY THIS INVARIANT specifically — old expectation:
+	# REJECTED; new: not flagged by the inert-land check (a species naming an unknown tag
+	# is still reported, just under a different problem string, which this suite's
+	# `_has_invariant_problem()` substring filter deliberately does not chase).
+	check(not _has_invariant_problem(_make(["quiet"] as Array[String])),
+		"a species needing only the RETIRED `quiet` tag is NOT flagged by the inert-land invariant specifically any more")
+	check(not _has_invariant_problem(_make(["open_grass", "quiet"] as Array[String])),
+		"...and pairing it with `open_grass` no longer trips the invariant either — `quiet` is no longer in BARE_TAGS, so `only_bare` cannot go true")
 
 	# --- legitimate species pass ------------------------------------------------
-	check(not _has_invariant_problem(_make(["open_grass", "cover"] as Array[String])),
-		"the retuned Rabbit (`open_grass, cover`) is ACCEPTED")
-	check(not _has_invariant_problem(_make(["forest", "cover"] as Array[String])),
-		"Fox (`forest, cover`) is ACCEPTED")
+	# `cover` RETIRED 2026-09-07 (habitat-tiers re-spec moved every shipped consumer off
+	# it): these two fixtures used to be `["open_grass", "cover"]` (Rabbit) and
+	# `["forest", "cover"]` (Fox). Re-pointed to real post-retirement legacy pairs —
+	# Rabbit's real base tier (open_grass, cultivated) and Stag's legacy field
+	# (forest, rocks) — rather than to a tag no shipped species names any more.
+	check(not _has_invariant_problem(_make(["open_grass", "cultivated"] as Array[String])),
+		"Rabbit-style (`open_grass, cultivated`) is ACCEPTED")
+	check(not _has_invariant_problem(_make(["forest", "rocks"] as Array[String])),
+		"Stag-style (`forest, rocks`) is ACCEPTED")
 	check(not _has_invariant_problem(_make(["cultivated", "open_grass"] as Array[String])),
 		"Chicken (`cultivated, open_grass`) is ACCEPTED — `cultivated` is player-made")
 

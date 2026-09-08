@@ -30,6 +30,13 @@
 ; OcclusionFader exemption requirement as every sibling terrain scene — see
 ; CommonTree1.tscn's header for the full mechanism. The ground plane (renamed "Ground")
 ; and all 3 floor patches are children of a wrapper Node3D literally named "Slab".
+;
+; OCCLUSIONFADER REMOVED 2026-09-08 — ANY MENTION OF IT BELOW IS HISTORY. The per-resident
+; transparency fade (D-41 §4) flickered in play and was cut outright; the script, its scene node
+; and its two suites are gone. The "Slab" node stays, because every terrain scene is built
+; around it and removing it would restructure all 33 for no gain — but NO CODE LOOKS THAT NAME
+; UP ANY MORE. It is a grouping convention now, with no behaviour attached, so nothing breaks if
+; a new scene groups differently and nothing is gained by "restoring" the exemption.
 [gd_scene load_steps=8 format=3]
 
 [ext_resource type="PackedScene" uid="uid://br74vgr6o3rsp" path="res://assets/terrain/birch_tree/BirchTree.fbx" id="1_model"]

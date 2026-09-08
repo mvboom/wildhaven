@@ -52,6 +52,13 @@
 ; per-vertex data. `[editable path="Model"]` is required for the override to apply to a
 ; node living inside an instanced sub-scene — omitting it is the mistake that would silently
 ; leave this override inert.
+;
+; OCCLUSIONFADER REMOVED 2026-09-08 — ANY MENTION OF IT BELOW IS HISTORY. The per-resident
+; transparency fade (D-41 §4) flickered in play and was cut outright; the script, its scene node
+; and its two suites are gone. The "Slab" node stays, because every terrain scene is built
+; around it and removing it would restructure all 33 for no gain — but NO CODE LOOKS THAT NAME
+; UP ANY MORE. It is a grouping convention now, with no behaviour attached, so nothing breaks if
+; a new scene groups differently and nothing is gained by "restoring" the exemption.
 [gd_scene load_steps=10 format=3]
 
 [ext_resource type="PackedScene" uid="uid://dwadcv8vn386p" path="res://assets/terrain/dead_tree/DeadTree.fbx" id="1_model"]

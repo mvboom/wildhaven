@@ -1,54 +1,69 @@
-; WildGrass — the Wild grass terrain tile (emits *nothing*, the inert-land invariant's
-; structural source — see terrain.md, spec.md Open Question #29). Reuses the same
-; Grass_Common_Short.gltf mesh as true Grass (CC0, Quaternius, Stylized Nature MegaKit —
-; see project/attribution/sources/quaternius_stylized_nature_megakit.tres); no new source
-; for this rework either.
+; WildGrass — Wild grass terrain visual. Emits NOTHING; deliberately tag-inert, and that
+; inertness is load-bearing (terrain.md). This is what untouched revealed land looks like, and
+; spec.md Open Question #29 is still open on it: it must read as "something to claim" without
+; reading as broken.
 ;
-; MULTIMESH REWORK (2026-08-16, human-reported): same complaint that drove
-; GrassCommonShort.tscn's rework — "grass and wild grass... still spotty... shorter
-; height, and more instances (30+)" — applied here too, same technique (a single
-; MultiMeshInstance3D, "WildGrassMultiMesh" below, instead of 30+ individual scene-tree
-; nodes; see GrassCommonShort.tscn's header for the full "why not just add more
-; MeshInstance3D nodes" reasoning, identical here).
+; STILL EXACTLY ONE VARIANT, AND THAT IS A DELIBERATE HOLD, NOT AN OMISSION. Meadow and Scrub
+; each went to 3 variants in this pass; Wild grass did not, because its `model_scenes` count is
+; not a look decision here — it is wired into behaviour. `wild_grass` is one of only two style
+; PICKER categories, so a second variant would make `WorldRoot._supports_mixed()` true, put a
+; `mixed` row at the head of its catalog, and move its unchosen default off "wild_grass" onto
+; "mixed" for every existing save (the same consequence D-54 accepted for Forest, but never
+; ruled on for this terrain). Four test assertions pin the current state deliberately —
+; test_hud_hotbar.gd's `style_ids_for_category("wild_grass").size() == 1`, two stale-id
+; fallbacks in test_style_defaults.gd and one in test_save_round_trip.gd.
 ;
-; STILL DELIBERATELY DIFFERENT FROM TRUE GRASS, not a copy of it — this is a PROPOSED
-; treatment for Open Question #29 ("must read as something to claim, without reading as
-; broken"), not its closure:
-;   - 32 instances (vs. Grass's 36) — still clears "30+", but a lower count than true
-;     Grass, continuing the prior version's "thinner growth" intent.
-;   - CLUSTERED, not evenly scattered: 4 cluster centers with UNEVEN per-cluster counts
-;     (10, 6, 10, 6 — not a uniform 8/8/8/8) so coverage reads patchy/untended rather than
-;     as a uniform lawn, with real gaps of bare ground between clusters. Grass, by
-;     contrast, scatters evenly across the whole tile. Deterministic, fixed-seed build
-;     (seed 20260817, distinct from Grass's 20260816) — one baked pattern, not randomized
-;     per tile at runtime.
-;   - 3 small bare-dirt PlaneMesh patches (up from 2 previously) placed in the gaps between
-;     clusters, reinforcing the "bald spots" cue.
-;   - Slab tint stays the duller, drier olive-khaki (Color(0.55, 0.52, 0.3, 1)) vs. true
-;     Grass's saturated green (Color(0.42, 0.68, 0.3, 1)) — unchanged from the prior pass.
+; RULED 2026-09-08 -> D-56: "wild grass should only have a single type". This is now a STANDING
+; CONSTRAINT, not an unfinished look pass. Do not add a second variant here without a fresh
+; human ruling, and do not re-point those four assertions to make one fit — they are the guard
+; on that decision, not stale scaffolding. Improving this terrain's LOOK is still fair game
+; (Open Question #29 is untouched and open); doing it by adding a variant is not.
 ;
-; HEIGHT REDUCED: scale baseline dropped to 0.065 (+/-22% jitter) — shorter than
-; GrassCommonShort's new 0.075 baseline, continuing this terrain's existing "smaller than
-; true Grass" convention from the original hand-placed version. FLAG FOR HUMAN SIGN-OFF,
-; same as GrassCommonShort's baseline — no GDD number exists for grass height, and whether
-; this reads as "something to claim" per #29's exact wording is the human's eyeball call,
-; not tech-art's to settle.
+; REBUILT THROUGH THE SHARED GENERATOR (2026-09-08) with its own values carried over unchanged:
+; slab Color(0.55, 0.52, 0.3) olive-khaki, 3 bare-dirt patches Color(0.42, 0.34, 0.2), 32x
+; Grass_Common_Short at the shorter 0.065 baseline, seed 20260816 — all of it the state the
+; human's 2026-08-16 density/height feedback settled.
 ;
-; MESH EMBEDDED, NOT ExtResource-REFERENCED, and BUILT VIA A ONE-OFF HEADLESS SCRIPT: same
-; reasoning and the same MultiMesh-buffer / dummy-RenderingServer caveat as
-; GrassCommonShort.tscn's header — see there for the full explanation, identical here.
+; CLUSTERED, NOT EVENLY SCATTERED, and this is the one place the shared generator's scatter is
+; overridden: the 32 blades are distributed across 4 uneven clump centres with real bare ground
+; between them. An even scatter would read as a mown lawn, which is precisely the opposite of
+; "untouched" — the distinction from true Grass is the whole job of this tile.
 ;
-; EVERYTHING NESTED UNDER ONE NODE NAMED "Slab" (unchanged requirement from the prior
-; pass): wild grass is the world's default untouched-land terrain, so it is the "old"
-; visual sitting under nearly every tile a player ever repaints to Forest — see this
-; scene's original header (preserved in content-pipeline-status.md's `wild_grass` row) and
-; CommonTree1.tscn's header for the full OcclusionFader-exemption mechanism this protects
-; against. The ground box, all 3 bare-dirt patches, and the multimesh are all children of
-; one wrapper Node3D literally named "Slab".
+; BUILT BY A ONE-OFF HEADLESS SCRIPT, NOT HAND-AUTHORED, AND NOT EDITABLE BY HAND — same
+; generator, buffer layout and headless caveat as the four Grass variants; see
+; GrassCommonShort.tscn's header for the full explanation. Re-run the generator to change
+; anything below; do not hand-edit the MultiMesh buffer.
 ;
-; SLAB WIDENED 0.94 -> 1.0 (2026-08-16, human-reported cross-tile seam gap — a separate
-; complaint from the density one above, fixed in the same pass): same fix, same exact-1.0-
-; match reasoning as GrassCommonShort.tscn's header. X/Z only, Y (0.2) untouched.
+; INHERITS THE GRASS CALIBRATION BASELINE (human sign-off 2026-09-08): slab BoxMesh
+; 1.0 x 0.2 x 1.0 at y=-0.1 (the 1.0 width is the cross-tile seam-gap fix, do not narrow it),
+; blotchy floor patches at y=0.001, fixed-seed deterministic scatter within +/-0.42 tile-units
+; of centre, +/-18% scale jitter and free Y-rotation, everything ground-level nested under one
+; node named "Slab" (the OcclusionFader exemption convention). The human ruled on these values
+; against Grass first precisely so they would not be re-proposed per terrain.
+;
+; HIGH-COUNT BLADES ARE A MULTIMESH; LOW-COUNT PROPS ARE INSTANCED glTF SCENES. Props here
+; number 1-3 per tile, so a MultiMesh would buy nothing, and two of the flower meshes carry
+; TWO surfaces with different textures, which a single embedded MultiMesh mesh cannot express
+; cleanly. Referencing the raw piece directly is also what Meadow.tscn and Scrub.tscn already
+; did before this pass.
+;
+; Source: Stylized Nature MegaKit (Standard/free), Quaternius, CC0 1.0 Universal — License.txt
+; re-checked per asset-import-pipeline.md's audit gate. See
+; project/attribution/sources/quaternius_stylized_nature_megakit.tres.
+;
+; GRASS COLOUR: DELIBERATELY DRIER BAND (2026-09-08 human ruling — "keep them drier").
+; See GrassCommonShort.tscn's header for the full palette-band explanation. This terrain is
+; deliberately NOT moved to band 2's true green: dryness is part of what distinguishes it from
+; true Grass, and that distinction carries gameplay meaning (Scrub is `browse` rough grazing;
+; Wild grass is tag-inert unclaimed land). It samples band 4, rgb(103,163,0) yellow-green —
+; still a real change where the mesh shipped on band 1's gold, but visibly drier than Grass.
+;
+; OCCLUSIONFADER REMOVED 2026-09-08 — ANY MENTION OF IT BELOW IS HISTORY. The per-resident
+; transparency fade (D-41 §4) flickered in play and was cut outright; the script, its scene node
+; and its two suites are gone. The "Slab" node stays, because every terrain scene is built
+; around it and removing it would restructure all 33 for no gain — but NO CODE LOOKS THAT NAME
+; UP ANY MORE. It is a grouping convention now, with no behaviour attached, so nothing breaks if
+; a new scene groups differently and nothing is gained by "restoring" the exemption.
 [gd_scene format=4]
 
 [ext_resource type="Texture2D" path="res://assets/terrain/grass_common_short/Grass.png" id="1_yqtat"]
@@ -77,13 +92,13 @@ albedo_color = Color(0.42, 0.34, 0.2, 1)
 [sub_resource type="PlaneMesh" id="PlaneMesh_ex5kk"]
 size = Vector2(0.2, 0.2)
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_h8ojc"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_qqp8k"]
 resource_name = "Grass"
 cull_mode = 2
 albedo_texture = ExtResource("1_yqtat")
-metadata/_gltf_primary_texture_coord = 0
+uv1_offset = Vector3(-0.00252, 0, 0)
 
-[sub_resource type="ArrayMesh" id="ArrayMesh_qwafn"]
+[sub_resource type="ArrayMesh" id="ArrayMesh_gjb8x"]
 _surfaces = [{
 "aabb": AABB(-0.3556424, -0.022385215, -0.47937828, 0.6388705, 1.3341035, 0.73726547),
 "format": 34896613377,
@@ -98,7 +113,7 @@ _surfaces = [{
 }]
 blend_shape_mode = 0
 
-[sub_resource type="ArrayMesh" id="ArrayMesh_10ow6"]
+[sub_resource type="ArrayMesh" id="ArrayMesh_vc7in"]
 resource_name = "Grass_Common_Short_Plane_014"
 _surfaces = [{
 "aabb": AABB(-0.3556424, -0.022385215, -0.47937828, 0.6388705, 1.3341035, 0.73726547),
@@ -107,7 +122,7 @@ _surfaces = [{
 "index_count": 465,
 "index_data": PackedByteArray("AAABAAIAAAADAAEAAwAAAAQABQADAAQAAwAFAAYABgAFAAcAAwAGAAgABgAHAAkACAAGAAoACQAHAAsACAAKAAwACQALAA0ADAAKAA4ADQALAA8ADQAPABAAEAAPABEADAAOABIAEgAOABMAEgATABQAJQAmACcAKAAlACcAKAApACUAKQAqACUAKQArACoAJQAsACYAKgAsACUALAAtACYAKgAuACwALAAvAC0ALgAvACwALwAwAC0ALgAxAC8ALwAyADAAMQAyAC8AMgAzADAAMQA0ADIAMgA1ADMANAA1ADIANQA2ADMANAA3ADUANQA4ADYANwA4ADUANwA5ADgAOgA7ADwAOgA9ADsAOwA+ADwAOwA/AD4APwBAAD4APwBBAEAAQQBCAEAAQwBEAEUAQwBGAEQARABGAEcARABHAEgASABHAEkASABJAEoASgBJAEsATABNAE4ATABPAE0ATQBQAE4ATQBRAFAAUQBSAFAAUQBTAFIAUwBUAFIAVQBWAFcAVQBYAFYAVwBZAFUAVwBaAFkAWgBXAFsAWgBbAFwAXABdAFoAWwBeAFwAXABfAF0AWwBgAF4AXwBhAF0AYABiAF4AXwBjAGEAYABkAGIAZABlAGIAZABmAGUAYwBnAGEAYwBoAGcAaABpAGcAFQAXAGoAFQAWABcAGQAVAGoAGQBqABoAagAbABoAFwBrAGoAagBrABsAFwAYAGsAawAcABsAGABsAGsAawBsABwAGAAdAGwAbAAeABwAHQBtAGwAbABtAB4AHQAfAG0AbQAgAB4AHwBuAG0AbQBuACAAbgAhACAAHwAiAG4AbgAjACEAIgAjAG4AIgAkACMAbwBwAHEAbwByAHAAcwBvAHEAcwBxAHQAcQB1AHQAcAB2AHEAcQB2AHUAcAB3AHYAdgB4AHUAdwB5AHYAdgB5AHgAdwB6AHkAeQB7AHgAegB8AHkAeQB8AHsAegB9AHwAfAB+AHsAfQB/AHwAfAB/AH4AfwCAAH4AfQCBAH8AfwCCAIAAgQCCAH8AgQCDAIIAhACFAIYAhACHAIUAiACEAIYAiACGAIkAhgCKAIkAhQCLAIYAhgCLAIoAhQCMAIsAiwCNAIoAjACOAIsAiwCOAI0AjACPAI4AjgCQAI0AjwCRAI4AjgCRAJAAjwCSAJEAkQCTAJAAkgCUAJEAkQCUAJMAlACVAJMAkgCWAJQAlACXAJUAlgCXAJQAlgCYAJcA"),
 "lods": [0.6771018, PackedByteArray("AAABAAIAAAADAAEAAwAAAAQABQADAAQAAwAFAAYABgAFAAcAAwAGAAgABgAHAAkACAAGAAoACQAHAAsACAAKAAwACQALAA0ADAAKAA4ADQALAA8ADQAPABAAEAAPABEADAAOABIAEgAOABMAEgATABQAFQAWABcAFwAYABUAGQAVABoAFQAbABoAFQAYABsAGAAcABsAGAAdABwAHQAeABwAHQAfAB4AHwAgAB4AHwAhACAAHwAiACEAIgAjACEAIgAkACMA")],
-"material": SubResource("StandardMaterial3D_h8ojc"),
+"material": SubResource("StandardMaterial3D_qqp8k"),
 "name": "Grass",
 "primitive": 3,
 "uv_scale": Vector4(0, 0, 0, 0),
@@ -115,37 +130,37 @@ _surfaces = [{
 "vertex_data": PackedByteArray("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")
 }]
 blend_shape_mode = 0
-shadow_mesh = SubResource("ArrayMesh_qwafn")
+shadow_mesh = SubResource("ArrayMesh_gjb8x")
 
-[sub_resource type="MultiMesh" id="MultiMesh_qqp8k"]
+[sub_resource type="MultiMesh" id="MultiMesh_1i1sh"]
 transform_format = 1
 instance_count = 32
-mesh = SubResource("ArrayMesh_10ow6")
-buffer = PackedFloat32Array(-0.036328368, 0, 0.062133014, -0.24989216, 0, 0.07197404, 0, 0, -0.062133014, 0, -0.036328368, -0.23673028, 0.04939354, 0, 0.050492294, -0.16163522, 0, 0.07063422, 0, 0, -0.050492294, 0, 0.04939354, -0.29230425, -0.0651973, 0, -0.016023856, -0.33585748, 0, 0.067137554, 0, 0, 0.016023856, 0, -0.0651973, -0.22874583, 0.061316624, 0, -0.03110613, -0.19994886, 0, 0.06875551, 0, 0, 0.03110613, 0, 0.061316624, -0.1884561, 0.025630893, 0, -0.05321645, -0.19109315, 0, 0.05906719, 0, 0, 0.05321645, 0, 0.025630893, -0.213426, 0.044961035, 0, 0.053094286, -0.32672623, 0, 0.069573686, 0, 0, -0.053094286, 0, 0.044961035, -0.2899317, -0.06675898, 0, 0.0070562605, -0.2148393, 0, 0.06713086, 0, 0, -0.0070562605, 0, -0.06675898, -0.11284903, 0.058973182, 0, -0.041248407, -0.2258607, 0, 0.071967125, 0, 0, 0.041248407, 0, 0.058973182, -0.29447407, -0.054907095, 0, 0.024081564, -0.25114474, 0, 0.059955906, 0, 0, -0.024081564, 0, -0.054907095, -0.106423095, -0.05454983, 0, 0.0035630425, -0.16819586, 0, 0.05466607, 0, 0, -0.0035630425, 0, -0.05454983, -0.18911211, 0.0685651, 0, -0.003293666, 0.32320887, 0, 0.068644166, 0, 0, 0.003293666, 0, 0.0685651, -0.031703122, 0.018965438, 0, -0.07662037, 0.26639766, 0, 0.07893269, 0, 0, 0.07662037, 0, 0.018965438, -0.24792552, -0.053430777, 0, -0.041031085, 0.19667086, 0, 0.06736763, 0, 0, 0.041031085, 0, -0.053430777, -0.08297915, 0.06119941, 0, -0.0018467001, 0.25966036, 0, 0.06122727, 0, 0, 0.0018467001, 0, 0.06119941, -0.11068029, 0.014244866, 0, 0.058833446, 0.2633102, 0, 0.060533386, 0, 0, -0.058833446, 0, 0.014244866, -0.14122298, -0.05481297, 0, -0.04615101, 0.20991111, 0, 0.071654566, 0, 0, 0.04615101, 0, -0.05481297, -0.14740571, -0.016026143, 0, -0.06268989, -0.2183583, 0, 0.064705946, 0, 0, 0.06268989, 0, -0.016026143, 0.28277224, -0.036219843, 0, -0.038543906, -0.18187654, 0, 0.05289149, 0, 0, 0.038543906, 0, -0.036219843, 0.21888375, 0.045150526, 0, -0.05667729, -0.16507791, 0, 0.07246299, 0, 0, 0.05667729, 0, 0.045150526, 0.33254433, -0.014199802, 0, 0.056970324, -0.06523699, 0, 0.058713306, 0, 0, -0.056970324, 0, -0.014199802, 0.3387983, -0.038861517, 0, 0.03478195, -0.2257813, 0, 0.052153636, 0, 0, -0.03478195, 0, -0.038861517, 0.29050693, 0.06553474, 0, -0.036372453, -0.1807203, 0, 0.0749517, 0, 0, 0.036372453, 0, 0.06553474, 0.41873044, 0.040848847, 0, 0.042382974, -0.24688348, 0, 0.05886378, 0, 0, -0.042382974, 0, 0.040848847, 0.33535597, 0.00019595017, 0, 0.059842918, -0.12479877, 0, 0.05984324, 0, 0, -0.059842918, 0, 0.00019595017, 0.1925858, -0.019178824, 0, 0.07276879, -0.24279833, 0, 0.07525373, 0, 0, -0.07276879, 0, -0.019178824, 0.37621433, 0.05004571, 0, -0.015785832, -0.19376102, 0, 0.052476335, 0, 0, 0.015785832, 0, 0.05004571, 0.19424745, 0.061801285, 0, -0.034303933, 0.34723863, 0, 0.07068351, 0, 0, 0.034303933, 0, 0.061801285, 0.3206789, -0.0033625185, 0, -0.05480888, 0.1769801, 0, 0.05491193, 0, 0, 0.05480888, 0, -0.0033625185, 0.38591814, -0.029656837, 0, 0.07131999, 0.36407292, 0, 0.07724033, 0, 0, -0.07131999, 0, -0.029656837, 0.21489722, -0.02679933, 0, -0.053717043, 0.23361734, 0, 0.060031034, 0, 0, 0.053717043, 0, -0.02679933, 0.40366027, -0.020466939, 0, 0.060483314, 0.34087953, 0, 0.063852385, 0, 0, -0.060483314, 0, -0.020466939, 0.18495265, -0.062485743, 0, -0.03972563, 0.27265555, 0, 0.07404454, 0, 0, 0.03972563, 0, -0.062485743, 0.31265128)
+mesh = SubResource("ArrayMesh_vc7in")
+buffer = PackedFloat32Array(0.036133587, 0, 0.06409194, -0.013349021, 0, 0.07357591, 0, 0, -0.06409194, 0, 0.036133587, 0.09099621, -0.01920823, 0, 0.066336885, 0.053633034, 0, 0.069061846, 0, 0, -0.066336885, 0, -0.01920823, -0.12846766, -0.047409553, 0, 0.045012817, -0.20125616, 0, 0.06537446, 0, 0, -0.045012817, 0, -0.047409553, -0.11889929, 0.0277539, 0, -0.04753339, -0.09557901, 0, 0.05504273, 0, 0, 0.04753339, 0, 0.0277539, -0.09301441, -0.0039490825, 0, 0.07368729, 0.051739737, 0, 0.07379304, 0, 0, -0.07368729, 0, -0.0039490825, -0.035655376, 0.07421778, 0, -0.010855914, 0.0022884847, 0, 0.075007536, 0, 0, 0.010855914, 0, 0.07421778, -0.22325312, -0.018127093, 0, 0.062214073, -0.2771142, 0, 0.0648011, 0, 0, -0.062214073, 0, -0.018127093, -0.075739644, 0.037116777, 0, 0.062416274, -0.054028403, 0, 0.0726185, 0, 0, -0.062416274, 0, 0.037116777, -0.015268393, 0.070683114, 0, -0.0028444147, -0.011717873, 0, 0.07074032, 0, 0, 0.0028444147, 0, 0.070683114, 0.0480579, 0.02268615, 0, 0.05449203, 0.0035920234, 0, 0.05902578, 0, 0, -0.05449203, 0, 0.02268615, -0.09057366, 0.06089789, 0, -0.020130297, -0.13450813, 0, 0.06413877, 0, 0, 0.020130297, 0, 0.06089789, -0.097289704, -0.06689567, 0, 0.0017386377, -0.030993015, 0, 0.06691826, 0, 0, -0.0017386377, 0, -0.06689567, -0.025824754, -0.020612957, 0, -0.06122593, 0.054061905, 0, 0.064602695, 0, 0, 0.06122593, 0, -0.020612957, 0.1262133, 0.06600489, 0, -0.037602153, -0.1502483, 0, 0.07596425, 0, 0, 0.037602153, 0, 0.06600489, -0.13730702, 0.060832556, 0, 0.016743332, -0.251304, 0, 0.06309468, 0, 0, -0.016743332, 0, 0.060832556, -0.2375786, -0.037385654, 0, -0.044632286, -0.03787119, 0, 0.05822137, 0, 0, 0.044632286, 0, -0.037385654, -0.17609695, 0.05463688, 0, 0.0013662569, 0.10696979, 0, 0.05465396, 0, 0, -0.0013662569, 0, 0.05463688, 0.18532668, 0.06744491, 0, -0.01660996, -0.035009153, 0, 0.06946011, 0, 0, 0.01660996, 0, 0.06744491, -0.24200453, -0.03275996, 0, 0.05654964, -0.06276125, 0, 0.065353476, 0, 0, -0.05654964, 0, -0.03275996, -0.2790168, -0.06866448, 0, -0.031187937, 0.012759491, 0, 0.0754155, 0, 0, 0.031187937, 0, -0.06866448, 0.044987097, -0.07557108, 0, 0.0015244487, 0.23071422, 0, 0.07558645, 0, 0, -0.0015244487, 0, -0.07557108, 0.14068156, -0.060169466, 0, -0.012692639, -0.036914136, 0, 0.06149364, 0, 0, 0.012692639, 0, -0.060169466, -0.18339908, -0.034847934, 0, 0.04596156, -0.0920139, 0, 0.057678793, 0, 0, -0.04596156, 0, -0.034847934, -0.13872565, -0.022974746, 0, 0.055364393, -0.10509971, 0, 0.059942096, 0, 0, -0.055364393, 0, -0.022974746, -0.04919117, 0.01409823, 0, 0.05781141, -0.019170143, 0, 0.059505623, 0, 0, -0.05781141, 0, 0.01409823, 0.04889001, -0.026314257, 0, 0.06344606, -0.0016427964, 0, 0.06868655, 0, 0, -0.06344606, 0, -0.026314257, -0.02886709, -0.061480865, 0, -0.032936707, -0.15714896, 0, 0.06974757, 0, 0, 0.032936707, 0, -0.061480865, -0.18454003, -0.029799927, 0, -0.059973482, -0.024777249, 0, 0.06696905, 0, 0, 0.059973482, 0, -0.029799927, 0.0052678995, 0.05222321, 0, 0.034898166, 0.20096357, 0, 0.06281039, 0, 0, -0.034898166, 0, 0.05222321, 0.078870766, 0.04283945, 0, -0.03427234, -0.044800535, 0, 0.05486175, 0, 0, 0.03427234, 0, 0.04283945, 0.014439437, -0.009987708, 0, 0.06488016, -0.13316557, 0, 0.06564442, 0, 0, -0.06488016, 0, -0.009987708, -0.13271157, -0.030376643, 0, -0.04560269, -0.04123656, 0, 0.054793667, 0, 0, 0.04560269, 0, -0.030376643, 0.019135688)
 
-[node name="WildGrass" type="Node3D" unique_id=904205820]
+[node name="WildGrass" type="Node3D" unique_id=445818331]
 
-[node name="Slab" type="Node3D" parent="." unique_id=941796844]
+[node name="Slab" type="Node3D" parent="." unique_id=17077420]
 
-[node name="Ground" type="MeshInstance3D" parent="Slab" unique_id=1530503202]
+[node name="Ground" type="MeshInstance3D" parent="Slab" unique_id=1811784448]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
 material_override = SubResource("StandardMaterial3D_5efx0")
 mesh = SubResource("BoxMesh_7e6k1")
 
-[node name="BarePatch_A" type="MeshInstance3D" parent="Slab" unique_id=771934115]
-transform = Transform3D(0.57357645, 0, 0.81915206, 0, 1, 0, -0.81915206, 0, 0.57357645, 0.02, 0.001, -0.02)
+[node name="FloorPatch_0" type="MeshInstance3D" parent="Slab" unique_id=735487301]
+transform = Transform3D(-0.49591854, 0, -0.86836904, 0, 1, 0, 0.86836904, 0, -0.49591854, -0.060962453, 0.001, -0.111545876)
 material_override = SubResource("StandardMaterial3D_1556d")
 mesh = SubResource("PlaneMesh_ykh8i")
 
-[node name="BarePatch_B" type="MeshInstance3D" parent="Slab" unique_id=280208124]
-transform = Transform3D(0.49999997, 0, -0.86602545, 0, 1, 0, 0.86602545, 0, 0.49999997, -0.32, 0.001, 0.18)
+[node name="FloorPatch_1" type="MeshInstance3D" parent="Slab" unique_id=683682544]
+transform = Transform3D(0.34789798, 0, -0.9375324, 0, 1, 0, 0.9375324, 0, 0.34789798, -0.19309878, 0.001, -0.17623395)
 material_override = SubResource("StandardMaterial3D_t4pde")
 mesh = SubResource("PlaneMesh_p0d76")
 
-[node name="BarePatch_C" type="MeshInstance3D" parent="Slab" unique_id=759139977]
-transform = Transform3D(0.9659258, 0, 0.25881904, 0, 1, 0, -0.25881904, 0, 0.9659258, 0.02, 0.001, 0.36)
+[node name="FloorPatch_2" type="MeshInstance3D" parent="Slab" unique_id=137830639]
+transform = Transform3D(-0.6352099, 0, 0.7723395, 0, 1, 0, -0.7723395, 0, -0.6352099, -0.1777389, 0.001, -0.07444306)
 material_override = SubResource("StandardMaterial3D_amfaa")
 mesh = SubResource("PlaneMesh_ex5kk")
 
-[node name="WildGrassMultiMesh" type="MultiMeshInstance3D" parent="Slab" unique_id=2012759272]
-multimesh = SubResource("MultiMesh_qqp8k")
+[node name="MultiMesh_CommonShort" type="MultiMeshInstance3D" parent="Slab" unique_id=75001944]
+multimesh = SubResource("MultiMesh_1i1sh")

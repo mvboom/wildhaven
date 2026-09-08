@@ -23,10 +23,77 @@
 ;
 ; news_reports intentionally empty — News Report pools for this pool are a separate, later
 ; purchase (not part of Content Pipeline step 4/5 for this dispatch).
-[gd_resource type="Resource" script_class="AnimalDefinition" load_steps=3 format=3]
+;
+; TIERS — RE-SPEC 2026-09-04 (habitat tiers).
+;
+; PROPOSAL, NOT A DECISION. Every divisor, radius and cap below is this design's own
+; first-pass proposal awaiting human sign-off, per the project rule that all tuning values
+; are the human's. Source: docs/superpowers/specs/2026-09-04-habitat-tiers-design.md § 9.
+;
+; THE DESIGN'S OWN WORKED EXAMPLE. Horse used to share the IDENTICAL `open_grass,
+; cultivated` recipe with Cow, Bull and Alpaca — the exact defect this whole design fixes.
+; Horse now gates on `stable*` specifically, distinct from Cow's barn+silo and Bull's
+; large_barn.
+;
+; WHY TWO TIERS: a stable and some grass gets a pair; a stable, a wide tract and water gets
+; a herd, with `water/2` binding the herd size — so digging more pond visibly buys more
+; horses.
+;
+; The legacy flat fields (habitat_needs / tiles_per_individual / max_individuals) are LEFT
+; IN PLACE and are now inert: `effective_tiers()` prefers `tiers` when non-empty. They are
+; retained so a rollback is a one-line edit rather than a re-authoring.
+[gd_resource type="Resource" script_class="AnimalDefinition" load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://scripts/definitions/animal_definition.gd" id="1_schema"]
-[ext_resource type="PackedScene" path="res://assets/animals/horse/Horse.tscn" id="2_model"]
+[ext_resource type="Script" path="res://scripts/definitions/habitat_need.gd" id="2_need"]
+[ext_resource type="Script" path="res://scripts/definitions/habitat_tier.gd" id="3_tier"]
+[ext_resource type="PackedScene" path="res://assets/animals/horse/Horse.tscn" id="4_model"]
+
+[sub_resource type="Resource" id="need_pair_stable"]
+script = ExtResource("2_need")
+tag = "stable"
+radius = 5
+tiles_per_individual = 0
+
+[sub_resource type="Resource" id="need_pair_grass"]
+script = ExtResource("2_need")
+tag = "open_grass"
+radius = 8
+tiles_per_individual = 6
+
+[sub_resource type="Resource" id="tier_pair"]
+script = ExtResource("3_tier")
+id = "pair"
+needs = Array[Resource]([SubResource("need_pair_stable"), SubResource("need_pair_grass")])
+limits = Array[Resource]([])
+max_individuals = 2
+arrival_group_size = 1
+
+[sub_resource type="Resource" id="need_herd_stable"]
+script = ExtResource("2_need")
+tag = "stable"
+radius = 5
+tiles_per_individual = 0
+
+[sub_resource type="Resource" id="need_herd_grass"]
+script = ExtResource("2_need")
+tag = "open_grass"
+radius = 14
+tiles_per_individual = 4
+
+[sub_resource type="Resource" id="need_herd_water"]
+script = ExtResource("2_need")
+tag = "water"
+radius = 12
+tiles_per_individual = 2
+
+[sub_resource type="Resource" id="tier_herd"]
+script = ExtResource("3_tier")
+id = "herd"
+needs = Array[Resource]([SubResource("need_herd_stable"), SubResource("need_herd_grass"), SubResource("need_herd_water")])
+limits = Array[Resource]([])
+max_individuals = 12
+arrival_group_size = 3
 
 [resource]
 script = ExtResource("1_schema")
@@ -40,6 +107,8 @@ scout_radius = 8
 capacity_radius = 0
 tiles_per_individual = 5
 max_individuals = 6
-model_scenes = Array[PackedScene]([ExtResource("2_model")])
+tiers = Array[Resource]([SubResource("tier_pair"), SubResource("tier_herd")])
+emits_tags = Array[String]([])
+model_scenes = Array[PackedScene]([ExtResource("4_model")])
 fact_text_pool = Array[String](["A newborn foal can already stand up on its own in about an hour, and it can walk just a few hours after that."])
 news_reports = Array[String]([])

@@ -5,12 +5,18 @@
 ; NO DESIGN DOC STATES ANY OF THIS ITEM'S VALUES. cost = 15, footprint = Vector2i(1, 1)
 ; are FIRST-PASS PROPOSALS sourced only from House's own stated 1x1 baseline (~15 Wood
 ; — buildings.md) — FLAG FOR HUMAN SIGN-OFF, same as every other new farm building in
-; this batch. allowed_terrain = ["grass"] (matching House) and emitted_tags = [] (no
-; species in the shared vocabulary needs a farm-building tag) are this task's own explicit
+; this batch. allowed_terrain = ["grass"] (matching House) is this task's own explicit
 ; uniform choice, not sourced from a design doc row.
 ;
 ; fact_text is Content Pipeline step 5 (content-writer's job) — left as PLACEHOLDER, the
 ; correct interim state PlaceableDefinition.pending_signoff() already expects and handles.
+;
+; emitted_tags SET 2026-09-04 by the habitat-tiers ruling. Previously `[]` — every farm
+; building was placeable decoration with no simulation meaning. `built` is emitted by
+; EVERY placeable so one `HabitatLimit` on `built` excludes all of them, including
+; buildings added later. OpenBarn also emits `barn` AND `stable` — an open-sided barn IS a
+; stable, a deliberate subsumption: one building serves cows or horses. See
+; docs/superpowers/specs/2026-09-04-habitat-tiers-design.md § 8.
 [gd_resource type="Resource" script_class="PlaceableDefinition" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/definitions/placeable_definition.gd" id="1_schema"]
@@ -24,6 +30,6 @@ hotbar_category = "farm_building"
 cost = 15
 footprint = Vector2i(1, 1)
 allowed_terrain = Array[String](["grass"])
-emitted_tags = Array[String]([])
+emitted_tags = Array[String](["built", "barn", "stable"])
 model_scenes = Array[PackedScene]([ExtResource("2_model")])
 fact_text = "PLACEHOLDER — flavor copy for the Open Barn pending Content Pipeline step 5."

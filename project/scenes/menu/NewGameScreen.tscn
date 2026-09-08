@@ -176,7 +176,7 @@ layout_mode = 2
 mouse_filter = 2
 theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
 theme_override_font_sizes/font_size = 20
-text = "[COPY] choose a starting land"
+text = "Pick a place to start"
 horizontal_alignment = 1
 
 [node name="PresetRow" type="HBoxContainer" parent="Layout/Stack"]
@@ -196,7 +196,7 @@ layout_mode = 2
 mouse_filter = 2
 theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
 theme_override_font_sizes/font_size = 20
-text = "[COPY] name your world"
+text = "Name your world"
 horizontal_alignment = 1
 
 [node name="NameField" type="LineEdit" parent="Layout/Stack"]

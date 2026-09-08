@@ -93,7 +93,6 @@ const PREVIEW_POLL_SECONDS: float = 0.1
 var _world: WorldRoot = null
 var _hud: GameHud = null
 var _fact_card: FactCard = null
-var _notification_feed: NotificationFeed = null
 var _cue: TapCue = null
 var _crosshair: Crosshair = null
 
@@ -105,13 +104,11 @@ var _crosshair_valid: bool = false
 
 
 func attach(
-	world: WorldRoot, hud: GameHud, fact_card: FactCard, feed: NotificationFeed,
-	cue: TapCue, crosshair: Crosshair
+	world: WorldRoot, hud: GameHud, fact_card: FactCard, cue: TapCue, crosshair: Crosshair
 ) -> void:
 	_world = world
 	_hud = hud
 	_fact_card = fact_card
-	_notification_feed = feed
 	_cue = cue
 	_crosshair = crosshair
 
@@ -385,15 +382,20 @@ func _resolve_crosshair_state(screen_position: Vector2) -> bool:
 	return false
 
 
-## Opens the replay entry for a species, in the feed rather than the big payoff card — an
-## Inspect-tap is curiosity, not a move-in (gdd.md -> Pillar 4: "on success AND on curiosity"),
-## and the feed is where every non-first-ever fact-card moment lives now.
+## Opens the fact card for a species — the same card a first-ever arrival fires (gdd.md ->
+## Pillar 4: education arrives "on success AND on curiosity", and this is the curiosity half).
+##
+## THE CARD, NOT A QUIETER SURFACE, AND BLOCKING IS FINE HERE. The replay used to open an entry
+## on the right-side rolling feed, which is deleted (`GameUI._on_resident_arrived()` explains
+## why). The objection to a modal is that it interrupts; a tap on an animal is the player
+## asking, so there is nothing to interrupt. It also puts Read-Aloud back on the curiosity
+## path, which the feed had dropped — the one surface a pre-fluent reader most needs it on.
 func _show_species_card(species_id: String) -> void:
-	if _notification_feed == null:
+	if _fact_card == null:
 		return
 	var species: AnimalDefinition = species_definition(species_id)
 	if species != null:
-		_notification_feed.show_fact(species.display_name, species.effective_fact_text())
+		_fact_card.show_species(species)
 
 
 ## Looks a species up by id.

@@ -37,6 +37,21 @@ Picture-book rules bind **every** asset, new or sourced:
   proportion or silhouette mismatches, which must be judged per-asset at pick time.
 - **Palette:** saturated but gentle — bright hues pulled back from full saturation;
   warm-leaning; no pure black or pure white.
+- **The warmth is in the LIGHTING, not in the materials** (D-55). Scene light is a warm,
+  bright fill over a lower key — `Main.tscn` Environment `ambient_light_color`
+  (0.78, 0.74, 0.66) at 0.95 energy, `DirectionalLight3D.light_energy` 0.75. That ~2:1
+  key-to-fill ratio is deliberate: under the fixed ~45° camera most of any model is shaded, so
+  the fill is what most of the screen is actually lit by, and a cold or dim one makes every
+  asset read grey no matter what its albedo says. **Do not compensate for a cold render by
+  warming an asset's albedo** — imported packs are typically authored neutral (the Quaternius
+  Farm Buildings pack measurably is), and their own reference renders get their warmth the same
+  way this scene does.
+- **"No pure white" is a rule about the RENDER, not the asset.** With linear tonemapping (the
+  Environment carries no `tonemap_mode` — see D-55 for why filmic was rejected) anything above
+  **~0.67 linear albedo clips to `#ffffff`** on a sun-facing face. An asset can honour the rule
+  and still break it on screen; check the lit value, not the swatch. There is no headroom left
+  above that ceiling, so raising `light_energy` or importing a brighter pack re-opens the
+  question.
 - **Readability test:** every animal must read as a recognizable, friendly shape at the
   default mid-zoom (~12–15 tiles on screen). If a species only reads at close zoom, simplify it.
 - **Variation-ready:** animal textures separate base coat from a pattern-mask layer
@@ -176,7 +191,7 @@ correctly in code. Full detail in
 | Terrain (emits) | Assets available | Notes |
 |---|---|---|
 | **Forest** (`forest`) | Huge surplus — MegaKit CommonTree/Pine/Twisted; Nature Pack Birch/Common/Pine/Palm/Willow (+ seasonal); Trees pack (45 models) | Pick a small "common" set |
-| **Rock** (`cover`, `rocks`) | Nature Pack `Rock_1..7`, `Rock_Moss_*`; MegaKit `Rock_Medium`, Pebbles; RTS `Rock`/`Mountain` | Load-bearing — the Fox/Rabbit `cover` source. `Rock_Moss` = the nudge's "mossy boulders" |
+| **Rock** (`rocks`) | Nature Pack `Rock_1..7`, `Rock_Moss_*`; MegaKit `Rock_Medium`, Pebbles; RTS `Rock`/`Mountain` | Load-bearing — the `rocks` source (Donkey, Alpaca, Shiba Inu, Stag). It also emitted `cover` until that tag was retired at D-52. `Rock_Moss` = the nudge's "mossy boulders" |
 | **Cultivated field** (`cultivated`) | Nature Crops Pack — Wheat, Corn, Carrot, Beet, Lettuce, Tomato, Pumpkin, Watermelon, Rice, with growth stages (`_Crop`/`_Harvested`); RTS `Farm_*` modeled plots | Villager need |
 | **Grass** (`open_grass`) | MegaKit Grass_Common/Wispy, Nature Pack Grass, Crops Grass, Clover, Fern | |
 | **Water** (`water`) | Surface is a shader/plane, no model | Dress edges with Nature Pack `Lilypad`, reeds |

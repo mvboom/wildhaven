@@ -56,6 +56,15 @@ extends RefCounted
 ## tick — and it means a future species imported without loop set reproduces as nothing worse
 ## than this safety net.
 
+## NO LEG CAN LAST FOREVER. Two separate guards, because the symptom is the ugliest one this
+## file can produce and one guard is not enough for it. A resident that stops advancing while
+## WALKING keeps its walk clip looping at full speed over a frozen position — an animal
+## marching on the spot — because `AnimationPlayer` runs off the engine's clock and knows
+## nothing about `tick()`. `SEPARATION_MAX_STEP_FRACTION` makes forward progress arithmetic
+## against the one cause found (a crowd's summed nudge cancelling the step); the
+## `STALL_TIMEOUT_SECONDS` watchdog abandons a leg that stops advancing for ANY reason,
+## including ones nobody has found yet. `test_roamer_stall.gd` pins both separately.
+
 enum State { PAUSED, WALKING }
 
 ## PLACEHOLDER — the human owns this. **No GDD or spec.md number exists for walk speed**;
@@ -139,6 +148,46 @@ const SEPARATION_DISTANCE_TILES: float = 0.6
 ## visibly snapping residents apart.
 const SEPARATION_STRENGTH_TILES_PER_SECOND: float = 0.6
 
+## PLACEHOLDER — the human owns this. **No GDD or spec.md number exists for this.** The most
+## of one travel step the SUMMED separation push is allowed to reach.
+##
+## THIS EXISTS BECAUSE ITS ABSENCE DEADLOCKED ANIMALS (found 2026-09-08). The push above is a
+## sum over every neighbour in range and was uncapped, while
+## `SEPARATION_STRENGTH_TILES_PER_SECOND` is the SAME 0.6 as `WALK_SPEED_TILES_PER_SECOND` —
+## so two or three neighbours cancelled the forward step outright. A PAUSED resident is never
+## nudged itself (see `_separation_nudge()`), which makes a cluster of standing animals an
+## immovable wall and the cancellation a STABLE equilibrium, not a passing jostle. The walker
+## then never reached its corner, never left WALKING, and marched on the spot with its walk
+## clip looping — `AnimationPlayer` runs off the engine's clock, not off `tick()`.
+##
+## Any value strictly below 1.0 makes forward progress arithmetic rather than hopeful: the
+## step is `step` toward the corner and the push is at most `f * step`, so the walker closes
+## on its corner at no worse than `(1 - f) * step` per tick. 0.5 keeps the steering plainly
+## visible (`test_roamer_stall.gd` asserts it still bends a path) while halving the worst
+## case a crowd can cost. Raising it toward 1.0 buys stronger avoidance and slower walking
+## through crowds; it can never reintroduce the deadlock, which is the point of the form.
+const SEPARATION_MAX_STEP_FRACTION: float = 0.5
+
+## PLACEHOLDER — the human owns this. **No GDD or spec.md number exists for this.** How long a
+## WALKING resident may fail to get closer to its current corner before it abandons the leg
+## and goes back to a pause.
+##
+## A BACKSTOP, NOT THE FIX. `SEPARATION_MAX_STEP_FRACTION` above closes the one cause we
+## actually found; this closes the CLASS. Before it, the only exit from WALKING was arrival,
+## so anything at all that stopped a resident advancing — a cause nobody has thought of yet,
+## a future force added to `tick()`, a corner made unreachable mid-leg — froze it in an
+## animated march forever, which is the single worst-looking failure this file can produce.
+## Giving the leg up costs a re-rolled waypoint and reads as an animal changing its mind.
+##
+## Same defence-in-depth shape as `_ensure_playing()` against a frozen locomotion clip: the
+## real repair lives elsewhere, and this makes the symptom survivable regardless.
+##
+## 3 seconds is far longer than any honest slow patch — even at the halved speed a full crowd
+## can impose, a walker still covers ~0.9 tiles in that time, against the
+## `ARRIVAL_EPSILON_TILES` of improvement it takes to reset the clock — and short enough that
+## a player reads a pause, not a broken animal.
+const STALL_TIMEOUT_SECONDS: float = 3.0
+
 
 var _resident: Node3D = null
 var _home: Vector3 = Vector3.ZERO
@@ -181,6 +230,15 @@ var _travel_speed: float = WALK_SPEED_TILES_PER_SECOND
 
 var _state: State = State.PAUSED
 var _pause_remaining: float = 0.0
+
+## The no-progress watchdog's two fields (`STALL_TIMEOUT_SECONDS`). `_leg_best_distance` is the
+## closest this resident has yet come to the corner it is currently walking toward — the
+## measure has to be BEST-EVER rather than last-tick, or a resident oscillating around an
+## equilibrium would keep resetting its own clock on the outward half of every wobble and the
+## watchdog would never fire. `INF` means "no reading yet", so the first tick of any leg always
+## records one.
+var _leg_best_distance: float = INF
+var _no_progress_seconds: float = 0.0
 
 ## The corners of the current travel leg, from `WorldNavigation.find_path()` — or, with no
 ## `_world_navigation` bound (every caller before the animal-navigation pass, and every
@@ -307,9 +365,13 @@ func tick(delta: float) -> void:
 			_begin_pause()
 		else:
 			_face(_path[_path_index] - _resident.position)
+			_reset_leg_progress()  # a new corner is a new leg to measure progress against
+		return
+	if not _note_progress(remaining, delta):
+		_begin_pause()  # going nowhere; re-roll rather than march on the spot
 		return
 	var move: Vector3 = (to_corner / remaining) * step
-	_resident.position += move + _separation_nudge(delta)
+	_resident.position += move + _separation_nudge(delta, step)
 
 
 func _begin_pause() -> void:
@@ -340,6 +402,7 @@ func _begin_walk() -> void:
 		_path = PackedVector3Array([waypoint])
 	_path_index = 0
 	_face(_path[_path_index] - _resident.position)
+	_reset_leg_progress()
 
 	_state = State.WALKING
 	if _run_clip != "" and _rng.randf() < RUN_PROBABILITY:
@@ -440,11 +503,33 @@ func _ensure_playing() -> void:
 		_player.play(_expected_clip)
 
 
+## Clears the watchdog's reading. Called at the start of every leg and at every corner.
+func _reset_leg_progress() -> void:
+	_leg_best_distance = INF
+	_no_progress_seconds = 0.0
+
+
+## Records this tick's distance to the current corner and answers whether the leg is still
+## worth walking. False once `STALL_TIMEOUT_SECONDS` has passed with no meaningful gain —
+## `ARRIVAL_EPSILON_TILES` is reused as "meaningful" because it is already this file's
+## definition of a distance too small to act on.
+func _note_progress(remaining: float, delta: float) -> bool:
+	if remaining < _leg_best_distance - ARRIVAL_EPSILON_TILES:
+		_leg_best_distance = remaining
+		_no_progress_seconds = 0.0
+		return true
+	_no_progress_seconds += delta
+	return _no_progress_seconds < STALL_TIMEOUT_SECONDS
+
+
 ## Soft per-tick push away from any OTHER resident within `SEPARATION_DISTANCE_TILES` —
 ## reduces walking-through-each-other, does NOT guarantee it (soft steering, not hard
 ## collision — human-confirmed decision). Only applied while WALKING: a PAUSED resident
 ## does not need to dodge, and nudging a standing-still pose would fight its "at rest" read.
-func _separation_nudge(delta: float) -> Vector3:
+## `step` is this tick's travel distance; the returned push is clamped to
+## `SEPARATION_MAX_STEP_FRACTION` of it so it can never cancel forward motion — see that
+## constant for the deadlock this closes.
+func _separation_nudge(delta: float, step: float) -> Vector3:
 	if not _nearby_resident_provider.is_valid():
 		return Vector3.ZERO
 	var nearby: Array = _nearby_resident_provider.call()
@@ -459,4 +544,5 @@ func _separation_nudge(delta: float) -> Vector3:
 			continue
 		var strength: float = (SEPARATION_DISTANCE_TILES - dist) / SEPARATION_DISTANCE_TILES
 		push += (away / dist) * strength
-	return push * SEPARATION_STRENGTH_TILES_PER_SECOND * delta
+	var nudge: Vector3 = push * SEPARATION_STRENGTH_TILES_PER_SECOND * delta
+	return nudge.limit_length(step * SEPARATION_MAX_STEP_FRACTION)

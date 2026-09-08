@@ -2,10 +2,77 @@
 ; Source: source-content/assets/Farm Animals by @Quaternius/Blends/Sheep.blend
 ; Format: blend (no gltf in pack; blend carries 2 of the 2 required clips vs fbx's 1)
 ; Every value below was ruled by the human at this run's checkpoint.
-[gd_resource type="Resource" script_class="AnimalDefinition" load_steps=3 format=3]
+;
+; TIERS — RE-SPEC 2026-09-04 (habitat tiers).
+;
+; PROPOSAL, NOT A DECISION. Every divisor and cap below is this design's own first-pass
+; proposal awaiting human sign-off, per the project rule that all tuning values are the
+; human's. Source: docs/superpowers/specs/2026-09-04-habitat-tiers-design.md § 9.
+;
+; TWO TIERS: "base" (`open_grass/4` `people/3` — a sheep follows the villagers who keep it,
+; not a building) and "flock" (the same needs plus `mill`, arriving in groups of 4) — wool
+; needs somewhere to be milled, so a windmill nearby is what grows a pair into a flock.
+;
+; INTERPRETATION FLAG: the spec table writes the flock tier's added need as bare `mill`,
+; with no `/divisor` and no explicit `*`. Read here as GATE_ONLY (present-or-not, matching
+; the windmill's role as a landmark rather than a scaling resource) — the human should
+; confirm this reading or supply a divisor.
+;
+; The legacy flat fields (habitat_needs / tiles_per_individual / max_individuals) are LEFT
+; IN PLACE and are now inert: `effective_tiers()` prefers `tiers` when non-empty. They are
+; retained so a rollback is a one-line edit rather than a re-authoring.
+[gd_resource type="Resource" script_class="AnimalDefinition" load_steps=13 format=3]
 
 [ext_resource type="Script" path="res://scripts/definitions/animal_definition.gd" id="1_schema"]
 [ext_resource type="PackedScene" path="res://assets/animals/sheep/Sheep.tscn" id="2_model"]
+[ext_resource type="Script" path="res://scripts/definitions/habitat_need.gd" id="3_need"]
+[ext_resource type="Script" path="res://scripts/definitions/habitat_tier.gd" id="4_tier"]
+
+[sub_resource type="Resource" id="need_base_grass"]
+script = ExtResource("3_need")
+tag = "open_grass"
+radius = 0
+tiles_per_individual = 4
+
+[sub_resource type="Resource" id="need_base_people"]
+script = ExtResource("3_need")
+tag = "people"
+radius = 0
+tiles_per_individual = 3
+
+[sub_resource type="Resource" id="tier_base"]
+script = ExtResource("4_tier")
+id = "base"
+needs = Array[Resource]([SubResource("need_base_grass"), SubResource("need_base_people")])
+limits = Array[Resource]([])
+max_individuals = 3
+arrival_group_size = 1
+
+[sub_resource type="Resource" id="need_flock_grass"]
+script = ExtResource("3_need")
+tag = "open_grass"
+radius = 0
+tiles_per_individual = 4
+
+[sub_resource type="Resource" id="need_flock_people"]
+script = ExtResource("3_need")
+tag = "people"
+radius = 0
+tiles_per_individual = 3
+
+[sub_resource type="Resource" id="need_flock_mill"]
+script = ExtResource("3_need")
+tag = "mill"
+radius = 0
+tiles_per_individual = 0
+
+[sub_resource type="Resource" id="tier_flock"]
+script = ExtResource("4_tier")
+id = "flock"
+needs = Array[Resource]([SubResource("need_flock_grass"), SubResource("need_flock_people"), SubResource("need_flock_mill")])
+limits = Array[Resource]([])
+max_individuals = 8
+arrival_group_size = 4
 
 [resource]
 script = ExtResource("1_schema")
@@ -19,6 +86,8 @@ scout_radius = 8
 capacity_radius = 0
 tiles_per_individual = 5
 max_individuals = 6
+tiers = Array[Resource]([SubResource("tier_base"), SubResource("tier_flock")])
+emits_tags = Array[String]([])
 model_scenes = Array[PackedScene]([ExtResource("2_model")])
 ; fact_text_pool REPLACED by scripts/fact_card_pipeline.py (2026-08-30) -- AWAITING STEP-8 HUMAN SIGN-OFF, not yet reviewed.
 fact_text_pool = Array[String](["Sheep are amazing at remembering faces—they can recognize and remember up to 50 different sheep and humans for over two years!", "Sheep have super-wide vision that stretches almost all the way around their heads, so they can see behind themselves without turning around!"])

@@ -1,1 +1,40 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128"><rect width="124" height="124" x="2" y="2" fill="#363d52" stroke="#212532" stroke-width="4" rx="14"/><g fill="#fff" transform="translate(12.322 12.322)scale(.101)"><path d="M105 673v33q407 354 814 0v-33z"/><path fill="#478cbf" d="m105 673 152 14q12 1 15 14l4 67 132 10 8-61q2-11 15-15h162q13 4 15 15l8 61 132-10 4-67q3-13 15-14l152-14V427q30-39 56-81-35-59-83-108-43 20-82 47-40-37-88-64 7-51 8-102-59-28-123-42-26 43-46 89-49-7-98 0-20-46-46-89-64 14-123 42 1 51 8 102-48 27-88 64-39-27-82-47-48 49-83 108 26 42 56 81zm0 33v39c0 276 813 276 814 0v-39l-134 12-5 69q-2 10-14 13l-162 11q-12 0-16-11l-10-65H446l-10 65q-4 11-16 11l-162-11q-12-3-14-13l-5-69z"/><path d="M483 600c0 34 58 34 58 0v-86c0-34-58-34-58 0z"/><circle cx="725" cy="526" r="90"/><circle cx="299" cy="526" r="90"/></g><g fill="#414042" transform="translate(12.322 12.322)scale(.101)"><circle cx="307" cy="532" r="60"/><circle cx="717" cy="532" r="60"/></g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="128" height="128" role="img" aria-label="Wildhaven">
+  <!--
+    Wildhaven mark — a paw badge.
+
+    The GDD already uses "paw badges" as the far-zoom animal LOD, so the mark is the
+    game's own visual token promoted to brand. Palette is lifted from the title screen
+    (project/scenes/TitleScreen.tscn) and the landing page:
+      sky gradient  #8FD3EF -> #CEEFE3 (70%) -> #F6EFC9
+      ink (brown)   #6B4A2B
+      sand border   #E6D3A6
+
+    Ink-on-sky, not cream-on-sky: cream on the sky gradient is ~1.5:1 contrast and
+    dissolves at 16px. Ink brown on sky is ~4.6:1 and still reads as a paw in a tab strip.
+
+    Every toe and the pad is a rounded blob — no points, no claws (art.md picture-book rule).
+  -->
+  <defs>
+    <linearGradient id="wh-sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0"   stop-color="#8FD3EF"/>
+      <stop offset="0.7" stop-color="#CEEFE3"/>
+      <stop offset="1"   stop-color="#F6EFC9"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="128" height="128" rx="112" fill="url(#wh-sky)"/>
+  <!-- Hairline inner border so the light tile still has an edge on a white tab bar. -->
+  <rect x="5" y="5" width="502" height="502" rx="107" fill="none" stroke="#E6D3A6" stroke-width="10"/>
+
+  <g fill="#6B4A2B" transform="translate(0 -12)">
+    <!-- Geometry is tuned for the 16px tab render, not the 180px one: the toes are
+         spread until the gaps between them survive at ~1.5px, otherwise all four
+         smear into a single bar and the paw stops reading. -->
+    <!-- pad: wide rounded blob, slightly narrower at the top -->
+    <path d="M256 273C325 273 366 306 366 350C366 397 318 423 256 423C194 423 146 397 146 350C146 306 187 273 256 273Z"/>
+    <!-- toes -->
+    <ellipse cx="104" cy="262" rx="42" ry="50" transform="rotate(-22 104 262)"/>
+    <ellipse cx="190" cy="160" rx="43" ry="53" transform="rotate(-9 190 160)"/>
+    <ellipse cx="322" cy="160" rx="43" ry="53" transform="rotate(9 322 160)"/>
+    <ellipse cx="408" cy="262" rx="42" ry="50" transform="rotate(22 408 262)"/>
+  </g></svg>

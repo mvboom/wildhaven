@@ -30,10 +30,52 @@
 ;
 ; news_reports intentionally empty — News Report pools for this pool are a separate, later
 ; purchase (not part of Content Pipeline step 4/5 for this dispatch).
-[gd_resource type="Resource" script_class="AnimalDefinition" load_steps=3 format=3]
+;
+; TIERS — RE-SPEC 2026-09-04 (habitat tiers).
+;
+; PROPOSAL, NOT A DECISION. Every divisor below is this design's own first-pass proposal
+; awaiting human sign-off, per the project rule that all tuning values are the human's.
+; Source: docs/superpowers/specs/2026-09-04-habitat-tiers-design.md § 9.
+;
+; PERSON CATEGORY. Single tier "companion": `house*` `rocks/4` `people/3` — `rocks` is the
+; distinguisher from Pug (also `house*` + `people`), keeping the two breeds' signatures
+; apart the same way `rocks` separates Alpaca from the rest of the Domesticated cluster.
+;
+; The legacy flat fields (habitat_needs / tiles_per_individual / max_individuals) are LEFT
+; IN PLACE and are now inert: `effective_tiers()` prefers `tiers` when non-empty. They are
+; retained so a rollback is a one-line edit rather than a re-authoring.
+[gd_resource type="Resource" script_class="AnimalDefinition" load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scripts/definitions/animal_definition.gd" id="1_schema"]
 [ext_resource type="PackedScene" path="res://assets/animals/shiba_inu/ShibaInu.tscn" id="2_model"]
+[ext_resource type="Script" path="res://scripts/definitions/habitat_need.gd" id="3_need"]
+[ext_resource type="Script" path="res://scripts/definitions/habitat_tier.gd" id="4_tier"]
+
+[sub_resource type="Resource" id="need_companion_house"]
+script = ExtResource("3_need")
+tag = "house"
+radius = 0
+tiles_per_individual = 0
+
+[sub_resource type="Resource" id="need_companion_rocks"]
+script = ExtResource("3_need")
+tag = "rocks"
+radius = 0
+tiles_per_individual = 4
+
+[sub_resource type="Resource" id="need_companion_people"]
+script = ExtResource("3_need")
+tag = "people"
+radius = 0
+tiles_per_individual = 3
+
+[sub_resource type="Resource" id="tier_companion"]
+script = ExtResource("4_tier")
+id = "companion"
+needs = Array[Resource]([SubResource("need_companion_house"), SubResource("need_companion_rocks"), SubResource("need_companion_people")])
+limits = Array[Resource]([])
+max_individuals = 6
+arrival_group_size = 1
 
 [resource]
 script = ExtResource("1_schema")
@@ -47,6 +89,8 @@ scout_radius = 8
 capacity_radius = 0
 tiles_per_individual = 2
 max_individuals = 6
+tiers = Array[Resource]([SubResource("tier_companion")])
+emits_tags = Array[String]([])
 model_scenes = Array[PackedScene]([ExtResource("2_model")])
 ; fact_text_pool REPLACED by scripts/fact_card_pipeline.py (2026-08-17) -- AWAITING STEP-8 HUMAN SIGN-OFF, not yet reviewed.
 fact_text_pool = Array[String](["Shiba Inus are small dogs from Japan with fluffy double coats and distinctive white markings. These spirited pups form strong, loyal bonds with their families and are confident, independent thinkers!", "Look closely at a Shiba Inu's tail—it curls up and loops over their back in a beautiful curve!"])

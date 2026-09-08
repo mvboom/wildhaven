@@ -24,7 +24,9 @@ extends QATestCase
 ## suite is the TERRAIN side — the structural construction that makes the species-side
 ## check cheap.
 
-const EXPECTED_TERRAIN_COUNT: int = 6
+## 6 v1 terrains + the habitat-tiers ruling's 3 additions (Meadow, Scrub, Snowfield —
+## task-8-brief.md). None of the 3 touch wild_grass.tres or the derivation itself.
+const EXPECTED_TERRAIN_COUNT: int = 9
 
 
 ## True when `def.validate()` reports the inert-land invariant specifically.
@@ -113,12 +115,16 @@ func _init() -> void:
 		"derive_bare_tags() with NO wild_grass returns empty — the documented hazard, covered by assertion 1")
 
 	# --- the still-hardcoded AnimalDefinition side -------------------------------
-	# Recorded, not asserted as a failure, and deliberately not fixed here.
-	check_eq(AnimalDefinition.BARE_TAGS, PackedStringArray(["open_grass", "quiet"]),
-		"AnimalDefinition.BARE_TAGS is still the hardcoded pair (pinned so a change is deliberate)")
+	# RE-POINTED 2026-09-04 (habitat-tiers ruling, spec OQ-F): `quiet` was RETIRED from
+	# `HABITAT_TAGS` — a `built` `HabitatLimit` does its job strictly better — and BARE_TAGS
+	# had to follow, because every entry there must resolve inside the shared vocabulary
+	# (test_inert_land_invariant.gd asserts exactly that). Old value ["open_grass", "quiet"]
+	# -> new value ["open_grass"]; still recorded, not asserted as a failure.
+	check_eq(AnimalDefinition.BARE_TAGS, PackedStringArray(["open_grass"]),
+		"AnimalDefinition.BARE_TAGS is still the hardcoded singleton (pinned so a change is deliberate)")
 	note_expected_pending(
 		"AnimalDefinition.BARE_TAGS is hardcoded and DISAGREES with the derivation",
-		"animal_definition.gd:60 holds [\"open_grass\",\"quiet\"]; derive_bare_tags() over real data is []. "
+		"animal_definition.gd holds [\"open_grass\"]; derive_bare_tags() over real data is []. "
 		+ "The hardcoded set is a STRICT SUPERSET of the derived one, so the species-side subset check is "
 		+ "OVER-enforced, never under-enforced — the safe direction to err for a pillar invariant. "
 		+ "Reconciling them (making AnimalDefinition read the derivation) is Tier 1 row 6's work; "

@@ -12,7 +12,6 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/NewsReportToast.tscn" id="8"]
 [ext_resource type="Script" path="res://scripts/ui/news_report_presenter.gd" id="10"]
 [ext_resource type="PackedScene" path="res://scenes/ui/MenuWindow.tscn" id="13"]
-[ext_resource type="PackedScene" path="res://scenes/ui/NotificationFeed.tscn" id="14"]
 [ext_resource type="PackedScene" path="res://scenes/ui/CoachChip.tscn" id="17"]
 
 [sub_resource type="StyleBoxFlat" id="HudPanel"]
@@ -371,12 +370,8 @@ unique_name_in_owner = true
 [node name="DisplacementNotice" parent="." instance=ExtResource("6")]
 unique_name_in_owner = true
 
-[node name="NotificationFeed" parent="." instance=ExtResource("14")]
-unique_name_in_owner = true
-
-; Task 7 — the onboarding coach's chip. Added AFTER NotificationFeed so it draws above the HUD
-; (and above NotificationFeed's own entries, which never compete for the same screen real
-; estate the coach points at), but BEFORE MenuWindow below: `GameUI._process()` already refuses
+; Task 7 — the onboarding coach's chip. Added AFTER the fact card and displacement notice so it
+; draws above the HUD, but BEFORE MenuWindow below: `GameUI._process()` already refuses
 ; to show a new chip while a modal is open (the same suppression `Crosshair` applies), and this
 ; draw order means even a chip already on screen the instant a modal opens is covered by it
 ; rather than floating on top, belt-and-suspenders with that script-side check.

@@ -27,7 +27,9 @@ const WORLD_PATH: String = "res://scenes/Main.tscn"
 const EXPECTED_STARTING_WOOD: int = 50
 const EXPECTED_CULTIVATED_COST: int = 2
 const EXPECTED_HOUSE_COST: int = 15
-const EXPECTED_FREE_TERRAINS: Array[String] = ["forest", "grass", "rock", "water", "wild_grass"]
+## Includes the habitat-tiers ruling's 3 additions (Meadow, Scrub, Snowfield —
+## task-8-brief.md) — all natural terrain, all free, per the same pricing rule.
+const EXPECTED_FREE_TERRAINS: Array[String] = ["forest", "grass", "meadow", "rock", "scrub", "snowfield", "water", "wild_grass"]
 
 ## Forest tiles painted for the accrual measurement, and again for the doubling check.
 const FOREST_BATCH: int = 5

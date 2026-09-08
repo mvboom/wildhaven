@@ -1,0 +1,99 @@
+; CommonTree3 — Forest terrain variant: a third ROUND-CANOPY broadleaf, matching CommonTree1
+; and CommonTree2 exactly in texture set, bark and leaf language.
+;
+; THIS SLOT USED TO BE A CONIFER, AND THE CONIFER IS NOT COMING BACK FROM THIS KIT. A narrow
+; tapered pine was added on 2026-08-16 to answer "every tree looks the same", removed later as
+; the project's only Poly Pizza asset, restored as MegaKit Pine1 during the standardisation, and
+; then removed AGAIN on 2026-09-08 after a human look at all five variants side by side. The
+; reason is in the assets, not in taste:
+;
+;   - Pine1 renders as a SOLID CONE. Its foliage is `Leaf_Pine_C.png`, a single flat frond
+;     silhouette, over only 770 canopy triangles — against CommonTree1's 1920 of individually
+;     cut leaves. It reads as a different KIND of asset beside its siblings, not a different
+;     species.
+;   - ALL FIVE pines in the kit (Pine_1..5) use that same frond texture. Pine_4 and Pine_5 carry
+;     more canopy geometry (1210 / 1158 tris) and would break up more, but none of them has
+;     CommonTree's leaf-cutout look. There is no pine here that matches.
+;   - The tall layered conifers in the pack's own Preview_4.jpg are NOT in this download.
+;     `Leaves_GiantPine_C.png` ships in Textures/, but no GiantPine mesh exists in glTF, FBX or
+;     OBJ — the free Standard set is 68 of 116 models and the giant pines are among the 48 that
+;     are not included. The preview advertises the PRO kit.
+;
+; So the conifer silhouette is UNAVAILABLE from the standardised pack, not merely unchosen.
+; Re-adding one means either buying the PRO kit or accepting a second pack in Forest, which is
+; the exact thing the standardisation removed. Do not re-add Pine1 as a look fix.
+;
+; SCALE: raw mesh AABB height 9.42519 -> scaled 0.26525 for the ~2.5 tile-unit canopy every
+; Forest tree targets (CommonTree1's shipped 0.344 x 7.264786 = 2.499). Height stays a control
+; variable across the terrain; only silhouette and foliage differ.
+;
+; 1800 canopy triangles — nearly CommonTree1's 1920 — so it carries the same leaf density and
+; will not read as the "cheap" one of the three.
+;
+; SHORTENED TO 1.9 TILE-UNITS (2026-09-08, human ruling: "lower the common tree 3, by even
+; more"). Scale 0.26525 -> 0.20159 against a raw mesh AABB height of 9.42519
+; (0.20159 x 9.42519 = 1.900).
+;
+; THE THREE BROADLEAF TREES NOW FORM A DELIBERATE HEIGHT LADDER, and this is the shortest rung:
+;   CommonTree1  2.5 tile-units  "Tree - Tall"
+;   CommonTree2  2.2             "Tree - Medium"
+;   CommonTree3  1.9             "Tree - Short"
+; Even 0.3-unit steps. This REPLACES the older "height is a control variable, only silhouette
+; differs" rule that the other Forest headers state — with three near-identical round-canopy
+; meshes, height IS the variety, and an even canopy line was the thing that read as monotonous.
+; TwistedTree1 and BushCommon are outside the ladder: the first is a different silhouette
+; entirely, the second is undergrowth at the ~0.6 shrub class.
+;
+; If a fourth broadleaf is ever added, extend the ladder rather than parking it at 2.5 — three
+; graded heights and one more at the top would undo the effect.
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="PackedScene" uid="uid://dt3b30as44ghq" path="res://assets/terrain/common_tree_3/CommonTree_3.gltf" id="1_model"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_slab"]
+size = Vector3(1.0, 0.2, 1.0)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_slab"]
+albedo_color = Color(0.16, 0.4, 0.22, 1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_patch1"]
+size = Vector2(0.42, 0.36)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_patch_moss"]
+albedo_color = Color(0.11, 0.32, 0.16, 1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_patch2"]
+size = Vector2(0.3, 0.34)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_patch_litter"]
+albedo_color = Color(0.3, 0.22, 0.13, 1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_patch3"]
+size = Vector2(0.26, 0.3)
+
+[node name="CommonTree3" type="Node3D"]
+
+[node name="Slab" type="Node3D" parent="."]
+
+[node name="Ground" type="MeshInstance3D" parent="Slab"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+mesh = SubResource("BoxMesh_slab")
+material_override = SubResource("StandardMaterial3D_slab")
+
+[node name="FloorPatch_1_Moss" type="MeshInstance3D" parent="Slab"]
+transform = Transform3D(0.965926, 0, -0.258819, 0, 1, 0, 0.258819, 0, 0.965926, -0.18, 0.001, -0.12)
+mesh = SubResource("PlaneMesh_patch1")
+material_override = SubResource("StandardMaterial3D_patch_moss")
+
+[node name="FloorPatch_2_Litter" type="MeshInstance3D" parent="Slab"]
+transform = Transform3D(0.642788, 0, -0.766044, 0, 1, 0, 0.766044, 0, 0.642788, 0.2, 0.001, 0.15)
+mesh = SubResource("PlaneMesh_patch2")
+material_override = SubResource("StandardMaterial3D_patch_litter")
+
+[node name="FloorPatch_3_Moss" type="MeshInstance3D" parent="Slab"]
+transform = Transform3D(-0.173648, 0, -0.984808, 0, 1, 0, 0.984808, 0, -0.173648, 0.05, 0.001, -0.28)
+mesh = SubResource("PlaneMesh_patch3")
+material_override = SubResource("StandardMaterial3D_patch_moss")
+
+[node name="Model" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.20159, 0, 0, 0, 0.20159, 0, 0, 0, 0.20159, 0, 0, 0)

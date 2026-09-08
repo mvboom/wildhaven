@@ -8,13 +8,12 @@ extends CanvasLayer
 ##
 ##   WorldRoot.wood_changed        -> GameHud.set_wood              (read-only, never flashes)
 ##   WorldRoot.resident_arrived    -> FactCard                      (row 7's signature moment, FIRST-EVER arrival only)
-##   WorldRoot.resident_arrived    -> NotificationFeed               (row 7, every REPEAT arrival)
 ##   WorldRoot.resident_arrived    -> GameHud counters + FieldGuide (row 11, a resident landed)
 ##   WorldRoot.resident_departed   -> GameHud counters + FieldGuide (row 11, on top of row 10)
 ##   WorldRoot.tile_changed        -> TapRouter.invalidate_preview  (row 6's live preview)
-##   WorldRoot.displacement_warned -> NotificationFeed               (row 10's informed consent, non-blocking)
-##   WorldRoot.resident_relocated  -> DisplacementNotice            (row 10, outcome one — UNCHANGED, still the toast)
-##   WorldRoot.resident_departed   -> DisplacementNotice            (row 10, outcome two — UNCHANGED, still the toast)
+##   WorldRoot.displacement_warned -> DisplacementNotice            (row 10's informed consent — PLAYER-CAUSED ONLY, see the handler)
+##   WorldRoot.resident_relocated  -> DisplacementNotice            (row 10, outcome one — PLAYER-CAUSED ONLY)
+##   WorldRoot.resident_departed   -> DisplacementNotice            (row 10, outcome two — PLAYER-CAUSED ONLY)
 ##   SettingsOverlay.hints_toggled -> NewsReportPresenter            (row 12, suppresses live)
 ##   left-click                    -> TapRouter                     (Pillar 3's one gesture)
 ##
@@ -49,7 +48,6 @@ const VILLAGER_SPECIES_ID: String = "human"
 @onready var news_report_toast: NewsReportToast = %NewsReportToast
 @onready var crosshair: Crosshair = %Crosshair
 @onready var news_report_presenter: NewsReportPresenter = %NewsReportPresenter
-@onready var notification_feed: NotificationFeed = %NotificationFeed
 @onready var coach_chip: CoachChip = %CoachChip
 
 var _world: WorldRoot = null
@@ -72,6 +70,18 @@ var _coach: OnboardingCoach = null
 ## marks a species hosted before the signal fires, so there is no "before this arrival" moment
 ## left at that layer. This snapshot is what supplies one instead.
 var _known_before_session: Array[String] = []
+
+## THE LATCH: was the settlement now running the player's own doing? Set by
+## `_on_displacement_warned()` and read by the two consequence handlers below, which decide
+## whether the move marker and the banner line appear at all.
+##
+## SAFE BECAUSE THE ORDERING IS SYNCHRONOUS AND STRUCTURAL, NOT A RACE. `GentleDisplacement.
+## _settle()` emits `displacement_warned` and then calls `_apply()` for every affected home in
+## the same call, on the same frame — that is gdd.md's "warning first and acting after", and it
+## is why no consequence can reach the handlers below without its own warning having set this
+## first. `test_displacement_attribution.gd` asserts that ordering directly, so a future edit
+## that made settlement asynchronous would fail there rather than silently mislabel a banner.
+var _settlement_player_caused: bool = false
 
 
 func _ready() -> void:
@@ -198,7 +208,7 @@ func bind_world() -> void:
 			func(_id: String, _p: Vector3) -> void: _coach.notice_arrival()
 		)
 
-	tap_router.attach(_world, hud, fact_card, notification_feed, tap_cue, crosshair)
+	tap_router.attach(_world, hud, fact_card, tap_cue, crosshair)
 
 
 func world() -> WorldRoot:
@@ -233,19 +243,26 @@ func _on_wood_changed(amount: int) -> void:
 
 
 ## Row 7's signature moment, but only on a species' FIRST-EVER arrival — the payoff the
-## core loop exists to deliver (gdd.md -> Core Loop step 4). Every repeat arrival of an
-## already-known species routes to `notification_feed` instead, and Inspect-tap replay
-## (`TapRouter._show_species_card()`) always routes there too, never back to this card
-## (spec.md -> "Not depth axes" still applies to Pillar 4's curiosity path — it just isn't
-## this widget any more).
+## core loop exists to deliver (gdd.md -> Core Loop step 4).
+##
+## A REPEAT ARRIVAL SHOWS NOTHING AT ALL, AND THAT ABSENCE IS THE POINT. It used to open an
+## entry on a right-side rolling feed; the feed is deleted. The reason is a rate, not a taste:
+## `HabitatSimulation._move_in()` emits this signal ONCE PER INDIVIDUAL, and a neighbourhood
+## with room for several fills one at a time (each landing re-marks it dirty, enqueuing the
+## next on a 20-60 s delay — `ArrivalQueue`). N settled sites therefore announce something
+## every (20-60)/N seconds, forever, and `_known_before_session` is seeded from
+## `species_hosted_ids()` at load, so in every session after the first that is EVERY arrival.
+## No text surface survives that; the feed was permanently occupied and churning.
+##
+## What tells the player instead: the animal itself appearing in the world, the row-11 counters
+## below, and the Field Guide's permanent record. Text is reserved for the two moments that
+## are actually singular — a species arriving for the first time ever (this card) and a
+## deliberate Inspect tap (`TapRouter._show_species_card()`, which opens this same card).
 func _on_resident_arrived(species_id: String, _world_position: Vector3) -> void:
 	var species: AnimalDefinition = tap_router.species_definition(species_id)
-	if species != null:
-		if _known_before_session.has(species_id):
-			notification_feed.show_fact(species.display_name, species.effective_fact_text())
-		else:
-			_known_before_session.append(species_id)
-			fact_card.show_species(species)
+	if species != null and not _known_before_session.has(species_id):
+		_known_before_session.append(species_id)
+		fact_card.show_species(species)
 	# A move-in changes what the land under the cursor is (somebody now lives there), and it is
 	# not one of the `tile_changed` events, so it is invalidated explicitly.
 	tap_router.invalidate_preview()
@@ -264,14 +281,34 @@ func _on_tile_changed(_x: int, _z: int) -> void:
 
 ## ROW 10, THE WARNING. **One dialogue per emission**, summarising every affected home — the
 ## payload already is one gesture's worth, so there is nothing here to batch, dedupe or
-## rate-limit, and "a warning is never suppressed while its consequence proceeds" holds because
-## nothing in this path can decline to show one.
+## rate-limit.
 ##
 ## A warning arriving while an older one is still on screen replaces it. It cannot happen in one
 ## settlement (one emission, one dialogue) and it is the right answer when it does: two gestures
 ## have settled, and the newer one describes the world the player is looking at.
+##
+## THE ONE THING THAT CAN DECLINE TO SHOW A PANEL, AND WHY IT IS NOT A SUPPRESSION. gdd.md
+## promises disclosure for "the warned, reversible result of the player's own **settled
+## choice**, never the game's initiative". `GentleDisplacement` opens a settlement gesture from
+## two places, and only one of them is that: `on_edit()` (the player painted, built or removed
+## something) and `on_arrival()` (an animal landed, which rebuilds the tile-exclusivity map and
+## can push a neighbour over capacity). The second needs no player anywhere in the chain, and in
+## a settled world it fires continuously — which is what put a panel on screen every few seconds
+## with nobody touching the game, reading "This will be a different kind of place."
+## (`DisplacementCopy.LEAD_MIXED`, whose own definition is "a mode the UI cannot attribute" —
+## because there was no player action to attribute). Showing it was not disclosure; it was a
+## false statement about a change the player never made.
+##
+## So the gate narrows this surface to exactly what the pillar names, rather than removing it:
+## every player-caused displacement still warns, with no rate limit and no dedupe, and
+## `SettlementWindow.touch()`'s OR means an edit that joins an arrival-armed gesture warns too.
 func _on_displacement_warned(warning: Dictionary) -> void:
-	notification_feed.show_warning(warning)
+	# Set BEFORE the early return: the consequence handlers read it whether or not a panel is
+	# shown, and an arrival-caused settlement must leave it false rather than stale-true.
+	_settlement_player_caused = bool(warning.get("player_caused", false))
+	if not _settlement_player_caused:
+		return
+	displacement_notice.show_warning(warning)
 
 
 ## Outcome one, and the one that runs most often. `from_tile` is a grid coordinate, so it is put
@@ -280,13 +317,20 @@ func _on_displacement_warned(warning: Dictionary) -> void:
 func _on_resident_relocated(
 	species_id: String, from_tile: Vector2i, _to_tile: Vector2i, world_position: Vector3
 ) -> void:
-	var from_position: Vector3 = world_position
-	if _world != null:
-		from_position = _world.grid_to_world(from_tile.x, from_tile.y)
-	displacement_notice.note_relocation(
-		species_id, _display_name_of(species_id), from_position, world_position
-	)
+	# SILENT WHEN THE PLAYER DID NOT CAUSE IT — the same rule the warning follows, and the same
+	# reason. An arrival-caused relocation is a home shuffling itself around the tile-exclusivity
+	# map with nobody touching the game; narrating it put a banner and a move marker on screen
+	# every few seconds. The relocation itself still happens and is still visible in the world —
+	# what stops is the game talking about its own bookkeeping.
+	if _settlement_player_caused:
+		var from_position: Vector3 = world_position
+		if _world != null:
+			from_position = _world.grid_to_world(from_tile.x, from_tile.y)
+		displacement_notice.note_relocation(
+			species_id, _display_name_of(species_id), from_position, world_position
+		)
 	# Somebody's home is no longer where it was, so the read under a resting cursor changed.
+	# UNCONDITIONAL: the world changed either way, and a stale preview would be a lie.
 	tap_router.invalidate_preview()
 
 
@@ -297,9 +341,12 @@ func _on_resident_relocated(
 func _on_resident_departed(
 	species_id: String, _home_tile: Vector2i, _individuals: int, world_position: Vector3
 ) -> void:
-	displacement_notice.note_departure(
-		species_id, _display_name_of(species_id), world_position
-	)
+	# Silent when the player did not cause it — see `_on_resident_relocated()`.
+	if _settlement_player_caused:
+		displacement_notice.note_departure(
+			species_id, _display_name_of(species_id), world_position
+		)
+	# Unconditional below: the counters and the preview describe the world, not the gesture.
 	tap_router.invalidate_preview()
 	# Row 11. A departure can drop Currently Resident and Village Population (never Species
 	# Hosted — that record is permanent, gdd.md -> Gentle Displacement), and the Field Guide's

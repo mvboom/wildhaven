@@ -26,7 +26,7 @@ const ARRIVAL_DELAY_MIN_SECONDS: float = 20.0
 const ARRIVAL_DELAY_MAX_SECONDS: float = 60.0
 
 
-## Entries: { "position": Vector2i, "species_id": String, "remaining": float }
+## Entries: { "position": Vector2i, "species_id": String, "remaining": float, "count": int }
 var _pending: Array[Dictionary] = []
 var _rng := RandomNumberGenerator.new()
 
@@ -54,15 +54,21 @@ func has_pending(position: Vector2i, species_id: String) -> bool:
 	return false
 
 
-## Enqueues one arrival on a randomised delay. No-op when one is already pending for this
-## site and species.
-func enqueue(position: Vector2i, species_id: String) -> bool:
+## Enqueues an arrival of `count` individuals at `position`, on a randomised delay. No-op
+## when one is already pending for this site and species.
+##
+## `count` comes from the qualifying tier's `arrival_group_size`, so deer arrive as a small
+## group and a lone fox arrives alone. It is re-checked at due time and may land partially
+## — see `HabitatSimulation._land_or_drop()`. Clamped to at least 1: a caller passing 0 or
+## negative still gets one arrival, not a silently-vanished queue entry.
+func enqueue(position: Vector2i, species_id: String, count: int = 1) -> bool:
 	if has_pending(position, species_id):
 		return false
 	_pending.append({
 		"position": position,
 		"species_id": AnimalDefinition.normalize_id(species_id),
 		"remaining": _rng.randf_range(ARRIVAL_DELAY_MIN_SECONDS, ARRIVAL_DELAY_MAX_SECONDS),
+		"count": maxi(count, 1),
 	})
 	return true
 
@@ -129,6 +135,7 @@ func to_save() -> Array[Dictionary]:
 			"position": [position.x, position.y],
 			"species_id": entry["species_id"] as String,
 			"remaining": float(entry["remaining"]),
+			"count": int(entry.get("count", 1)),
 		})
 	return out
 
@@ -179,10 +186,18 @@ func restore(entries: Array) -> void:
 			push_warning("ArrivalQueue: a saved arrival is a duplicate of one already restored; skipped.")
 			continue
 
+		# A save written before group arrivals has no `count`. Read it as 1, never as 0 — a 0
+		# would silently drop the arrival on load, exactly the class of bug this file's header
+		# warns against.
+		var count: int = int(entry.get("count", 1))
+		if count < 1:
+			count = 1
+
 		# A saved delay is honoured as saved — clamping it up to the fresh 20-60 s band would
 		# silently restart a wait the child had already spent most of.
 		_pending.append({
 			"position": position,
 			"species_id": species_id,
 			"remaining": maxf(0.0, float(remaining_raw)),
+			"count": count,
 		})

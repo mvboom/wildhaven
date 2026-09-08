@@ -54,6 +54,13 @@
 ; accumulation error) so neighboring slabs' edges touch with no gap. Y (height, 0.2)
 ; untouched. Applied identically across all 10 composed terrain scenes this pass touches —
 ; see content-pipeline-status.md -> Terrain for the full list.
+;
+; OCCLUSIONFADER REMOVED 2026-09-08 — ANY MENTION OF IT BELOW IS HISTORY. The per-resident
+; transparency fade (D-41 §4) flickered in play and was cut outright; the script, its scene node
+; and its two suites are gone. The "Slab" node stays, because every terrain scene is built
+; around it and removing it would restructure all 33 for no gain — but NO CODE LOOKS THAT NAME
+; UP ANY MORE. It is a grouping convention now, with no behaviour attached, so nothing breaks if
+; a new scene groups differently and nothing is gained by "restoring" the exemption.
 [gd_scene load_steps=8 format=3]
 
 [ext_resource type="PackedScene" uid="uid://pyt385qy8x3x" path="res://assets/terrain/common_tree_1/CommonTree_1.gltf" id="1_model"]

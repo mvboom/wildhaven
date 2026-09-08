@@ -271,8 +271,8 @@ text = "Back"
 
 [node name="RenameDialog" type="ConfirmationDialog" parent="."]
 unique_name_in_owner = true
-title = "[COPY] Rename World"
-dialog_text = "[COPY] Choose a new name for this world."
+title = "Rename World"
+dialog_text = "Choose a new name for this world."
 ok_button_text = "OK"
 cancel_button_text = "Cancel"
 
@@ -292,7 +292,7 @@ max_length = 40
 
 [node name="DeleteConfirmDialog" type="ConfirmationDialog" parent="."]
 unique_name_in_owner = true
-title = "[COPY] Delete World?"
-dialog_text = "[COPY] This can't be undone."
+title = "Delete World?"
+dialog_text = "This can't be undone."
 ok_button_text = "OK"
 cancel_button_text = "Cancel"

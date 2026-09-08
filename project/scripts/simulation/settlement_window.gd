@@ -52,6 +52,7 @@ const GRACE_WINDOW_SECONDS: float = 12.0
 ##   "id": int, "remaining": float,
 ##   "tiles": Dictionary,  # Vector2i -> true, the edited tiles
 ##   "keys": Dictionary,   # String   -> true, the neighbourhoods this gesture covers
+##   "player_caused": bool,# see `touch()`
 ## }
 var _gestures: Array[Dictionary] = []
 var _next_id: int = 1
@@ -74,11 +75,28 @@ func pending_gestures() -> int:
 ## Merging is transitive by construction: every open gesture sharing a key with this edit is
 ## folded into one, which keeps the invariant that a neighbourhood belongs to at most one
 ## gesture and therefore appears in at most one warning.
-func touch(tile: Vector2i, keys: Array[String]) -> int:
+## WHAT `player_caused` IS FOR. A gesture can be opened by two very different things:
+## `GentleDisplacement.on_edit()` (the player terraformed, built or removed something) and
+## `GentleDisplacement.on_arrival()` (an animal landed, which rebuilds the tile-exclusivity map
+## and can push a NEIGHBOUR over capacity). Only the first is "the player's own settled choice"
+## that gdd.md's pillar promises a warning for; the second is the game's own initiative, and
+## warning about it produces copy that is simply untrue — `DisplacementCopy.LEAD_MIXED` ("This
+## will be a different kind of place.") asking a child about a change they never made.
+##
+## THE FLAG IS STICKY ACROSS A MERGE, deliberately, and OR is the only defensible rule: if any
+## part of what settled together was the player's doing, the whole settlement is theirs to be
+## told about. Under-reporting here would silently drop a real warning; over-reporting only
+## shows one extra panel for an edit the player did in fact make.
+##
+## This class still holds ONLY the timer — it does not act on the flag, it carries it. The
+## decision of what to show belongs to the presentation layer (`GameUI._on_displacement_warned`).
+func touch(tile: Vector2i, keys: Array[String], player_caused: bool = false) -> int:
 	if keys.is_empty():
 		return -1
 
-	var merged: Dictionary = {"id": 0, "remaining": 0.0, "tiles": {}, "keys": {}}
+	var merged: Dictionary = {
+		"id": 0, "remaining": 0.0, "tiles": {}, "keys": {}, "player_caused": player_caused,
+	}
 	var kept: Array[Dictionary] = []
 	var found: bool = false
 
@@ -93,6 +111,11 @@ func touch(tile: Vector2i, keys: Array[String]) -> int:
 		found = true
 		merged["tiles"].merge(gesture["tiles"])
 		merged["keys"].merge(gesture["keys"])
+		# STICKY, by OR — see `touch()`'s header. `get()` with a default rather than `[]` so a
+		# gesture dictionary built before this field existed cannot crash a merge.
+		merged["player_caused"] = (
+			bool(merged["player_caused"]) or bool(gesture.get("player_caused", false))
+		)
 
 	if not found:
 		merged["id"] = _next_id
@@ -133,6 +156,11 @@ func advance(delta: float) -> Array[Dictionary]:
 			still_open.append(gesture)
 	_gestures = still_open
 	return settled
+
+
+## Whether a settled gesture includes any edit the player themselves made. See `touch()`.
+static func is_player_caused(gesture: Dictionary) -> bool:
+	return bool(gesture.get("player_caused", false))
 
 
 ## The edited tiles of a settled gesture, in insertion order.

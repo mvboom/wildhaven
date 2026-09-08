@@ -1,0 +1,87 @@
+; TwistedTree1 — Forest terrain variant: the GNARLED silhouette, a third shape distinct from
+; both the round-canopy CommonTrees and Pine1's cone.
+;
+; Carries its own Bark_TwistedTree / Leaves_TwistedTree texture set rather than reusing the
+; CommonTree bark, so it reads as a different KIND of tree and not a reshaped one.
+;
+; SCALE: raw mesh AABB height 16.7255 (much larger source geometry than its siblings — the
+; factor looks wrong beside Pine1's 0.34 and is not) -> scaled 0.14948 for the same ~2.5
+; tile-unit canopy every Forest tree targets.
+;
+; STANDARDISED ONTO THE STYLIZED NATURE MEGAKIT (2026-09-08, human ruling: "make sure all of our
+; trees used the same Stylized Nature Megakit"). Forest previously drew from three packs at once;
+; the MegaKit is the one that also supplies the GROUND these trees stand on (grass.tres,
+; meadow.tres, wild_grass.tres all draw from it), which is the adjacency that reads hardest, so
+; it is the pack the whole terrain now uses. Source: Stylized Nature MegaKit (Standard/free),
+; Quaternius, CC0 1.0 Universal — License.txt re-checked per asset-import-pipeline.md's audit
+; gate. See project/attribution/sources/quaternius_stylized_nature_megakit.tres.
+;
+; SLAB AND FLOOR PATCHES ARE COPIED VERBATIM FROM CommonTree1.tscn — same forest green
+; Color(0.16, 0.4, 0.22), same 1.0 x 0.2 x 1.0 geometry (the 1.0 width is the established
+; cross-tile seam-gap fix, do not narrow it), same 3 moss/leaf-litter PlaneMesh patches at
+; y=0.001. Deliberately not a new taste call: every Forest variant shares one floor so the
+; terrain reads as one thing while the silhouettes differ.
+;
+; EVERYTHING GROUND-LEVEL NESTED UNDER ONE NODE NAMED "Slab" — the OcclusionFader exemption
+; convention; see CommonTree1.tscn's header for the mechanism.
+;
+; SCALE IS MEASURED, NOT GUESSED, but the TARGET is still a first-pass judgment call inherited
+; from CommonTree1.tscn (there is no GDD number for tree height) — FLAG FOR HUMAN SIGN-OFF.
+;
+; OCCLUSIONFADER REMOVED 2026-09-08 — ANY MENTION OF IT BELOW IS HISTORY. The per-resident
+; transparency fade (D-41 §4) flickered in play and was cut outright; the script, its scene node
+; and its two suites are gone. The "Slab" node stays, because every terrain scene is built
+; around it and removing it would restructure all 33 for no gain — but NO CODE LOOKS THAT NAME
+; UP ANY MORE. It is a grouping convention now, with no behaviour attached, so nothing breaks if
+; a new scene groups differently and nothing is gained by "restoring" the exemption.
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="PackedScene" uid="uid://c7jygct2rwm5w" path="res://assets/terrain/twisted_tree_1/TwistedTree_1.gltf" id="1_model"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_slab"]
+size = Vector3(1.0, 0.2, 1.0)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_slab"]
+albedo_color = Color(0.16, 0.4, 0.22, 1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_patch1"]
+size = Vector2(0.42, 0.36)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_patch_moss"]
+albedo_color = Color(0.11, 0.32, 0.16, 1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_patch2"]
+size = Vector2(0.3, 0.34)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_patch_litter"]
+albedo_color = Color(0.3, 0.22, 0.13, 1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_patch3"]
+size = Vector2(0.26, 0.3)
+
+[node name="TwistedTree1" type="Node3D"]
+
+[node name="Slab" type="Node3D" parent="."]
+
+[node name="Ground" type="MeshInstance3D" parent="Slab"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+mesh = SubResource("BoxMesh_slab")
+material_override = SubResource("StandardMaterial3D_slab")
+
+[node name="FloorPatch_1_Moss" type="MeshInstance3D" parent="Slab"]
+transform = Transform3D(0.965926, 0, -0.258819, 0, 1, 0, 0.258819, 0, 0.965926, -0.18, 0.001, -0.12)
+mesh = SubResource("PlaneMesh_patch1")
+material_override = SubResource("StandardMaterial3D_patch_moss")
+
+[node name="FloorPatch_2_Litter" type="MeshInstance3D" parent="Slab"]
+transform = Transform3D(0.642788, 0, -0.766044, 0, 1, 0, 0.766044, 0, 0.642788, 0.2, 0.001, 0.15)
+mesh = SubResource("PlaneMesh_patch2")
+material_override = SubResource("StandardMaterial3D_patch_litter")
+
+[node name="FloorPatch_3_Moss" type="MeshInstance3D" parent="Slab"]
+transform = Transform3D(-0.173648, 0, -0.984808, 0, 1, 0, 0.984808, 0, -0.173648, 0.05, 0.001, -0.28)
+mesh = SubResource("PlaneMesh_patch3")
+material_override = SubResource("StandardMaterial3D_patch_moss")
+
+[node name="Model" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.14948, 0, 0, 0, 0.14948, 0, 0, 0, 0.14948, 0, 0, 0)

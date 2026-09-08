@@ -96,7 +96,7 @@ second nested radius loop inside an evaluation that is already O(radius²).
 implementer would look.** [spec.md](spec.md)'s deepening table lists "**tag radius
 richness**" as *depth* for row 6, which means the thin form is the version without it.
 Model A also satisfies the design intent it appears to threaten: Fox needs `forest` **and**
-`cover`, and with a species radius of 8–12 tiles, "both within the radius" already *is*
+two tags from two sources, and with a per-need radius in the 2–16 band, "both within the radius" already *is*
 "forest near rock." The two-brushstroke composition survives.
 
 **Action:** one paragraph added to `spec.md` under Shared Patterns stating the thin tag

@@ -106,6 +106,14 @@ func _process(_delta: float) -> bool:
 	_world.presentation.set_process(false)
 	_preview = NeighborhoodPreview.new()
 
+	# RE-POINTED 2026-09-04 (habitat-tiers ruling): the rabbit's scarce need moved from free
+	# `rock` to `cultivated_field` (cost 2/tile). This suite paints several such blocks across
+	# its checks (the boundary sweep alone is up to 14 tiles), which the 50-Wood starting
+	# budget no longer comfortably covers alongside the `home`-band fixture below it. No check
+	# in this suite asserts on Wood, so resetting it high is a pure test-fixture fix, the same
+	# pattern `test_economy_rules.gd` / `test_removal_refund.gd` already use.
+	_world.wood.reset(1000)
+
 	_check_no_number_can_reach_the_screen()
 	_check_welcoming_is_the_qualification_predicate()
 	_check_every_reachable_band_is_wordless_of_digits()
@@ -213,9 +221,14 @@ func _check_welcoming_is_the_qualification_predicate() -> void:
 	# RE-POINTED (-> D-29 #1, `WorldGrid.START_TERRAIN_ID` "grass" -> "wild_grass"): "revealed
 	# ground already emits `open_grass` in quantity" stopped being true the moment the default
 	# flipped to tag-inert `wild_grass`. Paint an explicit `grass` border around the whole 5x3
-	# area the sweep below is about to paint `rock` into, generous enough (20 tiles) that
-	# `open_grass` never becomes the limiting need across the sweep — `cover` stays the one
-	# thing the sweep is actually measuring, exactly as the comment below always intended.
+	# area the sweep below is about to paint into, generous enough (20 tiles) that `open_grass`
+	# never becomes the limiting need across the sweep.
+	#
+	# RE-POINTED AGAIN 2026-09-04 (habitat-tiers ruling): `capacity_at()` now reads
+	# `AnimalDefinition.effective_tiers()`, which prefers the real `tiers` rabbit.tres now
+	# carries — base tier needs `open_grass/4` + `cultivated/4`, not `cover`. The sweep below
+	# paints `cultivated_field`, not `rock`; `cultivated` stays the one thing the sweep is
+	# actually measuring, exactly as the comment below always intended.
 	for x in range(SWEEP_TILE.x - 3, SWEEP_TILE.x + 4):
 		for z in range(SWEEP_TILE.y - 3, SWEEP_TILE.y + 2):
 			var inside_sweep: bool = (
@@ -225,10 +238,10 @@ func _check_welcoming_is_the_qualification_predicate() -> void:
 			if not inside_sweep:
 				_world.paint_tile(x, z, "grass")
 
-	# Cover tiles added one at a time under a fixed cursor. The rabbit needs `open_grass` +
-	# `cover` at 4 tiles per individual (roster.md's decided value, -> D-27 #2; this comment said
+	# Cultivated tiles added one at a time under a fixed cursor. The rabbit needs `open_grass` +
+	# `cultivated` at 4 tiles per individual (roster.md's decided value, -> D-27 #2; this comment said
 	# 12 until 2026-07-28), so the boundary is crossed exactly once and not at either endpoint —
-	# which is what makes the equivalence worth asserting. `cover` is the scarce need throughout:
+	# which is what makes the equivalence worth asserting. `cultivated` is the scarce need throughout:
 	# the border painted above supplies `open_grass` explicitly, so the sweep is measuring the
 	# tag the player is actually painting.
 	for painted in 15:
@@ -248,8 +261,8 @@ func _check_welcoming_is_the_qualification_predicate() -> void:
 			saw_welcoming = true
 			if boundary_at < 0:
 				boundary_at = painted
-		# add one more cover tile and go round again
-		_world.paint_tile(SWEEP_TILE.x - 2 + (painted % 5), SWEEP_TILE.y - 2 + (painted / 5), "rock")
+		# add one more cultivated tile and go round again
+		_world.paint_tile(SWEEP_TILE.x - 2 + (painted % 5), SWEEP_TILE.y - 2 + (painted / 5), "cultivated_field")
 
 	check_eq(disagreements, 0,
 		"THE BAND IS THE PREDICATE: `welcoming` == (some species has capacity >= 1) at %d of %d "
@@ -259,7 +272,7 @@ func _check_welcoming_is_the_qualification_predicate() -> void:
 	# above would hold trivially on a preview that always said one thing.
 	check(saw_wild, "...and the sweep really saw the `wild` side of the boundary")
 	check(saw_welcoming,
-		"...and the `welcoming` side, first at %d cover tiles" % boundary_at)
+		"...and the `welcoming` side, first at %d cultivated tiles" % boundary_at)
 	check(boundary_at > 0 and boundary_at < 14,
 		"...crossing it mid-sweep (at step %d of 15), not at an endpoint" % boundary_at)
 
@@ -283,6 +296,10 @@ func _check_every_reachable_band_is_wordless_of_digits() -> void:
 	# Land a real resident so the `home` band is reached the way a player reaches it.
 	# RE-POINTED (-> D-29 #1): `wild_grass` (the new default) supplies no `open_grass`, so the
 	# rabbit's other need is painted explicitly, same as the sweep above.
+	#
+	# RE-POINTED AGAIN 2026-09-04 (habitat-tiers ruling): rabbit.tres's base tier needs
+	# `open_grass/4` + `cultivated/4`, not `cover` — the block below is `cultivated_field`, not
+	# `rock`.
 	for x in range(HOME_ORIGIN.x - 1, HOME_ORIGIN.x + HOME_W + 1):
 		for z in range(HOME_ORIGIN.y - 1, HOME_ORIGIN.y + HOME_D + 1):
 			var inside_home: bool = (
@@ -293,7 +310,7 @@ func _check_every_reachable_band_is_wordless_of_digits() -> void:
 				_world.paint_tile(x, z, "grass")
 	for dx in HOME_W:
 		for dz in HOME_D:
-			_world.paint_tile(HOME_ORIGIN.x + dx, HOME_ORIGIN.y + dz, "rock")
+			_world.paint_tile(HOME_ORIGIN.x + dx, HOME_ORIGIN.y + dz, "cultivated_field")
 	for _i in 120:
 		_world.simulation.tick(0.0)
 	_world.simulation.tick(ArrivalQueue.ARRIVAL_DELAY_MAX_SECONDS + 1.0)
@@ -495,12 +512,17 @@ func _check_the_missing_near_miss_band() -> void:
 				grass_painted += 1
 	check(grass_painted >= 4, "painted %d grass tiles around `nearly` for open_grass" % grass_painted)
 
-	# Three cover tiles: one short of qualifying.
+	# RE-POINTED 2026-09-04 (habitat-tiers ruling): `capacity_at()` now reads
+	# `AnimalDefinition.effective_tiers()`, which prefers the real `tiers` rabbit.tres now
+	# carries — base tier needs `open_grass/4` + `cultivated/4`, not `cover`. Painted
+	# `cultivated_field`, not `rock`.
+	#
+	# Three cultivated tiles: one short of qualifying.
 	var painted: int = 0
 	for i in 3:
-		if world.paint_tile(nearly.x - 2 + (i % 5), nearly.y - 1 + (i / 5), "rock"):
+		if world.paint_tile(nearly.x - 2 + (i % 5), nearly.y - 1 + (i / 5), "cultivated_field"):
 			painted += 1
-	check_eq(painted, 3, "three cover tiles painted — one short of the fourth")
+	check_eq(painted, 3, "three cultivated tiles painted — one short of the fourth")
 
 	var preview := NeighborhoodPreview.new()
 	check_eq(world.capacity_at(nearly.x, nearly.y, "rabbit"), 0,
@@ -513,9 +535,9 @@ func _check_the_missing_near_miss_band() -> void:
 		"...exactly like bare ground: the preview cannot tell the player they are close")
 
 	# And the fourth tile flips it in one step — the very jump gdd.md wanted a ramp for.
-	world.paint_tile(nearly.x + 3, nearly.y + 1, "rock")
+	world.paint_tile(nearly.x + 3, nearly.y + 1, "cultivated_field")
 	check_eq(world.capacity_at(nearly.x, nearly.y, "rabbit"), 1,
-		"THE FOURTH cover tile is capacity 1 — the shipped rabbit's qualification boundary, "
+		"THE FOURTH cultivated tile is capacity 1 — the shipped rabbit's qualification boundary, "
 		+ "measured through the real `.tres` and not a synthetic species")
 	check_eq(preview.read(world, nearly), NeighborhoodPreview.BAND_WELCOMING,
 		"the FOURTH tile flips `wild` straight to `welcoming` with nothing in between")

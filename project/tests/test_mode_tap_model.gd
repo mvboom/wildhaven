@@ -263,17 +263,25 @@ func _check_inspect_names_the_building_on_the_tile() -> void:
 	check_eq(_hud.tile_readout_text(), "House",
 		"...and the readout is the building's name, and only that")
 
-	# A farm building is the case the old two-line readout rendered as a bare em dash: it emits
-	# no tags at all, so nothing but the name can identify it. Addressed by its
-	# REAL id, not the "farm_building" group key — `select_palette_option()` takes catalog ids
-	# only (a group key returns false and would silently leave the House selected).
+	# A farm building was the case the old two-line readout rendered as a bare em dash, back
+	# when every farm building emitted no tags at all. RE-POINTED 2026-09-04 (habitat-tiers
+	# Task 7): the Well now emits ["built", "water"] (the universal `built` exclusion handle
+	# plus the tag it shares with natural water), so it no longer emits zero tags — but the
+	# INVARIANT this test protects is unchanged and, if anything, now proven more strongly:
+	# the readout names the building from its display_name regardless of whether emitted_tags
+	# is empty or not. Addressed by its REAL id, not the "farm_building" group key —
+	# `select_palette_option()` takes catalog ids only (a group key returns false and would
+	# silently leave the House selected).
 	var barn_tile := Vector2i(20, 6)
 	_hud.set_mode(GameHud.Mode.BUILD)
 	check(_hud.select_palette_option("well"), "the Well is selectable by its catalog id")
 	check_eq(_tap(barn_tile), TapRouter.RESULT_PLACED, "a farm building is standing on a second tile")
 	var placed: PlaceableDefinition = _world.grid.get_building(barn_tile.x, barn_tile.y)
 	check(placed != null and not placed.display_name.is_empty(), "...and it has a display name")
-	check(placed.emitted_tags.is_empty(), "...and emits no tags, so only its name can identify it")
+	check_eq(PackedStringArray(placed.emitted_tags), PackedStringArray(["built", "water"]),
+		"...and now emits [\"built\", \"water\"] (habitat-tiers), yet the readout still resolves "
+		+ "to the display_name, not a tag list — the em-dash bug is about the readout logic, "
+		+ "not about which buildings happen to have zero tags")
 
 	_hud.set_mode(GameHud.Mode.INSPECT)
 	check_eq(_tap(barn_tile), TapRouter.RESULT_INSPECT, "an Inspect tap on it resolves to Inspect")
@@ -374,13 +382,14 @@ func _check_priority_rule_in_all_three_modes() -> void:
 	_hud.set_mode(GameHud.Mode.INSPECT)
 	check_eq(_router.handle_tap(screen), TapRouter.RESULT_RESIDENT,
 		"PRIORITY RULE in Inspect: the animal wins the tap (this is the replay path)")
-	# REPOINTED (Task 5, notification-surfaces): the replay routes to the feed now, never the
-	# big card — see `test_fact_card.gd`'s `_check_tap_to_replay_in_inspect()` for the same
-	# pattern.
-	check(not _card.is_open(), "...and the card does NOT replay — the tap routes to the feed instead")
-	var feed: NotificationFeed = _ui.notification_feed
-	check_eq(feed.entry_texts()[0], "%s. %s" % [species.display_name, species.effective_fact_text()],
-		"...the feed gains the replay entry instead, with the same verbatim copy")
+	# REPOINTED (remove-notification-feed): the replay opens the FACT CARD again — the rolling
+	# feed it briefly routed to is deleted. See `test_fact_card.gd`'s
+	# `_check_tap_to_replay_in_inspect()` for the same pattern, and note the dismiss below: a
+	# tap with the card up dismisses it, so every later tap in this check needs a closed card.
+	check(_card.is_open(), "...and the card DOES replay — a player-driven tap earns the card")
+	check_eq(_card.spoken_text(), "%s. %s" % [species.display_name, species.effective_fact_text()],
+		"...carrying the same verbatim copy a move-in would have shown")
+	_card.dismiss()
 
 	# --- THE WANDER HALF: the hitbox travels with the animal (Inspect only) -------------------
 	# Residents roam (row 6). gameplay-engineer measured the arrival-time hit point 43.1 px from
@@ -399,10 +408,11 @@ func _check_priority_rule_in_all_three_modes() -> void:
 
 	check_eq(_router.handle_tap(live_screen), TapRouter.RESULT_RESIDENT,
 		"A TAP AT THE ANIMAL'S LIVE POSITION HITS IT (still Inspect)")
-	# REPOINTED (Task 5, notification-surfaces): same routing change as above.
-	check(not _card.is_open(), "...and does NOT open its card — the feed gains an entry instead")
-	check_eq(feed.entry_texts()[0], "%s. %s" % [species.display_name, species.effective_fact_text()],
+	# REPOINTED (remove-notification-feed): same routing change as above.
+	check(_card.is_open(), "...and opens its card")
+	check_eq(_card.spoken_text(), "%s. %s" % [species.display_name, species.effective_fact_text()],
 		"...still the same verbatim copy")
+	_card.dismiss()
 
 	# RE-POINTED (-> D-29 #7): this used to prove the STALE hitbox misses. Terraform no longer
 	# runs the resident query at all, so a tap at the animal's old arrival position paints in
@@ -703,13 +713,18 @@ func _check_live_neighborhood_preview() -> void:
 	# needs BOTH `open_grass` and `cover`, and the old ambient `grass` backdrop used to supply
 	# the `open_grass` half implicitly everywhere. `wild_grass` emits nothing, so painting only
 	# `cover` (rock) now caps capacity at 0 forever — this ring of explicit `grass` just outside
-	# the rock block supplies the other need without touching the rock tiles or the cursor tile
-	# itself, which must stay untouched land for check 2 above.
+	# the block supplies the other need without touching the block's own tiles or the cursor
+	# tile itself, which must stay untouched land for check 2 above.
+	#
+	# RE-POINTED AGAIN 2026-09-04 (habitat-tiers ruling): `refresh_preview()` reads capacity
+	# through `AnimalDefinition.effective_tiers()`, which prefers the real `tiers` rabbit.tres
+	# now carries — base tier needs `open_grass/4` + `cultivated/4`, not `cover`. The block
+	# below is now painted `cultivated_field`, not `rock`.
 	var grass_painted: int = 0
 	for dx in range(-3, 4):
 		for dz in range(-3, 4):
 			if dx >= -2 and dx <= 1 and dz >= -2 and dz <= 1:
-				continue  # the rock block's own footprint, painted below
+				continue  # the cultivated block's own footprint, painted below
 			if _world.paint_tile(tile.x + dx, tile.y + dz, "grass"):
 				grass_painted += 1
 	check(grass_painted >= 4,
@@ -720,9 +735,9 @@ func _check_live_neighborhood_preview() -> void:
 		for dz in range(-2, 2):
 			if dx == 0 and dz == 0:
 				continue
-			if _world.paint_tile(tile.x + dx, tile.y + dz, "rock"):
+			if _world.paint_tile(tile.x + dx, tile.y + dz, "cultivated_field"):
 				painted += 1
-	check(painted >= 12, "painted %d rock tiles beside the cursor (cover for a rabbit)" % painted)
+	check(painted >= 12, "painted %d cultivated tiles beside the cursor (cultivated for a rabbit)" % painted)
 
 	var settled_band: String = _router.refresh_preview(screen)
 	check_eq(settled_band, NeighborhoodPreview.BAND_WELCOMING,

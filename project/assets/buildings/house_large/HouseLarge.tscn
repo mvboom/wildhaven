@@ -1,0 +1,74 @@
+; RENAMED 2026-09-07 (house cull): was `house_secondage_1_level1/HouseSecondage1Level1.tscn`, root node
+; `HouseSecondage1Level1`. The House's look pool was cut from 18 variants to 3 — this one plus its two
+; `Houses_SecondAge_1_Level*` siblings — and the survivors were renamed to say what the player
+; sees rather than where the mesh came from. The style id `WorldRoot._style_id_from_scene_path()`
+; derives from THIS filename, so the rename changes the id `house_secondage_1_level_1` -> `house_large`; a save
+; holding the old id degrades through `get_style_default()`'s existing stale-id fallback (to
+; `model_scenes[0]`), which is the documented behaviour for a renamed scene, not a migration.
+; The SOURCE glTF keeps its pack filename (`HousesSecondAge1Level1.gltf`) so the CREDITS.md /
+; `quaternius_ultimate_fantasy_rts.tres` `assets_used` provenance line still matches on disk.
+; The player-facing label is NOT this filename: `StylePickerPopup._HOUSE_LABELS` maps
+; `house_large` -> "House - Large", because `capitalize()` cannot produce the dash.
+;
+; House look variant — HouseSecondage1Level1 (SecondAge house batch).
+; The SecondAge tier of the same pack, artist and palette as the 10 shipped FirstAge
+; House variants — imported so the House's `model_scenes` pool can be widened.
+; Wiring these into project/data/buildings/house.tres is gameplay-engineer's step, NOT
+; done here.
+;
+; Source: Quaternius, "Ultimate Fantasy RTS" pack (glTF), Houses_SecondAge_1_Level1.gltf — CC0 1.0
+; Universal, same pack as every shipped House variant. Pack License.txt re-read on this
+; run; no new attribution entry — `assets_used` extended in
+; project/attribution/sources/quaternius_ultimate_fantasy_rts.tres.
+;
+; MATERIAL/TEXTURE AUDIT (measured on the raw, unmodified glTF, same probe method the
+; Farm Buildings batch used): albedo_texture is null on all 5 surfaces and NO mesh
+; surface carries an ARRAY_COLOR channel at all — color comes entirely from each named
+; material's albedo_color (Main 0.6933/0.3491/0.2691, Walls 0.6910/0.6933/0.6520, Stone
+; 0.5315/0.5333/0.5015, Wood 0.5333/0.4160/0.2572, Wood_Light 0.6467/0.5303/0.3449, and
+; Stone_Light 0.7042/0.7067/0.6645 where present). Wood and Stone are byte-identical to
+; the shipped FirstAge variants' two materials, so the SecondAge tier is the same palette,
+; not a second one. Nothing to fix; no material_override applied.
+;
+; TRIANGLES: 2336 across 5 materials (the shipped Houses_FirstAge_1_Level1 is 404
+; across 2) — this tier models doors and windows the FirstAge lean-to does not.
+;
+; SCALE: NONE — 1.0 scale, no transform written at all. Raw AABB measured via manual
+; local-transform composition (NOT global_transform — see
+; project/data/terrain/cultivated_field.tres's header for why that silently returns
+; identity on a freshly-instantiated, not-yet-tree-attached node): footprint 0.889953 x
+; 0.864464 tile-units (x, z), height 0.772206. Both footprint axes already sit inside a
+; 1x1 tile (WorldGrid.TILE_SIZE = 1.0), so nothing is rescaled and NO judgment call is
+; embedded here — this is a measurement, not a proposal, the same posture
+; Houses_FirstAge_1_Level1 ships with.
+;
+; FACING: left as authored (identity transform, no rotation) — unconfirmed by a human eye
+; pass, same posture as every other placement judgment call in this project. FLAG FOR
+; HUMAN SIGN-OFF.
+; RECENTRED 2026-09-07 (house cull), and this is a CORRECTION, not a new judgment call.
+; MEASURED: this wrapper's world-composed mesh AABB centred on (-0.094363, _, -0.111007) in the
+; wrapper's own space, not on (0, 0) — the mesh is off-centre on its own origin in the source
+; glTF. A building is positioned by its TILE CENTRE, so an off-centre mesh hangs over the
+; neighbouring tile: at 0.0433 units of overhang this one spilled 0.0394 on X and 0.0433 on Z.
+;
+; The `Model` node's translation below is exactly the negation of that measured centre
+; (+0.094363, 0, +0.111007) — a number read off the mesh, not chosen, so nothing here needs a
+; human ruling. X and Z only: Y is left untouched because the model already sits on the ground
+; plane and vertical placement is not what a footprint reserves.
+;
+; WHY THIS SURFACED NOW, since the mesh has been off-centre since it was imported on 2026-08-29:
+; `test_building_footprint_alignment.gd` only ever spill-checks the House that actually gets
+; placed, which is `model_scenes[0]`. Before the cull that was `house/House.tscn`
+; (Houses_FirstAge_1_Level1), which happens to be centred on X exactly and clears the tile on Z;
+; the other 17 variants were never placed by any test, so their offsets sat unmeasured. The cull
+; promoted this file into the tested slot and the existing assertion caught it immediately. THE
+; SCALE FACTOR ABOVE IS UNCHANGED — recentring moves the mesh, it does not resize it.
+;
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" uid="uid://bftf8vvfjhk1m" path="res://assets/buildings/house_large/HousesSecondAge1Level1.gltf" id="1_model"]
+
+[node name="HouseLarge" type="Node3D"]
+
+[node name="Model" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.094363, 0, 0.111007)

@@ -43,6 +43,58 @@ const _ROW_SPACING: float = 6.0
 const _POPUP_MAX_HEIGHT: float = 320.0
 const _SCREEN_MARGIN: float = 8.0
 
+## Player-facing labels for the three House looks (house cull, 2026-09-07). The ONLY place a
+## style id gets an authored label instead of a derived one — every other picker category either
+## reads a real `display_name` off its definition (`farm_building`, the grass-family group) or
+## humanizes its id with `String.capitalize()`.
+##
+## WHY A MAP AND NOT A RENAME: `capitalize()` cannot produce the " - " the human's names carry
+## ("House - Large", not "House Large"), and a style id is DERIVED FROM A FILENAME
+## (`WorldRoot._style_id_from_scene_path()`), so no filename can spell one. The asset folders were
+## still renamed alongside this (`house_secondage_1_level1` -> `house_large`, and its two
+## siblings) so the stored id, the scene on disk and this label all say the same word; the map
+## exists only for the punctuation.
+##
+## WHY NOT `PlaceableDefinition.display_name`: that field names the BUILDABLE ("House"), one per
+## `.tres`. These three are `model_scenes` entries of that single buildable — variants have no
+## definition of their own to carry a name, which is the same reason `_label_for()` derives
+## forest/wild_grass labels rather than reading them.
+##
+## A MISS FALLS THROUGH, it does not break: an id not listed here (a re-wired variant from the 15
+## the cull left unwired on disk, say) still renders via `capitalize()` below, so this map can go
+## stale without ever producing an empty row. Keep it in step with `data/buildings/house.tres`'s
+## `model_scenes` — see that file's "LOOK POOL CUT" header note for the other half of this fact.
+## Player-facing labels for the five Forest looks (2026-09-08 human naming pass). Second map of
+## the same kind as `_HOUSE_LABELS` below, and for the same two reasons: `String.capitalize()`
+## cannot produce the " - " these names carry, and it would render `bush_common` as "Bush Common"
+## where the human named it plainly "Bush".
+##
+## NOTE THE IDS DO NOT SPELL THE NAMES, and unlike the house cull the asset folders were NOT
+## renamed to match. `common_tree_1` is "Tree - Tall" and `common_tree_3` is "Tree - Short", so
+## the numbers carry no ordering meaning. That is deliberate: a style id is DERIVED FROM ITS
+## FILENAME (`WorldRoot._style_id_from_scene_path()`), and since D-57 a tile stores the id it was
+## painted with — so renaming the folders would strand every captured style in every existing
+## save and re-randomise those trees on load, which is the exact symptom two bug reports in this
+## same session were about. The house cull could rename freely because nothing stored per-tile
+## style yet. Renaming here is still possible LATER, but it is a save-affecting change and needs
+## its own ruling, not a tidy-up.
+##
+## A miss falls through to `capitalize()` exactly as the house map's does — keep in step with
+## `data/terrain/forest.tres`'s `model_scenes`.
+const _FOREST_LABELS: Dictionary = {
+	"common_tree_1": "Tree - Tall",
+	"common_tree_2": "Tree - Medium",
+	"common_tree_3": "Tree - Short",
+	"twisted_tree_1": "Tree - Twisted",
+	"bush_common": "Bush",
+}
+
+const _HOUSE_LABELS: Dictionary = {
+	"house_large": "House - Large",
+	"house_medium": "House - Medium",
+	"house_small": "House - Small",
+}
+
 var _world: WorldRoot = null
 var _category: String = ""
 
@@ -186,16 +238,51 @@ func _rebuild_rows() -> void:
 	_panel.reset_size()
 
 
-## Forest/Wild Grass/House: humanize the derived style id (`"birch_tree"` -> `"Birch Tree"` —
+## House: an authored label from `_HOUSE_LABELS` (the three looks the 2026-09-07 cull left
+## wired), falling through to the humanized id for anything not listed there.
+##
+## Forest: an authored label from `_FOREST_LABELS` (2026-09-08 naming pass), falling through to
+## the humanized id for anything not listed.
+##
+## Wild Grass: humanize the derived style id (`"wild_grass"` -> `"Wild Grass"` —
 ## `String.capitalize()` is exactly this rule: underscores become spaces, each word's first
-## letter uppercases). Farm Building: the resolved `PlaceableDefinition.display_name` itself,
-## already real human-authored copy — no humanization applied or needed.
+## letter uppercases). Farm Building AND the grass-family terrain group (habitat-tiers Task
+## 8b): the resolved definition's own real `display_name` — already real human-authored copy,
+## no humanization needed (and, for the grass-family group specifically, correct where
+## `capitalize()` would not always be: `wild_grass`'s own `display_name` is "Wild grass",
+## lowercase `g`, which `"wild_grass".capitalize()` alone would get wrong).
 func _label_for(style_id: String) -> String:
-	if _category == "farm_building":
-		for placeable: PlaceableDefinition in _world.placeable_options():
-			if placeable.id == style_id:
-				return placeable.display_name
+	return style_label(_world, _category, style_id)
+
+
+## `_label_for()`'s rules, callable without an open popup — STATIC AND PUBLIC because the
+## palette button now renders the same name (2026-09-08 human ruling, see `GameHud`'s own
+## "ANOTHER DELIBERATE DIFFERENCE" header note): the Forest / Grasslands / House buttons read
+## as whichever look is currently picked, exactly as Farm Building's always has. One
+## implementation rather than two, so a button and the row that sets it can never disagree
+## about what a style is called — the same "one place to fix" posture
+## `TerrainView.screen_to_grid()` keeps for the camera/ray chain.
+##
+## `world` may be null (a HUD whose `build_palettes()` has not run): the two definition-backed
+## categories then fall through to the humanized id rather than raising, which is the same
+## graceful degradation a missing definition already gets below.
+static func style_label(world: WorldRoot, category: String, style_id: String) -> String:
+	if category == "farm_building":
+		if world != null:
+			for placeable: PlaceableDefinition in world.placeable_options():
+				if placeable.id == style_id:
+					return placeable.display_name
 		return style_id
+	if category == GameHud.TERRAIN_GROUP_ID:
+		if world != null:
+			for terrain: TerrainDefinition in world.terrain_options():
+				if terrain.id == style_id:
+					return terrain.display_name
+		return style_id.capitalize()
+	if category == "house" and _HOUSE_LABELS.has(style_id):
+		return _HOUSE_LABELS[style_id] as String
+	if category == "forest" and _FOREST_LABELS.has(style_id):
+		return _FOREST_LABELS[style_id] as String
 	return style_id.capitalize()
 
 

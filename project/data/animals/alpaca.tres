@@ -30,10 +30,54 @@
 ;
 ; news_reports intentionally empty — News Report pools for this pool are a separate, later
 ; purchase (not part of Content Pipeline step 4/5 for this dispatch).
-[gd_resource type="Resource" script_class="AnimalDefinition" load_steps=3 format=3]
+;
+; TIERS — RE-SPEC 2026-09-04 (habitat tiers).
+;
+; PROPOSAL, NOT A DECISION. Every divisor below is this design's own first-pass proposal
+; awaiting human sign-off, per the project rule that all tuning values are the human's.
+; Source: docs/superpowers/specs/2026-09-04-habitat-tiers-design.md § 9.
+;
+; THIS IS WHAT FIXES THE DEFECT this whole design exists for: Alpaca used to share the
+; IDENTICAL `open_grass, cultivated` recipe with Horse, Cow and Bull. Single tier
+; "highland": `barn*` `open_grass/5` `rocks/6` — `rocks` is the distinguisher (an alpaca is
+; a highland animal), and the `barn*` gate was added in self-review: the original proposal
+; had no building need at all and so failed its own Domesticated category test (spec § 9).
+;
+; The legacy flat fields (habitat_needs / tiles_per_individual / max_individuals) are LEFT
+; IN PLACE and are now inert: `effective_tiers()` prefers `tiers` when non-empty. They are
+; retained so a rollback is a one-line edit rather than a re-authoring.
+[gd_resource type="Resource" script_class="AnimalDefinition" load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scripts/definitions/animal_definition.gd" id="1_schema"]
 [ext_resource type="PackedScene" path="res://assets/animals/alpaca/Alpaca.tscn" id="2_model"]
+[ext_resource type="Script" path="res://scripts/definitions/habitat_need.gd" id="3_need"]
+[ext_resource type="Script" path="res://scripts/definitions/habitat_tier.gd" id="4_tier"]
+
+[sub_resource type="Resource" id="need_highland_barn"]
+script = ExtResource("3_need")
+tag = "barn"
+radius = 0
+tiles_per_individual = 0
+
+[sub_resource type="Resource" id="need_highland_grass"]
+script = ExtResource("3_need")
+tag = "open_grass"
+radius = 0
+tiles_per_individual = 5
+
+[sub_resource type="Resource" id="need_highland_rocks"]
+script = ExtResource("3_need")
+tag = "rocks"
+radius = 0
+tiles_per_individual = 6
+
+[sub_resource type="Resource" id="tier_highland"]
+script = ExtResource("4_tier")
+id = "highland"
+needs = Array[Resource]([SubResource("need_highland_barn"), SubResource("need_highland_grass"), SubResource("need_highland_rocks")])
+limits = Array[Resource]([])
+max_individuals = 6
+arrival_group_size = 1
 
 [resource]
 script = ExtResource("1_schema")
@@ -47,6 +91,8 @@ scout_radius = 8
 capacity_radius = 0
 tiles_per_individual = 5
 max_individuals = 6
+tiers = Array[Resource]([SubResource("tier_highland")])
+emits_tags = Array[String]([])
 model_scenes = Array[PackedScene]([ExtResource("2_model")])
 fact_text_pool = Array[String](["Baby alpacas are called crias, and grown alpacas hum to each other — especially when something around them changes."])
 news_reports = Array[String]([])

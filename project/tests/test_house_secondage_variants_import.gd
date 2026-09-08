@@ -10,13 +10,27 @@ extends QATestCase
 ##
 ## Static buildings: load + instantiate + a MeshInstance3D + the world-composed footprint
 ## fits the 1x1 tile. No animation clips to assert.
+##
+## STILL 10 AFTER THE 2026-09-07 HOUSE CULL, on purpose. That ruling cut house.tres's
+## `model_scenes` from 18 look variants to 3, but it UNWIRED the rest rather than deleting
+## them — every one of these 10 wrappers is still on disk, still attributed, still named in
+## CREDITS.md. This suite asserts what the repo CONTAINS, not what the House offers the
+## player (that is `test_placeable_schema.gd`'s pinned count), so the correct response to the
+## cull was to re-point three paths, not to drop seven cases. Shrinking it to 3 would delete
+## the only load coverage the unwired wrappers have and let one rot silently until someone
+## re-wired it.
 
 const TILE_SIZE: float = 1.0
 
 const VARIANT_PATHS: Array[String] = [
-	"res://assets/buildings/house_secondage_1_level1/HouseSecondage1Level1.tscn",
-	"res://assets/buildings/house_secondage_1_level2/HouseSecondage1Level2.tscn",
-	"res://assets/buildings/house_secondage_1_level3/HouseSecondage1Level3.tscn",
+	# RENAMED 2026-09-07 (house cull): these three are the only SecondAge variants still wired
+	# into house.tres, so they were renamed off their source-pack names and onto the labels the
+	# player sees. Still covered here, at their new paths — the suite is an IMPORT check ("does
+	# the wrapper load, instantiate and fit a 1x1 tile"), which is exactly as true of a wired
+	# variant as of an unwired one, so the cull neither removes nor narrows it.
+	"res://assets/buildings/house_large/HouseLarge.tscn",
+	"res://assets/buildings/house_small/HouseSmall.tscn",
+	"res://assets/buildings/house_medium/HouseMedium.tscn",
 	"res://assets/buildings/house_secondage_2_level1/HouseSecondage2Level1.tscn",
 	"res://assets/buildings/house_secondage_2_level2/HouseSecondage2Level2.tscn",
 	"res://assets/buildings/house_secondage_2_level3/HouseSecondage2Level3.tscn",

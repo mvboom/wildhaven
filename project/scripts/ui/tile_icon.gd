@@ -34,6 +34,8 @@ enum Kind {
 	LOOK = 9,
 	HELP = 10,
 	FARM_BUILDING = 11,
+	# APPENDED, habitat-tiers Task 8b — never insert, see this enum's own header above.
+	GRASS_FAMILY = 12,
 }
 
 ## Palette option id -> glyph. Lives here rather than on `GameHud` because `HabitatRecipe`
@@ -53,6 +55,13 @@ const KIND_BY_ID: Dictionary = {
 	# group key earns one shared glyph instead; `GameHud._add_palette_button()` falls back to
 	# it when the resolved member has no glyph of its own.
 	"farm_building": Kind.FARM_BUILDING,
+	# The hotbar's grass-family TERRAIN GROUP key (habitat-tiers Task 8b), same fallback role
+	# as "farm_building" immediately above: `grass`/`wild_grass` already have their own glyphs
+	# and keep using them when resolved as the group's current default, but `meadow`/`scrub`
+	# have none of their own — without this fallback entry, the button would render with NO
+	# glyph at all whenever one of those two is the resolved default (the exact "Barn button
+	# looks blank" bug `_icon_kind_for()`'s own comment already documents for Farm Building).
+	"grass_family": Kind.GRASS_FAMILY,
 }
 
 
@@ -103,6 +112,8 @@ func _draw() -> void:
 			_draw_house(ink, c)
 		Kind.FARM_BUILDING:
 			_draw_farm_building(ink, c)
+		Kind.GRASS_FAMILY:
+			_draw_grass_family(ink, c)
 		Kind.ERASER:
 			_draw_eraser(ink, c)
 		Kind.EXIT:
@@ -226,6 +237,23 @@ func _draw_farm_building(ink: Color, c: Vector2) -> void:
 	var door_top: float = wall_bottom - 11.0
 	draw_rect(Rect2(Vector2(c.x - 7.0, door_top), Vector2(14.0, 11.0)), ink, false, THICKNESS * 0.6)
 	draw_line(Vector2(c.x, door_top), Vector2(c.x, wall_bottom), ink, THICKNESS * 0.6, true)
+
+
+## The grass-family TERRAIN GROUP's glyph (habitat-tiers Task 8b) — shown when the button's
+## resolved default is `meadow` or `scrub`, neither of which has a glyph of its own (see
+## `KIND_BY_ID`'s own comment for the fallback mechanism). A shorter grass fan than GRASS's own
+## (reads as "some kind of grass", not a specific one) plus a small filled flower — meadow's
+## own defining feature (`flowers` habitat tag) — is what separates this from both GRASS and
+## WILD_GRASS at a glance, the same "distinguish by silhouette, not colour" rule every other
+## glyph here follows (see this file's own monochrome note).
+func _draw_grass_family(ink: Color, c: Vector2) -> void:
+	_draw_grass(ink, c, 3, 12.0)
+	var petal_centre: Vector2 = c + Vector2(9.0, -10.0)
+	var petal_radius: float = 3.2
+	for i in 5:
+		var angle: float = TAU * float(i) / 5.0
+		draw_circle(petal_centre + Vector2(petal_radius, 0.0).rotated(angle), petal_radius, ink)
+	draw_circle(petal_centre, petal_radius * 0.7, ink)
 
 
 ## A plain outlined block with one divider line — the classic two-tone eraser silhouette,

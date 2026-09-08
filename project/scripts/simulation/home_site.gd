@@ -32,11 +32,37 @@ var species_id: String = ""
 ## simply by qualifying on the grass around it.
 var structure_tags: Array[String] = []
 
-## The radius this site allocates tiles over — the species' `scout_radius`, which is the
-## radius that picked the site. Capacity counts over `capacity_radius` instead (-> D-27 #1);
-## v1's default makes the two equal, and a species that diverges would count acreage over a
-## radius wider or narrower than the one it allocates. That is deliberate and expressible;
-## nothing in the floor roster does it.
+## Tags this site's RESIDENTS contribute to its tile, copied from the species'
+## `emits_tags` when the site is claimed.
+##
+## DERIVED, NEVER PERSISTED. It is re-copied from the species on load, so a retuned
+## `.tres` takes effect immediately rather than being frozen into old saves.
+##
+## Cached here rather than looked up because `CapacityEvaluator` holds no roster and so
+## cannot map `species_id` back to an `AnimalDefinition`.
+var resident_tags: Array[String] = []:
+	set(value):
+		resident_tags = value
+		resident_tag_mask = WorldGrid.tags_mask(value)
+
+## `resident_tags` as a bitmask, kept in step by the setter above so the two can never
+## disagree. Read by `CapacityEvaluator.tag_counts()` once per site per call to answer
+## "could any resident contribute a tag this tier reads?" without walking strings — see
+## `WorldGrid.tile_tag_mask()` for the same bargain on the terrain side.
+var resident_tag_mask: int = 0
+
+## The radius this site allocates tiles over (`covers()`, and therefore
+## `HomeSiteRegistry.sites_covering()` / the exclusivity ownership walk) — the WIDEST radius
+## any matching (species, tier) pair reaches, not a bare `scout_radius` copy (final review
+## finding I2, 2026-09-04). A settled site is registered/claimed at
+## `HabitatSimulation._species_widest_radius()`; a structure site at
+## `_home_site_radius_for()`'s max across every species/tier it could serve. Both max in
+## `HabitatTier.max_radius(species.scout_radius)`, so this degrades to `scout_radius` exactly
+## when nothing in the species' tiers reaches wider — which is every species whose needs all
+## follow the sentinel. `HomeSiteRegistry.claim()` never narrows this once set. Capacity
+## counts over `capacity_radius` instead (-> D-27 #1); v1's default makes the two equal, and a
+## species that diverges would count acreage over a radius wider or narrower than the one it
+## allocates. That is deliberate and expressible; nothing in the floor roster does it.
 var radius: int = 0
 
 ## Monotonic creation order. **This is the tie-break in the exclusivity rule**: where two
@@ -87,12 +113,21 @@ func is_structure() -> bool:
 
 ## True when this structure's tags satisfy one of the species' habitat needs — i.e. this
 ## building is a home *for that species*.
+##
+## Reads through `AnimalDefinition.effective_tiers()` — authored tiers, or the synthesised
+## legacy tier, never the raw flat `habitat_needs` array. A species whose real requirements
+## moved into `tiers` (habitat-tiers) has a `habitat_needs` that may name no building tag at
+## all, so reading it directly here would make every one of that species' buildings "nobody's
+## habitat" — exactly the defect this fix closes. Any ONE tier naming a `need` tag this
+## structure emits is enough; a tier's OTHER needs (grass, water, a second building) are a
+## capacity question, not a "does this building count as this species' home" question.
 func serves(species: AnimalDefinition) -> bool:
 	if species == null or structure_tags.is_empty():
 		return false
-	for tag: String in species.habitat_needs:
-		if structure_tags.has(tag):
-			return true
+	for tier: HabitatTier in species.effective_tiers():
+		for need: HabitatNeed in tier.needs:
+			if structure_tags.has(need.tag):
+				return true
 	return false
 
 

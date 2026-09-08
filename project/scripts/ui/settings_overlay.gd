@@ -48,10 +48,10 @@ signal hints_toggled(enabled: bool)
 ## as a stub because no approved string exists yet, matching `FieldGuide.EMPTY_STATE_TEXT`'s
 ## precedent for an unwritten player-facing word (`GameHud.REMOVE_ENTRY_LABEL` used to be the
 ## same kind of stub; it is human-decided text now, "Erase").
-const HINTS_LABEL: String = "[COPY] Gameplay Hints"
+const HINTS_LABEL: String = "Gameplay Hints"
 
 ## [COPY] — content-writer's. Same stub convention as `HINTS_LABEL` above.
-const MASTER_VOLUME_LABEL: String = "[COPY] Master Volume"
+const MASTER_VOLUME_LABEL: String = "Master Volume"
 
 ## The slider's own scale — 0-100 integer "percent", not raw 0.0-1.0, because a whole
 ## number reads more plainly to this game's audience (gdd.md's fluent-reader-8-10 target)

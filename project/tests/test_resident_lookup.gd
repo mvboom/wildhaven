@@ -185,6 +185,11 @@ func _land_a_wandering_rabbit() -> bool:
 	# needs BOTH `open_grass` and `cover`, and `wild_grass` (the new default) supplies neither
 	# implicitly — this border supplies the `open_grass` half the old ambient `grass` backdrop
 	# used to give away for free.
+	#
+	# RE-POINTED AGAIN 2026-09-04 (habitat-tiers ruling): `capacity_at()` now reads
+	# `AnimalDefinition.effective_tiers()`, which prefers the real `tiers` rabbit.tres now
+	# carries — base tier needs `open_grass/4` + `cultivated/4`, not `cover`. The block below
+	# is now painted `cultivated_field`, not `rock`.
 	for x in range(ROCK_ORIGIN.x - 1, ROCK_ORIGIN.x + ROCK_W + 1):
 		for z in range(ROCK_ORIGIN.y - 1, ROCK_ORIGIN.y + ROCK_D + 1):
 			var inside_rock: bool = (
@@ -195,7 +200,7 @@ func _land_a_wandering_rabbit() -> bool:
 				_world.paint_tile(x, z, "grass")
 	for dx in ROCK_W:
 		for dz in ROCK_D:
-			_world.paint_tile(ROCK_ORIGIN.x + dx, ROCK_ORIGIN.y + dz, "rock")
+			_world.paint_tile(ROCK_ORIGIN.x + dx, ROCK_ORIGIN.y + dz, "cultivated_field")
 	for _i in 60:
 		_world.simulation.tick(0.0)
 	_world.simulation.tick(ArrivalQueue.ARRIVAL_DELAY_MAX_SECONDS + 1.0)
@@ -349,14 +354,15 @@ func _check_priority_rule_while_moving_in_all_three_modes() -> void:
 	var live: Vector2 = _step_to_a_walking_tap()
 	check_eq(_router.handle_tap(live), TapRouter.RESULT_RESIDENT,
 		"INSPECT: a tap on the MOVING animal resolves to the animal")
-	# REPOINTED (Task 5, notification-surfaces): the replay routes to the feed now, never the
-	# big card — see `test_fact_card.gd`'s `_check_tap_to_replay_in_inspect()` for the same
-	# pattern.
-	check(not _card.is_open(), "...and does NOT reopen the big card — the replay routes to the feed instead")
-	var feed: NotificationFeed = _ui.notification_feed
+	# REPOINTED (remove-notification-feed): the replay opens the FACT CARD again — the rolling
+	# feed it briefly routed to is deleted. See `test_fact_card.gd`'s
+	# `_check_tap_to_replay_in_inspect()` for the same pattern, and note the dismiss below: a
+	# tap with the card up dismisses it, so every later tap in this check needs a closed card.
+	check(_card.is_open(), "...and reopens the big card — the replay is the card again")
 	var rabbit: AnimalDefinition = _world.roster.by_id("rabbit")
-	check_eq(feed.entry_texts()[0], "%s. %s" % [rabbit.display_name, rabbit.effective_fact_text()],
-		"...the feed gains the replay entry instead, with the same verbatim copy")
+	check_eq(_card.spoken_text(), "%s. %s" % [rabbit.display_name, rabbit.effective_fact_text()],
+		"...with the same verbatim copy")
+	_card.dismiss()
 
 	# TERRAFORM — on a tile where the paint WOULD have succeeded, so a real conversion proves
 	# the tile action ran rather than merely failing to find the resident.

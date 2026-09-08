@@ -1,11 +1,43 @@
 [gd_resource type="Resource" script_class="WorldPreset" load_steps=2 format=3]
 
+; THE MIX BELOW IS THE DECIDED VALUE (human ruling, 2026-09-07 -> D-53, closing the second
+; half of Open Question #10). Before it, all three preset cards built the same tag-inert
+; wild grass and the choice was a label; this is the card that makes "choose a starting
+; land" mean something.
+;
+; The authored shares, and what became of them:
+;   40% meadow  ->  as authored (open_grass + flowers)
+;   20% scrub   ->  as authored (browse + rocks)
+;   10% water   ->  as authored
+;   10% wild grass -> as authored (tag-inert)
+;   10% trees + 10% bush -> ONE 20% `forest` entry. There is no `bush` terrain: Bush.tscn and
+;     BushBerries.tscn are two of forest.tres's eight equal-weight `model_scenes`, so ~2/8 of
+;     forest tiles already render as bushes via pick_variant()'s stable hash (D-42). The 20%
+;     therefore lands at roughly 15% trees / 5% bushes, not the authored 10/10 — accepted at
+;     ruling time; splitting it exactly would need a real `bush` terrain with its own tag and
+;     blocks_movement decision, which is deliberately not this change.
+;
+; THIS PRESET DELIBERATELY EMITS TAGS FROM FRAME ONE — meadow, scrub and water all qualify
+; habitat before the player touches anything. That is the D-53 ruling, not an oversight; see
+; world_preset.gd -> terrain_mix for the scope of the inert-land invariant it does and does
+; not relax. `base_terrain_id` stays tag-inert regardless (test_world_preset.gd).
+;
+; WHERE the tiles land is TerrainScatter's, not this file's: clumped by a seeded noise field,
+; so 10% water is a few ponds rather than ~130 single-tile puddles.
+
 [ext_resource type="Script" path="res://scripts/definitions/world_preset.gd" id="1_schema"]
 
 [resource]
 script = ExtResource("1_schema")
 id = "meadow_start"
-display_name = "Meadow Start"
+display_name = "Meadow"
 width = 36
 depth = 36
 base_terrain_id = "wild_grass"
+terrain_mix = {
+"forest": 0.2,
+"meadow": 0.4,
+"scrub": 0.2,
+"water": 0.1,
+"wild_grass": 0.1
+}

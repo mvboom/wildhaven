@@ -74,8 +74,51 @@ var depth: int = DEFAULT_DEPTH
 ## Flat row-major stores, indexed `x * depth + z`. Flat rather than nested arrays because
 ## the capacity evaluator's hot path is one pass over a rectangle of tiles.
 var _terrain_ids: PackedStringArray = PackedStringArray()
+
+## PER-TILE CAPTURED STYLE, one entry per tile in lockstep with `_terrain_ids` (2026-09-08,
+## human ruling: "when you switch the type of tree, ALL trees switch to that tree" — it must
+## not). A style id here is the one the tile was PAINTED with; `WorldRoot.paint_tile()` stamps
+## it from the style default current at that moment, and nothing rewrites it afterwards. Empty
+## means "no captured style", which resolves exactly as it always did — `pick_variant()`'s
+## per-tile hash (D-42).
+##
+## This is what replaced D-54's world-wide look setting (-> D-57), and after D-58 it is the ONLY
+## thing deciding a tile's look. Under D-54 a style default was read at RENDER time, so changing
+## it restyled ground already placed; it is read at PAINT time and stored now, so a style behaves
+## like a brush — you pick what to put down and what you put down stays.
+##
+## NOT part of the tag mask and deliberately outside "THE ONE RULE" below: a style is purely
+## cosmetic and emits nothing, so a write here never needs `_refresh_tag_mask()`.
+var _tile_styles: PackedStringArray = PackedStringArray()
+
+## PER-BUILDING CAPTURED STYLE, keyed by footprint ORIGIN rather than stored per tile — a
+## building already anchors everything else it owns at its origin (`_building_origins`), and a
+## footprint has one look, not one per covered tile. Same paint-time capture rule as
+## `_tile_styles`; cleared by `clear_building()` so a freed origin cannot hand its look to
+## whatever is built there next.
+var _building_styles: Dictionary = {}   # Vector2i origin -> String style id
 var _building_defs: Array = []          # PlaceableDefinition or null, per tile
 var _building_origins: Array[Vector2i] = []  # footprint anchor, or Vector2i(-1, -1)
+
+## Per-tile habitat-tag BITMASK, one bit per `AnimalDefinition.HABITAT_TAGS` entry, kept in
+## lockstep with `_terrain_ids` / `_building_defs` by `_refresh_tag_mask()`.
+##
+## WHY IT EXISTS. `get_tile_tags()` is a String round trip — a `String` out of a
+## `PackedStringArray`, then a `Dictionary` hash to resolve the `TerrainDefinition` — and the
+## capacity evaluator runs it once per tile in radius, per tier, per species. Profiled at the
+## 128x128 cap that single call was 56% of a full-roster evaluation. A tile's tags are a pure
+## function of what occupies it (-> D-25), so the answer is derivable once per EDIT rather
+## than once per READ, which is the same incremental-index bargain `_forest_tile_count` and
+## `HomeSiteRegistry._structure_by_position` already make.
+##
+## The vocabulary is closed and human-gated, and `TerrainDefinition.validate()` /
+## `PlaceableDefinition.validate()` both reject an `emitted_tags` entry outside it, so every
+## shipped tag has a bit and no tag can go silently unrepresented.
+##
+## THE ONE RULE: every write to `_terrain_ids` or `_building_defs` must be followed by a
+## `_refresh_tag_mask()` for the tiles it touched. There are five such writers and they are
+## all in this file.
+var _tile_tag_masks: PackedInt64Array = PackedInt64Array()
 
 var _terrain_by_id: Dictionary = {}     # String id -> TerrainDefinition
 var _terrain_defs: Array[TerrainDefinition] = []
@@ -87,6 +130,50 @@ var _forest_tile_count: int = 0
 var _origin_offset: Vector2 = Vector2.ZERO
 
 
+## Tag -> bit, built once from the shared vocabulary. `HABITAT_TAGS` is a `const`, so this
+## table can never drift from it at runtime.
+static var _tag_bits: Dictionary = _build_tag_bits()
+
+## "This tile carries at least one tag OUTSIDE the shared vocabulary."
+##
+## The vocabulary is closed and both `TerrainDefinition.validate()` and
+## `PlaceableDefinition.validate()` reject an entry outside it — but validation is a
+## NON-FATAL report, not a load barrier, so a mis-authored `.tres` can still reach the
+## simulation, and synthetic fixtures in the test suite use invented tags freely. Without
+## this bit such a tag would map to no bit at all and be silently uncountable, turning a
+## loud data error into a wrong capacity. With it, a tile carrying any unknown tag always
+## survives the evaluator's early-out and is resolved against the real tag array instead.
+##
+## Bit 62, not 63: these masks live in a `PackedInt64Array`, whose values are signed.
+const UNKNOWN_TAG_BIT: int = 1 << 62
+
+
+static func _build_tag_bits() -> Dictionary:
+	var out: Dictionary = {}
+	var tags: PackedStringArray = AnimalDefinition.HABITAT_TAGS
+	for i in tags.size():
+		out[tags[i]] = 1 << i
+	return out
+
+
+## The single bit standing for `tag`, or 0 for a tag outside the vocabulary. A 0 bit can
+## never match, which is the safe direction: an unknown tag counts for nothing rather than
+## aliasing onto another tag's bit.
+static func tag_bit(tag: String) -> int:
+	return int(_tag_bits.get(tag, 0))
+
+
+## The OR of every bit in `tags`, with `UNKNOWN_TAG_BIT` set if any entry is outside the
+## vocabulary. Takes any string container (`Array[String]`, `PackedStringArray`) so callers
+## need not convert.
+static func tags_mask(tags) -> int:
+	var mask: int = 0
+	for tag: String in tags:
+		var bit: int = int(_tag_bits.get(tag, 0))
+		mask |= UNKNOWN_TAG_BIT if bit == 0 else bit
+	return mask
+
+
 func _ready() -> void:
 	if _terrain_defs.is_empty():
 		build(TerrainDefinition.load_all(), DEFAULT_WIDTH, DEFAULT_DEPTH)
@@ -94,7 +181,17 @@ func _ready() -> void:
 
 ## Builds (or rebuilds) the grid from a terrain roster. Every tile starts as
 ## `START_TERRAIN_ID`. Separated from `_ready()` so tests and tools can drive it directly.
-func build(terrain_defs: Array, new_width: int = DEFAULT_WIDTH, new_depth: int = DEFAULT_DEPTH) -> void:
+## `terrain_mix` and `world_seed` DEFAULT TO THE PRE-D-53 BEHAVIOUR and must keep doing so: an
+## empty mix takes the uniform `START_TERRAIN_ID` fill this function has always done, which is
+## what leaves every suite's world — and the editor's F6 world — byte-identical. Only a real
+## New Game passes a mix; see `WorldRoot._ready()`'s call.
+func build(
+	terrain_defs: Array,
+	new_width: int = DEFAULT_WIDTH,
+	new_depth: int = DEFAULT_DEPTH,
+	terrain_mix: Dictionary = {},
+	world_seed: int = 0
+) -> void:
 	width = max(1, new_width)
 	depth = max(1, new_depth)
 
@@ -114,15 +211,65 @@ func build(terrain_defs: Array, new_width: int = DEFAULT_WIDTH, new_depth: int =
 	var count: int = width * depth
 	_terrain_ids = PackedStringArray()
 	_terrain_ids.resize(count)
+	_tile_styles = PackedStringArray()
+	_tile_styles.resize(count)
+	_building_styles = {}
 	_building_defs = []
 	_building_defs.resize(count)
 	_building_origins = []
 	_building_origins.resize(count)
+	_tile_tag_masks = PackedInt64Array()
+	_tile_tag_masks.resize(count)
+	# Every tile starts as the same terrain with no building, so the mask is the same one
+	# value everywhere — resolved once, not per tile.
+	if terrain_mix.is_empty():
+		var start_def: TerrainDefinition = terrain_definition(START_TERRAIN_ID)
+		var start_mask: int = 0 if start_def == null else tags_mask(start_def.emitted_tags)
+		for i in count:
+			_terrain_ids[i] = START_TERRAIN_ID
+			_building_defs[i] = null
+			_building_origins[i] = Vector2i(-1, -1)
+			_tile_tag_masks[i] = start_mask
+		_forest_tile_count = 0
+	else:
+		_fill_from_mix(terrain_mix, count, world_seed)
+
+
+## The `terrain_mix` half of `build()` — a preset's starting terrain proportions, placed by
+## `TerrainScatter` and written straight into the flat stores.
+##
+## NO `set_terrain()` CALLS. The obvious wiring — walk the grid calling the public setter — is
+## ~1,296 signal emissions into a `TerrainView` that does not exist yet at this point in
+## `WorldRoot._ready()`, plus 1,296 redundant tag-mask resolutions. Writing the stores directly
+## is both correct and the only version that is cheap, and it is safe here specifically because
+## `build()` owns the arrays outright: nothing is listening and no tile has a building on it yet.
+##
+## THE TAG MASK IS RESOLVED PER DISTINCT TERRAIN, not per tile. A mix has a handful of ids and
+## a grid has thousands of tiles, and `tags_mask()` is a String round trip per call — the same
+## reason `_tile_tag_masks` exists at all (see its header).
+func _fill_from_mix(terrain_mix: Dictionary, count: int, world_seed: int) -> void:
+	var ids: PackedStringArray = TerrainScatter.generate(terrain_mix, width, depth, world_seed)
+
+	var mask_by_id: Dictionary = {}
+	var is_forest_by_id: Dictionary = {}
+	var forest_id: String = TerrainDefinition.normalize_id(FOREST_TERRAIN_ID)
+
+	_forest_tile_count = 0
 	for i in count:
-		_terrain_ids[i] = START_TERRAIN_ID
+		var id: String = ids[i]
+		if not mask_by_id.has(id):
+			var def: TerrainDefinition = terrain_definition(id)
+			# An id the shipped terrain set does not carry contributes no tags rather than
+			# taking the build down — the same non-fatal degradation `WorldSnapshot.apply()`
+			# uses. `test_world_preset.gd` is what makes a mis-authored mix loud.
+			mask_by_id[id] = 0 if def == null else tags_mask(def.emitted_tags)
+			is_forest_by_id[id] = TerrainDefinition.normalize_id(id) == forest_id
+		_terrain_ids[i] = id
 		_building_defs[i] = null
 		_building_origins[i] = Vector2i(-1, -1)
-	_forest_tile_count = 0
+		_tile_tag_masks[i] = int(mask_by_id[id])
+		if bool(is_forest_by_id[id]):
+			_forest_tile_count += 1
 
 
 # --- Mist reveal (Tier 1 row 13, D-38) ---------------------------------------------------
@@ -164,18 +311,24 @@ func grow(requested_width: int, requested_depth: int, world_seed: int) -> Array[
 	var old_width: int = width
 	var old_depth: int = depth
 	var old_terrain: PackedStringArray = _terrain_ids
+	var old_styles: PackedStringArray = _tile_styles
 	var old_buildings: Array = _building_defs
 	var old_origins: Array[Vector2i] = _building_origins
+	var old_masks: PackedInt64Array = _tile_tag_masks
 
 	width = new_width
 	depth = new_depth
 	var count: int = width * depth
 	_terrain_ids = PackedStringArray()
 	_terrain_ids.resize(count)
+	_tile_styles = PackedStringArray()
+	_tile_styles.resize(count)
 	_building_defs = []
 	_building_defs.resize(count)
 	_building_origins = []
 	_building_origins.resize(count)
+	_tile_tag_masks = PackedInt64Array()
+	_tile_tag_masks.resize(count)
 
 	var new_tiles: Array[Vector2i] = []
 	for x in width:
@@ -184,14 +337,19 @@ func grow(requested_width: int, requested_depth: int, world_seed: int) -> Array[
 			if x < old_width and z < old_depth:
 				var old_i: int = x * old_depth + z
 				_terrain_ids[i] = old_terrain[old_i]
+				_tile_styles[i] = old_styles[old_i]
 				_building_defs[i] = old_buildings[old_i]
 				_building_origins[i] = old_origins[old_i]
+				# A carried-over tile's occupancy is unchanged, so its mask is too.
+				_tile_tag_masks[i] = old_masks[old_i]
 			else:
 				# The revealed terrain is always wild grass (`MistReveal`'s own header explains
 				# why), so it can never be Forest — no `_forest_tile_count` bookkeeping needed.
 				_terrain_ids[i] = MistReveal.reveal_terrain_id(world_seed, x, z)
+				_tile_styles[i] = ""
 				_building_defs[i] = null
 				_building_origins[i] = Vector2i(-1, -1)
+				_tile_tag_masks[i] = _tag_mask_for_tile(x, z)
 				new_tiles.append(Vector2i(x, z))
 
 	grown.emit(new_tiles)
@@ -293,6 +451,36 @@ func get_tile_tags(x: int, z: int) -> Array[String]:
 	return terrain.emitted_tags
 
 
+## THE SAME DERIVATION AS `get_tile_tags()`, as a bitmask, read straight out of the cache.
+##
+## This is the form the capacity evaluator's tile walk uses: one array index and a bit test
+## instead of a String lookup and an `Array.has()` per tag. Out-of-bounds reads 0, matching
+## `get_tile_tags()`'s empty array — a tile that is not there emits nothing.
+##
+## `get_tile_tags()` stays the readable form and remains the source of truth for the mask
+## (`_tag_mask_for_tile()` derives one from the other), so the two can never disagree about
+## what a tile emits; `test_tile_tag_mask.gd` pins that equivalence over the whole grid.
+func tile_tag_mask(x: int, z: int) -> int:
+	if not in_bounds(x, z):
+		return 0
+	return _tile_tag_masks[_index(x, z)]
+
+
+## Derives one tile's mask from `get_tile_tags()` — the one place the two representations
+## are tied together.
+func _tag_mask_for_tile(x: int, z: int) -> int:
+	return tags_mask(get_tile_tags(x, z))
+
+
+## Recomputes one tile's cached mask. Called by every writer that changes what a tile holds.
+func _refresh_tag_mask(x: int, z: int) -> void:
+	if not in_bounds(x, z):
+		return
+	var i: int = _index(x, z)
+	if i < _tile_tag_masks.size():
+		_tile_tag_masks[i] = _tag_mask_for_tile(x, z)
+
+
 ## Forest tiles currently on the map, maintained incrementally so the economy never scans
 ## the world. A building footprint suppresses the tile's terrain tags but does not remove
 ## the terrain, and Forest is not in the House's `allowed_terrain`, so this counts terrain.
@@ -304,7 +492,7 @@ func forest_tile_count() -> int:
 
 ## Sets a tile's terrain with no cost check. Returns false when nothing changed.
 ## `WorldRoot.paint_tile()` is the checked public entry point — call that, not this.
-func set_terrain(x: int, z: int, terrain_id: String) -> bool:
+func set_terrain(x: int, z: int, terrain_id: String, style_id: String = "") -> bool:
 	if not in_bounds(x, z):
 		return false
 	var def: TerrainDefinition = terrain_definition(terrain_id)
@@ -319,8 +507,53 @@ func set_terrain(x: int, z: int, terrain_id: String) -> bool:
 	if normalized == FOREST_TERRAIN_ID:
 		_forest_tile_count += 1
 	_terrain_ids[i] = normalized
+	# THE STYLE IS WRITTEN HERE, BEFORE THE SIGNAL, AND THAT ORDER IS THE WHOLE REASON THIS
+	# PARAMETER EXISTS. `tile_changed` below is emitted SYNCHRONOUSLY and is what makes
+	# `TerrainView` build the tile's visual, so a caller that set the style on the next line
+	# stamped it too late: the tile was already drawn, with an empty style, through
+	# `pick_variant()`. That shipped as "it still cycles through different tree styles randomly
+	# when I select and place trees" — the player picked a tree, placed a row, and got an
+	# assortment. Passing the style in is what makes the write and the draw atomic.
+	#
+	# It also subsumes the old "clear on repaint" rule: a caller that supplies no style clears
+	# it, which is correct, because a stored id belongs to the terrain that was here and must not
+	# survive onto a different one.
+	_tile_styles[i] = style_id
+	_refresh_tag_mask(x, z)
 	tile_changed.emit(x, z)
 	return true
+
+
+## The style id `(x, z)` was painted with, or "" when it carries none (every tile of a terrain
+## with no picker, every tile of a pre-D-57 save, and every mist-revealed tile). Read by
+## `TerrainChunkLod._resolve_variant()`, where "" means "fall through to `pick_variant()`".
+## After D-58 an empty FOREST tile means a pre-v7 save, not a design — a new map's tiles are
+## stamped with concrete ids by `WorldRoot._randomise_initial_styles()`.
+func get_tile_style(x: int, z: int) -> String:
+	if not in_bounds(x, z):
+		return ""
+	return _tile_styles[_index(x, z)]
+
+
+## Stamps `(x, z)`'s captured style. Called by `WorldRoot.paint_tile()` immediately after a
+## successful `set_terrain()`; nothing else should write this, because "captured at paint time"
+## is the whole contract (-> D-57).
+func set_tile_style(x: int, z: int, style_id: String) -> void:
+	if in_bounds(x, z):
+		_tile_styles[_index(x, z)] = style_id
+
+
+## The style the building anchored at `origin` was PLACED with, or "" for none.
+func get_building_style(origin: Vector2i) -> String:
+	return WorldSnapshot.text_or(_building_styles.get(origin, ""), "")
+
+
+## Stamps a placed building's captured style. Same paint-time-only contract as tile styles.
+func set_building_style(origin: Vector2i, style_id: String) -> void:
+	if style_id.is_empty():
+		_building_styles.erase(origin)
+	else:
+		_building_styles[origin] = style_id
 
 
 ## Marks every tile of a footprint as occupied by `def`, anchored at `origin`. No cost or
@@ -335,6 +568,7 @@ func set_building(origin: Vector2i, def: PlaceableDefinition) -> bool:
 		var i: int = _index(tile.x, tile.y)
 		_building_defs[i] = def
 		_building_origins[i] = origin
+		_refresh_tag_mask(tile.x, tile.y)
 		tile_changed.emit(tile.x, tile.y)
 	return true
 
@@ -351,6 +585,7 @@ func clear_building(origin: Vector2i) -> bool:
 	var def: PlaceableDefinition = get_building(origin.x, origin.y)
 	if def == null:
 		return false
+	_building_styles.erase(origin)
 	for tile: Vector2i in footprint_tiles(origin, def):
 		if not tile_in_bounds(tile):
 			continue
@@ -359,6 +594,7 @@ func clear_building(origin: Vector2i) -> bool:
 		var i: int = _index(tile.x, tile.y)
 		_building_defs[i] = null
 		_building_origins[i] = Vector2i(-1, -1)
+		_refresh_tag_mask(tile.x, tile.y)
 		tile_changed.emit(tile.x, tile.y)
 	return true
 

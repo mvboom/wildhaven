@@ -151,7 +151,7 @@ func _finish_with_pendings() -> void:
 	note_expected_pending(
 		"NO SHIPPED-CONTENT BUILD DISPLACEMENT EXISTS TO DRIVE (reported, not a defect)",
 		"Mode-agnosticism is asserted three ways: behaviourally in the synthetic fixture (a "
-		+ "building placed over cover, and a tag-emitting building removed), structurally on "
+		+ "building placed over rock, and a tag-emitting building removed), structurally on "
 		+ "`GentleDisplacement.on_edit(tile)`, and through all three public `WorldRoot` entry "
 		+ "points arming the window. What the FLOOR CONTENT cannot produce is a *build* that "
 		+ "displaces: the only placeable is the House, `allowed_terrain = [\"grass\"]`, so it can "
@@ -173,7 +173,7 @@ func _finish_with_pendings() -> void:
 # margin is Open Question #25, explicitly not v1.
 
 func _check_the_trigger_is_exact() -> void:
-	# Population fixed at 2; capacity swept by leaving `remaining` cover tiles behind.
+	# Population fixed at 2; capacity swept by leaving `remaining` rock tiles behind.
 	# capacity == floor(remaining / 4).
 	var cases: Array[Dictionary] = [
 		{"remaining": 12, "capacity": 3, "warn": false, "why": "capacity ABOVE population"},
@@ -190,7 +190,7 @@ func _check_the_trigger_is_exact() -> void:
 	var quiet_count: int = 0
 	for c: Dictionary in cases:
 		var result: Dictionary = _trigger_probe(int(c["remaining"]), 2)
-		var label: String = "%d cover tiles -> capacity %d vs population 2 (%s)" % [
+		var label: String = "%d rock tiles -> capacity %d vs population 2 (%s)" % [
 			c["remaining"], result["capacity"], c["why"]
 		]
 		if int(result["capacity"]) != int(c["capacity"]):
@@ -242,7 +242,7 @@ func _check_the_trigger_includes_falling_to_zero() -> void:
 	var warnings: Array[Dictionary] = []
 	displacement.displacement_warned.connect(func(w: Dictionary) -> void: warnings.append(w))
 
-	_lay_cover(f, home, 4)
+	_lay_rocks(f, home, 4)
 	var site: HomeSite = _settle(f, home, f["species"], 1)
 	for i in 4:
 		_edit(f, Vector2i(10 + i, 10), "grass")
@@ -269,9 +269,9 @@ func _check_the_trigger_includes_falling_to_zero() -> void:
 func _check_mode_agnostic_in_the_simulation() -> void:
 	var outcomes: Array[String] = []
 
-	# (a) TERRAFORM — a cover tile painted away.
+	# (a) TERRAFORM — a rock tile painted away.
 	var terraform: Dictionary = _fixture()
-	_lay_cover(terraform, Vector2i(10, 10), 8)
+	_lay_rocks(terraform, Vector2i(10, 10), 8)
 	var t_site: HomeSite = _settle(terraform, Vector2i(10, 10), terraform["species"], 2)
 	_edit(terraform, Vector2i(17, 10), "grass")
 	(terraform["displacement"] as GentleDisplacement).tick(PAST_WINDOW)
@@ -282,9 +282,9 @@ func _check_mode_agnostic_in_the_simulation() -> void:
 		outcomes.append("terraform")
 	_teardown(terraform)
 
-	# (b) BUILD — a building put down ON cover tiles, suppressing their tags.
+	# (b) BUILD — a building put down ON rock tiles, suppressing their tags.
 	var build: Dictionary = _fixture()
-	_lay_cover(build, Vector2i(10, 10), 8)
+	_lay_rocks(build, Vector2i(10, 10), 8)
 	var b_site: HomeSite = _settle(build, Vector2i(10, 10), build["species"], 2)
 	var wall := _synthetic_placeable("wall", ["house"] as Array[String])
 	for i in 2:
@@ -293,7 +293,7 @@ func _check_mode_agnostic_in_the_simulation() -> void:
 		(build["sim"] as HabitatSimulation).on_building_changed(origin)
 		(build["displacement"] as GentleDisplacement).on_edit(origin)
 	check_eq((build["sim"] as HabitatSimulation).capacity_at(Vector2i(10, 10), build["species"]), 1,
-		"a building over 2 cover tiles suppresses their tags: capacity 2 -> 1")
+		"a building over 2 rock tiles suppresses their tags: capacity 2 -> 1")
 	(build["displacement"] as GentleDisplacement).tick(PAST_WINDOW)
 	check_eq((build["displacement"] as GentleDisplacement).warnings_raised, 1,
 		"BUILD displaces and warns — the same flow, with nothing told it was a build")
@@ -304,13 +304,15 @@ func _check_mode_agnostic_in_the_simulation() -> void:
 
 	# (c) REMOVAL — a tag-EMITTING building taken down.
 	var removal: Dictionary = _fixture()
-	var shelter := _synthetic_placeable("shelter", ["cover"] as Array[String])
-	_lay_cover(removal, Vector2i(10, 10), 4)                       # 4 cover tiles from terrain
+	# `cover` RETIRED 2026-09-07 (habitat-tiers re-spec) — re-pointed to `rocks`, matching
+	# the species' need below.
+	var shelter := _synthetic_placeable("shelter", ["rocks"] as Array[String])
+	_lay_rocks(removal, Vector2i(10, 10), 4)                       # 4 rock tiles from terrain
 	for i in 4:                                                     # + 4 from buildings = 8
 		(removal["grid"] as WorldGrid).set_building(Vector2i(10 + i, 11), shelter)
 	var r_site: HomeSite = _settle(removal, Vector2i(10, 10), removal["species"], 2)
 	check_eq((removal["sim"] as HabitatSimulation).capacity_at(Vector2i(10, 10), removal["species"]), 2,
-		"4 terrain cover tiles + 4 building cover tiles support 2")
+		"4 terrain rock tiles + 4 building rock tiles support 2")
 	var gone := Vector2i(13, 11)
 	(removal["grid"] as WorldGrid).clear_building(gone)
 	(removal["sim"] as HabitatSimulation).on_building_changed(gone)
@@ -346,7 +348,7 @@ func _check_mode_agnostic_in_the_simulation() -> void:
 # --- 3. One warning per settled gesture, summarising every affected home ------------------------
 
 func _check_one_warning_summarises_every_affected_home() -> void:
-	# Three overlapping home sites, TWO species, each with exactly one cover tile of its own and
+	# Three overlapping home sites, TWO species, each with exactly one rock tile of its own and
 	# exactly one resident. One burst of taps takes all three tiles away.
 	#
 	# CAPACITY_RADIUS IS DELIBERATELY NARROWED, SEPARATELY FROM `scout_radius` (2026-08-17):
@@ -446,7 +448,7 @@ func _check_warning_first_consequence_after_and_never_suppressed() -> void:
 	displacement.resident_relocated.connect(
 		func(_s: String, _f: Vector2i, _t: Vector2i, _p: Vector3) -> void: order.append("relocated"))
 
-	_lay_cover(f, home, 4)
+	_lay_rocks(f, home, 4)
 	var site: HomeSite = _settle(f, home, f["species"], 1)
 	for i in 4:
 		_edit(f, Vector2i(10 + i, 10), "grass")
@@ -458,7 +460,7 @@ func _check_warning_first_consequence_after_and_never_suppressed() -> void:
 
 	# NEVER SUPPRESSED, part 1: a second displacement in the same world warns again. There is no
 	# "already told them" state anywhere.
-	_lay_cover(f, home, 8)
+	_lay_rocks(f, home, 8)
 	var second: HomeSite = _settle(f, home, f["species"], 2)
 	for i in 8:
 		_edit(f, Vector2i(10 + i, 10), "grass")
@@ -477,7 +479,7 @@ func _check_warning_first_consequence_after_and_never_suppressed() -> void:
 	var deaf_displacement: GentleDisplacement = deaf["displacement"]
 	check_eq(deaf_displacement.displacement_warned.get_connections().size(), 0,
 		"NOBODY IS LISTENING to `displacement_warned` in this fixture")
-	_lay_cover(deaf, Vector2i(10, 10), 4)
+	_lay_rocks(deaf, Vector2i(10, 10), 4)
 	var deaf_site: HomeSite = _settle(deaf, Vector2i(10, 10), deaf["species"], 1)
 	for i in 4:
 		_edit(deaf, Vector2i(10 + i, 10), "grass")
@@ -500,7 +502,7 @@ func _check_warning_first_consequence_after_and_never_suppressed() -> void:
 # the overshoot but asserts nothing about whether it is consumed. This is that assertion.
 #
 # THE REPRO, sized exactly to the mechanism `on_arrival()`'s own header describes: an 8-tile row
-# of cover from (18,18) to (25,18) at the synthetic species' divisor of 4.
+# of rock from (18,18) to (25,18) at the synthetic species' divisor of 4.
 #   1. Site A registers at (18,18) with radius 8, the ONLY site — it owns the whole row (8 tiles,
 #      capacity 2) and is settled at population 2. Correct: capacity == population, no warning.
 #   2. Site B's tile at (24,18) is marked dirty and its arrival runs the real `HabitatSimulation`
@@ -525,7 +527,7 @@ func _check_arrival_extends_to_a_competing_neighbour() -> void:
 
 	var home_a := Vector2i(18, 18)
 	var home_b := Vector2i(24, 18)
-	_lay_cover(f, home_a, 8)  # (18,18) .. (25,18) — covers home_b's tile too
+	_lay_rocks(f, home_a, 8)  # (18,18) .. (25,18) — covers home_b's tile too
 
 	var site_a: HomeSite = _settle(f, home_a, species, 2)
 	check_eq(sim.capacity_at(home_a, species), 2,
@@ -652,7 +654,7 @@ func _check_species_hosted_is_permanent() -> void:
 
 	check_eq(registry.species_hosted_count(), 0, "a fresh world has hosted nobody")
 
-	_lay_cover(f, home, 4)
+	_lay_rocks(f, home, 4)
 	var site: HomeSite = _settle(f, home, f["species"], 1)
 	check_eq(registry.species_hosted_ids(), ["critter"] as Array[String],
 		"settling records the species as hosted")
@@ -988,8 +990,8 @@ func _check_rebuilding_after_a_departure_lets_the_species_return() -> void:
 
 # --- probes ---------------------------------------------------------------------------------------
 
-## Drives one complete trigger case: lay 12 cover tiles, settle `population` residents, edit the
-## world down to `remaining` cover tiles as ONE gesture, settle it, and report what happened.
+## Drives one complete trigger case: lay 12 rock tiles, settle `population` residents, edit the
+## world down to `remaining` rock tiles as ONE gesture, settle it, and report what happened.
 func _trigger_probe(remaining: int, population: int) -> Dictionary:
 	var f: Dictionary = _fixture()
 	var displacement: GentleDisplacement = f["displacement"]
@@ -1029,10 +1031,10 @@ func _trigger_probe(remaining: int, population: int) -> Dictionary:
 	return result
 
 
-## Drives one relocation case. The home's own cover is destroyed outright; `remote_cover` cover
+## Drives one relocation case. The home's own rock is destroyed outright; `remote_rocks` rock
 ## tiles sit 10 tiles away — outside the home's radius (8) but reachable by a candidate inside
 ## the relocation search radius (8). Reports the outcome the warning chose and what followed.
-func _relocation_probe(remote_cover: int, population: int) -> Dictionary:
+func _relocation_probe(remote_rocks: int, population: int) -> Dictionary:
 	var f: Dictionary = _fixture()
 	var displacement: GentleDisplacement = f["displacement"]
 	var grid: WorldGrid = f["grid"]
@@ -1049,7 +1051,7 @@ func _relocation_probe(remote_cover: int, population: int) -> Dictionary:
 	displacement.resident_departed.connect(
 		func(_s: String, tile: Vector2i, _n: int, _p: Vector3) -> void: departures.append(tile))
 
-	# The home's own habitat: a 4x2 block, 8 cover tiles -> capacity 2.
+	# The home's own habitat: a 4x2 block, 8 rock tiles -> capacity 2.
 	var own: Array[Vector2i] = []
 	for dz in 2:
 		for dx in 4:
@@ -1059,7 +1061,7 @@ func _relocation_probe(remote_cover: int, population: int) -> Dictionary:
 
 	# The distant patch, at z = 20: 10 tiles from the home, so it is invisible to the home
 	# itself and visible only from a candidate that has moved toward it.
-	for i in remote_cover:
+	for i in remote_rocks:
 		grid.set_terrain(home.x + i, 20, "rock")
 
 	var site: HomeSite = _settle(f, home, f["species"], population)
@@ -1089,12 +1091,14 @@ func _relocation_probe(remote_cover: int, population: int) -> Dictionary:
 
 # --- fixtures --------------------------------------------------------------------------------------
 
-## A world with no scene, one SYNTHETIC species: `cover`, 4 tiles per individual, radius 8.
+## A world with no scene, one SYNTHETIC species: `rocks` (`cover` RETIRED 2026-09-07,
+## habitat-tiers re-spec — re-pointed to `rocks`, which the `rock` terrain painted by
+## `_lay_rocks()` still emits), 4 tiles per individual, radius 8.
 func _fixture() -> Dictionary:
 	return _build_fixture([_species("critter", "Critter", 4)])
 
 
-## Two synthetic species, both needing `cover` at ONE tile per individual, so a single tile is a
+## Two synthetic species, both needing `rocks` at ONE tile per individual, so a single tile is a
 ## whole household's habitat and three homes can be displaced by three taps.
 func _two_species_fixture() -> Dictionary:
 	var critter: AnimalDefinition = _species("critter", "Critter", 1)
@@ -1109,7 +1113,7 @@ func _species(id: String, display_name: String, tiles_per_individual: int) -> An
 	var species := AnimalDefinition.new()
 	species.id = id
 	species.display_name = display_name
-	species.habitat_needs = ["cover"] as Array[String]
+	species.habitat_needs = ["rocks"] as Array[String]
 	species.tiles_per_individual = tiles_per_individual
 	species.scout_radius = 8
 	species.model_scenes = [load("res://assets/placeholder/grass/Grass.tscn") as PackedScene]
@@ -1164,7 +1168,9 @@ func _edit(f: Dictionary, tile: Vector2i, terrain_id: String) -> void:
 	(f["displacement"] as GentleDisplacement).on_edit(tile)
 
 
-func _lay_cover(f: Dictionary, home: Vector2i, count: int) -> void:
+## Named `_lay_rocks` since `cover` was RETIRED 2026-09-07 — this fixture's species used to
+## need `cover`, satisfied by the same painted `rock` terrain now read as `rocks`.
+func _lay_rocks(f: Dictionary, home: Vector2i, count: int) -> void:
 	var grid: WorldGrid = f["grid"]
 	for i in count:
 		grid.set_terrain(home.x + i, home.y, "rock")
