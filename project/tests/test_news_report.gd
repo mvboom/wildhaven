@@ -528,22 +528,44 @@ func _check_nothing_hosted_names_the_villager() -> void:
 ## because it already survives a save; that is only true if the restored count actually
 ## reaches the pacer. `restore_hosted()` is the same path `world_snapshot.gd` uses on load.
 ##
+## `expected` is computed from a PRE-restore snapshot of `species_hosted_ids()`, never from a
+## post-restore read of `species_hosted_count()` — reading both sides of the comparison off
+## the same post-restore call was tautological (fixed 2026-09-08, round-1 review):
+## `HintPacer.next_interval()` is deterministic on `(hosted_count, _since_activity)` with no
+## RNG, so two schedulers fed the SAME number always agree with each other whether or not
+## `restore_hosted()` actually worked — a broken restore that silently left the count at 0
+## would still pass. Deriving `expected` independently of the post-restore state is what lets
+## this check actually fail when restore misbehaves.
+##
 ## MUST RUN AFTER `_check_nothing_hosted_names_the_villager()` (see that check's own ordering
-## note) — `restore_hosted()` is additive-only, so this check reads whatever
-## `species_hosted_count()` actually is post-restore rather than asserting it lands on any
-## particular number: the property under test is that a restored count paces IDENTICALLY to
-## the same count held in memory, not that the count itself is some fixture-chosen value.
+## note) — `restore_hosted()` is additive-only, so this check must not run before the villager
+## gate's own `species_hosted_count() == 0` fixture assertion.
+##
+## THE IDS BELOW MUST STAY DISJOINT FROM WHATEVER `_check_ranking_prefers_species_not_yet_
+## hosted()` PICKS UP BY POSITION (`roster[0]`/`roster[1]` off `_world.roster.species()`,
+## filename-sorted — `alpaca`/`bull` today): that check relies on those two species going from
+## unhosted to hosted, so if this check's `ids` ever collided with them first, that check's
+## `few == never` comparison would fail — loudly, since `species_weight()` returns discrete
+## tier constants rather than degrading quietly. This check still has to run first regardless,
+## because of the villager-gate ordering above; this note exists so a future reorder finds the
+## constraint here instead of rediscovering it from a failing assertion.
 func _check_hosted_count_survives_a_round_trip() -> void:
+	var before_ids: Array[String] = _world.species_hosted_ids()
 	var ids: Array[String] = ["human", "rabbit", "fox", "deer"] as Array[String]
+	var newly_hosted: int = 0
+	for id: String in ids:
+		if not before_ids.has(id):
+			newly_hosted += 1
+	var expected: int = before_ids.size() + newly_hosted
+
 	_world.registry.restore_hosted(ids)
-	var observed: int = _world.species_hosted_count()
-	check(observed >= ids.size(),
-		"restoring %d ids raises the hosted count to at least %d (observed %d)"
-			% [ids.size(), ids.size(), observed])
+	check_eq(_world.species_hosted_count(), expected,
+		"restoring %d never-before-hosted ids raises the count from %d to %d (observed %d)"
+			% [newly_hosted, before_ids.size(), expected, _world.species_hosted_count()])
 
 	var from_memory := NewsReportScheduler.new(SEED)
 	from_memory.set_pacer(HintPacer.new())
-	from_memory.set_hosted_count(observed)
+	from_memory.set_hosted_count(expected)
 	from_memory.advance(NewsReportScheduler.NUDGE_DELAY_SECONDS + 0.01)
 
 	var from_restore := NewsReportScheduler.new(SEED)
