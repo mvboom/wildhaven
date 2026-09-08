@@ -1,0 +1,156 @@
+; MeadowMixed — Meadow terrain visual, variant 3 of 3: clumps AND singles together, the
+; densest and most varied of the three. NEW in the 2026-09-08 grass-family rework.
+;
+; 22x Grass_Common_Short at 0.075 + 1x Flower_3_Group + 1x Flower_4_Group + 2x Flower_3_Single
+; + 2x Flower_4_Single, all at the scales their sibling variants use.
+;
+; The blade count is the LOWEST of the three Meadow variants on purpose: this tile carries six
+; flower props where variant 1 carries four, and holding the grass count constant as well
+; pushes the tile from "rich" into the clutter the Grass rework was careful to avoid.
+;
+; BUILT BY A ONE-OFF HEADLESS SCRIPT, NOT HAND-AUTHORED, AND NOT EDITABLE BY HAND — same
+; generator, buffer layout and headless caveat as the four Grass variants; see
+; GrassCommonShort.tscn's header for the full explanation. Re-run the generator to change
+; anything below; do not hand-edit the MultiMesh buffer.
+;
+; INHERITS THE GRASS CALIBRATION BASELINE (human sign-off 2026-09-08): slab BoxMesh
+; 1.0 x 0.2 x 1.0 at y=-0.1 (the 1.0 width is the cross-tile seam-gap fix, do not narrow it),
+; blotchy floor patches at y=0.001, fixed-seed deterministic scatter within +/-0.42 tile-units
+; of centre, +/-18% scale jitter and free Y-rotation, everything ground-level nested under one
+; node named "Slab" (the OcclusionFader exemption convention). The human ruled on these values
+; against Grass first precisely so they would not be re-proposed per terrain.
+;
+; HIGH-COUNT BLADES ARE A MULTIMESH; LOW-COUNT PROPS ARE INSTANCED glTF SCENES. Props here
+; number 1-3 per tile, so a MultiMesh would buy nothing, and two of the flower meshes carry
+; TWO surfaces with different textures, which a single embedded MultiMesh mesh cannot express
+; cleanly. Referencing the raw piece directly is also what Meadow.tscn and Scrub.tscn already
+; did before this pass.
+;
+; Source: Stylized Nature MegaKit (Standard/free), Quaternius, CC0 1.0 Universal — License.txt
+; re-checked per asset-import-pipeline.md's audit gate. See
+; project/attribution/sources/quaternius_stylized_nature_megakit.tres.
+;
+; GRASS COLOUR: TRUE GREEN BAND (2026-09-08, human-reported "the grass is very yellow").
+; Grass.png is a 4-band vertical palette strip, each band 28px of a 512px texture, and the
+; colour of every blade in this project comes from WHICH BAND its UVs land in — nothing tints
+; anything (albedo is pure white, no vertex colours). The bands are:
+;   band 1  x 0-27    rgb(177,152,0)  gold
+;   band 2  x 28-55   rgb(57,149,0)   TRUE GREEN
+;   band 3  x 56-83   rgb(185,87,0)   rust
+;   band 4  x 84-111  rgb(103,163,0)  yellow-green
+; Band 2 was the one band NOTHING in the project sampled: the Wispy meshes ship on band 1
+; (gold) and the Common meshes on band 4 (yellow-green), which is why the world read warm.
+; `uv1_offset` below re-centres this material's UV span in band 2, computed per mesh from its
+; own measured span so every one lands with ~7px of margin on both band edges (mip bleed).
+; The MESH IS UNTOUCHED — this is a material property and is reversible by deleting one line.
+[gd_scene format=4]
+
+[ext_resource type="Texture2D" path="res://assets/terrain/grass_common_short/Grass.png" id="1_ojplf"]
+[ext_resource type="PackedScene" path="res://assets/terrain/flower_3_group/Flower_3_Group.gltf" id="2_r8eum"]
+[ext_resource type="PackedScene" path="res://assets/terrain/flower_4_group/Flower_4_Group.gltf" id="3_tcgi5"]
+[ext_resource type="PackedScene" path="res://assets/terrain/flower_3_single/Flower_3_Single.gltf" id="4_8xcuy"]
+[ext_resource type="PackedScene" path="res://assets/terrain/flower_4_single/Flower_4_Single.gltf" id="5_badft"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_c3svd"]
+albedo_color = Color(0.42, 0.68, 0.3, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_nqa0n"]
+size = Vector3(1, 0.2, 1)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_crsqc"]
+albedo_color = Color(0.56, 0.78, 0.32, 1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_0x68t"]
+size = Vector2(0.38, 0.32)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_1amr2"]
+albedo_color = Color(0.72, 0.72, 0.36, 1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_6wfci"]
+size = Vector2(0.28, 0.3)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_pqpyp"]
+resource_name = "Grass"
+cull_mode = 2
+albedo_texture = ExtResource("1_ojplf")
+uv1_offset = Vector3(-0.1119, 0, 0)
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_nmpn8"]
+_surfaces = [{
+"aabb": AABB(-0.3556424, -0.022385215, -0.47937828, 0.6388705, 1.3341035, 0.73726547),
+"format": 34896613377,
+"index_count": 465,
+"index_data": PackedByteArray("AAABAAIAAAADAAEAAwAAAAQABQADAAQAAwAFAAYABgAFAAcAAwAGAAgABgAHAAkACAAGAAoACQAHAAsACAAKAAwACQALAA0ADAAKAA4ADQALAA8ADQAPABAAEAAPABEADAAOABIAEgAOABMAEgATABQAJQAmACcAKAAlACcAKAApACUAKQAqACUAKQArACoAJQAsACYAKgAsACUALAAtACYAKgAuACwALAAvAC0ALgAvACwALwAwAC0ALgAxAC8ALwAyADAAMQAyAC8AMgAzADAAMQA0ADIAMgA1ADMANAA1ADIANQA2ADMANAA3ADUANQA4ADYANwA4ADUANwA5ADgAOgA7ADwAOgA9ADsAOwA+ADwAOwA/AD4APwBAAD4APwBBAEAAQQBCAEAAQwBEAEUAQwBGAEQARABGAEcARABHAEgASABHAEkASABJAEoASgBJAEsATABNAE4ATABPAE0ATQBQAE4ATQBRAFAAUQBSAFAAUQBTAFIAUwBUAFIAVQBWAFcAVQBYAFYAVwBZAFUAVwBaAFkAWgBXAFsAWgBbAFwAXABdAFoAWwBeAFwAXABfAF0AWwBgAF4AXwBhAF0AYABiAF4AXwBjAGEAYABkAGIAZABlAGIAZABmAGUAYwBnAGEAYwBoAGcAaABpAGcAFQAXAGoAFQAWABcAGQAVAGoAGQBqABoAagAbABoAFwBrAGoAagBrABsAFwAYAGsAawAcABsAGABsAGsAawBsABwAGAAdAGwAbAAeABwAHQBtAGwAbABtAB4AHQAfAG0AbQAgAB4AHwBuAG0AbQBuACAAbgAhACAAHwAiAG4AbgAjACEAIgAjAG4AIgAkACMAbwBwAHEAbwByAHAAcwBvAHEAcwBxAHQAcQB1AHQAcAB2AHEAcQB2AHUAcAB3AHYAdgB4AHUAdwB5AHYAdgB5AHgAdwB6AHkAeQB7AHgAegB8AHkAeQB8AHsAegB9AHwAfAB+AHsAfQB/AHwAfAB/AH4AfwCAAH4AfQCBAH8AfwCCAIAAgQCCAH8AgQCDAIIAhACFAIYAhACHAIUAiACEAIYAiACGAIkAhgCKAIkAhQCLAIYAhgCLAIoAhQCMAIsAiwCNAIoAjACOAIsAiwCOAI0AjACPAI4AjgCQAI0AjwCRAI4AjgCRAJAAjwCSAJEAkQCTAJAAkgCUAJEAkQCUAJMAlACVAJMAkgCWAJQAlACXAJUAlgCXAJQAlgCYAJcA"),
+"lods": [0.6771018, PackedByteArray("AAABAAIAAAADAAEAAwAAAAQABQADAAQAAwAFAAYABgAFAAcAAwAGAAgABgAHAAkACAAGAAoACQAHAAsACAAKAAwACQALAA0ADAAKAA4ADQALAA8ADQAPABAAEAAPABEADAAOABIAEgAOABMAEgATABQAFQAWABcAFwAYABUAGQAVABoAFQAbABoAFQAYABsAGAAcABsAGAAdABwAHQAeABwAHQAfAB4AHwAgAB4AHwAhACAAHwAiACEAIgAjACEAIgAkACMA")],
+"name": "Grass",
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 153,
+"vertex_data": PackedByteArray("5CqjELGmAACsQWEBwaUAAIEqYQGxpQAAuj3PHsGnAAAHIB0kEKgAAO0Oo1UbqgAAFi0hXJuqAAAFB85y2KgAAOlCsk+4qgAAPSSDdx2pAADlMv9/iKgAAGACYZPLpAAA0UdDf+yoAACjF8WZHaQAAFk/qsuvmAAAAABSqMWgAAAjD9ytwJ8AANgCeLtbnAAAtE0SxemaAACAS+Dyio0AACRV//8rigAAtl9hAdnAAADATGEBfLsAAApRrRWbtwAA9FUjO2O0AACzcWEBeK0AAPdzRxdXqgAAI3Z1O0aoAAACe7d2/qsAAMJbvXXMtwAADHsEkiyzAAC2XaWQVb4AAN50t8jz0QAACGvn4onrAABdXg/HctoAAH5d3/X//wAA3FoT64v2AACozqQaTl0AABvZbzvicQAA9dZYHBB0AABp1WEB53MAAFTMYQFsXAAAgrsWGltdAABluGEBwFsAAN/RUjr+WwAAtOAKbhNoAADLv1o66FwAANfZp2yDUgAAVuQVhcldAAAhyGpswlMAADzejIPWSAAAVOxvsvw3AABJzSqDs0oAAOTo3rBUJQAAEu6Wx64ZAACb2nOweykAABjqxtYAAAAAjOPzzXMJAADpzWEByJMAAFDUmCjLjwAAxMzkJ/GdAABL02EBR4kAANbSZD3rpAAABtqMPdGXAAA137hQ5qkAAGTiQk/joQAAquZdWgGqAABOK2EBXcsAAMw3biwL1AAAhTphAW/QAAAzI14q3cwAAJgdaUT91AAAlzC5RdDbAADQGhpch+MAABMm9lpU5gAA3xwgaP/rAACrRWEBW3oAAMIvsyVzggAAjEXPKQl4AADYNWEBKYIAAL0+/kUpcQAAgCqPQY56AADLL0deq2cAADwlwFnkbQAAsiSOaaZkAAAVjZ0ShpoAAHeSXQP5oQAAkpdbH3WhAABPiF0DsJkAAFKMAiMzlwAAooogSwiOAAD/n51KEaEAALaXj1O3lwAArofvYCuFAAB4miFxLpEAAEeUnWhojgAAf6P4ctmYAAB1hCR4O3kAAKae5qkAeQAAm41RgIh+AAAcpVunKIEAAPCm/MYtbwAAWK1L0TJvAABRgo6GV3AAAOuIHY2JcwAA4oKElIdpAAD8YnoWWL0AAIdmTDu0ugAA3ms6dkS+AADdbFWRIMUAABlq48eS4gAAbXJhAYV4AACQgvYY43wAANBvhRmHeQAAHIZhAVJ7AAAXZGEB+Y0AAGhiDBtsjgAAoGAnOq6MAADHbDQ5dngAAEd+OjmAfAAAKFvTbACDAADfZptrCG8AAPB3W2tScwAA11nyg9x4AACsZJOCXGUAANl0LIIeagAAfVqVsY9TAAAuYimw10EAAKpf+MYXNgAAN2+2r2FIAABqaVnW/x0AALJtdM0tKAAAVLJGAFzIAAB2uCoTALkAAJWvKhSixwAAV7wAAGy5AAARlg4BRsQAAHOUqxU+wwAAVJWeN/TCAAASr8I2tccAAJC2ZjZvuQAAPZsbb4rIAAB6tPNtcs0AAHe7TG1UvwAAzKODiOzNAAAOvDKHI9MAAA/CY4ZVxQAALcbtulPhAADZ2pS5hecAABTkstLA7gAARd28uLDaAAD//73jNfYAAH75x9mj7QAA")
+}]
+blend_shape_mode = 0
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_8yn2g"]
+resource_name = "Grass_Common_Short_Plane_014"
+_surfaces = [{
+"aabb": AABB(-0.3556424, -0.022385215, -0.47937828, 0.6388705, 1.3341035, 0.73726547),
+"attribute_data": PackedByteArray("AwMD/ywvdu0AAAD/eC84/AAAAP8qLzj8Dg4O/2svwN8PDw//By+f2j4+Pv/OLriqSkpK/zMvcKSUlJT/tC6Bji8vL/98L3iwmJiY/xUv9ImLi4v/Ri+/gf////+kLv9uiYmJ/4wvdYL/////6y7RaPPz8/9wL484/////5wuvlr/////zy5jVf////+mLjlI6+vr/6Av7z7/////mS+iEv////+5L/EFAAAA/9wwOPwAAAD/nTA4/AEBAf+rMJboEhIS/7wwWsQAAAD/GTE4/AEBAf8gMQnnExMT/ycxC8RUVFT/ODG5ilNTU//PMKuLoqKi/zgxUXCkpKT/1jCkcebm5v8jMWk7+Pj4/wIxFCLm5ub/2DACPfz8/P/VMLsP/////8wwLBoBAQH/qzPI4xMTE//OMxDEAQEB/8czIuIAAAD/wjM4/AAAAP+jMzj8AQEB/2szUuQAAAD/YDM4/BMTE/+2MyTFVFRU/+czHpMSEhL/eTMdxVRUVP/QM3WUoqKi//Mz1HxTU1P/lTOwlKSkpP/fM09+5ubm/w409lCkpKT/pjOvfubm5v8DNHpS+Pj4/xQ0gDzm5ub/0zPhUvz8/P8HNNAt//////EzWTYAAAD/TTI4/AkJCf9jMknWCAgI/0ky99YAAAD/XzI4/Dc3N/9eMizCR0dH/3YyBcLi4uL/hzJ6r9XV1f+SMuSw+Pj4/6AyJqYAAAD/LTA4/AkJCf9XMJTSAAAA/2AwOPwICAj/EjCS1Dc3N///L2K7R0dH/z8wHbri4uL/9i93pNXV1f8bMJGl+Pj4//0v1pgAAAD/MzM4/AkJCf/pMhbZCAgI/zIzHdUAAAD//jI4/Dc3N/8cM9q5R0dH/9gyJL7i4uL/6jJdotXV1f/GMr6m+Pj4/8QydJcDAwP/VDSM6wAAAP9mNEz6Dg4O/3c0Od8AAAD/RDRM+g8PD/9RNLHbPj4+/0w047QvLy//kzRitUpKSv94NLuslJSU/0I0y5+Li4v/gTQhkJiYmP9sNF2YiYmJ/580WY7/////NzRYifPz8/+PNDdZ/////1Y0cIHr6+v/pDStW/////+qNBU9/////8A0HTP/////MDRne/////9GNA91/////zI05m0BAQH/5zDQ5xMTE//zMDLEVFRU/wUxMoukpKT/CDH7cObm5v//MDY8AAAA/1suOPwBAQH/kS5o5QEBAf9SLt7kAAAA/50uOPwAAAD/Ky44/AEBAf8mLmTjExMT/yAuTsUTExP/SC45xhISEv+DLjPGVFRU/w0uSpRUVFT/NS54lVNTU/9uLraVoqKi/wku7X2kpKT/LS5Bf6SkpP9jLqR/5ubm/wsuyVHm5ub/JS4pU/j4+P8cLhk95ubm/1AumFP8/Pz/PS45Lv////9LLtM2AAAA//ExSf0BAQH/BTIE6wEBAf/oMQzqAAAA/xIyjv0AAAD/kjGI/AEBAf+NMZjoExMT/5AxwccTExP/5jGWyBISEv//Me/IVFRU/6QxFZJUVFT/+DE0k1NTU/8PMtWToqKi/8Axg3mkpKT/ETLIeqSkpP8lMpF75ubm/zMyv0jm5ub/eDINSvj4+P+XMsIx5ubm/4Ay3Ur8/Pz/9TJFIf/////fMucq"),
+"format": 34896613407,
+"index_count": 465,
+"index_data": PackedByteArray("AAABAAIAAAADAAEAAwAAAAQABQADAAQAAwAFAAYABgAFAAcAAwAGAAgABgAHAAkACAAGAAoACQAHAAsACAAKAAwACQALAA0ADAAKAA4ADQALAA8ADQAPABAAEAAPABEADAAOABIAEgAOABMAEgATABQAJQAmACcAKAAlACcAKAApACUAKQAqACUAKQArACoAJQAsACYAKgAsACUALAAtACYAKgAuACwALAAvAC0ALgAvACwALwAwAC0ALgAxAC8ALwAyADAAMQAyAC8AMgAzADAAMQA0ADIAMgA1ADMANAA1ADIANQA2ADMANAA3ADUANQA4ADYANwA4ADUANwA5ADgAOgA7ADwAOgA9ADsAOwA+ADwAOwA/AD4APwBAAD4APwBBAEAAQQBCAEAAQwBEAEUAQwBGAEQARABGAEcARABHAEgASABHAEkASABJAEoASgBJAEsATABNAE4ATABPAE0ATQBQAE4ATQBRAFAAUQBSAFAAUQBTAFIAUwBUAFIAVQBWAFcAVQBYAFYAVwBZAFUAVwBaAFkAWgBXAFsAWgBbAFwAXABdAFoAWwBeAFwAXABfAF0AWwBgAF4AXwBhAF0AYABiAF4AXwBjAGEAYABkAGIAZABlAGIAZABmAGUAYwBnAGEAYwBoAGcAaABpAGcAFQAXAGoAFQAWABcAGQAVAGoAGQBqABoAagAbABoAFwBrAGoAagBrABsAFwAYAGsAawAcABsAGABsAGsAawBsABwAGAAdAGwAbAAeABwAHQBtAGwAbABtAB4AHQAfAG0AbQAgAB4AHwBuAG0AbQBuACAAbgAhACAAHwAiAG4AbgAjACEAIgAjAG4AIgAkACMAbwBwAHEAbwByAHAAcwBvAHEAcwBxAHQAcQB1AHQAcAB2AHEAcQB2AHUAcAB3AHYAdgB4AHUAdwB5AHYAdgB5AHgAdwB6AHkAeQB7AHgAegB8AHkAeQB8AHsAegB9AHwAfAB+AHsAfQB/AHwAfAB/AH4AfwCAAH4AfQCBAH8AfwCCAIAAgQCCAH8AgQCDAIIAhACFAIYAhACHAIUAiACEAIYAiACGAIkAhgCKAIkAhQCLAIYAhgCLAIoAhQCMAIsAiwCNAIoAjACOAIsAiwCOAI0AjACPAI4AjgCQAI0AjwCRAI4AjgCRAJAAjwCSAJEAkQCTAJAAkgCUAJEAkQCUAJMAlACVAJMAkgCWAJQAlACXAJUAlgCXAJQAlgCYAJcA"),
+"lods": [0.6771018, PackedByteArray("AAABAAIAAAADAAEAAwAAAAQABQADAAQAAwAFAAYABgAFAAcAAwAGAAgABgAHAAkACAAGAAoACQAHAAsACAAKAAwACQALAA0ADAAKAA4ADQALAA8ADQAPABAAEAAPABEADAAOABIAEgAOABMAEgATABQAFQAWABcAFwAYABUAGQAVABoAFQAbABoAFQAYABsAGAAcABsAGAAdABwAHQAeABwAHQAfAB4AHwAgAB4AHwAhACAAHwAiACEAIgAjACEAIgAkACMA")],
+"material": SubResource("StandardMaterial3D_pqpyp"),
+"name": "Grass",
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 153,
+"vertex_data": PackedByteArray("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")
+}]
+blend_shape_mode = 0
+shadow_mesh = SubResource("ArrayMesh_nmpn8")
+
+[sub_resource type="MultiMesh" id="MultiMesh_ho4ks"]
+transform_format = 1
+instance_count = 22
+mesh = SubResource("ArrayMesh_8yn2g")
+buffer = PackedFloat32Array(0.08647143, 0, -0.018487586, -0.29025668, 0, 0.08842567, 0, 0, 0.018487586, 0, 0.08647143, -0.22273013, -0.086414054, 0, -0.009064254, -0.26832026, 0, 0.08688814, 0, 0, 0.009064254, 0, -0.086414054, -0.40311557, -0.010311054, 0, -0.066392265, -0.20859353, 0, 0.06718817, 0, 0, 0.066392265, 0, -0.010311054, -0.3698093, 0.0545818, 0, -0.029802583, -0.41144297, 0, 0.062188156, 0, 0, 0.029802583, 0, 0.0545818, 0.09910378, -0.071590655, 0, -0.03691983, 0.28503308, 0, 0.080549955, 0, 0, 0.03691983, 0, -0.071590655, 0.21001962, -0.036792178, 0, -0.08034219, 0.25044873, 0, 0.0883659, 0, 0, 0.08034219, 0, -0.036792178, -0.32208675, 0.010721241, 0, 0.07067687, -0.15567136, 0, 0.07148542, 0, 0, -0.07067687, 0, 0.010721241, 0.22325966, 0.04977937, 0, 0.06797932, 0.07118374, 0, 0.0842566, 0, 0, -0.06797932, 0, 0.04977937, 0.17582253, 0.034435734, 0, -0.080291525, 0.18135819, 0, 0.08736446, 0, 0, 0.080291525, 0, 0.034435734, 0.40206686, 0.067502834, 0, 0.017823948, 0.41877618, 0, 0.06981637, 0, 0, -0.017823948, 0, 0.067502834, 0.08773014, -0.036807597, 0, 0.05298509, -0.3881166, 0, 0.06451526, 0, 0, -0.05298509, 0, -0.036807597, 0.09849611, -0.054316584, 0, -0.032612316, 0.009168148, 0, 0.06335499, 0, 0, 0.032612316, 0, -0.054316584, -0.3938661, 0.040409647, 0, 0.056454003, -0.11035237, 0, 0.06942618, 0, 0, -0.056454003, 0, 0.040409647, 0.30726156, 0.019386183, 0, 0.060525816, 0.19950393, 0, 0.06355469, 0, 0, -0.060525816, 0, 0.019386183, -0.15269321, -0.009264545, 0, 0.08080809, -0.2532565, 0, 0.08133744, 0, 0, -0.08080809, 0, -0.009264545, 0.1119481, -0.043147434, 0, 0.07483379, -0.32227767, 0, 0.086381696, 0, 0, -0.07483379, 0, -0.043147434, 0.14185914, -0.03634281, 0, -0.060210243, -0.11372322, 0, 0.070328325, 0, 0, 0.060210243, 0, -0.03634281, -0.19594496, -0.055997603, 0, 0.030152183, -0.19019324, 0, 0.063599415, 0, 0, -0.030152183, 0, -0.055997603, -0.15447542, 0.080061354, 0, 0.012900984, -0.32632935, 0, 0.081094116, 0, 0, -0.012900984, 0, 0.080061354, 0.3262699, 0.021941938, 0, 0.06416181, -0.22842611, 0, 0.067809924, 0, 0, -0.06416181, 0, 0.021941938, 0.004766971, 0.021695623, 0, -0.06533141, 7.5399876e-05, 0, 0.06883962, 0, 0, 0.06533141, 0, 0.021695623, 0.38761714, -0.05150545, 0, -0.05306323, 0.1790466, 0, 0.07394943, 0, 0, 0.05306323, 0, -0.05150545, -0.16124564)
+
+[node name="MeadowMixed" type="Node3D" unique_id=224461430]
+
+[node name="Slab" type="Node3D" parent="." unique_id=1842247814]
+
+[node name="Ground" type="MeshInstance3D" parent="Slab" unique_id=937493125]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+material_override = SubResource("StandardMaterial3D_c3svd")
+mesh = SubResource("BoxMesh_nqa0n")
+
+[node name="FloorPatch_0" type="MeshInstance3D" parent="Slab" unique_id=394084081]
+transform = Transform3D(0.46462873, 0, 0.8855056, 0, 1, 0, -0.8855056, 0, 0.46462873, 0.036204815, 0.001, 0.04057312)
+material_override = SubResource("StandardMaterial3D_crsqc")
+mesh = SubResource("PlaneMesh_0x68t")
+
+[node name="FloorPatch_1" type="MeshInstance3D" parent="Slab" unique_id=1358332002]
+transform = Transform3D(-0.20232151, 0, 0.97931916, 0, 1, 0, -0.97931916, 0, -0.20232151, 0.16880569, 0.001, -0.20165558)
+material_override = SubResource("StandardMaterial3D_1amr2")
+mesh = SubResource("PlaneMesh_6wfci")
+
+[node name="MultiMesh_CommonShort" type="MultiMeshInstance3D" parent="Slab" unique_id=1388297752]
+multimesh = SubResource("MultiMesh_ho4ks")
+
+[node name="Flower3Group_0" type="Node3D" parent="." unique_id=826967403 instance=ExtResource("2_r8eum")]
+transform = Transform3D(-0.14968637, 0, 0.032939266, 0, 0.15326776, 0, -0.032939266, 0, -0.14968637, -0.015265708, 0, 0.3181092)
+
+[node name="Flower4Group_0" type="Node3D" parent="." unique_id=1296213356 instance=ExtResource("3_tcgi5")]
+transform = Transform3D(-0.12554508, 0, 0.016130628, 0, 0.12657711, 0, -0.016130628, 0, -0.12554508, -0.08147506, 0, -0.11971842)
+
+[node name="Flower3Single_0" type="Node3D" parent="." unique_id=1618414793 instance=ExtResource("4_8xcuy")]
+transform = Transform3D(-0.010459462, 0, -0.14994085, 0, 0.15030521, 0, 0.14994085, 0, -0.010459462, 0.053683795, 0, 0.31802756)
+
+[node name="Flower3Single_1" type="Node3D" parent="." unique_id=1863321226 instance=ExtResource("4_8xcuy")]
+transform = Transform3D(0.020451596, 0, 0.14606123, 0, 0.1474861, 0, -0.14606123, 0, 0.020451596, -0.2208661, 0, 0.05117199)
+
+[node name="Flower4Single_0" type="Node3D" parent="." unique_id=18878703 instance=ExtResource("5_badft")]
+transform = Transform3D(0.0072676074, 0, -0.11863374, 0, 0.11885614, 0, 0.11863374, 0, 0.0072676074, -0.22704674, 0, 0.05224042)
+
+[node name="Flower4Single_1" type="Node3D" parent="." unique_id=753676329 instance=ExtResource("5_badft")]
+transform = Transform3D(0.07465929, 0, 0.09956516, 0, 0.12444771, 0, -0.09956516, 0, 0.07465929, -0.27653483, 0, -0.020793447)

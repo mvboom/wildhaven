@@ -33,11 +33,17 @@ text = "Wildhaven uses art from other creators. Thank you!"
 [node name="Rule" type="HSeparator" parent="Stack"]
 layout_mode = 2
 
+; mouse_filter = 0 (STOP), NOT the 2 (IGNORE) the rest of this screen's non-interactive
+; nodes carry: IGNORE takes a Control out of the viewport's GUI hit test entirely, so the
+; wheel event never reaches ScrollContainer._gui_input() and the list is frozen — clicking
+; inside it first does not help, because there is nothing there to click. Matches
+; FieldGuide.tscn's identically-shaped ListScroll. The VBox and Labels inside stay IGNORE
+; so the wheel falls through them to this container.
 [node name="ListScroll" type="ScrollContainer" parent="Stack"]
 custom_minimum_size = Vector2(0, 260)
 layout_mode = 2
 size_flags_vertical = 3
-mouse_filter = 2
+mouse_filter = 0
 
 [node name="EntryList" type="VBoxContainer" parent="Stack/ListScroll"]
 unique_name_in_owner = true

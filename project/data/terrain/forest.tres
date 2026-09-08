@@ -99,13 +99,46 @@
 ; and BirchTree/Bush/BushBerries (Ultimate Nature Pack, flat-shaded) "are not even close to
 ; being similar", with a single-pack standardisation pass still to come. This edit is only
 ; the removal half of that; it does not close the consistency question.
-[gd_resource type="Resource" script_class="TerrainDefinition" load_steps=9 format=3]
+;
+; PINETREE REMOVED TOO (2026-09-08, same human pass), 6 -> 5. This one is NOT a quality
+; ruling either: PineTree.tscn is the project's only Poly Pizza-sourced tree, and the
+; standardisation target has since been settled as the Stylized Nature MegaKit — the pack
+; that already supplies the GROUND these trees stand on (grass.tres, meadow.tres,
+; wild_grass.tres all draw from it), which is the adjacency that reads hardest. A one-off
+; from a third pack cannot survive that, whatever it looks like on its own.
+;
+; KNOWN REGRESSION, ACCEPTED AND FLAGGED: PineTree was added on 2026-08-16 specifically to
+; answer "every tree looks the same" — it was the only NARROW TAPERED CONIFER silhouette in
+; the list, and the two CommonTrees are both round-canopy. Removing it costs that contrast
+; until a MegaKit replacement lands. THE REPLACEMENT EXISTS AND IS IN THE ALREADY-AUDITED
+; PACK: the MegaKit ships Pine_1..5 with their own Leaf_Pine/Leaf_Pine_C texture set, plus
+; TwistedTree_1..5 (own Bark_TwistedTree/Leaves_TwistedTree set) as a THIRD, gnarled
+; silhouette. Neither family is imported yet and neither has been eyeballed at the game's
+; camera pitch, so the silhouette gap is RECOVERABLE, not closed — do not treat it as closed
+; until a Pine is actually in and looked at.
+;
+; DO NOT CONFUSE MegaKit `Pine_*` WITH THE `PineTree2.tscn` REMOVED ABOVE. That one came from
+; the Textured Stylized Trees pack, whose assets_used happens to record a "Pine_2" of its
+; own — a different pack, a different mesh, different textures. Importing a MegaKit pine is
+; new work, not a re-add of something this same pass just culled.
+;
+; The MegaKit has no BIRCH mesh at any name, so BirchTree.tscn has no like-for-like
+; replacement in it; that swap (if it happens) is a substitution, not a port.
+;
+; The 5 survivors are still two packs: CommonTree1/CommonTree2 (MegaKit, matching the
+; ground) and BirchTree/Bush/BushBerries (Ultimate Nature Pack, flat-shaded). The MegaKit
+; replacements for the latter three are Bush_Common and Bush_Common_Flowers — the second is
+; ALREADY imported and licence-cleared at assets/terrain/bush_common_flowers/ (gltf only, no
+; .tscn wrapper yet). Unwired, not deleted, for PineTree as for DeadTree/PineTree2:
+; PineTree.tscn stays on disk and test_pine_tree_import.gd still covers it, and
+; quaternius_poly_pizza_nature.tres keeps its entry unchanged because that pack still
+; supplies Rock/Rocks/Grass/Crops/Wheat elsewhere in the project.
+[gd_resource type="Resource" script_class="TerrainDefinition" load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scripts/definitions/terrain_definition.gd" id="1_schema"]
 [ext_resource type="PackedScene" path="res://assets/terrain/common_tree_1/CommonTree1.tscn" id="2_model"]
 [ext_resource type="Resource" path="res://data/terrain/forest_harvest.tres" id="3_harvest"]
 [ext_resource type="PackedScene" path="res://assets/terrain/common_tree_2/CommonTree2.tscn" id="4_model"]
-[ext_resource type="PackedScene" path="res://assets/terrain/pine_tree/PineTree.tscn" id="5_model"]
 [ext_resource type="PackedScene" path="res://assets/terrain/birch_tree/BirchTree.tscn" id="6_model"]
 [ext_resource type="PackedScene" path="res://assets/terrain/bush/Bush.tscn" id="9_model"]
 [ext_resource type="PackedScene" path="res://assets/terrain/bush_berries/BushBerries.tscn" id="10_model"]
@@ -117,5 +150,5 @@ display_name = "Forest"
 emitted_tags = Array[String](["forest"])
 cost = 0
 blocks_movement = true
-model_scenes = Array[PackedScene]([ExtResource("2_model"), ExtResource("4_model"), ExtResource("5_model"), ExtResource("6_model"), ExtResource("9_model"), ExtResource("10_model")])
+model_scenes = Array[PackedScene]([ExtResource("2_model"), ExtResource("4_model"), ExtResource("6_model"), ExtResource("9_model"), ExtResource("10_model")])
 harvestable = ExtResource("3_harvest")

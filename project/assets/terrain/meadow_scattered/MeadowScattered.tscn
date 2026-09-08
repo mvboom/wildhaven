@@ -1,0 +1,156 @@
+; MeadowScattered — Meadow terrain visual, variant 2 of 3: SINGLE flowers spread thinly rather
+; than clumped. NEW in the 2026-09-08 grass-family rework.
+;
+; 26x Grass_Common_Short at 0.075 + 3x Flower_3_Single at 0.14505 (raw AABB height 2.068194 ->
+; 0.300 tile-units) + 3x Flower_4_Single at 0.12401 (raw 2.419159 -> 0.300). Both scales are
+; NEW, and both deliberately target the SAME ~0.30 tile-units the Group meshes already use, so
+; a single bloom and a clump of blooms are the same height as each other across the terrain.
+;
+; Flower_3_Single and Flower_4_Single are NEWLY IMPORTED this pass. Both carry TWO surfaces
+; (Leaves.png + Flowers.png), which is why every flower in this family is an instanced prop
+; rather than a MultiMesh.
+;
+; BUILT BY A ONE-OFF HEADLESS SCRIPT, NOT HAND-AUTHORED, AND NOT EDITABLE BY HAND — same
+; generator, buffer layout and headless caveat as the four Grass variants; see
+; GrassCommonShort.tscn's header for the full explanation. Re-run the generator to change
+; anything below; do not hand-edit the MultiMesh buffer.
+;
+; INHERITS THE GRASS CALIBRATION BASELINE (human sign-off 2026-09-08): slab BoxMesh
+; 1.0 x 0.2 x 1.0 at y=-0.1 (the 1.0 width is the cross-tile seam-gap fix, do not narrow it),
+; blotchy floor patches at y=0.001, fixed-seed deterministic scatter within +/-0.42 tile-units
+; of centre, +/-18% scale jitter and free Y-rotation, everything ground-level nested under one
+; node named "Slab" (the OcclusionFader exemption convention). The human ruled on these values
+; against Grass first precisely so they would not be re-proposed per terrain.
+;
+; HIGH-COUNT BLADES ARE A MULTIMESH; LOW-COUNT PROPS ARE INSTANCED glTF SCENES. Props here
+; number 1-3 per tile, so a MultiMesh would buy nothing, and two of the flower meshes carry
+; TWO surfaces with different textures, which a single embedded MultiMesh mesh cannot express
+; cleanly. Referencing the raw piece directly is also what Meadow.tscn and Scrub.tscn already
+; did before this pass.
+;
+; Source: Stylized Nature MegaKit (Standard/free), Quaternius, CC0 1.0 Universal — License.txt
+; re-checked per asset-import-pipeline.md's audit gate. See
+; project/attribution/sources/quaternius_stylized_nature_megakit.tres.
+;
+; GRASS COLOUR: TRUE GREEN BAND (2026-09-08, human-reported "the grass is very yellow").
+; Grass.png is a 4-band vertical palette strip, each band 28px of a 512px texture, and the
+; colour of every blade in this project comes from WHICH BAND its UVs land in — nothing tints
+; anything (albedo is pure white, no vertex colours). The bands are:
+;   band 1  x 0-27    rgb(177,152,0)  gold
+;   band 2  x 28-55   rgb(57,149,0)   TRUE GREEN
+;   band 3  x 56-83   rgb(185,87,0)   rust
+;   band 4  x 84-111  rgb(103,163,0)  yellow-green
+; Band 2 was the one band NOTHING in the project sampled: the Wispy meshes ship on band 1
+; (gold) and the Common meshes on band 4 (yellow-green), which is why the world read warm.
+; `uv1_offset` below re-centres this material's UV span in band 2, computed per mesh from its
+; own measured span so every one lands with ~7px of margin on both band edges (mip bleed).
+; The MESH IS UNTOUCHED — this is a material property and is reversible by deleting one line.
+[gd_scene format=4]
+
+[ext_resource type="Texture2D" path="res://assets/terrain/grass_common_short/Grass.png" id="1_16pnj"]
+[ext_resource type="PackedScene" path="res://assets/terrain/flower_3_single/Flower_3_Single.gltf" id="2_q0fsx"]
+[ext_resource type="PackedScene" path="res://assets/terrain/flower_4_single/Flower_4_Single.gltf" id="3_xnc3q"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_f0105"]
+albedo_color = Color(0.42, 0.68, 0.3, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_rv7hl"]
+size = Vector3(1, 0.2, 1)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_keuke"]
+albedo_color = Color(0.56, 0.78, 0.32, 1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_qf4k3"]
+size = Vector2(0.36, 0.3)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_y8t1o"]
+albedo_color = Color(0.72, 0.72, 0.36, 1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_62dej"]
+size = Vector2(0.32, 0.34)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_pa01q"]
+resource_name = "Grass"
+cull_mode = 2
+albedo_texture = ExtResource("1_16pnj")
+uv1_offset = Vector3(-0.1119, 0, 0)
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_ff06f"]
+_surfaces = [{
+"aabb": AABB(-0.3556424, -0.022385215, -0.47937828, 0.6388705, 1.3341035, 0.73726547),
+"format": 34896613377,
+"index_count": 465,
+"index_data": PackedByteArray("AAABAAIAAAADAAEAAwAAAAQABQADAAQAAwAFAAYABgAFAAcAAwAGAAgABgAHAAkACAAGAAoACQAHAAsACAAKAAwACQALAA0ADAAKAA4ADQALAA8ADQAPABAAEAAPABEADAAOABIAEgAOABMAEgATABQAJQAmACcAKAAlACcAKAApACUAKQAqACUAKQArACoAJQAsACYAKgAsACUALAAtACYAKgAuACwALAAvAC0ALgAvACwALwAwAC0ALgAxAC8ALwAyADAAMQAyAC8AMgAzADAAMQA0ADIAMgA1ADMANAA1ADIANQA2ADMANAA3ADUANQA4ADYANwA4ADUANwA5ADgAOgA7ADwAOgA9ADsAOwA+ADwAOwA/AD4APwBAAD4APwBBAEAAQQBCAEAAQwBEAEUAQwBGAEQARABGAEcARABHAEgASABHAEkASABJAEoASgBJAEsATABNAE4ATABPAE0ATQBQAE4ATQBRAFAAUQBSAFAAUQBTAFIAUwBUAFIAVQBWAFcAVQBYAFYAVwBZAFUAVwBaAFkAWgBXAFsAWgBbAFwAXABdAFoAWwBeAFwAXABfAF0AWwBgAF4AXwBhAF0AYABiAF4AXwBjAGEAYABkAGIAZABlAGIAZABmAGUAYwBnAGEAYwBoAGcAaABpAGcAFQAXAGoAFQAWABcAGQAVAGoAGQBqABoAagAbABoAFwBrAGoAagBrABsAFwAYAGsAawAcABsAGABsAGsAawBsABwAGAAdAGwAbAAeABwAHQBtAGwAbABtAB4AHQAfAG0AbQAgAB4AHwBuAG0AbQBuACAAbgAhACAAHwAiAG4AbgAjACEAIgAjAG4AIgAkACMAbwBwAHEAbwByAHAAcwBvAHEAcwBxAHQAcQB1AHQAcAB2AHEAcQB2AHUAcAB3AHYAdgB4AHUAdwB5AHYAdgB5AHgAdwB6AHkAeQB7AHgAegB8AHkAeQB8AHsAegB9AHwAfAB+AHsAfQB/AHwAfAB/AH4AfwCAAH4AfQCBAH8AfwCCAIAAgQCCAH8AgQCDAIIAhACFAIYAhACHAIUAiACEAIYAiACGAIkAhgCKAIkAhQCLAIYAhgCLAIoAhQCMAIsAiwCNAIoAjACOAIsAiwCOAI0AjACPAI4AjgCQAI0AjwCRAI4AjgCRAJAAjwCSAJEAkQCTAJAAkgCUAJEAkQCUAJMAlACVAJMAkgCWAJQAlACXAJUAlgCXAJQAlgCYAJcA"),
+"lods": [0.6771018, PackedByteArray("AAABAAIAAAADAAEAAwAAAAQABQADAAQAAwAFAAYABgAFAAcAAwAGAAgABgAHAAkACAAGAAoACQAHAAsACAAKAAwACQALAA0ADAAKAA4ADQALAA8ADQAPABAAEAAPABEADAAOABIAEgAOABMAEgATABQAFQAWABcAFwAYABUAGQAVABoAFQAbABoAFQAYABsAGAAcABsAGAAdABwAHQAeABwAHQAfAB4AHwAgAB4AHwAhACAAHwAiACEAIgAjACEAIgAkACMA")],
+"name": "Grass",
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 153,
+"vertex_data": PackedByteArray("5CqjELGmAACsQWEBwaUAAIEqYQGxpQAAuj3PHsGnAAAHIB0kEKgAAO0Oo1UbqgAAFi0hXJuqAAAFB85y2KgAAOlCsk+4qgAAPSSDdx2pAADlMv9/iKgAAGACYZPLpAAA0UdDf+yoAACjF8WZHaQAAFk/qsuvmAAAAABSqMWgAAAjD9ytwJ8AANgCeLtbnAAAtE0SxemaAACAS+Dyio0AACRV//8rigAAtl9hAdnAAADATGEBfLsAAApRrRWbtwAA9FUjO2O0AACzcWEBeK0AAPdzRxdXqgAAI3Z1O0aoAAACe7d2/qsAAMJbvXXMtwAADHsEkiyzAAC2XaWQVb4AAN50t8jz0QAACGvn4onrAABdXg/HctoAAH5d3/X//wAA3FoT64v2AACozqQaTl0AABvZbzvicQAA9dZYHBB0AABp1WEB53MAAFTMYQFsXAAAgrsWGltdAABluGEBwFsAAN/RUjr+WwAAtOAKbhNoAADLv1o66FwAANfZp2yDUgAAVuQVhcldAAAhyGpswlMAADzejIPWSAAAVOxvsvw3AABJzSqDs0oAAOTo3rBUJQAAEu6Wx64ZAACb2nOweykAABjqxtYAAAAAjOPzzXMJAADpzWEByJMAAFDUmCjLjwAAxMzkJ/GdAABL02EBR4kAANbSZD3rpAAABtqMPdGXAAA137hQ5qkAAGTiQk/joQAAquZdWgGqAABOK2EBXcsAAMw3biwL1AAAhTphAW/QAAAzI14q3cwAAJgdaUT91AAAlzC5RdDbAADQGhpch+MAABMm9lpU5gAA3xwgaP/rAACrRWEBW3oAAMIvsyVzggAAjEXPKQl4AADYNWEBKYIAAL0+/kUpcQAAgCqPQY56AADLL0deq2cAADwlwFnkbQAAsiSOaaZkAAAVjZ0ShpoAAHeSXQP5oQAAkpdbH3WhAABPiF0DsJkAAFKMAiMzlwAAooogSwiOAAD/n51KEaEAALaXj1O3lwAArofvYCuFAAB4miFxLpEAAEeUnWhojgAAf6P4ctmYAAB1hCR4O3kAAKae5qkAeQAAm41RgIh+AAAcpVunKIEAAPCm/MYtbwAAWK1L0TJvAABRgo6GV3AAAOuIHY2JcwAA4oKElIdpAAD8YnoWWL0AAIdmTDu0ugAA3ms6dkS+AADdbFWRIMUAABlq48eS4gAAbXJhAYV4AACQgvYY43wAANBvhRmHeQAAHIZhAVJ7AAAXZGEB+Y0AAGhiDBtsjgAAoGAnOq6MAADHbDQ5dngAAEd+OjmAfAAAKFvTbACDAADfZptrCG8AAPB3W2tScwAA11nyg9x4AACsZJOCXGUAANl0LIIeagAAfVqVsY9TAAAuYimw10EAAKpf+MYXNgAAN2+2r2FIAABqaVnW/x0AALJtdM0tKAAAVLJGAFzIAAB2uCoTALkAAJWvKhSixwAAV7wAAGy5AAARlg4BRsQAAHOUqxU+wwAAVJWeN/TCAAASr8I2tccAAJC2ZjZvuQAAPZsbb4rIAAB6tPNtcs0AAHe7TG1UvwAAzKODiOzNAAAOvDKHI9MAAA/CY4ZVxQAALcbtulPhAADZ2pS5hecAABTkstLA7gAARd28uLDaAAD//73jNfYAAH75x9mj7QAA")
+}]
+blend_shape_mode = 0
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_7k015"]
+resource_name = "Grass_Common_Short_Plane_014"
+_surfaces = [{
+"aabb": AABB(-0.3556424, -0.022385215, -0.47937828, 0.6388705, 1.3341035, 0.73726547),
+"attribute_data": PackedByteArray("AwMD/ywvdu0AAAD/eC84/AAAAP8qLzj8Dg4O/2svwN8PDw//By+f2j4+Pv/OLriqSkpK/zMvcKSUlJT/tC6Bji8vL/98L3iwmJiY/xUv9ImLi4v/Ri+/gf////+kLv9uiYmJ/4wvdYL/////6y7RaPPz8/9wL484/////5wuvlr/////zy5jVf////+mLjlI6+vr/6Av7z7/////mS+iEv////+5L/EFAAAA/9wwOPwAAAD/nTA4/AEBAf+rMJboEhIS/7wwWsQAAAD/GTE4/AEBAf8gMQnnExMT/ycxC8RUVFT/ODG5ilNTU//PMKuLoqKi/zgxUXCkpKT/1jCkcebm5v8jMWk7+Pj4/wIxFCLm5ub/2DACPfz8/P/VMLsP/////8wwLBoBAQH/qzPI4xMTE//OMxDEAQEB/8czIuIAAAD/wjM4/AAAAP+jMzj8AQEB/2szUuQAAAD/YDM4/BMTE/+2MyTFVFRU/+czHpMSEhL/eTMdxVRUVP/QM3WUoqKi//Mz1HxTU1P/lTOwlKSkpP/fM09+5ubm/w409lCkpKT/pjOvfubm5v8DNHpS+Pj4/xQ0gDzm5ub/0zPhUvz8/P8HNNAt//////EzWTYAAAD/TTI4/AkJCf9jMknWCAgI/0ky99YAAAD/XzI4/Dc3N/9eMizCR0dH/3YyBcLi4uL/hzJ6r9XV1f+SMuSw+Pj4/6AyJqYAAAD/LTA4/AkJCf9XMJTSAAAA/2AwOPwICAj/EjCS1Dc3N///L2K7R0dH/z8wHbri4uL/9i93pNXV1f8bMJGl+Pj4//0v1pgAAAD/MzM4/AkJCf/pMhbZCAgI/zIzHdUAAAD//jI4/Dc3N/8cM9q5R0dH/9gyJL7i4uL/6jJdotXV1f/GMr6m+Pj4/8QydJcDAwP/VDSM6wAAAP9mNEz6Dg4O/3c0Od8AAAD/RDRM+g8PD/9RNLHbPj4+/0w047QvLy//kzRitUpKSv94NLuslJSU/0I0y5+Li4v/gTQhkJiYmP9sNF2YiYmJ/580WY7/////NzRYifPz8/+PNDdZ/////1Y0cIHr6+v/pDStW/////+qNBU9/////8A0HTP/////MDRne/////9GNA91/////zI05m0BAQH/5zDQ5xMTE//zMDLEVFRU/wUxMoukpKT/CDH7cObm5v//MDY8AAAA/1suOPwBAQH/kS5o5QEBAf9SLt7kAAAA/50uOPwAAAD/Ky44/AEBAf8mLmTjExMT/yAuTsUTExP/SC45xhISEv+DLjPGVFRU/w0uSpRUVFT/NS54lVNTU/9uLraVoqKi/wku7X2kpKT/LS5Bf6SkpP9jLqR/5ubm/wsuyVHm5ub/JS4pU/j4+P8cLhk95ubm/1AumFP8/Pz/PS45Lv////9LLtM2AAAA//ExSf0BAQH/BTIE6wEBAf/oMQzqAAAA/xIyjv0AAAD/kjGI/AEBAf+NMZjoExMT/5AxwccTExP/5jGWyBISEv//Me/IVFRU/6QxFZJUVFT/+DE0k1NTU/8PMtWToqKi/8Axg3mkpKT/ETLIeqSkpP8lMpF75ubm/zMyv0jm5ub/eDINSvj4+P+XMsIx5ubm/4Ay3Ur8/Pz/9TJFIf/////fMucq"),
+"format": 34896613407,
+"index_count": 465,
+"index_data": PackedByteArray("AAABAAIAAAADAAEAAwAAAAQABQADAAQAAwAFAAYABgAFAAcAAwAGAAgABgAHAAkACAAGAAoACQAHAAsACAAKAAwACQALAA0ADAAKAA4ADQALAA8ADQAPABAAEAAPABEADAAOABIAEgAOABMAEgATABQAJQAmACcAKAAlACcAKAApACUAKQAqACUAKQArACoAJQAsACYAKgAsACUALAAtACYAKgAuACwALAAvAC0ALgAvACwALwAwAC0ALgAxAC8ALwAyADAAMQAyAC8AMgAzADAAMQA0ADIAMgA1ADMANAA1ADIANQA2ADMANAA3ADUANQA4ADYANwA4ADUANwA5ADgAOgA7ADwAOgA9ADsAOwA+ADwAOwA/AD4APwBAAD4APwBBAEAAQQBCAEAAQwBEAEUAQwBGAEQARABGAEcARABHAEgASABHAEkASABJAEoASgBJAEsATABNAE4ATABPAE0ATQBQAE4ATQBRAFAAUQBSAFAAUQBTAFIAUwBUAFIAVQBWAFcAVQBYAFYAVwBZAFUAVwBaAFkAWgBXAFsAWgBbAFwAXABdAFoAWwBeAFwAXABfAF0AWwBgAF4AXwBhAF0AYABiAF4AXwBjAGEAYABkAGIAZABlAGIAZABmAGUAYwBnAGEAYwBoAGcAaABpAGcAFQAXAGoAFQAWABcAGQAVAGoAGQBqABoAagAbABoAFwBrAGoAagBrABsAFwAYAGsAawAcABsAGABsAGsAawBsABwAGAAdAGwAbAAeABwAHQBtAGwAbABtAB4AHQAfAG0AbQAgAB4AHwBuAG0AbQBuACAAbgAhACAAHwAiAG4AbgAjACEAIgAjAG4AIgAkACMAbwBwAHEAbwByAHAAcwBvAHEAcwBxAHQAcQB1AHQAcAB2AHEAcQB2AHUAcAB3AHYAdgB4AHUAdwB5AHYAdgB5AHgAdwB6AHkAeQB7AHgAegB8AHkAeQB8AHsAegB9AHwAfAB+AHsAfQB/AHwAfAB/AH4AfwCAAH4AfQCBAH8AfwCCAIAAgQCCAH8AgQCDAIIAhACFAIYAhACHAIUAiACEAIYAiACGAIkAhgCKAIkAhQCLAIYAhgCLAIoAhQCMAIsAiwCNAIoAjACOAIsAiwCOAI0AjACPAI4AjgCQAI0AjwCRAI4AjgCRAJAAjwCSAJEAkQCTAJAAkgCUAJEAkQCUAJMAlACVAJMAkgCWAJQAlACXAJUAlgCXAJQAlgCYAJcA"),
+"lods": [0.6771018, PackedByteArray("AAABAAIAAAADAAEAAwAAAAQABQADAAQAAwAFAAYABgAFAAcAAwAGAAgABgAHAAkACAAGAAoACQAHAAsACAAKAAwACQALAA0ADAAKAA4ADQALAA8ADQAPABAAEAAPABEADAAOABIAEgAOABMAEgATABQAFQAWABcAFwAYABUAGQAVABoAFQAbABoAFQAYABsAGAAcABsAGAAdABwAHQAeABwAHQAfAB4AHwAgAB4AHwAhACAAHwAiACEAIgAjACEAIgAkACMA")],
+"material": SubResource("StandardMaterial3D_pa01q"),
+"name": "Grass",
+"primitive": 3,
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 153,
+"vertex_data": PackedByteArray("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")
+}]
+blend_shape_mode = 0
+shadow_mesh = SubResource("ArrayMesh_ff06f")
+
+[sub_resource type="MultiMesh" id="MultiMesh_cyo0u"]
+transform_format = 1
+instance_count = 26
+mesh = SubResource("ArrayMesh_7k015")
+buffer = PackedFloat32Array(-0.058094524, 0, -0.06011888, -0.36322403, 0, 0.08360176, 0, 0, 0.06011888, 0, -0.058094524, 0.19471118, 0.010826466, 0, -0.07095835, 0.37026504, 0, 0.07177953, 0, 0, 0.07095835, 0, 0.010826466, -0.21403605, 0.06625437, 0, -0.012354286, -0.13607442, 0, 0.067396365, 0, 0, 0.012354286, 0, 0.06625437, -0.26632982, 0.04116458, 0, -0.054576527, -0.019505382, 0, 0.068360224, 0, 0, 0.054576527, 0, 0.04116458, -0.30263016, -0.057822905, 0, 0.0567185, -0.33520305, 0, 0.08099677, 0, 0, -0.0567185, 0, -0.057822905, -0.3914774, -4.5164154e-05, 0, -0.07840897, -0.07071602, 0, 0.07840899, 0, 0, 0.07840897, 0, -4.5164154e-05, 0.021062821, 0.073440984, 0, 0.011675647, -0.046984673, 0, 0.07436329, 0, 0, -0.011675647, 0, 0.073440984, -0.14214176, 0.05718701, 0, -0.036798973, 0.11567345, 0, 0.06800381, 0, 0, 0.036798973, 0, 0.05718701, 0.07351288, -0.07809443, 0, -0.035521373, -0.2656932, 0, 0.085793406, 0, 0, 0.035521373, 0, -0.07809443, 0.24735919, 0.07037452, 0, 0.0042284373, 0.32739016, 0, 0.07050144, 0, 0, -0.0042284373, 0, 0.07037452, 0.19988856, -0.055249877, 0, 0.04973713, 0.39027575, 0, 0.07433929, 0, 0, -0.04973713, 0, -0.055249877, -0.13151515, 0.038120583, 0, -0.049120642, -0.30455258, 0, 0.0621773, 0, 0, 0.049120642, 0, 0.038120583, 0.20408168, 0.067141496, 0, -0.03901931, -0.22115512, 0, 0.07765621, 0, 0, 0.03901931, 0, 0.067141496, 0.40441838, 0.07361492, 0, -0.019756608, -0.35623896, 0, 0.07621994, 0, 0, 0.019756608, 0, 0.07361492, 0.18924376, 0.007694229, 0, 0.06559364, -0.31029385, 0, 0.06604337, 0, 0, -0.06559364, 0, 0.007694229, -0.07559678, 0.025985243, 0, 0.056487713, -0.14805704, 0, 0.062177926, 0, 0, -0.056487713, 0, 0.025985243, 0.30004153, 0.08201926, 0, 0.017805917, -0.30724895, 0, 0.08392979, 0, 0, -0.017805917, 0, 0.08201926, 0.005301237, -0.058850862, 0, 0.052357327, -0.28791046, 0, 0.078770004, 0, 0, -0.052357327, 0, -0.058850862, 0.17823604, 0.0065595442, 0, -0.078812964, -0.3263771, 0, 0.07908547, 0, 0, 0.078812964, 0, 0.0065595442, -0.056932837, 0.027322497, 0, -0.068387814, 0.14164552, 0, 0.07364382, 0, 0, 0.068387814, 0, 0.027322497, 0.114325434, -0.013534275, 0, -0.06256686, -0.28920507, 0, 0.06401397, 0, 0, 0.06256686, 0, -0.013534275, 0.21694073, -0.020789083, 0, -0.05950586, 0.40081468, 0, 0.0630328, 0, 0, 0.05950586, 0, -0.020789083, -0.15476817, 0.06161728, 0, 0.004206228, -0.26821962, 0, 0.06176068, 0, 0, -0.004206228, 0, 0.06161728, 0.22182783, -0.008748417, 0, -0.06447222, 0.06801969, 0, 0.06506306, 0, 0, 0.06447222, 0, -0.008748417, 0.36979893, -0.026044443, 0, 0.055821512, -0.18553291, 0, 0.06159833, 0, 0, -0.055821512, 0, -0.026044443, 0.36156365, 0.06314067, 0, 0.015140944, -0.013815016, 0, 0.06493067, 0, 0, -0.015140944, 0, 0.06314067, 0.07830164)
+
+[node name="MeadowScattered" type="Node3D" unique_id=1088896140]
+
+[node name="Slab" type="Node3D" parent="." unique_id=113907689]
+
+[node name="Ground" type="MeshInstance3D" parent="Slab" unique_id=808288080]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+material_override = SubResource("StandardMaterial3D_f0105")
+mesh = SubResource("BoxMesh_rv7hl")
+
+[node name="FloorPatch_0" type="MeshInstance3D" parent="Slab" unique_id=1081463347]
+transform = Transform3D(-0.5702152, 0, 0.82149535, 0, 1, 0, -0.82149535, 0, -0.5702152, 0.11291066, 0.001, -0.07371077)
+material_override = SubResource("StandardMaterial3D_keuke")
+mesh = SubResource("PlaneMesh_qf4k3")
+
+[node name="FloorPatch_1" type="MeshInstance3D" parent="Slab" unique_id=1840598262]
+transform = Transform3D(0.99877125, 0, -0.049558185, 0, 1, 0, 0.049558185, 0, 0.99877125, 0.07949293, 0.001, 0.20988646)
+material_override = SubResource("StandardMaterial3D_y8t1o")
+mesh = SubResource("PlaneMesh_62dej")
+
+[node name="MultiMesh_CommonShort" type="MultiMeshInstance3D" parent="Slab" unique_id=302438171]
+multimesh = SubResource("MultiMesh_cyo0u")
+
+[node name="Flower3Single_0" type="Node3D" parent="." unique_id=1618414793 instance=ExtResource("2_q0fsx")]
+transform = Transform3D(-0.11538997, 0, -0.09986458, 0, 0.15260334, 0, 0.09986458, 0, -0.11538997, -0.10790342, 0, 0.23025112)
+
+[node name="Flower3Single_1" type="Node3D" parent="." unique_id=1011419132 instance=ExtResource("2_q0fsx")]
+transform = Transform3D(0.15366738, 0, -0.029433228, 0, 0.15646079, 0, 0.029433228, 0, 0.15366738, -0.17189315, 0, 0.2756085)
+
+[node name="Flower3Single_2" type="Node3D" parent="." unique_id=1043125442 instance=ExtResource("2_q0fsx")]
+transform = Transform3D(0.08721372, 0, -0.1156286, 0, 0.14483164, 0, 0.1156286, 0, 0.08721372, -0.060462873, 0, 0.13269094)
+
+[node name="Flower4Single_0" type="Node3D" parent="." unique_id=18878703 instance=ExtResource("3_xnc3q")]
+transform = Transform3D(-0.012547014, 0, 0.11961589, 0, 0.120272145, 0, -0.11961589, 0, -0.012547014, 0.14864273, 0, 0.097813755)
+
+[node name="Flower4Single_1" type="Node3D" parent="." unique_id=1415039611 instance=ExtResource("3_xnc3q")]
+transform = Transform3D(-0.10500111, 0, 0.076769985, 0, 0.13007253, 0, -0.076769985, 0, -0.10500111, -0.18852986, 0, -0.104220316)
+
+[node name="Flower4Single_2" type="Node3D" parent="." unique_id=263589067 instance=ExtResource("3_xnc3q")]
+transform = Transform3D(-0.10954296, 0, 0.033224706, 0, 0.1144707, 0, -0.033224706, 0, -0.10954296, 0.31359884, 0, 0.0301635)

@@ -103,11 +103,15 @@ func _process(_delta: float) -> bool:
 
 	# --- An explicit choice still wins ------------------------------------------------------
 	# The fix must not cost the player the picker. Choosing one tree still means one tree.
-	_world.set_style_default("forest", "pine_tree")
+	# RE-POINTED 2026-09-08: this drove "pine_tree", which the style-consistency cull unwired
+	# from forest.tres (Poly Pizza's lone tree, replaced later by a MegaKit Pine). Any surviving
+	# variant exercises the identical claim — "an explicit choice beats the mix" is not about
+	# WHICH tree — so this is a re-point, not a relaxation.
+	_world.set_style_default("forest", "birch_tree")
 	var chosen: PackedScene = _world.resolve_style_scene("forest")
 	if check(chosen != null, "an explicitly chosen style still resolves to a scene"):
 		check(
-			chosen.resource_path.contains("PineTree"),
+			chosen.resource_path.contains("BirchTree"),
 			"the chosen style is the one the player picked"
 		)
 	var uniform: Dictionary = {}

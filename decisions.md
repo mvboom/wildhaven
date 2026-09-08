@@ -1624,3 +1624,46 @@ The lit faces are deliberately near-identical; the entire visible change is in t
 **Not decided here:** the farm palette's four values are tuning and remain the human's to move —
 they live in one file per colour precisely so retuning is a one-file edit rather than a hunt
 through eight importers.
+
+---
+
+### D-56 · Wild grass ships exactly one visual variant, and that is a behaviour decision
+
+**Decision:** `wild_grass.tres` carries exactly one `model_scenes` entry and keeps carrying one.
+This is a standing constraint, not the current state of an unfinished look pass — a future
+richness pass may not add a second variant here without a fresh human ruling.
+
+**Why this needed a ruling at all, when Meadow and Scrub did not.** The 2026-09-08 grass-family
+rework took Grass to 4 variants and Meadow and Scrub to 3, so that a painted field alternates
+per tile via D-42's stable hash instead of stamping one identical tile. Wild grass is the only
+member of the family left doing the stamping, which makes "give it variants too" the obvious
+next move. It is not, because for this terrain `model_scenes.size()` is wired into behaviour:
+
+- `wild_grass` is one of only TWO style-picker categories (`WorldRoot._model_scenes_for_category()`
+  handles `house`, `forest` and `wild_grass` and nothing else). `meadow` and `scrub` have no style
+  ids at all, which is why their variant counts were a pure look call and needed no ruling.
+- A second entry makes `WorldRoot._supports_mixed()` true, which puts `mixed` at the HEAD of
+  wild grass's style catalog.
+- `get_style_default()` degrades an unchosen category to `valid_ids[0]`, so that head position
+  moves the unchosen default off `"wild_grass"` and onto `"mixed"` — for every existing save,
+  not just new ones. This is precisely the consequence **D-54** accepted for Forest, where it was
+  a fix; here nobody had ruled on it.
+
+**Four assertions pin the single-variant state deliberately, and they stay pinned:**
+`test_hud_hotbar.gd`'s `style_ids_for_category("wild_grass").size() == 1`, two stale-id fallback
+checks in `test_style_defaults.gd`, and one in `test_save_round_trip.gd`. They are not stale
+scaffolding to be re-pointed by whoever next touches this terrain — they are the guard on this
+decision. A change that turns them red is doing the thing this entry forbids.
+
+**What this does NOT decide.** Wild grass's own look is untouched by this and stays open:
+`WildGrass.tscn` was rebuilt through the shared grass-family generator on 2026-09-08 with every
+value carried over unchanged (olive-khaki slab, 3 bare-dirt patches, 32 blades at the 0.065
+baseline, seed 20260816, 4 uneven clusters — the state the human's 2026-08-16 density/height
+feedback settled). **Open Question #29** — does wild grass read as "something to claim" without
+reading as broken — is unaffected and still open. Improving that look is fair game; adding a
+variant to do it is not.
+
+**Consequence accepted:** wild grass will keep tiling more visibly than the other three
+grass-family terrains. The terrain is transitional by design — one free Terraform tap converts
+it to true grass — so the repetition is on land the player is being invited to change, and the
+tag-inert "unclaimed" read matters more than the variety.

@@ -44,11 +44,43 @@
 ; new grass mesh source was pulled in for THIS wiring (Tall was already imported and
 ; unused, same D-42 opportunity as Forest's CommonTree2) — see this pass's other terrain
 ; entries (Rock, Cultivated field) for where genuinely new sources were needed instead.
-[gd_resource type="Resource" script_class="TerrainDefinition" load_steps=4 format=3]
+; GRASS-FAMILY REWORK (2026-09-08), model_scenes 2 -> 4. Grass is the CALIBRATION REFERENCE
+; for the wider rework the human approved this day: build Grass fully, rule on its colours,
+; counts and scales, then apply those settled values to Meadow, Scrub and Wild grass rather
+; than re-proposing them per terrain. Nothing in meadow.tres/scrub.tres/wild_grass.tres is
+; touched yet, deliberately.
+;
+; The 4 variants are GrassCommonShort (even short lawn, unchanged look), GrassCommonTall
+; (taller tufts over a short underlayer — rebuilt from 8 hand-placed nodes to a MultiMesh, a
+; gap its own header had flagged as out of scope since 2026-08-16), GrassClover (lawn with
+; clover, NEW) and GrassWispy (coarser wispy short/tall pair, NEW). All 4 are equal weight in
+; pick_variant() — no ordering or priority intended — so a painted field alternates per tile
+; via D-42's stable hash instead of stamping one identical tile everywhere.
+;
+; NO STYLE PICKER IS CREATED BY THIS. Only `forest` and `wild_grass` are picker categories;
+; `grass` reaches the hotbar through WorldRoot's `grass_family` TERRAIN GROUP, which lists
+; terrain ids rather than scene variants. These 4 are automatic per-tile variety only.
+;
+; PROP VOCABULARY IS PARTITIONED BY EMITTED TAG, and that is why there are no flowers in any
+; of these 4: Grass emits `open_grass` alone, Meadow emits `open_grass` + `flowers` and is the
+; only source of that tag. See GrassClover.tscn's header for the full reasoning.
+;
+; 3 NEW IMPORTS this pass, all Stylized Nature MegaKit (Standard/free), Quaternius, CC0 1.0
+; Universal, License.txt re-checked per asset-import-pipeline.md's audit gate:
+; Grass_Wispy_Tall, Clover_1, Clover_2. Recorded in
+; project/attribution/sources/quaternius_stylized_nature_megakit.tres.
+;
+; EVERY COLOUR, COUNT AND SCALE IN THE 4 SCENES IS A FIRST-PASS PROPOSAL AWAITING HUMAN
+; SIGN-OFF — the pre-existing figures (0.075 / 0.134 / 0.14) are carried over unchanged from
+; already-shipped scenes; the new ones (Wispy_Tall 0.1316, Clover_1 0.0699, Clover_2 0.0633)
+; have never been eyeballed at the game's camera pitch.
+[gd_resource type="Resource" script_class="TerrainDefinition" load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/definitions/terrain_definition.gd" id="1_schema"]
 [ext_resource type="PackedScene" path="res://assets/terrain/grass_common_short/GrassCommonShort.tscn" id="2_model"]
 [ext_resource type="PackedScene" path="res://assets/terrain/grass_common_tall/GrassCommonTall.tscn" id="3_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/grass_clover/GrassClover.tscn" id="4_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/grass_wispy/GrassWispy.tscn" id="5_model"]
 
 [resource]
 script = ExtResource("1_schema")
@@ -56,5 +88,5 @@ id = "grass"
 display_name = "Grass"
 emitted_tags = Array[String](["open_grass"])
 cost = 0
-model_scenes = Array[PackedScene]([ExtResource("2_model"), ExtResource("3_model")])
+model_scenes = Array[PackedScene]([ExtResource("2_model"), ExtResource("3_model"), ExtResource("4_model"), ExtResource("5_model")])
 harvestable = null

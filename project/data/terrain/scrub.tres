@@ -28,10 +28,32 @@
 ;
 ; No `fact_text` copy yet — Content Pipeline step 5 (Content Writer), explicitly out of
 ; scope for this task.
-[gd_resource type="Resource" script_class="TerrainDefinition" load_steps=3 format=3]
+; GRASS-FAMILY REWORK (2026-09-08), model_scenes 1 -> 3, applying the Grass calibration
+; baseline. Variants: Scrub (rocky), ScrubBrush (browse-heavy, no rock) and ScrubSparse
+; (thinnest cover, most bare ground). All 3 equal weight in pick_variant().
+;
+; ROCK SOURCE SWAPPED OFF THE ULTIMATE NATURE PACK onto the MegaKit (Rock_Medium_1/2,
+; Pebble_Round_1/2), so this terrain no longer mixes packs inside a single tile — it was the
+; only terrain that did. The 0.220 tile-unit rock target is carried over from what the old
+; Rock_1 already measured to, so the swap changes the pack and not the size.
+;
+; BUSH SWAPPED Bush_Common_Flowers -> Bush_Common on the tag-partition rule: `flowers` is
+; Meadow's tag and Meadow is its only source, so a flowering shrub on a `browse`/`rocks`
+; terrain undercuts the partition. Bush_Common_Flowers stays imported on disk, unwired.
+;
+; ONE VARIANT CARRIES NO ROCK AT ALL (ScrubBrush) and that is safe: `emitted_tags` is read from
+; THIS FILE, never from which variant a tile happens to draw, so `rocks` is unaffected.
+;
+; NO PICKER CONSEQUENCE — `scrub` is not a style-picker category. See meadow.tres.
+;
+; 5 NEW IMPORTS, MegaKit, CC0 1.0, audit gate re-checked: Bush_Common, Rock_Medium_1,
+; Rock_Medium_2, Pebble_Round_1, Pebble_Round_2. All new scales are FIRST-PASS PROPOSALS.
+[gd_resource type="Resource" script_class="TerrainDefinition" load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://scripts/definitions/terrain_definition.gd" id="1_schema"]
 [ext_resource type="PackedScene" path="res://assets/terrain/scrub/Scrub.tscn" id="2_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/scrub_brush/ScrubBrush.tscn" id="3_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/scrub_sparse/ScrubSparse.tscn" id="4_model"]
 
 [resource]
 script = ExtResource("1_schema")
@@ -39,5 +61,5 @@ id = "scrub"
 display_name = "Scrub"
 emitted_tags = Array[String](["browse", "rocks"])
 cost = 0
-model_scenes = Array[PackedScene]([ExtResource("2_model")])
+model_scenes = Array[PackedScene]([ExtResource("2_model"), ExtResource("3_model"), ExtResource("4_model")])
 harvestable = null
