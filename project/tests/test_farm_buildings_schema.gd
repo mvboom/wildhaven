@@ -39,7 +39,7 @@ const EXPECTED: Array[Dictionary] = [
 		# header for why only the display name moved.
 		"display_name": "Large Barn",
 		"cost": 30,
-		"footprint": Vector2i(2, 2),
+		"footprint": Vector2i(3, 3),
 		"emitted_tags": ["built", "barn", "large_barn"],
 	},
 	{
@@ -48,7 +48,7 @@ const EXPECTED: Array[Dictionary] = [
 		"id": "small_barn",
 		"display_name": "Small Barn",
 		"cost": 15,
-		"footprint": Vector2i(1, 1),
+		"footprint": Vector2i(2, 2),
 		"emitted_tags": ["built", "barn"],
 	},
 	{
@@ -57,7 +57,7 @@ const EXPECTED: Array[Dictionary] = [
 		"id": "open_barn",
 		"display_name": "Open Barn",
 		"cost": 15,
-		"footprint": Vector2i(1, 1),
+		"footprint": Vector2i(2, 2),
 		"emitted_tags": ["built", "barn", "stable"],
 	},
 	{
@@ -75,7 +75,7 @@ const EXPECTED: Array[Dictionary] = [
 		"id": "silo",
 		"display_name": "Silo",
 		"cost": 15,
-		"footprint": Vector2i(1, 1),
+		"footprint": Vector2i(2, 2),
 		"emitted_tags": ["built", "silo"],
 	},
 	{
@@ -84,7 +84,7 @@ const EXPECTED: Array[Dictionary] = [
 		"id": "windmill",
 		"display_name": "Windmill",
 		"cost": 15,
-		"footprint": Vector2i(1, 1),
+		"footprint": Vector2i(2, 2),
 		"emitted_tags": ["built", "mill"],
 	},
 	{
@@ -93,7 +93,7 @@ const EXPECTED: Array[Dictionary] = [
 		"id": "water_tower",
 		"display_name": "Water Tower",
 		"cost": 15,
-		"footprint": Vector2i(1, 1),
+		"footprint": Vector2i(2, 2),
 		"emitted_tags": ["built", "water"],
 	},
 	{

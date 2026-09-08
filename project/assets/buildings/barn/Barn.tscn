@@ -58,6 +58,18 @@
 ; 2026-09-07 house cull hit the same defect in three House wrappers, which prompted auditing the
 ; rest; that suite now covers EVERY buildable, so this class of defect cannot return unnoticed.
 ;
+; RESCALED AGAIN 2026-09-08 — LARGE BARN TO 3x3 (human ruling). With every former 1x1 buildable
+; now at 2x2, Small Barn and Large Barn had collapsed to the same footprint AND the same on-screen
+; size, so "large" stopped meaning anything. Taking this one to 3x3 restores the distinction the
+; `barn` / `large_barn` tag pair depends on.
+;
+; The long-horizontal-axis target moves 1.738618 -> 2.607927 (3 x the House batch's original
+; 0.869309), so the basis scale and the recentring translation are each multiplied by 1.5
+; (0.211448 -> 0.317172). Same reasoning as the 2x2 pass: a uniform factor preserves every ratio the
+; SCALE note above derived, so that note stays true at exactly two-thirds these numbers.
+;
+; TRIAL, not a signed-off value — spec.md Open Question #18.
+;
 [gd_scene load_steps=2 format=3]
 
 [ext_resource type="PackedScene" uid="uid://c1qjsp88pjm5u" path="res://assets/buildings/barn/Barn.fbx" id="1_model"]
@@ -65,4 +77,4 @@
 [node name="Barn" type="Node3D"]
 
 [node name="Model" parent="." instance=ExtResource("1_model")]
-transform = Transform3D(0.211448, 0, 0, 0, 0.211448, 0, 0, 0, 0.211448, -0.000226, 0, -0.025788)
+transform = Transform3D(0.317172, 0, 0, 0, 0.317172, 0, 0, 0, 0.317172, -0.000339, 0, -0.038682)

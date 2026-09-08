@@ -56,6 +56,10 @@
 ; but they are still separate facts; buildings.md's subsumption rule ("a large barn *is* a barn,
 ; so Barn satisfies both `barn` and `large_barn`") is unchanged by this rename.
 ;
+; FOOTPRINT 2x2 -> 3x3, 2026-09-08 (human ruling). Small Barn and Large Barn had collapsed to
+; the same footprint and size once every 1x1 went to 2x2; 3x3 restores the `large_barn` read. Model
+; scale raised 1.5x to match — see Barn.tscn. `cost` unchanged. TRIAL — Open Question #18.
+;
 [gd_resource type="Resource" script_class="PlaceableDefinition" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/definitions/placeable_definition.gd" id="1_schema"]
@@ -67,7 +71,7 @@ id = "barn"
 display_name = "Large Barn"
 hotbar_category = "farm_building"
 cost = 30
-footprint = Vector2i(2, 2)
+footprint = Vector2i(3, 3)
 allowed_terrain = Array[String](["grass"])
 emitted_tags = Array[String](["built", "barn", "large_barn"])
 model_scenes = Array[PackedScene]([ExtResource("2_model")])

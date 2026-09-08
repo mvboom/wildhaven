@@ -1,0 +1,339 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/help_content.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/ui/speaker_icon.gd" id="2"]
+
+[node name="HelpContent" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1")
+
+[node name="Stack" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/separation = 16
+
+; The Read-Aloud row sits OUTSIDE %Sections on purpose: `help_content.gd`'s `spoken_text()`
+; walks %Sections and reads every Label it finds, so a label in here would end up spoken as
+; part of the page.
+[node name="ReadRow" type="HBoxContainer" parent="Stack"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 12
+
+[node name="ReadAloudButton" type="Button" parent="Stack/ReadRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(88, 72)
+layout_mode = 2
+size_flags_vertical = 4
+
+[node name="Icon" type="Control" parent="Stack/ReadRow/ReadAloudButton"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("2")
+
+; Text is assigned by `help_content.gd` (READ_LABEL / STOP_LABEL), so it carries no authored
+; `text` of its own -- and it is outside %Sections, so it is never spoken.
+[node name="ReadAloudLabel" type="Label" parent="Stack/ReadRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 24
+
+; mouse_filter = 0 (STOP), NOT the 2 (IGNORE) every non-interactive node here carries: IGNORE
+; takes a Control out of the viewport's GUI hit test entirely, so the wheel event never reaches
+; ScrollContainer._gui_input() and the page cannot be scrolled. Same note as CreditsScreen.tscn's
+; ListScroll and FieldGuide.tscn's identically-shaped one. %Sections and its Labels stay IGNORE
+; so the wheel falls through them to this container.
+[node name="Scroll" type="ScrollContainer" parent="Stack"]
+custom_minimum_size = Vector2(0, 320)
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 0
+
+; EVERY PLAYER-FACING WORD ON THE HELP PAGE IS AUTHORED HERE, and nowhere else. The order of
+; these Labels is the order Read-Aloud speaks them (`help_content.gd` -> `spoken_text()`), so
+; a section moved here moves in the spoken script too, automatically.
+[node name="Sections" type="VBoxContainer" parent="Stack/Scroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_constants/separation = 12
+
+[node name="Heading0" type="Label" parent="Stack/Scroll/Sections"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 30
+text = "Welcome to Wildhaven"
+autowrap_mode = 3
+vertical_alignment = 2
+
+[node name="Body1" type="Label" parent="Stack/Scroll/Sections"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 24
+text = "This is your land. You can change it however you like."
+autowrap_mode = 3
+
+[node name="Body2" type="Label" parent="Stack/Scroll/Sections"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 24
+text = "When a place feels like home to an animal, that animal comes to live there. You do not catch animals. You invite them."
+autowrap_mode = 3
+
+[node name="Heading3" type="Label" parent="Stack/Scroll/Sections"]
+custom_minimum_size = Vector2(0, 56)
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 30
+text = "How to play"
+autowrap_mode = 3
+vertical_alignment = 2
+
+[node name="Body4" type="Label" parent="Stack/Scroll/Sections"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 24
+text = "Pick something from the row at the bottom of the screen, then tap the ground. That is the whole game."
+autowrap_mode = 3
+
+[node name="Line5" type="Label" parent="Stack/Scroll/Sections"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 24
+text = "Info - tap Info, then tap anything to find out what it is. Tap an animal and it says hello."
+autowrap_mode = 3
+
+[node name="Line6" type="Label" parent="Stack/Scroll/Sections"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 24
+text = "Ground - tap grass, water, trees, rock or a field. Then tap the world to put it there. Painting the ground is free."
+autowrap_mode = 3
+
+[node name="Line7" type="Label" parent="Stack/Scroll/Sections"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 24
+text = "Houses - tap a house or a farm building, then tap a spot to build it. Buildings cost wood."
+autowrap_mode = 3
+
+[node name="Line8" type="Label" parent="Stack/Scroll/Sections"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 24
+text = "Erase - tap Erase, then tap something you want to take away."
+autowrap_mode = 3
+
+[node name="Body9" type="Label" parent="Stack/Scroll/Sections"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 24
+text = "The number keys 0 to 9 pick from that row too, if you like keys better than clicking."
+autowrap_mode = 3
+
+[node name="Body10" type="Label" parent="Stack/Scroll/Sections"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 24
+text = "Some buttons are holding more than one thing. Press and hold a button for a moment to see what else is inside it, like a different tree or a different house."
+autowrap_mode = 3
+
+[node name="Heading11" type="Label" parent="Stack/Scroll/Sections"]
+custom_minimum_size = Vector2(0, 56)
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 30
+text = "Moving around"
+autowrap_mode = 3
+vertical_alignment = 2
+
+[node name="Line12" type="Label" parent="Stack/Scroll/Sections"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 24
+text = "Hold the right mouse button and drag to move around. The arrow keys and W, A, S and D work too."
+autowrap_mode = 3
+
+[node name="Line13" type="Label" parent="Stack/Scroll/Sections"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 24
+text = "Roll the mouse wheel to zoom in and out."
+autowrap_mode = 3
+
+[node name="Line14" type="Label" parent="Stack/Scroll/Sections"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 24
+text = "Press Q or E to turn the world a quarter turn."
+autowrap_mode = 3
+
+[node name="Line15" type="Label" parent="Stack/Scroll/Sections"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 24
+text = "Hold the Home key to see your whole world at once. Let go and you are right back where you were."
+autowrap_mode = 3
+
+[node name="Line16" type="Label" parent="Stack/Scroll/Sections"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 24
+text = "Press Tab, or tap the question mark button, to open your Field Guide. It remembers every animal you have met."
+autowrap_mode = 3
+
+[node name="Heading17" type="Label" parent="Stack/Scroll/Sections"]
+custom_minimum_size = Vector2(0, 56)
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 30
+text = "Nothing here can go wrong"
+autowrap_mode = 3
+vertical_alignment = 2
+
+[node name="Body18" type="Label" parent="Stack/Scroll/Sections"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 24
+text = "There is no way to lose. There is no timer and no score."
+autowrap_mode = 3
+
+[node name="Body19" type="Label" parent="Stack/Scroll/Sections"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 24
+text = "Change your mind as much as you like. If you take something away again right after you put it down, you get all your wood back."
+autowrap_mode = 3
+
+[node name="Body20" type="Label" parent="Stack/Scroll/Sections"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 24
+text = "Your world saves itself. You never have to remember to save."
+autowrap_mode = 3
+
+[node name="Heading21" type="Label" parent="Stack/Scroll/Sections"]
+custom_minimum_size = Vector2(0, 56)
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 30
+text = "If nobody has moved in yet"
+autowrap_mode = 3
+vertical_alignment = 2
+
+[node name="Body22" type="Label" parent="Stack/Scroll/Sections"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 24
+text = "That is okay. Here is what helps."
+autowrap_mode = 3
+
+[node name="Line23" type="Label" parent="Stack/Scroll/Sections"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 24
+text = "1. Paint a patch of grass, and put some trees, water or rocks near it."
+autowrap_mode = 3
+
+[node name="Line24" type="Label" parent="Stack/Scroll/Sections"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 24
+text = "2. Build a house on the grass."
+autowrap_mode = 3
+
+[node name="Line25" type="Label" parent="Stack/Scroll/Sections"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 24
+text = "3. Watch the words that appear while you are choosing a spot. They tell you when a place is getting cozy."
+autowrap_mode = 3
+
+[node name="Line26" type="Label" parent="Stack/Scroll/Sections"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 24
+text = "4. Then wait a little. Animals take their time. They will come while you are busy somewhere else."
+autowrap_mode = 3
+
+[node name="Body27" type="Label" parent="Stack/Scroll/Sections"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 24
+text = "Rabbits are the easiest neighbours to start with. They like grass with a few rocks nearby."
+autowrap_mode = 3
+
+[node name="Heading28" type="Label" parent="Stack/Scroll/Sections"]
+custom_minimum_size = Vector2(0, 56)
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 30
+text = "For grown-ups"
+autowrap_mode = 3
+vertical_alignment = 2
+
+[node name="Body29" type="Label" parent="Stack/Scroll/Sections"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 24
+text = "Read-Aloud reads the game's words out loud and can be switched off. Gameplay Hints turns off the pop-up nudges. Both live in Settings on the title screen, and a change takes effect the next time you play."
+autowrap_mode = 3
+
+[node name="Body30" type="Label" parent="Stack/Scroll/Sections"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
+theme_override_font_sizes/font_size = 24
+text = "There is no failure state anywhere in Wildhaven, no timer, and nothing that punishes walking away mid-play."
+autowrap_mode = 3

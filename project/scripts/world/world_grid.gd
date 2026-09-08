@@ -460,9 +460,36 @@ func is_occupied(x: int, z: int) -> bool:
 ##
 ## Returns the definition's own array by reference for speed — the capacity pass runs this
 ## once per tile in radius per evaluation. **Callers must not mutate the result.**
+## ONE BUILDING EMITS ONCE, AT ITS CENTRE TILE (2026-09-08, human ruling). A footprint tile
+## that is not the centre is occupied and terrain-suppressed but emits NOTHING.
+##
+## WHY, and it is not a micro-optimisation: a tag count is a count of TILES, so before this
+## change a building contributed one copy of its `emitted_tags` per tile it covered. That was
+## invisible while every buildable was 1x1 and became wrong the moment they were not:
+##   * `built` ceilings stopped meaning what they were ruled to mean — rabbit's `built <= 2`
+##     ("a distant cottage is fine, a village is not") was silently a 4x tighter rule at 2x2
+##     and 9x tighter next to the 3x3 barn, excluding rabbits from a single building.
+##   * Well and Water Tower emit `water`, which is a SCALING need (cow 3/individual, horse 2,
+##     fox 6) — a 2x2 tower quietly counted as four ponds.
+##   * Worst: a scout founds a home site on any tile whose tags satisfy a tier, so all four
+##     tiles of a 2x2 House passed the `house` gate and ONE HOUSE SEATED TWO VILLAGERS.
+##     Measured, not theorised: capacity_at(28,28) and capacity_at(29,28) each read 1.
+## Emitting once restores 1x1 semantics for every count at every footprint, so NO ruled
+## constant had to move and none has to move again the next time a footprint does.
+##
+## CENTRE, NOT ORIGIN, because the tag's position is what radius checks measure to. The origin
+## is a corner: on the 3x3 barn that is ~1.41 tiles off the building's visual centre, enough to
+## push it outside the horse's radius-5 `stable` need when the barn plainly looks inside it.
+## Integer division lands on the true centre for odd footprints (3x3 -> origin + (1,1), zero
+## error) and on the origin for even ones (2x2 has no centre tile; the residual is 0.71 tiles,
+## against radii of 5-14). 1x1 is unchanged in every respect.
 func get_tile_tags(x: int, z: int) -> Array[String]:
 	var building: PlaceableDefinition = get_building(x, z)
 	if building != null:
+		var origin: Vector2i = get_building_origin(x, z)
+		var centre: Vector2i = origin + (building.footprint - Vector2i.ONE) / 2
+		if Vector2i(x, z) != centre:
+			return []
 		return building.emitted_tags
 	var terrain: TerrainDefinition = get_terrain(x, z)
 	if terrain == null:

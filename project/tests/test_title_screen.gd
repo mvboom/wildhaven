@@ -97,7 +97,6 @@ func _check_layout_is_not_collapsed() -> void:
 	var controls: Array[Control] = [
 		_screen.get_node("%NewGameButton") as Control,
 		_screen.get_node("%LoadGameButton") as Control,
-		_screen.get_node("%TutorialButton") as Control,
 		_screen.get_node("%HelpButton") as Control,
 		_screen.get_node("%CreditsButton") as Control,
 		_screen.get_node("%SettingsButton") as Control,

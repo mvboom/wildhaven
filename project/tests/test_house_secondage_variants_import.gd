@@ -20,7 +20,12 @@ extends QATestCase
 ## the only load coverage the unwired wrappers have and let one rot silently until someone
 ## re-wired it.
 
-const TILE_SIZE: float = 1.0
+## RE-PINNED 2026-09-08 — was 1.0. This is the FIT BUDGET, not WorldGrid.TILE_SIZE: the
+## footprint-deepening trial moved the House to a 2x2 footprint and doubled these three
+## wrappers' scale to suit, so the tiles they must fit inside now span 2.0 units. The three
+## meshes land at a 1.738618 long axis, the same margin Barn's 2x2 already used. A trial,
+## not a settled value — Open Question #18.
+const TILE_SIZE: float = 2.0
 
 const VARIANT_PATHS: Array[String] = [
 	# RENAMED 2026-09-07 (house cull): these three are the only SecondAge variants still wired

@@ -1,6 +1,7 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scripts/menu/coming_soon_screen.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/ui/HelpContent.tscn" id="2"]
 
 ; Same sky gradient as TitleScreen.tscn (2026-08-24 "match the main screen" pass).
 [sub_resource type="Gradient" id="SkyGradient"]
@@ -107,13 +108,22 @@ mouse_filter = 2
 theme_override_constants/separation = 24
 alignment = 1
 
-[node name="Message" type="Label" parent="Layout/Stack"]
+[node name="Title" type="Label" parent="Layout/Stack"]
 layout_mode = 2
 mouse_filter = 2
 theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
-theme_override_font_sizes/font_size = 36
-text = "Help Coming Soon"
+theme_override_font_sizes/font_size = 44
+text = "Help"
 horizontal_alignment = 1
+
+; Taller and wider than CreditsScreen's embedded content, and size_flags_vertical = 3 rather
+; than 0: this page is a scrolling column of prose, so it takes whatever height the Title and
+; Back button leave it instead of sitting at a fixed size.
+[node name="HelpContent" parent="Layout/Stack" instance=ExtResource("2")]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(760, 460)
+layout_mode = 2
+size_flags_vertical = 3
 
 [node name="BackButton" type="Button" parent="Layout/Stack"]
 unique_name_in_owner = true

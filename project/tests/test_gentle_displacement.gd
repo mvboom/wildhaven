@@ -60,7 +60,11 @@ const VETO_WORDS: PackedStringArray = [
 ## The villager habitat for the real-world sections. 20+ tiles from anything else so no other
 ## neighbourhood can overlap it (both radii are 8, so a shared tile would need them within 16).
 const HOUSE_TILE := Vector2i(28, 28)
-const FIELD_TILE := Vector2i(29, 28)
+## MOVED 2026-09-08 — was HOUSE_TILE + (1, 0), which is now INSIDE the House's own footprint.
+## The footprint-deepening trial took the House from 1x1 to 2x2, so a field "beside" the house
+## has to start two tiles out. The distance is still well inside the villager's scout radius of
+## 8, so what this fixture proves is unchanged.
+const FIELD_TILE := Vector2i(30, 28)
 const SECOND_FIELD := Vector2i(29, 27)
 const SPARE_HOUSE := Vector2i(26, 28)
 

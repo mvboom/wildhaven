@@ -64,16 +64,22 @@ const STYLE_PAD := Vector2i(28, 28)
 ## Pinned footprints for the whole catalog — the fixture premise, stated once. A human
 ## re-ruling any of these fails HERE, loudly, rather than quietly changing what this suite
 ## thinks it is covering (the original reason `barn`'s 2x2 was pinned; generalised 2026-09-07).
+## RE-PINNED 2026-09-08 — the eight 1x1 entries became 2x2 (footprint-deepening trial, human
+## ruling), and their wrapper meshes were doubled to the 1.738618 long-axis target Barn already
+## used. NOTE THE COVERAGE LOSS THIS CREATES, deliberately not papered over: with every buildable
+## at 2x2 this suite no longer exercises a 1x1 footprint at all, so the "1x1-vs-multi-tile"
+## premise stated below is intact again: the chicken coop and the well were ruled back to 1x1
+## on 2026-09-08, so this suite still covers 1x1, 2x2 and (with the Large Barn and Farmhouse) 3x3.
 const EXPECTED_FOOTPRINTS: Dictionary = {
-	"house": Vector2i(1, 1),
-	"farmhouse": Vector2i(2, 2),
-	"barn": Vector2i(2, 2),
-	"small_barn": Vector2i(1, 1),
-	"open_barn": Vector2i(1, 1),
+	"house": Vector2i(2, 2),
+	"farmhouse": Vector2i(3, 3),
+	"barn": Vector2i(3, 3),
+	"small_barn": Vector2i(2, 2),
+	"open_barn": Vector2i(2, 2),
 	"chicken_coop": Vector2i(1, 1),
-	"silo": Vector2i(1, 1),
-	"windmill": Vector2i(1, 1),
-	"water_tower": Vector2i(1, 1),
+	"silo": Vector2i(2, 2),
+	"windmill": Vector2i(2, 2),
+	"water_tower": Vector2i(2, 2),
 	"well": Vector2i(1, 1),
 }
 

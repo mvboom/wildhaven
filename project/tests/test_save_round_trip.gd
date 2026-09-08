@@ -56,7 +56,11 @@ const ROCK_X_TO: int = 8
 ## The villager's habitat. The House's `allowed_terrain` is `["grass"]`, so the tile is painted
 ## first — exactly what a player does, and without it the placement silently declines.
 const HOUSE_TILE := Vector2i(14, 14)
-const FIELD_TILE := Vector2i(15, 14)
+## MOVED 2026-09-08 — was HOUSE_TILE + (1, 0), which is now INSIDE the House's own footprint.
+## The footprint-deepening trial took the House from 1x1 to 2x2, so a field "beside" the house
+## has to start two tiles out. The distance is still well inside the villager's scout radius of
+## 8, so what this fixture proves is unchanged.
+const FIELD_TILE := Vector2i(16, 14)
 
 ## Simulated seconds driven by hand, past the 20-60 s arrival delay, so no test waits on frames.
 const ARRIVAL_TICKS: int = 200

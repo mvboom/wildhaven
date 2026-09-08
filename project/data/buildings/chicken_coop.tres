@@ -3,7 +3,7 @@
 ; project/assets/buildings/chicken_coop/ChickenCoop.tscn for the asset-level header
 ; (source, license, texture audit, measured-scale reasoning).
 ;
-; NO DESIGN DOC STATES ANY OF THIS ITEM'S VALUES. cost = 15, footprint = Vector2i(1, 1)
+; NO DESIGN DOC STATES ANY OF THIS ITEM'S VALUES. cost = 15, footprint = Vector2i(2, 2)
 ; are FIRST-PASS PROPOSALS sourced only from House's own stated 1x1 baseline (~15 Wood
 ; — buildings.md) — FLAG FOR HUMAN SIGN-OFF, same as every other new farm building in
 ; this batch. allowed_terrain = ["grass"] (matching House) is this task's own explicit
@@ -16,6 +16,29 @@
 ; building was placeable decoration with no simulation meaning. `built` is emitted by
 ; EVERY placeable so one `HabitatLimit` on `built` excludes all of them, including
 ; buildings added later. See docs/superpowers/specs/2026-09-04-habitat-tiers-design.md § 8.
+; FOOTPRINT 1x1 -> 2x2, 2026-09-08 — TRIAL (human ruling), NOT a signed-off value.
+; Open Question #18 (footprints & world dimensions) is still open; this is a look-pass so the
+; human can judge the result before the downstream re-tuning is paid for.
+;
+; WHY: buildings read too small against a person. A villager normalises to exactly 1.0 tile
+; height (WorldGrid.TILE_SIZE = 1.0) and every 1x1 building's mesh stood shorter than that. The
+; model wrapper's scale was doubled to match (0.869309 -> 1.738618 long-axis target, which is
+; Barn.tscn's existing 2x2 convention) — see the wrapper's own header for that half.
+;
+; `cost` IS DELIBERATELY UNCHANGED, per the same ruling. Consequence, noted not resolved:
+; wood-per-tile-claimed drops 4x (Open Questions #8 cost table, #26 starting stockpile).
+;
+; KNOWN OUTSTANDING, DELIBERATELY NOT DONE HERE — a `built` HabitatLimit counts TILES, not
+; buildings, so this building now contributes 4 `built` tiles where it contributed 1. That
+; silently tightens every wild exclusion ceiling 4x: rabbit (both tiers, max_count = 2) is now
+; excluded outright by a single building in scout radius, and deer's base tier and donkey's
+; range tier (max_count = 1) become unreachable near any building at all. Fox, Stag and the deer
+; herd tier are already at 0 and are unaffected. Those ceilings are tuning values and are the
+; human's to re-rule.
+; FOOTPRINT REVERTED 2x2 -> 1x1, 2026-09-08 (human ruling: "a chicken coop should still be 1x1").
+; The blanket 1x1 -> 2x2 pass caught this one; a coop is a small thing on a farm. Model scale halved
+; back to match — see ChickenCoop.tscn.
+;
 [gd_resource type="Resource" script_class="PlaceableDefinition" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/definitions/placeable_definition.gd" id="1_schema"]

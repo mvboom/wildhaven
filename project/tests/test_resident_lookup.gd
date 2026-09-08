@@ -389,15 +389,20 @@ func _check_priority_rule_while_moving_in_all_three_modes() -> void:
 	check(_resident.position != before, "the animal moved again before the Build tap")
 	tile = _world.screen_to_grid(live)
 	_hud.set_mode(GameHud.Mode.BUILD)
-	check(_hud.select_palette_option("house"), "the House is selected in the Build palette")
-	check(_world.can_place(tile.x, tile.y, "house"), "a Build tap here WOULD have succeeded")
+	# RE-POINTED 2026-09-08 to the Well, a 1x1 buildable — was the House, which is 2x2 since the
+	# footprint-deepening trial and therefore needs FOUR free grass tiles under a wandering
+	# resident, which its roam region does not reliably offer. Nothing this fixture proves is
+	# about the House: the assertion is that a tile action wins a contested tap, and any real
+	# buildable proves it. Using a 1x1 keeps the fixture testing tap routing, not placement luck.
+	check(_hud.select_palette_option("well"), "the Well is selected in the Build palette")
+	check(_world.can_place(tile.x, tile.y, "well"), "a Build tap here WOULD have succeeded")
 	check(not _world.resident_record_at(live).is_empty(),
 		"the resident really is standing at the tapped point before the tap")
 	var wood_before: int = _world.get_wood()
 	check_eq(_router.handle_tap(live), TapRouter.RESULT_PLACED,
 		"D-29 #7: BUILD never runs the resident query — the tile action wins even though the "
 		+ "MOVING animal stands on it")
-	check(_world.grid.is_occupied(tile.x, tile.y), "...and the House WAS built on top of it")
+	check(_world.grid.is_occupied(tile.x, tile.y), "...and the Well WAS built on top of it")
 	check(_world.get_wood() < wood_before, "...and Wood was spent")
 	check(not _card.is_open(), "...and no card fired — the resident query never ran")
 
@@ -559,7 +564,7 @@ func _step_to_a_walking_tap_on_buildable_ground() -> Vector2:
 		if live.distance_to(_arrival_screen) <= _tap_radius(_resident.position):
 			continue
 		var tile: Vector2i = _world.screen_to_grid(live)
-		if tile.x >= 0 and _world.can_place(tile.x, tile.y, "house"):
+		if tile.x >= 0 and _world.can_place(tile.x, tile.y, "well"):
 			return live
 	check(false, "the resident reached a walking, ghost-clear, buildable position within the cap")
 	return _screen_of(_resident.position)

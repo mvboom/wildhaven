@@ -27,7 +27,13 @@ const MODEL_PATH: String = "res://assets/buildings/house_large/HouseLarge.tscn"
 ## Questions #8/#26 and #18) — pinned so a silent drift is caught, not because the values
 ## are settled.
 const EXPECTED_COST: int = 15
-const EXPECTED_FOOTPRINT: Vector2i = Vector2i(1, 1)
+## RE-PINNED 2026-09-08 — was Vector2i(1, 1). FOOTPRINT-DEEPENING TRIAL (human ruling): the
+## eight 1x1 buildables moved to 2x2 so their meshes could be doubled to read correctly against
+## a 1.0-tile-tall villager. `cost` is deliberately unchanged. This is a look-pass, not a
+## settled value — Open Question #18 is still open, and the doc text above ("floor (Tier 1)
+## row: 1x1") is now the STALE half of this pin: gdd.md -> Build Mode and buildings.md ->
+## Floor building both still say 1x1 and have deliberately not been rewritten for a trial.
+const EXPECTED_FOOTPRINT: Vector2i = Vector2i(2, 2)
 const EXPECTED_ALLOWED_TERRAIN: PackedStringArray = ["grass"]
 ## RE-POINTED 2026-09-04 (habitat-tiers Task 7): was ["house"]. `built` now added
 ## alongside the already-decided `house` — `built` is emitted by EVERY placeable so one
@@ -80,7 +86,7 @@ func _init() -> void:
 
 	# --- human-decided values (buildings.md) ----------------------------------
 	check_eq(house.cost, EXPECTED_COST, "cost is buildings.md's floor baseline (~15 Wood)")
-	check_eq(house.footprint, EXPECTED_FOOTPRINT, "footprint == Vector2i(1, 1) — the Tier 1 floor form")
+	check_eq(house.footprint, EXPECTED_FOOTPRINT, "footprint == Vector2i(2, 2) — the 2026-09-08 deepening trial, not the Tier 1 floor form")
 	check_eq(PackedStringArray(house.allowed_terrain), EXPECTED_ALLOWED_TERRAIN,
 		"allowed_terrain == [\"grass\"] (\"houses build on grass only\")")
 	check_eq(PackedStringArray(house.emitted_tags), EXPECTED_EMITTED_TAGS,

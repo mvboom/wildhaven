@@ -117,11 +117,24 @@ func _check_a_building_suppresses_and_restores(world: WorldRoot, grid: WorldGrid
 	var def: PlaceableDefinition = options[0] as PlaceableDefinition
 	if not check(world.place_building(tile.x, tile.y, def.id), "SETUP: a building can be placed"):
 		return
-	var built: int = grid.tile_tag_mask(tile.x, tile.y)
+	# REWRITTEN 2026-09-08 for centre-tile emission (WorldGrid.get_tile_tags()). This assertion used
+	# to read "a footprint tile's mask carries `built`", which was true of EVERY covered tile and was
+	# exactly the bug: a tag count is a count of tiles, so an N-tile building contributed N copies of
+	# its tags. One building now emits ONCE, at its centre tile; every other tile it covers is
+	# occupied and terrain-suppressed but emits nothing. Pinned here in both directions, because the
+	# whole point is that the two halves differ.
+	var centre: Vector2i = tile + (def.footprint - Vector2i.ONE) / 2
+	var built: int = grid.tile_tag_mask(centre.x, centre.y)
 	check(built & WorldGrid.tag_bit("built") != 0,
-		"a footprint tile's mask carries `built` while occupied")
-	check_eq(built, WorldGrid.tags_mask(grid.get_tile_tags(tile.x, tile.y)),
+		"the footprint's CENTRE tile carries `built` while occupied")
+	check_eq(built, WorldGrid.tags_mask(grid.get_tile_tags(centre.x, centre.y)),
 		"...and matches get_tile_tags(), which a footprint suppresses to the building's tags")
+	for covered: Vector2i in WorldGrid.footprint_tiles(tile, def):
+		if covered == centre:
+			continue
+		check_eq(grid.tile_tag_mask(covered.x, covered.y), 0,
+			"...while every OTHER footprint tile %s emits nothing — one building, one emission"
+				% covered)
 	_check_agrees_everywhere(grid, "after set_building()")
 
 	if not check(world.remove_at(tile.x, tile.y), "SETUP: the building can be removed"):

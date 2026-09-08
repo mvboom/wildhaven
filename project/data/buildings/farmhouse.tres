@@ -52,6 +52,17 @@
 ; different footprints. That was already true before the cull; it is simply easier to notice now
 ; that the House pool is three entries instead of eighteen. Raised, not decided.
 ;
+; FOOTPRINT 2x2 -> 3x3, 2026-09-08 (human ruling), for the same reason Large Barn went to 3x3: the
+; House is 2x2 now, so `large_house` had no size of its own left.
+;
+; THE MODEL IS NOT YET RIGHT AND THIS IS KNOWN. Farmhouse still points at HouseMedium.tscn, which it
+; SHARES with the House buildable (buildings.md already flags the shared mesh as "raised, not
+; decided") and which is scaled for a 2x2 plot — so a placed Farmhouse currently sits undersized in
+; the middle of its 3x3 footprint. It cannot be rescaled here without also resizing the House.
+; The fix is the pending import of House1.fbx from the Quaternius "Buildings Pack - Jan 2019"
+; (CC0 1.0) as the Farmhouse's own model, which the human has asked for; that import is blocked
+; until this trial is committed, because scripts/asset_pipeline.py's preflight requires a clean tree.
+;
 [gd_resource type="Resource" script_class="PlaceableDefinition" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/definitions/placeable_definition.gd" id="1_schema"]
@@ -63,7 +74,7 @@ id = "farmhouse"
 display_name = "Farmhouse"
 hotbar_category = "farm_building"
 cost = 30
-footprint = Vector2i(2, 2)
+footprint = Vector2i(3, 3)
 allowed_terrain = Array[String](["grass"])
 emitted_tags = Array[String](["built", "house", "large_house"])
 model_scenes = Array[PackedScene]([ExtResource("2_model")])

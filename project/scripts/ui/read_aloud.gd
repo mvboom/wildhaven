@@ -61,3 +61,13 @@ static func speak(text: String) -> bool:
 static func stop() -> void:
 	if DisplayServer.has_feature(DisplayServer.FEATURE_TEXT_TO_SPEECH):
 		DisplayServer.tts_stop()
+
+
+## Is a `speak()` still in progress? `HelpContent`'s button is a play/stop control rather than
+## `FactCard`'s mute toggle -- the Help page never auto-speaks, so its button has to be able to
+## say "reading" and to notice when the speech ends on its own. Same quiet-degradation rule as
+## everything else here: no voice means never speaking, never an error.
+static func speaking() -> bool:
+	if not DisplayServer.has_feature(DisplayServer.FEATURE_TEXT_TO_SPEECH):
+		return false
+	return DisplayServer.tts_is_speaking()

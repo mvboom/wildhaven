@@ -272,7 +272,9 @@ func _check_inspect_names_the_building_on_the_tile() -> void:
 	# is empty or not. Addressed by its REAL id, not the "farm_building" group key —
 	# `select_palette_option()` takes catalog ids only (a group key returns false and would
 	# silently leave the House selected).
-	var barn_tile := Vector2i(20, 6)
+	# MOVED 2026-09-08 — was Vector2i(20, 6), which the House at (19, 6) now covers: the
+	# footprint-deepening trial made both buildings 2x2, so the House spans (19-20, 6-7).
+	var barn_tile := Vector2i(21, 6)
 	_hud.set_mode(GameHud.Mode.BUILD)
 	check(_hud.select_palette_option("well"), "the Well is selectable by its catalog id")
 	check_eq(_tap(barn_tile), TapRouter.RESULT_PLACED, "a farm building is standing on a second tile")
@@ -499,13 +501,18 @@ func _check_tile_action_wins_over_resident(
 		check_eq(_world.get_tile_terrain(tile.x, tile.y), "water",
 			"...the tile the resident stands on WAS painted")
 	else:
-		_hud.select_palette_option("house")
-		check(_world.can_place(tile.x, tile.y, "house"), "[%s] the tap here WOULD succeed" % mode_name)
+		# RE-POINTED 2026-09-08 to the Well, a 1x1 buildable — was the House, which is 2x2 since the
+		# footprint-deepening trial and therefore needs FOUR free grass tiles under a wandering
+		# resident, which its roam region does not reliably offer. Nothing this fixture proves is
+		# about the House: the assertion is that a tile action wins a contested tap, and any real
+		# buildable proves it. Using a 1x1 keeps the fixture testing tap routing, not placement luck.
+		_hud.select_palette_option("well")
+		check(_world.can_place(tile.x, tile.y, "well"), "[%s] the tap here WOULD succeed" % mode_name)
 		var wood_before: int = _world.get_wood()
 		check_eq(_router.handle_tap(screen), TapRouter.RESULT_PLACED,
 			"D-29 #7: in %s the tile action wins the tap even though a resident stands on it"
 				% mode_name)
-		check(_world.grid.is_occupied(tile.x, tile.y), "...and the House was built on top of it")
+		check(_world.grid.is_occupied(tile.x, tile.y), "...and the Well was built on top of it")
 		check(_world.get_wood() < wood_before, "...and Wood was spent")
 
 	check(not _card.is_open(),

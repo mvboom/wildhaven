@@ -36,7 +36,11 @@ const ROCK_D: int = 3
 
 ## The villager's, deliberately out of the rabbit's radius.
 const HOUSE_TILE := Vector2i(28, 28)
-const FIELD_TILE := Vector2i(29, 28)
+## MOVED 2026-09-08 — was HOUSE_TILE + (1, 0), which is now INSIDE the House's own footprint.
+## The footprint-deepening trial took the House from 1x1 to 2x2, so a field "beside" the house
+## has to start two tiles out. The distance is still well inside the villager's scout radius of
+## 8, so what this fixture proves is unchanged.
+const FIELD_TILE := Vector2i(30, 28)
 
 var _world: WorldRoot = null
 var _frames: int = 0
@@ -400,7 +404,13 @@ func _check_counts_in_the_real_world() -> void:
 			% terrain_id)
 	check(not _world.grid.is_occupied(den_tile.x, den_tile.y),
 		"...and the tile is unoccupied: a den is not a building and blocks no placement")
-	check(_world.can_place(den_tile.x, den_tile.y, "house") == (terrain_id == "grass"),
+	# RE-POINTED 2026-09-08 to the Well, a 1x1 buildable — was the House. "Decided by its terrain
+	# alone" is a statement about ONE tile, and it is only true of a 1x1 buildable: a 2x2 House is
+	# decided by four tiles' terrain, so the House stopped being able to express this assertion at
+	# all once the footprint-deepening trial widened it. The claim under test is unchanged and is
+	# about the DEN — a prop blocks no placement — so it wants the buildable whose footprint is the
+	# one tile the den sits on.
+	check(_world.can_place(den_tile.x, den_tile.y, "well") == (terrain_id == "grass"),
 		"...and buildability at the den tile is decided by its terrain alone, not by the prop")
 	check(_world.can_paint(den_tile.x, den_tile.y, "forest"),
 		"...and the tile under the den still paints")

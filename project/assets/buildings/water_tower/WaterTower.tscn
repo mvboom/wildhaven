@@ -44,6 +44,29 @@
 ; 2026-09-07 house cull hit the same defect in three House wrappers, which prompted auditing the
 ; rest; that suite now covers EVERY buildable, so this class of defect cannot return unnoticed.
 ;
+; RESCALED 2026-09-08 — FOOTPRINT-DEEPENING TRIAL (human ruling: "double everything uniformly").
+; The eight 1x1 buildables moved to a 2x2 footprint, so the long-horizontal-axis normalisation
+; target doubles: 0.869309 -> 1.738618 — the target Barn.tscn's own 2x2 already uses, so this is
+; the project's existing 2x2 convention, not a new one. This file's basis scale AND its
+; recentring translation are therefore each multiplied by exactly 2 (0.343295 -> 0.68659).
+;
+; DOUBLING RATHER THAN RE-MEASURING IS DELIBERATE. A uniform factor of 2 preserves every ratio
+; already ruled on, so nothing decided earlier is silently reverted — the SCALE and RECENTRED
+; notes above still describe their own derivation correctly, at exactly half this file's current
+; numbers. The translation doubles for the same reason the scale does: it is the negation of a
+; centre measured in post-scale wrapper space, so it scales with the mesh.
+;
+; THIS IS A TRIAL FOR A LOOK-PASS, NOT A SIGNED-OFF VALUE. The footprint change it serves is
+; unratified (spec.md Open Question #18) and the downstream re-tuning it implies is deliberately
+; NOT done yet — see the buildable's own .tres header for the outstanding list.
+;
+; WHY: buildings read too small against a person. `Man.tscn` normalises a villager to exactly
+; 1.0 tile height (WorldGrid.TILE_SIZE = 1.0, gdd.md -> "a villager stands ~1 tile tall"), and
+; every 1x1 building's scaled mesh stood SHORTER than that — all three House looks (0.772,
+; 0.909, 0.706), the Small Barn (0.687) shorter than the 0.734 cow, the Open Barn/stable (0.667)
+; shorter than the 0.965 horse. The 0.869309 target was a convention inherited from the FirstAge
+; House batch; it was never measured against a person.
+;
 [gd_scene load_steps=2 format=3]
 
 [ext_resource type="PackedScene" uid="uid://d0oe4pt6egi6" path="res://assets/buildings/water_tower/WaterTower.fbx" id="1_model"]
@@ -51,4 +74,4 @@
 [node name="WaterTower" type="Node3D"]
 
 [node name="Model" parent="." instance=ExtResource("1_model")]
-transform = Transform3D(0.343295, 0, 0, 0, 0.343295, 0, 0, 0, 0.343295, -0.025066, 0, 0.000000)
+transform = Transform3D(0.68659, 0, 0, 0, 0.68659, 0, 0, 0, 0.68659, -0.050132, 0, 0)
