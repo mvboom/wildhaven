@@ -84,7 +84,7 @@ Controls in gdd.md.
 full vocabulary and the qualification/capacity mechanics that read it: gdd.md → Habitat
 Suitability):
 
-- **Terrain-emitted:** `water` · `forest` · `open_grass` · `browse` · `cover` · `flowers` ·
+- **Terrain-emitted:** `water` · `forest` · `open_grass` · `browse` · `flowers` ·
   `sand` · `rocks` · `cultivated` · `snow`
 - **Building-emitted:** `built` · `house` · `large_house` · `barn` · `large_barn` ·
   `stable` · `coop` · `silo` · `mill`
@@ -94,11 +94,15 @@ Suitability):
 **`quiet` was retired.** It had no source and no consumer, and a `built` exclusion limit
 does its job strictly better: it is actually enforced, and it needs no terrain to emit it.
 
-**Three tags currently have no consuming species:** `sand` (no shipped terrain emits it),
+**`cover` was retired too (2026-09-07, → D-52).** The tier re-spec left it with a source
+but no consumer — Fox moved to `forest`/`open_grass`/`water`, Rabbit to
+`open_grass`/`cultivated` — so it went the way of `quiet`. Rock now emits `rocks` alone,
+which Donkey, Alpaca, Shiba Inu and Stag all need, so Rock's place is unchanged and there
+is no gameplay effect.
+
+**Two tags still have no consuming species:** `sand` (no shipped terrain emits it) and
 `coop` (emitted by the Chicken Coop, but Chicken has no `AnimalDefinition` — its asset was
-never purchased), and **`cover`** — which lost its last consumer at D-52, when Fox and
-Rabbit moved onto tiers that no longer ask for it. Rock still earns its place by emitting
-`rocks`, which Donkey, Alpaca and Shiba Inu all need. All three are deliberate.
+never purchased). Both are deliberate, not oversights.
 
 **Tag-source mapping** (decided — and with #5 closed, this table *is* the complete
 emission model; per-tag "counts as met" thresholds under #6 are likewise not part of v1):
@@ -111,7 +115,7 @@ emission model; per-tag "counts as met" thresholds under #6 are likewise not par
 | **Snowfield** *(new, 2026-09-04)* | `snow` |
 | Water | `water` |
 | Forest | `forest` |
-| Rock | `cover` · `rocks` |
+| Rock | `rocks` |
 | Sand | `sand` |
 | Cultivated field | `cultivated` |
 | Wild grass *(untouched revealed land)* | *nothing — tag-inert* |
@@ -130,9 +134,9 @@ Art for all three came from packs already imported, licence-cleared and attribut
 Ultimate Nature Pack's snow variants, and the Stylized Nature MegaKit's flowers, ferns,
 bushes and tall grass. No new sourcing gate was opened.
 
-**Rock, not forest, is the `cover` source** — though since D-52 no species consumes `cover`
-at all, so this now matters only for the tag's definition, not for any species. Historically
-it made Fox habitat a two-brushstroke
+**Rock, not forest, was the `cover` source** — a tag retired at D-52 once nothing consumed
+it. Kept here as history because it explains a design idea worth remembering: it made Fox
+habitat a two-brushstroke
 composition (forest *near* rock), never a side effect of painting forest for Wood (see
 [roster.md](roster.md)).
 
@@ -151,10 +155,9 @@ it reads as "wild" without reading as broken is Open Question #29.
 
 **Floor terrain (Tier 1):** five of the six v1 terrains — grass, water, forest, rock,
 cultivated (sand is depth). Cultivated ships at the floor because capacity reads
-cultivated tiles in radius, which the villager move-in needs; rock is the `cover` and
-`rocks` source (Open Question #5 resolved) — since D-52 it is `rocks` that species
-actually consume (Donkey, Alpaca, Shiba Inu, Stag), `cover` having lost its last consumer
-when Fox and Rabbit moved onto tiers — see gdd.md → Scope, row 3.
+cultivated tiles in radius, which the villager move-in needs; rock is the `rocks` source
+(Open Question #5 resolved), consumed by Donkey, Alpaca, Shiba Inu and Stag — see gdd.md →
+Scope, row 3.
 
 **Tag-vocabulary note:** `flowers` gained a source on 2026-09-04 (Meadow) and a consumer
 (Rabbit's warren tier). `sand` and `coop` remain sourced-or-emitted with no consuming

@@ -1346,10 +1346,6 @@ rather than `binding_entries()` (1), plus an explicit check that the Sherkiz
 
 ### D-52 · Habitat tiers replace the flat one-recipe habitat model
 
-> **DRAFTED BY AGENT, AWAITING HUMAN REVIEW.** The rulings recorded below were made by the
-> human on 2026-09-04; this entry transcribes them. The *values* the ruling produced are
-> still proposals — see "What is NOT decided here" at the end.
-
 **Decision:** a species no longer carries one flat habitat recipe. It carries an ordered
 list of **tiers**, each with its own needs, its own exclusion limits, its own population
 cap and its own arrival group size. Capacity becomes `max` over tiers of the existing
@@ -1391,6 +1387,25 @@ simulation meaning. They now have a job.
 - **F — `quiet` retired.** It had no source and no consumer, and a `built` exclusion limit
   does its job strictly better — it is actually enforced and needs no terrain to emit it.
 
+**`cover` retired too (2026-09-07).** The doc fold-back surfaced that the tier re-spec had
+left `cover` with a source but **no consumer**: Fox moved to `forest`/`open_grass`/`water`
+and Rabbit to `open_grass`/`cultivated`, so nothing asked for it any more. The human ruled
+it retired on the same grounds as `quiet`. Rock now emits `rocks` alone, which Donkey,
+Alpaca, Shiba Inu and Stag all need, so Rock's place is unchanged and there is no gameplay
+effect.
+
+This does retire a piece of stated design along with the tag. The GDD, spec and terrain
+docs had all carried the same line — *"Rock, not forest, is the `cover` source, so Fox
+habitat is always a two-brushstroke composition (forest near rock), never a side effect of
+painting forest for Wood"* — which was the reason Fox was called the hardest habitat on the
+floor roster. That composition argument no longer describes any shipped species. It is kept
+in the docs as history rather than deleted, because it still explains why the idea mattered.
+
+One consequence worth recording: the legacy flat `habitat_needs` fields were retained on
+all 15 species so a rollback would be a one-line edit. For Fox, Rabbit and Stag that
+rollback is **no longer faithful**, because the `cover` they named is gone from the
+vocabulary. The affordance is void for those three either way.
+
 **Also ruled during execution**, where review found the plan itself wrong:
 
 - **The legacy tier preserves the radius sentinel** rather than baking a concrete radius.
@@ -1415,9 +1430,10 @@ owned were verified end to end: the inert-land invariant (wild grass still emits
 `qualifies ≡ capacity ≥ 1` still one function, no lower clamp, an acyclic emission graph,
 and a human-gated vocabulary.
 
-**What is NOT decided here.** Every habitat value across the fifteen species, and
-Farmhouse's cost, footprint and model, remain **proposals awaiting sign-off** — each
-`.tres` says so in its own header. Suite-green confirms the mechanics work as specified; it
+**What is NOT decided here.** The mechanic above is decided. What remains open is
+**tuning**: every habitat value across the fifteen species, and Farmhouse's cost, footprint
+and model, are still **proposals awaiting sign-off** — each `.tres` says so in its own
+header. Suite-green confirms the mechanics work as specified; it
 does not confirm the numbers are final. No ✅ has been recorded in
 `content-pipeline-status.md` or `tier1-status.md` on the strength of this work.
 
