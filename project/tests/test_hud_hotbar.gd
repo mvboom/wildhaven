@@ -92,6 +92,7 @@ func _process(delta: float) -> bool:
 	_check_style_picker_lists_every_style_with_current_highlighted()
 	_check_house_style_picker_offers_the_three_culled_looks()
 	_check_forest_style_picker_uses_the_authored_names()
+	_check_every_picker_button_wears_the_picked_looks_name()
 	_check_style_picker_selection_updates_default_and_button_chrome()
 	_check_style_picker_selection_immediately_activates_the_choice()
 	_check_style_picker_reselecting_current_still_activates_it()
@@ -544,18 +545,21 @@ func _check_grass_family_terrain_group_into_one_button() -> void:
 		"the Terraform half of the row totals 6 buttons — water, forest, rock, "
 		+ "cultivated_field, snowfield, and the grass-family group — not 9")
 
-	# The group button's own label is the FIXED group name, never a member's own name (human
-	# ruling: "the group cannot just be 'Grass'") — checked here as the setup this task's own
-	# naming proposal rests on; the exact string is [COPY], awaiting sign-off (this task's
-	# report), so this proves STABILITY (same label regardless of which member is default,
-	# checked again below) rather than pinning the literal words.
+	# The group button's label NAMES WHICHEVER MEMBER IS CURRENTLY PICKED — 2026-09-08 human
+	# ruling, superseding the earlier "the group cannot just be 'Grass'" one this check used to
+	# pin the other way round. Asserted against the member's own `display_name` read live from
+	# the catalog, never a literal, so the [COPY]-pending names stay the content-writer's call.
 	var group_button: Button = _hud.palette_button_for(GameHud.TERRAIN_GROUP_ID)
 	if check(group_button != null, "the grass-family button exists to check its label"):
-		check_eq(group_button.tooltip_text, GameHud.TERRAIN_GROUP_DISPLAY_NAME,
-			"...and its label is the fixed group name, not whichever member is default")
-		check(group_button.tooltip_text != "Grass",
-			"...specifically: never literally 'Grass' — the human ruling's own stated failure "
-			+ "mode")
+		var picked: String = _world.get_style_default(GameHud.TERRAIN_GROUP_ID)
+		var picked_name: String = ""
+		for terrain: TerrainDefinition in _world.terrain_options():
+			if terrain.id == picked:
+				picked_name = terrain.display_name
+				break
+		check_eq(group_button.tooltip_text, picked_name,
+			"...and its label is the picked member's own name ('%s'), the same way Farm "
+			% picked_name + "Building's has always tracked its selection")
 
 
 ## THE CONSTRAINT'S OWN WORDS: "Selecting any of the four grouped terrains must still work end
@@ -1098,10 +1102,11 @@ func _check_style_picker_selection_updates_default_and_button_chrome() -> void:
 		"...and the button's rendered chrome (tooltip/name label) updates immediately, with "
 		+ "no full palette rebuild")
 
-	# Forest: the write itself, proved the same way — this category's button chrome (a fixed
-	# TileIcon.Kind, a tooltip that is the terrain's own display_name) does not vary per style
-	# id at all, so there is nothing else to observe changing on screen; see this check's own
-	# header note.
+	# Forest: the write AND the chrome, both proved the same way. This block used to note that
+	# Forest's chrome "does not vary per style id at all, so there is nothing else to observe" —
+	# no longer true as of the 2026-09-08 ruling that every picker button's label names the look
+	# it will place (`GameHud._picked_style_name()`), which is exactly what the label assertion
+	# below now observes. The icon is still a fixed `TileIcon.Kind` for this category.
 	var forest_ids: PackedStringArray = _world.style_ids_for_category("forest")
 	var forest_current: String = _world.get_style_default("forest")
 	var forest_other: String = ""
@@ -1117,10 +1122,27 @@ func _check_style_picker_selection_updates_default_and_button_chrome() -> void:
 			if forest_popup.row_style_id(i) == forest_other:
 				forest_index = i
 				break
+		var forest_row_label: String = ""
+		if forest_index >= 0:
+			forest_row_label = forest_popup.row_label(forest_index)
 		if check(forest_index >= 0, "the target forest variant appears as a row"):
 			forest_popup.select_row(forest_index)
 			check_eq(_world.get_style_default("forest"), forest_other,
 				"forest: selecting a row updates get_style_default()'s return value too")
+			var forest_button: Button = _hud.palette_button_for("forest")
+			if check(forest_button != null, "forest: the button survives the pick"):
+				# Against the POPUP ROW'S OWN label, not a literal: the whole point of sharing
+				# `StylePickerPopup.style_label()` is that the button says what the row the
+				# player tapped said, so that is the equality worth pinning.
+				check_eq(forest_button.tooltip_text, forest_row_label,
+					"forest: the button now reads the picked look's name ('%s'), not the flat "
+					% forest_row_label + "terrain name")
+				var forest_name_label: Label = (
+					forest_button.get_node_or_null("NameLabel") as Label
+				)
+				if check(forest_name_label != null, "forest: the button kept its name label"):
+					check_eq(forest_name_label.text, forest_row_label,
+						"forest: ...and the visible name label says it too, not just the tooltip")
 		forest_popup.close()
 
 
@@ -1619,3 +1641,51 @@ func _check_forest_style_picker_uses_the_authored_names() -> void:
 	check(not seen.has("Bush Common"),
 		"...nor \"Bush Common\" for the shrub")
 	popup.close()
+
+
+## EVERY PICKER BUTTON NAMES THE LOOK IT WILL PLACE — 2026-09-08 human ruling ("currently, when
+## a building is chosen, the name of the main button changes to the currently selected building.
+## This is good. I would like to see the same happen for Forest, Grasses, and Houses").
+##
+## Farm Building already behaved this way and is included anyway: the ruling made one rule out
+## of what used to be one category's exception, and a check that skipped the original case would
+## not notice the day the four drift apart again.
+##
+## ASSERTED AGAINST THE POPUP'S OWN ROW LABEL, never a literal string. The button and the row
+## share `StylePickerPopup.style_label()` precisely so they cannot disagree, so their equality
+## is the property worth pinning; the words themselves are [COPY] and the content-writer's to
+## change without breaking this.
+func _check_every_picker_button_wears_the_picked_looks_name() -> void:
+	for category: String in _PICKER_CATEGORIES:
+		var button: Button = _hud.palette_button_for(category)
+		if not check(button != null, "%s has a palette button" % category):
+			continue
+		var ids: PackedStringArray = _world.style_ids_for_category(category)
+		if not check(ids.size() > 1,
+				"%s offers more than one look (a single-look category keeps its plain name "
+				% category + "by design and has nothing to track here)"):
+			continue
+
+		# The LAST id, deliberately: index 0 is `get_style_default()`'s own fallback, so a
+		# button that ignored the pick entirely could still accidentally match it.
+		var target: String = ids[ids.size() - 1]
+		_hud.open_style_picker(category, button)
+		var popup: StylePickerPopup = _hud.style_picker()
+		var index: int = -1
+		for i in popup.row_count():
+			if popup.row_style_id(i) == target:
+				index = i
+				break
+		if not check(index >= 0, "%s: the target look appears as a row" % category):
+			popup.close()
+			continue
+		var row_label: String = popup.row_label(index)
+		popup.select_row(index)
+
+		var name_label: Label = button.get_node_or_null("NameLabel") as Label
+		if check(name_label != null, "%s: the button kept its name label" % category):
+			check_eq(name_label.text, row_label,
+				"%s: the button's visible name is the picked look's own ('%s')"
+					% [category, row_label])
+		check_eq(button.tooltip_text, row_label,
+			"%s: ...and its tooltip says the same thing" % category)

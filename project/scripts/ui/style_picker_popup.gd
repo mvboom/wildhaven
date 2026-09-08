@@ -252,19 +252,36 @@ func _rebuild_rows() -> void:
 ## `capitalize()` would not always be: `wild_grass`'s own `display_name` is "Wild grass",
 ## lowercase `g`, which `"wild_grass".capitalize()` alone would get wrong).
 func _label_for(style_id: String) -> String:
-	if _category == "farm_building":
-		for placeable: PlaceableDefinition in _world.placeable_options():
-			if placeable.id == style_id:
-				return placeable.display_name
+	return style_label(_world, _category, style_id)
+
+
+## `_label_for()`'s rules, callable without an open popup — STATIC AND PUBLIC because the
+## palette button now renders the same name (2026-09-08 human ruling, see `GameHud`'s own
+## "ANOTHER DELIBERATE DIFFERENCE" header note): the Forest / Grasslands / House buttons read
+## as whichever look is currently picked, exactly as Farm Building's always has. One
+## implementation rather than two, so a button and the row that sets it can never disagree
+## about what a style is called — the same "one place to fix" posture
+## `TerrainView.screen_to_grid()` keeps for the camera/ray chain.
+##
+## `world` may be null (a HUD whose `build_palettes()` has not run): the two definition-backed
+## categories then fall through to the humanized id rather than raising, which is the same
+## graceful degradation a missing definition already gets below.
+static func style_label(world: WorldRoot, category: String, style_id: String) -> String:
+	if category == "farm_building":
+		if world != null:
+			for placeable: PlaceableDefinition in world.placeable_options():
+				if placeable.id == style_id:
+					return placeable.display_name
 		return style_id
-	if _category == GameHud.TERRAIN_GROUP_ID:
-		for terrain: TerrainDefinition in _world.terrain_options():
-			if terrain.id == style_id:
-				return terrain.display_name
+	if category == GameHud.TERRAIN_GROUP_ID:
+		if world != null:
+			for terrain: TerrainDefinition in world.terrain_options():
+				if terrain.id == style_id:
+					return terrain.display_name
 		return style_id.capitalize()
-	if _category == "house" and _HOUSE_LABELS.has(style_id):
+	if category == "house" and _HOUSE_LABELS.has(style_id):
 		return _HOUSE_LABELS[style_id] as String
-	if _category == "forest" and _FOREST_LABELS.has(style_id):
+	if category == "forest" and _FOREST_LABELS.has(style_id):
 		return _FOREST_LABELS[style_id] as String
 	return style_id.capitalize()
 

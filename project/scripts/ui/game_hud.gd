@@ -69,16 +69,20 @@ extends Control
 ## field. A future terrain joining or leaving this group is a code review here, not a data
 ## edit, until/unless a real `hotbar_category`-style field is added to the schema.
 ##
-## ANOTHER DELIBERATE DIFFERENCE: Farm Building's button label TRACKS whichever member is
-## currently the default ("Barn", then "Silo" after a pick) — sound there because each member
-## is a structurally distinct building. Doing the same here would make this button read
-## literally "Grass" whenever grass is the resolved default (it starts out being the default —
-## `TERRAIN_GROUP_MEMBERS[0]`), which the human ruling explicitly rejects: "the group cannot
-## just be 'Grass'". This button's label is therefore the FIXED `TERRAIN_GROUP_DISPLAY_NAME`
-## below, never the resolved member's own `display_name`; only its icon still swaps per member
-## (`_icon_kind_for()`, unchanged mechanism, `Kind.GRASS_FAMILY` the new shared fallback glyph
-## for a member — meadow, scrub — with no glyph of its own, mirroring `Kind.FARM_BUILDING`'s
+## EVERY PICKER BUTTON'S LABEL TRACKS THE PICK (2026-09-08 human ruling, `_picked_style_name()`).
+## Farm Building's always did ("Barn", then "Silo" after a pick) — sound there because each
+## member is a structurally distinct building — and the human asked for the same of Forest, the
+## grass family and House, so all four now share one rule rather than Farm Building having its
+## own. This button reads "Grass", "Meadow", "Scrub" or "Wild grass" as the pick moves; Forest
+## reads "Tree - Tall" / "Bush"; House reads "House - Small". The icon swaps per member as it
+## already did (`_icon_kind_for()`, unchanged mechanism, `Kind.GRASS_FAMILY` the shared fallback
+## glyph for a member — meadow, scrub — with no glyph of its own, mirroring `Kind.FARM_BUILDING`'s
 ## own fallback role for that group).
+##
+## THIS SUPERSEDES THE EARLIER RULING that this label must be fixed ("the group cannot just be
+## 'Grass'"), which is why the old carve-out is gone rather than merely edited. What that ruling
+## named is still real and still here: `TERRAIN_GROUP_DISPLAY_NAME` remains the group's RESTING
+## name — `_picked_style_name()`'s fallback, worn whenever there is no pick to reflect.
 ##
 ## [COPY] PLACEHOLDER, AWAITING HUMAN/CONTENT-WRITER SIGN-OFF — naming is not the UI
 ## engineer's call. "Grasslands" is proposed: it names what the 4 members share (open and
@@ -795,16 +799,20 @@ func _terrain_group_keys() -> Array[String]:
 ## FOR `TERRAIN_GROUP_ID`: `icon_id` is whichever member is currently
 ## `WorldRoot.get_style_default(TERRAIN_GROUP_ID)`'s answer (re-resolved on every call, same
 ## "always live, never cached" contract `_placeable_group_row()` keeps) — that is what
-## `_icon_kind_for()` draws. `display_name` is deliberately NOT that member's own name (see
-## this file's own header for why "Grass" cannot be the label here); it is always the fixed
-## `TERRAIN_GROUP_DISPLAY_NAME`.
+## `_icon_kind_for()` draws. `display_name` is that same member's own name as of the
+## 2026-09-08 ruling (`_picked_style_name()`), with `TERRAIN_GROUP_DISPLAY_NAME` left as the
+## resting name it falls back to.
 func _terrain_group_row(group_key: String) -> Dictionary:
 	if group_key != TERRAIN_GROUP_ID:
 		var entry: Dictionary = _terrain_entries.get(group_key, {})
+		var standalone_name: String = entry.get("display_name", "") as String
 		return {
 			"id": group_key,
 			"icon_id": group_key,
-			"display_name": entry.get("display_name", "") as String,
+			# Forest is the one standalone terrain that is also a picker category, so this is
+			# where its button picks up "Tree - Tall" / "Bush" instead of the flat "Forest".
+			# Every other terrain has no style catalog to track and keeps its own name.
+			"display_name": _picked_style_name(group_key, standalone_name),
 			"cost": entry.get("cost", 0) as int,
 		}
 	var resolved_id: String = (
@@ -816,7 +824,7 @@ func _terrain_group_row(group_key: String) -> Dictionary:
 	return {
 		"id": group_key,
 		"icon_id": resolved_id,
-		"display_name": TERRAIN_GROUP_DISPLAY_NAME,
+		"display_name": _picked_style_name(TERRAIN_GROUP_ID, TERRAIN_GROUP_DISPLAY_NAME),
 		"cost": member_entry.get("cost", 0) as int,
 	}
 
@@ -854,9 +862,43 @@ func _placeable_group_row(group_key: String) -> Dictionary:
 	return {
 		"id": group_key,
 		"icon_id": resolved_id,
-		"display_name": entry.get("display_name", "") as String,
+		# For a true category (farm_building) the picked style IS the resolved member, so this
+		# reports exactly the member `display_name` this line always did. For House — a
+		# single-member group whose picker chooses a LOOK rather than a member — it is what
+		# makes the button read "House - Small" after that pick.
+		"display_name": _picked_style_name(group_key, entry.get("display_name", "") as String),
 		"cost": entry.get("cost", 0) as int,
 	}
+
+
+## THE NAME A PICKER BUTTON WEARS: whichever look is currently picked for `category`, or
+## `fallback` (the group's or the catalog entry's own name) when there is nothing to track.
+##
+## 2026-09-08 HUMAN RULING, and it REPLACES the "ANOTHER DELIBERATE DIFFERENCE" carve-out this
+## file's header used to describe: Farm Building's label has always tracked its selection
+## ("Barn", then "Silo"), and the human asked for the same of Forest, the grass family and
+## House. So the four picker categories now share one rule instead of Farm Building having its
+## own — the label answers "what will this button place?", which is the question a 6-10-year-old
+## is actually holding while they look at the row. The earlier ruling this supersedes ("the
+## group cannot just be 'Grass'") was about the GROUP's resting name, and `TERRAIN_GROUP_DISPLAY_NAME`
+## still serves exactly that role here, as the fallback below.
+##
+## GATED ON `_has_style_choice()`, deliberately: a category with one style offers no pick to
+## reflect, so its button keeps its plain catalog name rather than renaming itself to a variant
+## the player never chose (and could not change). That is the same "never promise a choice that
+## does not exist" rule the popup indicator itself is gated on.
+##
+## The label text comes from `StylePickerPopup.style_label()` — the popup's own rules, shared
+## rather than reimplemented, so the row a player taps and the button it renames can never
+## disagree about what a look is called.
+func _picked_style_name(category: String, fallback: String) -> String:
+	if _world == null or not _has_style_choice(category):
+		return fallback
+	var style_id: String = _world.get_style_default(category)
+	if style_id == "":
+		return fallback
+	var label: String = StylePickerPopup.style_label(_world, category, style_id)
+	return fallback if label == "" else label
 
 
 func _add_palette_button(kind: String, row: Dictionary) -> void:
