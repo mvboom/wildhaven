@@ -17,7 +17,7 @@ license_file = "res://assets/licenses/Quaternius_UltimateAnimatedAnimals_License
 attribution_required = false
 required_notice = ""
 conditions = ""
-assets_used = PackedStringArray("CommonTree_1", "CommonTree_2", "Grass_Common_Short", "Grass_Common_Tall", "Flower_3_Group", "Flower_4_Group", "Bush_Common_Flowers", "Fern_1", "Grass_Wispy_Short", "Grass_Wispy_Tall", "Clover_1", "Clover_2", "Flower_3_Single", "Flower_4_Single", "Bush_Common", "Rock_Medium_1", "Rock_Medium_2", "Pebble_Round_1", "Pebble_Round_2", "Rock_Medium_3", "Pine_1", "TwistedTree_1", "CommonTree_3")
+assets_used = PackedStringArray("CommonTree_1", "CommonTree_2", "Grass_Common_Short", "Grass_Common_Tall", "Flower_3_Group", "Flower_4_Group", "Fern_1", "Grass_Wispy_Short", "Grass_Wispy_Tall", "Clover_1", "Clover_2", "Flower_3_Single", "Flower_4_Single", "Bush_Common", "Rock_Medium_1", "Rock_Medium_2", "Pebble_Round_1", "Pebble_Round_2", "Rock_Medium_3", "TwistedTree_1", "CommonTree_3")
 per_file_licensing = false
 notes = "CC0 — crediting is courtesy, not compliance. Reuses the generic Quaternius CC0
 license text already in-repo (`License_Standard.txt` in this pack is the same generic
@@ -48,4 +48,20 @@ own header for full sourcing/scale detail.
 
 Pack ships many more trees/rocks/grass/flowers not evaluated here; append to assets_used
 as more are imported, do NOT create a second entry for this pack (same convention as the
-other Quaternius entries)."
+other Quaternius entries).
+
+PRUNED 2026-09-08 -- assets_used now records what the SHIPPED BUILD contains, not everything ever
+imported from this pack. The 2026-09-08 Forest MegaKit standardisation, the house cull and the
+Snowfield retirement unwired part of this pack from gameplay. project/export_presets.cfg now
+drops those files from all three presets via exclude_filter, so they are no longer distributed
+and no longer credited here. THE FILES REMAIN IN THE REPO under project/assets/ and their import
+tests still run -- if one is rewired it must be added back to assets_used AND removed from
+exclude_filter, or it will ship uncredited.
+Removed in this pass: Bush_Common_Flowers, Pine_1 (2 in all).
+Pine_1 is the notable one: assets/terrain/pine_1/Pine1.tscn was built during the same
+2026-09-08 standardisation as the conifer replacement for the culled PineTree, but was never
+added to project/data/terrain/forest.tres's model_scenes, so it has never rendered in game.
+Wiring it in is a one-line change to forest.tres -- if that happens, add Pine_1 back here and
+drop assets/terrain/pine_1/* from exclude_filter. Several names here (the grass, clover and
+wispy variants) ship as baked meshes plus their PNG textures rather than as runtime-loaded
+glTF, an artifact of the consolidation pass; they are used and stay credited."

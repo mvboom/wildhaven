@@ -16,6 +16,9 @@ extends QATestCase
 const SOURCES_DIR: String = "res://attribution/sources"
 const CREDITS_PATH: String = "res://CREDITS.md"
 
+## The exact prefix generate_credits.gd renders an entry's asset list behind.
+const ASSETS_USED_PREFIX: String = "- Assets used: "
+
 ## The CC BY 3.0 credit line that must reach the player. Exact-matched: this is a
 ## license condition, so paraphrase is not compliance.
 const REQUIRED_NOTICE_FRAGMENT: String = "\"Rabbit\" by Sherkiz, licensed under CC BY 3.0, via Poly Pizza"
@@ -121,13 +124,29 @@ func _init() -> void:
 	check(quat_at > ack_at, "Quaternius is filed under Acknowledgements")
 
 	# --- the artifact is not stale --------------------------------------------
-	# Every source's creator + license must appear somewhere in the rendered file. A
-	# newly-added entry that was never regenerated fails here.
+	# WHY THIS IS A PER-SECTION DIFF AND NOT A GREP: this block used to assert only that
+	# each entry's creator and license_name appeared SOMEWHERE in the rendered file. Twelve
+	# of the thirteen entries share the creator string "Quaternius", which made the check
+	# very nearly vacuous — it passed on a CREDITS.md whose MegaKit section listed 9 of 23
+	# assets and was four days behind its own source (found 2026-09-08). Compare each
+	# section's rendered "Assets used" line against the entry it was generated from, so a
+	# regenerate that never happened fails HERE rather than reaching a release review.
 	for e in entries:
-		check(credits.contains(e.creator),
-			"CREDITS.md mentions source creator \"%s\" (not stale)" % e.creator)
-		check(credits.contains(e.license_name),
-			"CREDITS.md states license for \"%s\"" % e.creator)
+		var section: String = _section_for(credits, e.source_name)
+		if not check(not section.is_empty(),
+				"CREDITS.md has a section for \"%s\"" % e.source_name):
+			continue
+		check(section.contains(e.creator),
+			"CREDITS.md credits \"%s\" for \"%s\"" % [e.creator, e.source_name])
+		check(section.contains(e.license_name),
+			"CREDITS.md states license for \"%s\"" % e.source_name)
+		# Empty on both sides is the legitimate "pack in the repo, nothing shipped" case
+		# (Textured Stylized Trees as of 2026-09-08) — the generator omits the line entirely.
+		var want: String = ", ".join(e.asset_names())
+		var got: String = _assets_used_line(section)
+		check(got == want,
+			"CREDITS.md's assets list for \"%s\" matches its source entry" % e.source_name,
+			"rendered: %s\n            entry:    %s" % [got, want])
 
 	finish()
 
@@ -146,3 +165,25 @@ func _load_entries() -> Array:
 		if res != null and res is AttributionEntry:
 			out.append(res)
 	return out
+
+
+## The section of the rendered CREDITS.md belonging to one source, found by its source_name
+## in the "### " heading. Matched by containment rather than by rebuilding the heading,
+## because the generator renders source_name bare OR as a markdown link depending on whether
+## the entry carries a source_url — the test should not care which.
+func _section_for(credits: String, source_name: String) -> String:
+	var parts: PackedStringArray = credits.split("\n### ")
+	for i: int in range(1, parts.size()):
+		var part: String = parts[i]
+		if part.get_slice("\n", 0).contains(source_name):
+			return part
+	return ""
+
+
+## The comma-joined asset list the generator rendered for a section, or "" when it rendered
+## no such line (which is what an entry with an empty assets_used produces).
+func _assets_used_line(section: String) -> String:
+	for line: String in section.split("\n"):
+		if line.begins_with(ASSETS_USED_PREFIX):
+			return line.substr(ASSETS_USED_PREFIX.length())
+	return ""

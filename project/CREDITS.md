@@ -122,7 +122,7 @@ retrieval date recorded, unlike quaternius_poly_pizza_characters.tres's undated 
 - License text in repo: `res://assets/licenses/Quaternius_UltimateAnimatedAnimals_License.txt`
 - Crediting: not required; shown as courtesy
 - Support the creator: [https://www.patreon.com/quaternius](https://www.patreon.com/quaternius)
-- Assets used: Rock (poly.pizza/m/4MUaQTcDdc), Rock Medium (poly.pizza/m/s1OJ3bBzqc), Rocks (poly.pizza/m/OQvi8PIZ40), Grass (poly.pizza/m/UGTOzcO3P2), Crops (poly.pizza/m/Ro6K0Yg7mx), Wheat (poly.pizza/m/lPspzfC8Pu), Pine Tree (poly.pizza/m/gX8WmgkeEm)
+- Assets used: Crops (poly.pizza/m/Ro6K0Yg7mx), Wheat (poly.pizza/m/lPspzfC8Pu)
 
 ### Quaternius — [Stylized Nature MegaKit (Standard/free)](https://quaternius.com)
 
@@ -132,7 +132,7 @@ retrieval date recorded, unlike quaternius_poly_pizza_characters.tres's undated 
 - License text in repo: `res://assets/licenses/Quaternius_UltimateAnimatedAnimals_License.txt`
 - Crediting: not required; shown as courtesy
 - Support the creator: [https://www.patreon.com/quaternius](https://www.patreon.com/quaternius)
-- Assets used: CommonTree_1, CommonTree_2, Grass_Common_Short, Grass_Common_Tall, Flower_3_Group, Flower_4_Group, Bush_Common_Flowers, Fern_1, Grass_Wispy_Short
+- Assets used: CommonTree_1, CommonTree_2, Grass_Common_Short, Grass_Common_Tall, Flower_3_Group, Flower_4_Group, Fern_1, Grass_Wispy_Short, Grass_Wispy_Tall, Clover_1, Clover_2, Flower_3_Single, Flower_4_Single, Bush_Common, Rock_Medium_1, Rock_Medium_2, Pebble_Round_1, Pebble_Round_2, Rock_Medium_3, TwistedTree_1, CommonTree_3
 
 ### Quaternius — [Textured Stylized Trees](https://quaternius.com)
 
@@ -142,7 +142,6 @@ retrieval date recorded, unlike quaternius_poly_pizza_characters.tres's undated 
 - License text in repo: `res://assets/licenses/Quaternius_UltimateAnimatedAnimals_License.txt`
 - Crediting: not required; shown as courtesy
 - Support the creator: [https://www.patreon.com/quaternius](https://www.patreon.com/quaternius)
-- Assets used: DeadTree_3, Pine_2
 
 ### Quaternius — [Ultimate Animated Animal Pack](https://quaternius.com/packs/ultimateanimatedanimals.html)
 
@@ -162,7 +161,7 @@ retrieval date recorded, unlike quaternius_poly_pizza_characters.tres's undated 
 - License text in repo: `res://assets/licenses/Quaternius_UltimateAnimatedAnimals_License.txt`
 - Crediting: not required; shown as courtesy
 - Support the creator: [https://www.patreon.com/quaternius](https://www.patreon.com/quaternius)
-- Assets used: Houses_FirstAge_1_Level1, Houses_FirstAge_1_Level2, Houses_FirstAge_1_Level3, Houses_FirstAge_2_Level1, Houses_FirstAge_2_Level2, Houses_FirstAge_2_Level3, Houses_FirstAge_3_Level1, Houses_FirstAge_3_Level2, Houses_FirstAge_3_Level3, TowerHouse_FirstAge, Houses_SecondAge_1_Level1, Houses_SecondAge_1_Level2, Houses_SecondAge_1_Level3, Houses_SecondAge_2_Level1, Houses_SecondAge_2_Level2, Houses_SecondAge_2_Level3, Houses_SecondAge_3_Level1, Houses_SecondAge_3_Level2, Houses_SecondAge_3_Level3, TowerHouse_SecondAge
+- Assets used: Houses_SecondAge_1_Level1, Houses_SecondAge_1_Level2, Houses_SecondAge_1_Level3
 
 ### Quaternius — [Ultimate Nature Pack](https://quaternius.com)
 
@@ -172,5 +171,5 @@ retrieval date recorded, unlike quaternius_poly_pizza_characters.tres's undated 
 - License text in repo: `res://assets/licenses/Quaternius_UltimateAnimatedAnimals_License.txt`
 - Crediting: not required; shown as courtesy
 - Support the creator: [https://www.patreon.com/quaternius](https://www.patreon.com/quaternius)
-- Assets used: WoodLog_Moss, Rock_Moss_3, Bush_1, Rock_1, BirchTree_1, BushBerries_1, Rock_Moss_2, Rock_Moss_5, Lilypad, Cactus_1, PalmTree_1, BirchTree_Snow_3, Bush_Snow_1
+- Assets used: WoodLog_Moss, Rock_Moss_3, Bush_1, Lilypad
 
