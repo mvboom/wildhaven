@@ -40,11 +40,12 @@ const IDLE_MULTIPLIER: float = 2.0
 ## happens to be a duration too.
 const BUILT_RECENTLY_SECONDS: float = 30.0
 
-## Seconds since the last placement. CLAMPED at `BUILT_RECENTLY_SECONDS` — this is the
-## Pillar 1 mitigation, not an optimisation. gdd.md says "hints never expire or repeat with
-## urgency"; letting this grow unbounded would be the first step toward a rate that climbs
-## the longer a child hesitates. It saturates instead: an hour of idleness paces exactly like
-## a moment of it.
+## Seconds since the last placement. Clamped at `BUILT_RECENTLY_SECONDS` as hygiene, so an
+## internal counter does not grow without bound across a long session — that is all this
+## clamp is. It is NOT where the Pillar 1 "cannot compound" guarantee lives: once
+## `_since_activity` reaches `BUILT_RECENTLY_SECONDS`, `built_recently()` already reads false,
+## so the clamp is unobservable through the only accessor that consults this field. See
+## `next_interval()` for where the real guarantee is enforced.
 var _since_activity: float = BUILT_RECENTLY_SECONDS
 
 
@@ -53,7 +54,8 @@ func notice_activity() -> void:
 	_since_activity = 0.0
 
 
-## Ticks the idle clock. Saturating, per `_since_activity`'s own note.
+## Ticks the idle clock. Saturating per `_since_activity`'s own note — bounds an internal
+## counter, nothing more; see `next_interval()` for the Pillar 1 guarantee itself.
 func advance(delta: float) -> void:
 	_since_activity = minf(_since_activity + delta, BUILT_RECENTLY_SECONDS)
 
@@ -65,6 +67,12 @@ func built_recently() -> bool:
 ## Seconds until the next hint should fire. A negative or nonsense count reads as the
 ## learning band rather than erroring — a hint layer that throws is worse than one that is
 ## briefly too generous.
+##
+## PILLAR 1 GUARANTEE lives HERE, not in `advance()`'s clamp: `multiplier` is always set by
+## this single if/else to exactly one of `BUILT_RECENTLY_MULTIPLIER` or `IDLE_MULTIPLIER`,
+## never accumulated across calls and never summed with the other. That exclusivity — not
+## the saturation of `_since_activity` — is what keeps the boost from stacking toward an
+## arbitrarily fast rate. spec §10.1: "the idle boost is capped, not compounding."
 func next_interval(hosted_count: int) -> float:
 	var band: float = BAND_RARE
 	if hosted_count <= 0:

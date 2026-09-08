@@ -11,6 +11,7 @@ extends QATestCase
 func _initialize() -> void:
 	begin("hint pacer")
 	_check_bands_widen_as_species_are_hosted()
+	_check_band_boundaries()
 	_check_activity_halves_and_idleness_doubles()
 	_check_the_idle_boost_cannot_compound()
 	_check_activity_expires()
@@ -33,6 +34,28 @@ func _check_bands_widen_as_species_are_hosted() -> void:
 		"a nonsense negative count is treated as the learning band, never as an error")
 
 
+## Boundary coverage for `EARLY_MAX_HOSTED` and `SETTLED_MAX_HOSTED` — the widening check above
+## only samples 0, 2, 4, 9, which cannot catch a `<` vs `<=` transposition at the boundaries
+## themselves. Exercised on freshly-constructed pacers, where the multiplier is always
+## `IDLE_MULTIPLIER` (a fresh pacer starts NOT "built recently" — see `_since_activity`'s
+## initial value), which isolates the band choice from the activity multiplier.
+func _check_band_boundaries() -> void:
+	var expected_band_by_hosted_count := {
+		0: HintPacer.BAND_LEARNING,
+		1: HintPacer.BAND_EARLY,
+		2: HintPacer.BAND_EARLY,
+		3: HintPacer.BAND_SETTLED,
+		4: HintPacer.BAND_SETTLED,
+		5: HintPacer.BAND_SETTLED,
+		6: HintPacer.BAND_RARE,
+	}
+	for hosted_count in expected_band_by_hosted_count:
+		var band: float = expected_band_by_hosted_count[hosted_count]
+		var pacer := HintPacer.new()
+		check_eq(pacer.next_interval(hosted_count), band * HintPacer.IDLE_MULTIPLIER,
+			"hosted_count %d maps to the %.0f s band" % [hosted_count, band])
+
+
 ## Exactly one multiplier always applies — "built recently" and "idle" are two sides of one
 ## predicate, never summed. See the spec's §9 note.
 func _check_activity_halves_and_idleness_doubles() -> void:
@@ -51,18 +74,68 @@ func _check_activity_halves_and_idleness_doubles() -> void:
 		% (idle_interval / busy_interval))
 
 
-## PILLAR 1 GUARD. gdd.md: "hints never expire or repeat with urgency." The idle multiplier
-## makes the game louder the longer a player does not act, which brushes that line; it was
-## accepted with the mitigation that it is applied ONCE and cannot stack toward an
-## arbitrarily fast rate. A pacer left idle for an hour must pace exactly like one left idle
-## for one tick.
+## PILLAR 1 GUARD. gdd.md: "hints never expire or repeat with urgency." spec §10.1: "the idle
+## boost is capped, not compounding — it multiplies the band once and cannot stack toward an
+## arbitrarily fast rate." That guarantee lives in `next_interval()`'s exclusive multiplier
+## selection, not in the `advance()` clamp (a clamped-vs-unclamped `_since_activity` is
+## unobservable through `built_recently()` once past the window, which is why a bare
+## fresh-vs-idle comparison does not exercise it). So this drives varied interleavings of
+## `notice_activity()` / `advance()` — long idle, repeated activity, activity immediately
+## followed by a long idle — and asserts the result is ALWAYS exactly one of the two fixed
+## outcomes, never a third value a compounding bug would produce.
 func _check_the_idle_boost_cannot_compound() -> void:
-	var brief := HintPacer.new()
-	brief.advance(1.0)
-	var long := HintPacer.new()
-	long.advance(3600.0)
-	check_eq(long.next_interval(0), brief.next_interval(0),
-		"an hour of idleness paces identically to a moment of it")
+	var scenarios: Array[HintPacer] = []
+
+	var untouched := HintPacer.new()
+	scenarios.append(untouched)
+
+	var brief_idle := HintPacer.new()
+	brief_idle.advance(1.0)
+	scenarios.append(brief_idle)
+
+	var long_idle := HintPacer.new()
+	long_idle.advance(3600.0)
+	scenarios.append(long_idle)
+
+	var repeated_activity := HintPacer.new()
+	for _i in range(20):
+		repeated_activity.notice_activity()
+		repeated_activity.advance(0.5)
+	scenarios.append(repeated_activity)
+
+	var active_then_long_idle := HintPacer.new()
+	active_then_long_idle.notice_activity()
+	active_then_long_idle.advance(7200.0)
+	scenarios.append(active_then_long_idle)
+
+	var interleaved := HintPacer.new()
+	interleaved.advance(3600.0)
+	interleaved.notice_activity()
+	interleaved.advance(3600.0)
+	interleaved.notice_activity()
+	interleaved.advance(1.0)
+	scenarios.append(interleaved)
+
+	for hosted_count in [0, 1, 2, 3, 4, 5, 6, 9]:
+		var band: float = _expected_band(hosted_count)
+		var busy_outcome: float = band * HintPacer.BUILT_RECENTLY_MULTIPLIER
+		var idle_outcome: float = band * HintPacer.IDLE_MULTIPLIER
+		for pacer in scenarios:
+			var interval: float = pacer.next_interval(hosted_count)
+			check(is_equal_approx(interval, busy_outcome) or is_equal_approx(interval, idle_outcome),
+				"next_interval(%d) is exactly band*%.1f or band*%.1f, never a third value (got %.2f)"
+				% [hosted_count, HintPacer.BUILT_RECENTLY_MULTIPLIER, HintPacer.IDLE_MULTIPLIER,
+					interval])
+
+
+func _expected_band(hosted_count: int) -> float:
+	if hosted_count <= 0:
+		return HintPacer.BAND_LEARNING
+	elif hosted_count <= HintPacer.EARLY_MAX_HOSTED:
+		return HintPacer.BAND_EARLY
+	elif hosted_count <= HintPacer.SETTLED_MAX_HOSTED:
+		return HintPacer.BAND_SETTLED
+	return HintPacer.BAND_RARE
 
 
 ## The built-recently window is a window, not a latch.
