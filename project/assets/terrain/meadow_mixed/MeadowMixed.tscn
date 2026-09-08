@@ -43,6 +43,13 @@
 ; `uv1_offset` below re-centres this material's UV span in band 2, computed per mesh from its
 ; own measured span so every one lands with ~7px of margin on both band edges (mip bleed).
 ; The MESH IS UNTOUCHED — this is a material property and is reversible by deleting one line.
+;
+; OCCLUSIONFADER REMOVED 2026-09-08 — ANY MENTION OF IT BELOW IS HISTORY. The per-resident
+; transparency fade (D-41 §4) flickered in play and was cut outright; the script, its scene node
+; and its two suites are gone. The "Slab" node stays, because every terrain scene is built
+; around it and removing it would restructure all 33 for no gain — but NO CODE LOOKS THAT NAME
+; UP ANY MORE. It is a grouping convention now, with no behaviour attached, so nothing breaks if
+; a new scene groups differently and nothing is gained by "restoring" the exemption.
 [gd_scene format=4]
 
 [ext_resource type="Texture2D" path="res://assets/terrain/grass_common_short/Grass.png" id="1_ojplf"]

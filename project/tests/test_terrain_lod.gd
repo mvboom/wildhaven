@@ -131,7 +131,8 @@ func _check_out_of_bounds_tap_is_still_a_miss() -> void:
 ## tier by this point in the run is not something to assume.
 func _check_forest_style_default_resolves_variant() -> void:
 	var tile := Vector2i(90, 10)
-	_world.style_defaults["forest"] = "birch_tree"
+	# RE-POINTED 2026-09-08 (Forest MegaKit standardisation): was `birch_tree`, which that pass unwired along with Bush/BushBerries. `twisted_tree_1` is a real, wired, NON-index-0 forest style, which is the only property this check needs.
+	_world.style_defaults["forest"] = "twisted_tree_1"
 	check(_world.paint_tile(tile.x, tile.y, "forest"), "setup: forest paints at %s" % tile)
 	var chunk_lod: TerrainChunkLod = _world.view._chunk_lod
 	chunk_lod.set_chunk_tier(TerrainChunkLod.chunk_of(tile.x, tile.y), true)
@@ -139,8 +140,8 @@ func _check_forest_style_default_resolves_variant() -> void:
 	if not check(container != null, "setup: tile %s has a near-tier container" % tile):
 		return
 	var rendered: String = _sole_child_name(container)
-	check_eq(rendered, "BirchTree",
-		"style_defaults[\"forest\"] = \"birch_tree\" renders BirchTree.tscn, "
+	check_eq(rendered, "TwistedTree1",
+		"style_defaults[\"forest\"] = \"twisted_tree_1\" renders TwistedTree1.tscn, "
 		+ "not pick_variant()'s per-tile hash")
 
 
@@ -154,7 +155,7 @@ func _check_rock_ignores_style_defaults() -> void:
 	var terrain: TerrainDefinition = _world.grid.terrain_definition("rock")
 	var expected_scene: PackedScene = terrain.pick_variant(tile.x, tile.y)
 	var expected_name: String = expected_scene.resource_path.get_file().get_basename()
-	_world.style_defaults["rock"] = "birch_tree"  # not a real rock style; must be ignored
+	_world.style_defaults["rock"] = "twisted_tree_1"  # not a real rock style; must be ignored
 	check(_world.paint_tile(tile.x, tile.y, "rock"), "setup: rock paints at %s" % tile)
 	var chunk_lod: TerrainChunkLod = _world.view._chunk_lod
 	chunk_lod.set_chunk_tier(TerrainChunkLod.chunk_of(tile.x, tile.y), true)
@@ -436,7 +437,7 @@ func _check_style_is_captured_at_paint_time() -> void:
 			% before.size())
 
 	# THE RULING: changing the style must leave standing ground completely alone.
-	_world.set_style_default("forest", "birch_tree")
+	_world.set_style_default("forest", "twisted_tree_1")
 	var after: Dictionary = _visible_scene_paths(80, 88)
 	check_eq(after.size(), before.size(),
 		"changing the style leaves already-painted forest untouched (%d models before, %d after)"
@@ -461,7 +462,7 @@ func _check_style_is_captured_at_paint_time() -> void:
 	chunk_lod.set_chunk_tier(TerrainChunkLod.chunk_of(70, 70), true)
 	var fresh: Dictionary = _visible_scene_paths(70, 71)
 	if check(fresh.size() == 1, "a tile painted AFTER the change carries exactly one model"):
-		check((fresh.keys()[0] as String).contains("BirchTree"),
+		check((fresh.keys()[0] as String).contains("TwistedTree1"),
 			"...and it is the style that was current when that tile was painted")
 	_world.set_style_default("forest", "common_tree_1")
 
@@ -473,7 +474,7 @@ func _check_style_is_captured_at_paint_time() -> void:
 func _check_far_tier_honours_per_tile_style() -> void:
 	var chunk_lod: TerrainChunkLod = _world.view._chunk_lod
 	# A single chunk deliberately painted in two passes under two different styles.
-	_world.set_style_default("forest", "birch_tree")
+	_world.set_style_default("forest", "twisted_tree_1")
 	for x in range(64, 68):
 		for z in range(64, 72):
 			_world.paint_tile(x, z, "grass")
@@ -498,7 +499,7 @@ func _check_far_tier_honours_per_tile_style() -> void:
 		"1 mesh means the far tier collapsed the chunk onto a single style again")
 
 	# And the world's CURRENT default has no say over any of it.
-	_world.set_style_default("forest", "bush")
+	_world.set_style_default("forest", "common_tree_3")
 	var after: Dictionary = {}
 	for mmi: MultiMeshInstance3D in _far_batches("Far_forest_%d_%d_" % [chunk.x, chunk.y]):
 		after[mmi.multimesh.mesh] = true
@@ -569,13 +570,13 @@ func _check_a_painted_tile_draws_its_style_immediately() -> void:
 	_world.paint_tile(56, 56, "grass")
 	chunk_lod.set_chunk_tier(chunk, true)
 
-	_world.set_style_default("forest", "birch_tree")
+	_world.set_style_default("forest", "twisted_tree_1")
 	if not check(_world.paint_tile(56, 56, "forest"), "setup: the tile paints to forest"):
 		return
 	# NO set_chunk_tier(), NO refresh_tile(), NO camera move between the paint and this read.
 	var drawn: Dictionary = _visible_scene_paths(56, 57)
 	if check(drawn.size() == 1, "the painted tile drew exactly one model (%d)" % drawn.size()):
-		check((drawn.keys()[0] as String).contains("BirchTree"),
+		check((drawn.keys()[0] as String).contains("TwistedTree1"),
 			"...and it is the chosen style, drawn on the paint itself rather than after a rebuild",
 			"a different model means the tile was drawn before its style was stamped")
 

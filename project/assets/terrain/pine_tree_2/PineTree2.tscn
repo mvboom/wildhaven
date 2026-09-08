@@ -61,6 +61,13 @@
 ; this directory, both overrides with `vertex_color_use_as_albedo` explicitly false.
 ; `[editable path="Model"]` is required for the override to apply to a node living inside an
 ; instanced sub-scene.
+;
+; OCCLUSIONFADER REMOVED 2026-09-08 — ANY MENTION OF IT BELOW IS HISTORY. The per-resident
+; transparency fade (D-41 §4) flickered in play and was cut outright; the script, its scene node
+; and its two suites are gone. The "Slab" node stays, because every terrain scene is built
+; around it and removing it would restructure all 33 for no gain — but NO CODE LOOKS THAT NAME
+; UP ANY MORE. It is a grouping convention now, with no behaviour attached, so nothing breaks if
+; a new scene groups differently and nothing is gained by "restoring" the exemption.
 [gd_scene load_steps=12 format=3]
 
 [ext_resource type="PackedScene" uid="uid://dogf1efo04bcn" path="res://assets/terrain/pine_tree_2/PineTree2.fbx" id="1_model"]

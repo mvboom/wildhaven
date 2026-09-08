@@ -1,11 +1,10 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/world/world_root.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/ui/camera_rig.gd" id="2"]
 [ext_resource type="PackedScene" path="res://scenes/ui/GameUI.tscn" id="3"]
 [ext_resource type="PackedScene" path="res://scenes/menu/LeaveOverlay.tscn" id="4"]
 [ext_resource type="Script" path="res://scripts/world/mist_boundary.gd" id="6"]
-[ext_resource type="Script" path="res://scripts/world/occlusion_fader.gd" id="5"]
 
 [sub_resource type="Environment" id="Environment_1"]
 background_mode = 1
@@ -100,9 +99,6 @@ current = true
 
 [node name="MistBoundary" type="Node3D" parent="."]
 script = ExtResource("6")
-
-[node name="OcclusionFader" type="Node" parent="."]
-script = ExtResource("5")
 
 [node name="GameUI" parent="." instance=ExtResource("3")]
 

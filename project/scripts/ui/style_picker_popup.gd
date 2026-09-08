@@ -64,6 +64,31 @@ const _SCREEN_MARGIN: float = 8.0
 ## the cull left unwired on disk, say) still renders via `capitalize()` below, so this map can go
 ## stale without ever producing an empty row. Keep it in step with `data/buildings/house.tres`'s
 ## `model_scenes` — see that file's "LOOK POOL CUT" header note for the other half of this fact.
+## Player-facing labels for the five Forest looks (2026-09-08 human naming pass). Second map of
+## the same kind as `_HOUSE_LABELS` below, and for the same two reasons: `String.capitalize()`
+## cannot produce the " - " these names carry, and it would render `bush_common` as "Bush Common"
+## where the human named it plainly "Bush".
+##
+## NOTE THE IDS DO NOT SPELL THE NAMES, and unlike the house cull the asset folders were NOT
+## renamed to match. `common_tree_1` is "Tree - Tall" and `common_tree_3` is "Tree - Short", so
+## the numbers carry no ordering meaning. That is deliberate: a style id is DERIVED FROM ITS
+## FILENAME (`WorldRoot._style_id_from_scene_path()`), and since D-57 a tile stores the id it was
+## painted with — so renaming the folders would strand every captured style in every existing
+## save and re-randomise those trees on load, which is the exact symptom two bug reports in this
+## same session were about. The house cull could rename freely because nothing stored per-tile
+## style yet. Renaming here is still possible LATER, but it is a save-affecting change and needs
+## its own ruling, not a tidy-up.
+##
+## A miss falls through to `capitalize()` exactly as the house map's does — keep in step with
+## `data/terrain/forest.tres`'s `model_scenes`.
+const _FOREST_LABELS: Dictionary = {
+	"common_tree_1": "Tree - Tall",
+	"common_tree_2": "Tree - Medium",
+	"common_tree_3": "Tree - Short",
+	"twisted_tree_1": "Tree - Twisted",
+	"bush_common": "Bush",
+}
+
 const _HOUSE_LABELS: Dictionary = {
 	"house_large": "House - Large",
 	"house_medium": "House - Medium",
@@ -216,7 +241,10 @@ func _rebuild_rows() -> void:
 ## House: an authored label from `_HOUSE_LABELS` (the three looks the 2026-09-07 cull left
 ## wired), falling through to the humanized id for anything not listed there.
 ##
-## Forest/Wild Grass: humanize the derived style id (`"birch_tree"` -> `"Birch Tree"` —
+## Forest: an authored label from `_FOREST_LABELS` (2026-09-08 naming pass), falling through to
+## the humanized id for anything not listed.
+##
+## Wild Grass: humanize the derived style id (`"wild_grass"` -> `"Wild Grass"` —
 ## `String.capitalize()` is exactly this rule: underscores become spaces, each word's first
 ## letter uppercases). Farm Building AND the grass-family terrain group (habitat-tiers Task
 ## 8b): the resolved definition's own real `display_name` — already real human-authored copy,
@@ -236,6 +264,8 @@ func _label_for(style_id: String) -> String:
 		return style_id.capitalize()
 	if _category == "house" and _HOUSE_LABELS.has(style_id):
 		return _HOUSE_LABELS[style_id] as String
+	if _category == "forest" and _FOREST_LABELS.has(style_id):
+		return _FOREST_LABELS[style_id] as String
 	return style_id.capitalize()
 
 

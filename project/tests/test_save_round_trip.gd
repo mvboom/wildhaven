@@ -1415,10 +1415,10 @@ func _reload_through_the_real_load_path(world: WorldRoot, label: String) -> Worl
 func _check_style_defaults_survive_a_reload() -> void:
 	# A non-default choice, or this check would pass even if the restore always fell back to the
 	# category's first catalog entry.
-	_source.set_style_default("forest", "birch_tree")
+	_source.set_style_default("forest", "twisted_tree_1")
 	var captured: Dictionary = WorldSnapshot.capture(_source, "Styled", "meadow_start", 4242)
 	check_eq(
-		(captured["style_defaults"] as Dictionary).get("forest", ""), "birch_tree",
+		(captured["style_defaults"] as Dictionary).get("forest", ""), "twisted_tree_1",
 		"setup: the non-default forest choice is captured"
 	)
 
@@ -1432,7 +1432,7 @@ func _check_style_defaults_survive_a_reload() -> void:
 	_take_off_process(reloaded)
 
 	check_eq(
-		reloaded.get_style_default("forest"), "birch_tree",
+		reloaded.get_style_default("forest"), "twisted_tree_1",
 		"the chosen forest default survives the real load path, not just the catalog's first entry"
 	)
 	# ...and a category never touched still falls through to its own first catalog entry, exactly
@@ -1565,22 +1565,22 @@ func _check_captured_tile_styles_survive_a_reload() -> void:
 	_take_off_process(source)
 	# Two tiles painted under two DIFFERENT styles, so the assertion cannot pass by everything
 	# happening to share one value.
-	source.set_style_default("forest", "birch_tree")
+	source.set_style_default("forest", "twisted_tree_1")
 	check(source.paint_tile(4, 4, "forest"), "setup: a tile paints under `birch_tree`")
 	source.set_style_default("forest", "common_tree_1")
 	check(source.paint_tile(6, 6, "forest"), "setup: a second tile paints under `common_tree_1`")
 	# ...and the picker left somewhere else entirely, so a reload that read the DEFAULT instead
 	# of the captured value would come back wrong rather than coincidentally right.
-	source.set_style_default("forest", "bush")
+	source.set_style_default("forest", "common_tree_3")
 
-	check_eq(source.grid.get_tile_style(4, 4), "birch_tree",
+	check_eq(source.grid.get_tile_style(4, 4), "twisted_tree_1",
 		"the tile captured the style current when it was PAINTED, not the one set afterwards")
 	check_eq(source.grid.get_tile_style(6, 6), "common_tree_1", "...and so did the second tile")
 
 	var reloaded: WorldRoot = _reload_through_the_real_load_path(source, "Captured styles")
 	if not check(reloaded != null, "the world reloads"):
 		return
-	check_eq(reloaded.grid.get_tile_style(4, 4), "birch_tree",
+	check_eq(reloaded.grid.get_tile_style(4, 4), "twisted_tree_1",
 		"a captured tile style survives the round trip")
 	check_eq(reloaded.grid.get_tile_style(6, 6), "common_tree_1",
 		"...independently of its neighbour — the array is not collapsed to one value")

@@ -36,6 +36,13 @@
 ; EVERYTHING GROUND-LEVEL NESTED UNDER ONE NODE NAMED "Slab" (OcclusionFader exemption
 ; convention, see CommonTree1.tscn's header); the tree and bush instances sit as plain
 ; siblings of Slab, same as every other terrain wrapper in this codebase.
+;
+; OCCLUSIONFADER REMOVED 2026-09-08 — ANY MENTION OF IT BELOW IS HISTORY. The per-resident
+; transparency fade (D-41 §4) flickered in play and was cut outright; the script, its scene node
+; and its two suites are gone. The "Slab" node stays, because every terrain scene is built
+; around it and removing it would restructure all 33 for no gain — but NO CODE LOOKS THAT NAME
+; UP ANY MORE. It is a grouping convention now, with no behaviour attached, so nothing breaks if
+; a new scene groups differently and nothing is gained by "restoring" the exemption.
 [gd_scene load_steps=7 format=3]
 
 [ext_resource type="PackedScene" uid="uid://ctl11527buk6h" path="res://assets/terrain/birch_tree_snow/BirchTree_Snow_3.fbx" id="1_tree"]

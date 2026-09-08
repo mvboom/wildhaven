@@ -133,15 +133,72 @@
 ; PineTree.tscn stays on disk and test_pine_tree_import.gd still covers it, and
 ; quaternius_poly_pizza_nature.tres keeps its entry unchanged because that pack still
 ; supplies Rock/Rocks/Grass/Crops/Wheat elsewhere in the project.
+; SINGLE-PACK AT LAST (2026-09-08, human ruling: "make sure all of our trees used the same
+; Stylized Nature Megakit"). model_scenes is now 5 entries, ALL Stylized Nature MegaKit:
+; CommonTree1 + CommonTree2 (round canopy, both already shipped and UNCHANGED), Pine1 (narrow
+; conifer, NEW), TwistedTree1 (gnarled, NEW) and BushCommon (ground-level undergrowth, NEW
+; wrapper over a mesh already imported for Scrub). Three distinct tree silhouettes plus
+; undergrowth, all equal weight in pick_variant().
+;
+; WHY THE MEGAKIT AND NOT THE OTHERS: it is the pack that already supplies the GROUND these
+; trees stand on — grass.tres, meadow.tres and wild_grass.tres all draw from it — and a tree
+; sitting in grass is the adjacency that reads hardest. Forest had been drawing from three packs
+; at once (MegaKit, Ultimate Nature Pack, Poly Pizza), more than any other terrain.
+;
+; RETIRED THIS PASS: BirchTree, Bush, BushBerries (all Ultimate Nature Pack) — the last
+; non-MegaKit holdouts. Unwired, not deleted, the same disposition DeadTree/PineTree2/PineTree
+; already have; their import suites still cover what the repo CONTAINS and are untouched.
+;
+; TWO LOSSES WITH NO MEGAKIT EQUIVALENT, both accepted by the human when the roster was chosen:
+; there is NO birch mesh in the kit at any name, and NO berry bush — so BirchTree's white-trunk
+; look and BushBerries' berry detail are simply gone rather than substituted. Undergrowth is one
+; pick now (BushCommon) rather than two. Bush_Common_Flowers is deliberately NOT the second:
+; `flowers` is Meadow's habitat tag and Meadow is its only source, so flowering shrubs stay off
+; every other terrain (the same call scrub.tres already applies).
+;
+; PINE RESTORES A DELIBERATE LOSS. The conifer silhouette was added on 2026-08-16 to answer
+; "every tree looks the same", then removed by this same day's earlier cull because it was the
+; project's only Poly Pizza asset — that cull's note said the gap was RECOVERABLE, not closed.
+; Pine1 is the recovery, from the audited pack. It is NOT the removed PineTree2, which came from
+; the Textured Stylized Trees pack.
+;
+; 2 NEW IMPORTS, MegaKit, CC0 1.0, audit gate re-checked: Pine_1, TwistedTree_1. Bush_Common was
+; already imported for Scrub and only gained a Forest wrapper here, at the SAME 0.37932 scale
+; Scrub uses, so one mesh is never two heights in one world.
+;
+; ALL SCALES ARE MEASURED AGAINST THE ESTABLISHED ~2.5 TILE-UNIT CANOPY TARGET (Pine1 0.34168
+; from raw height 7.316918; TwistedTree1 0.14948 from raw 16.7255 — a much larger source mesh,
+; so the small factor is correct, not a typo). The TARGET itself remains a first-pass judgment
+; call with no GDD number behind it — FLAG FOR HUMAN SIGN-OFF.
+; PINE DROPPED, COMMONTREE3 IN ITS PLACE (2026-09-08, human eyeball pass on all five variants
+; rendered side by side). The conifer slot is now a third round-canopy broadleaf.
+;
+; WHY, AND WHY IT IS NOT RECOVERABLE FROM THIS PACK: Pine1 rendered as a SOLID CONE — its
+; foliage is `Leaf_Pine_C.png`, one flat frond silhouette, over 770 canopy triangles against
+; CommonTree1's 1920 individually-cut leaves. All five kit pines share that texture, so none of
+; them matches; Pine_4/Pine_5 are merely denser (1210/1158 tris), not different in kind. And the
+; tall layered conifers in the pack's own Preview_4.jpg DO NOT SHIP HERE —
+; `Leaves_GiantPine_C.png` is present in Textures/ but no GiantPine mesh exists in glTF, FBX or
+; OBJ, because the free Standard set is 68 of 116 models. The preview advertises the PRO kit.
+; The conifer silhouette is therefore UNAVAILABLE, not unchosen: re-adding one means buying PRO
+; or putting a second pack back into Forest, which is what the standardisation removed.
+; Pine1.tscn and its import stay on disk, unwired.
+;
+; THE RED PAIR IS DELIBERATE (human ruling, same pass): TwistedTree1 and BushCommon both draw
+; `Leaves_TwistedTree_C.png`, which is rgb(167,23,23) RED, and TwistedTree1 additionally carries
+; a GREY `Bark_TwistedTree` trunk where every other variant is brown. Kept as an AUTUMN ACCENT
+; after seeing them in context — 2 of 5 variants reading as autumn trees scattered through green
+; forest. This is a decision, not an oversight: do not "fix" the red, and do not tint the grey
+; bark, without a fresh human ruling.
 [gd_resource type="Resource" script_class="TerrainDefinition" load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scripts/definitions/terrain_definition.gd" id="1_schema"]
 [ext_resource type="PackedScene" path="res://assets/terrain/common_tree_1/CommonTree1.tscn" id="2_model"]
 [ext_resource type="Resource" path="res://data/terrain/forest_harvest.tres" id="3_harvest"]
 [ext_resource type="PackedScene" path="res://assets/terrain/common_tree_2/CommonTree2.tscn" id="4_model"]
-[ext_resource type="PackedScene" path="res://assets/terrain/birch_tree/BirchTree.tscn" id="6_model"]
-[ext_resource type="PackedScene" path="res://assets/terrain/bush/Bush.tscn" id="9_model"]
-[ext_resource type="PackedScene" path="res://assets/terrain/bush_berries/BushBerries.tscn" id="10_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/common_tree_3/CommonTree3.tscn" id="5_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/twisted_tree_1/TwistedTree1.tscn" id="6_model"]
+[ext_resource type="PackedScene" path="res://assets/terrain/bush_common/BushCommon.tscn" id="9_model"]
 
 [resource]
 script = ExtResource("1_schema")
@@ -150,5 +207,5 @@ display_name = "Forest"
 emitted_tags = Array[String](["forest"])
 cost = 0
 blocks_movement = true
-model_scenes = Array[PackedScene]([ExtResource("2_model"), ExtResource("4_model"), ExtResource("6_model"), ExtResource("9_model"), ExtResource("10_model")])
+model_scenes = Array[PackedScene]([ExtResource("2_model"), ExtResource("4_model"), ExtResource("5_model"), ExtResource("6_model"), ExtResource("9_model")])
 harvestable = ExtResource("3_harvest")

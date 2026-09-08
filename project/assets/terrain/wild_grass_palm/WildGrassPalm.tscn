@@ -52,6 +52,13 @@
 ; NO SLAB WRAPPER NEEDED HERE: same reasoning as WildGrassCactus.tscn's header — the
 ; instanced WildGrass.tscn already carries its own internal "Slab" wrapper for the
 ; OcclusionFader exemption mechanism; the palm prop sits as a plain sibling.
+;
+; OCCLUSIONFADER REMOVED 2026-09-08 — ANY MENTION OF IT BELOW IS HISTORY. The per-resident
+; transparency fade (D-41 §4) flickered in play and was cut outright; the script, its scene node
+; and its two suites are gone. The "Slab" node stays, because every terrain scene is built
+; around it and removing it would restructure all 33 for no gain — but NO CODE LOOKS THAT NAME
+; UP ANY MORE. It is a grouping convention now, with no behaviour attached, so nothing breaks if
+; a new scene groups differently and nothing is gained by "restoring" the exemption.
 [gd_scene load_steps=3 format=3]
 
 [ext_resource type="PackedScene" path="res://assets/terrain/wild_grass/WildGrass.tscn" id="1_grass"]

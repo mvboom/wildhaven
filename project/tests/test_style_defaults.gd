@@ -46,8 +46,8 @@ func _process(_delta: float) -> bool:
 		"farm_building, never chosen, returns the first id in catalog (alphabetical) order")
 
 	# --- set to a valid id: returned as-is -----------------------------------------------
-	_world.set_style_default("forest", "birch_tree")
-	check_eq(_world.get_style_default("forest"), "birch_tree",
+	_world.set_style_default("forest", "twisted_tree_1")
+	check_eq(_world.get_style_default("forest"), "twisted_tree_1",
 		"a validly-set style id round-trips through the getter unchanged")
 
 	_world.set_style_default("farm_building", "silo")

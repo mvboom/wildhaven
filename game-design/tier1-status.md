@@ -310,7 +310,7 @@ holds the reference to `forest_harvest.tres` (row 5's harvestable).
 > **`implementation_location`:** `project/scripts/ui/camera_rig.gd` (full rewrite — the
 > first-person camera is fully replaced, not extended), `project/scripts/world/
 > iso_camera_framing.gd` (new — the shared orthographic framing math both the live camera and
-> the save-thumbnail capture use), `project/scripts/world/occlusion_fader.gd` (new — the
+> the save-thumbnail capture use), ~~`project/scripts/world/occlusion_fader.gd`~~ (DELETED 2026-09-08, D-59 — was the
 > bounded, per-resident selective transparency fade that replaces camera angle as the
 > occlusion fix), `project/scripts/ui/tap_router.gd` (mouse-capture gating and the
 > `MAX_INTERACTION_RANGE` "walk closer" gate both removed — cursor-position targeting,
@@ -338,9 +338,11 @@ holds the reference to `forest_harvest.tres` (row 5's harvestable).
 > carried over unchanged from D-29's already-playtested values as a starting point, **not
 > re-validated under orthographic projection** (a different zoom mechanic — frustum `size`,
 > not distance+FOV) — flagged for a real playtest, same as D-29's own numbers once were.
-> `OcclusionFader.RESIDENT_CHECK_RADIUS_TILES = 3`, `FADE_HYSTERESIS_FRAMES = 6`,
-> `fade_alpha = 0.9` — the human's own stated starting point for the alpha value specifically,
-> explicitly flagged as needing further tuning against real play, not a settled number.
+> ~~`OcclusionFader.RESIDENT_CHECK_RADIUS_TILES = 3`, `FADE_HYSTERESIS_FRAMES = 6`,
+> `fade_alpha = 0.9`~~ — **VOID 2026-09-08 (D-59): the fader is deleted.** These were flagged as
+> needing tuning against real play; the play happened, the fade flickered, and it was removed
+> rather than retuned. Note `FADE_HYSTERESIS_FRAMES` existed specifically to stop flicker and did
+> not, which is why no tuning value here is worth revisiting.
 >
 > **`validation_status`:** `bash scripts/run-tests.sh` — 68/70 suites passing (one fewer total
 > than the prior first-person count: `test_crosshair_targeting.gd` deleted, its whole premise
@@ -352,10 +354,13 @@ holds the reference to `forest_harvest.tres` (row 5's harvestable).
 > decision grew out of — so a captured save-thumbnail `Image` cannot be asserted non-blank
 > here; needs a real display/GPU environment to fully verify, not a code defect).
 >
-> **`human_gate`:** not yet run. The zoom-range re-tuning, the occlusion-fade scope/tuning, and
-> the tree-canopy asset fix are all named above as open, human-owned calls this decision
-> deliberately did not make — this row's gate should cover all three, not just "does the new
-> camera work."
+> **`human_gate`:** not yet run. The zoom-range re-tuning and the tree-canopy asset fix are named
+> above as open, human-owned calls this decision deliberately did not make — this row's gate
+> should cover both, not just "does the new camera work." **The third item, occlusion-fade
+> scope/tuning, is CLOSED as of 2026-09-08 (D-59) — not by tuning it but by deleting the fader.
+> Tree occlusion itself is back to being an OPEN problem with no current solution; D-41's
+> measured finding that camera angle alone does not fix it still stands and should not be
+> re-run.**
 >
 > **`status`: 🚧 — reopened, not closed.** Built and headless-validated against the plan above;
 > not yet human-played. The prior ✅/🚧 history below this note is superseded, not deleted.

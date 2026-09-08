@@ -338,14 +338,14 @@ func _check_the_removal_ledger_is_captured_json_native() -> void:
 ## round trip through the real load path (and the pre-v4 fallback behavior) is
 ## `test_save_round_trip.gd`.
 func _check_style_defaults() -> void:
-	_world.set_style_default("forest", "birch_tree")
+	_world.set_style_default("forest", "twisted_tree_1")
 	var data: Dictionary = WorldSnapshot.capture(_world, "W", "meadow_start", 0)
 	check_eq(int(data["save_version"]), WorldSnapshot.SAVE_VERSION,
 		"a capture is stamped at the current save_version (4 when style_defaults landed, 5 "
 		+ "since the resident-look field joined at the villager-variety fix)")
 	check(data.has("style_defaults"), "style_defaults is captured")
 	var captured: Dictionary = data["style_defaults"] as Dictionary
-	check_eq(captured.get("forest", ""), "birch_tree",
+	check_eq(captured.get("forest", ""), "twisted_tree_1",
 		"the chosen forest default is captured verbatim")
 
 

@@ -17,7 +17,7 @@ license_file = "res://assets/licenses/Quaternius_UltimateAnimatedAnimals_License
 attribution_required = false
 required_notice = ""
 conditions = ""
-assets_used = PackedStringArray("CommonTree_1", "CommonTree_2", "Grass_Common_Short", "Grass_Common_Tall", "Flower_3_Group", "Flower_4_Group", "Bush_Common_Flowers", "Fern_1", "Grass_Wispy_Short", "Grass_Wispy_Tall", "Clover_1", "Clover_2", "Flower_3_Single", "Flower_4_Single", "Bush_Common", "Rock_Medium_1", "Rock_Medium_2", "Pebble_Round_1", "Pebble_Round_2", "Rock_Medium_3")
+assets_used = PackedStringArray("CommonTree_1", "CommonTree_2", "Grass_Common_Short", "Grass_Common_Tall", "Flower_3_Group", "Flower_4_Group", "Bush_Common_Flowers", "Fern_1", "Grass_Wispy_Short", "Grass_Wispy_Tall", "Clover_1", "Clover_2", "Flower_3_Single", "Flower_4_Single", "Bush_Common", "Rock_Medium_1", "Rock_Medium_2", "Pebble_Round_1", "Pebble_Round_2", "Rock_Medium_3", "Pine_1", "TwistedTree_1", "CommonTree_3")
 per_file_licensing = false
 notes = "CC0 — crediting is courtesy, not compliance. Reuses the generic Quaternius CC0
 license text already in-repo (`License_Standard.txt` in this pack is the same generic

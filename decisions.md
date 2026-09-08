@@ -733,6 +733,14 @@ is a new decision, not an extension of this one.
 
 ### D-41 · Iso camera + selective occlusion fade replaces the first-person walk camera (reverses D-33)
 
+> **THE OCCLUSION-FADE HALF IS SUPERSEDED BY [D-59] (2026-09-08).** The iso camera, the pan/zoom
+> model and every safety rail below still stand and are still in force. What does not is
+> `OcclusionFader`: the fade shipped, flickered in play, and was removed outright. Read the
+> camera reasoning below as current; read "a bounded, per-resident transparency fade solves it
+> directly" as history — and note that this entry's *measured* finding that camera angle alone
+> does NOT fix occlusion is unaffected, so the underlying problem is now OPEN, not solved.
+
+
 **Decision (2026-08-14):** The camera becomes a fixed orthographic camera at
 `yaw = 45°`, `pitch ≈ -26.565°` (`IsoCameraFraming.YAW_DEGREES`/`PITCH_DEGREES`) —
 matching the original 2D mockups' isometric convention — replacing D-33's
@@ -1794,3 +1802,39 @@ becoming an error later.
 **Unaffected:** `wild_grass` never qualified for `mixed` (one variant), so **D-56 stands**
 unchanged. And the paint-time capture contract of D-57 is untouched — this entry removes a style
 *value*, not the mechanism.
+
+
+---
+
+### D-59 · The occlusion fade is removed; tree occlusion goes back to being an open problem
+
+**Decision:** `OcclusionFader` is deleted — the script, its `Main.tscn` node, and both of its test
+suites. No transparency is applied to anything at runtime any more. A resident standing behind a
+tree is simply hidden.
+
+**Why: it did not work, and the failure was the one its own design anticipated.** The fader faded
+only a forest tile actually blocking a real resident's line of sight to the camera, and it
+carried a hysteresis guard (`FADE_HYSTERESIS_FRAMES`) written specifically against "a wobbling
+detection boundary causing visible flutter". It flickered anyway. The human's report was that the
+trees "flash", and that it "doesn't really work" — a shipped guard that did not hold, not an
+untuned constant, which is why this is a removal rather than a retune.
+
+**This partly supersedes [D-41].** That entry paired the iso camera with the fade as a package.
+The camera half is untouched and current. The fade half is gone.
+
+**THE PROBLEM IS NOW OPEN, AND D-41'S MEASUREMENT STILL STANDS.** D-41 recorded, as a measured
+finding rather than an assumption, that **camera angle alone does not fix tree occlusion** — a
+low-pitch spike was built and it did not solve it. So nothing about removing the fade solves the
+original problem; it accepts it. Anyone reaching for a fix later should start from that
+measurement, not re-run it, and should not assume the answer is "fade again but tuned better" —
+that is precisely what was just removed.
+
+**What was kept, and why it looks vestigial but is not.** `TerrainChunkLod`'s per-tile container
+requirement was originally justified BY the fader's name-based lookup. It outlived it:
+`_tile_containers` is how that file finds, repaints and frees a single tile without rescanning
+the grid, and the reuse-don't-recreate rule is what keeps its documented same-frame node-rename
+race from biting. The `"Slab"` node in all 33 terrain scenes was the fade EXEMPTION (fading the
+ground plane would have opened a hole in the world) and is now a grouping convention with no
+behaviour attached — kept because every terrain scene is built around it and removing it would
+restructure all 33 for nothing. Every one of those scenes carries a stamped note saying so, since
+their headers still describe the exemption mechanism as if it were live.

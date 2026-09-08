@@ -9,15 +9,21 @@ extends Node3D
 ## can still produce more than one MultiMeshInstance3D; what collapses is the PER-TILE cost,
 ## not the per-piece one).
 ##
-## STRUCTURAL REQUIREMENT (for `occlusion_fader.gd` dependency): Near-tier tiles get a wrapper
-## Node3D named `"Tile_%d_%d"` for each tile, parented directly under TerrainView
-## (passed via `near_visual_parent`), with the real scene-instance visual as its child. This
-## container is created ONCE per tile and reused across repaints — never freed-and-recreated
-## in the same call, which would race Godot's sibling-rename-on-collision behavior and leave
-## the fader pointing at stale, about-to-be-freed geometry. `occlusion_fader.gd` depends on
-## this exact naming/parenting structure to find fadeable meshes; see lines 193, 282, 322 of
-## occlusion_fader.gd. Far-tier MultiMeshInstance3D nodes carry no such requirement — a chunk's
-## far batch is freed and rebuilt wholesale on any change within it.
+## STRUCTURAL REQUIREMENT: near-tier tiles get a wrapper Node3D named `"Tile_%d_%d"` for each
+## tile, parented directly under TerrainView (passed via `near_visual_parent`), with the real
+## scene-instance visual as its child. The container is created ONCE per tile and reused across
+## repaints — never freed-and-recreated in the same call, which would race Godot's
+## sibling-rename-on-collision behaviour.
+##
+## THE ORIGINAL REASON WAS `occlusion_fader.gd`, WHICH NO LONGER EXISTS (removed 2026-09-08 —
+## the per-resident transparency fade flickered in play and was cut; see D-41's supersession
+## note). The requirement OUTLIVED it and is still load-bearing on its own terms:
+## `_tile_containers` is how this file finds, repaints and frees one tile without rescanning the
+## grid, and the reuse rule is what keeps `set_chunk_tier()`'s documented same-frame rename race
+## from biting. Do not "simplify" either away now that the fader is gone.
+##
+## Far-tier MultiMeshInstance3D nodes carry no such requirement — a chunk's far batch is freed
+## and rebuilt wholesale on any change within it.
 
 ## PROPOSED (2026-08-22) — tiles per chunk edge. 256 chunks at the 128x128 cap: small enough
 ## to avoid visible popping at tier transitions, large enough that far-tier draw calls stay
@@ -58,7 +64,7 @@ const LOD_NEAR_RADIUS_CAP_TILES: float = 24.0
 ## `LOD_REBUILD_CHECK_INTERVAL_SECONDS` tick from floating-point/panning jitter.
 const LOD_HYSTERESIS_TILES: float = 2.0
 
-## PROPOSED (2026-08-22) — `occlusion_fader.gd`'s CHECK_INTERVAL_SECONDS is 0.1s for a cheap
+## PROPOSED (2026-08-22) — matched then to the since-removed occlusion fader's 0.1s cheap
 ## fade check; an LOD tier recheck is similarly cheap but the rebuild it can trigger is
 ## heavier (regenerating a MultiMesh), so a slightly longer interval avoids churn during
 ## smooth zoom/pan.
@@ -204,7 +210,7 @@ func set_chunk_tier(chunk: Vector2i, near: bool) -> void:
 
 ## Reuse-or-create `tile`'s near-tier container (Task 1's structural requirement: a
 ## persistent node per tile, never freed-and-recreated in the same call, so
-## `occlusion_fader.gd`'s name-based lookup never races a pending `queue_free()`). Only
+## a name-based lookup could never race a pending `queue_free()`). Only
 ## the container's CHILD visual is replaced on a terrain change.
 func _refresh_near_tile(tile: Vector2i) -> void:
 	var container: Node3D = _tile_containers.get(tile, null) as Node3D

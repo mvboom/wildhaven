@@ -91,6 +91,7 @@ func _process(delta: float) -> bool:
 	_check_long_press_opens_style_picker_and_swallows_the_release()
 	_check_style_picker_lists_every_style_with_current_highlighted()
 	_check_house_style_picker_offers_the_three_culled_looks()
+	_check_forest_style_picker_uses_the_authored_names()
 	_check_style_picker_selection_updates_default_and_button_chrome()
 	_check_style_picker_selection_immediately_activates_the_choice()
 	_check_style_picker_reselecting_current_still_activates_it()
@@ -962,6 +963,23 @@ func _check_style_picker_lists_every_style_with_current_highlighted() -> void:
 ##
 ## The dash is the whole reason a label map exists at all: `String.capitalize()`, which every
 ## other derived-id category uses, produces "House Large" and cannot produce "House - Large".
+## The five Forest looks and the names the human gave them (2026-09-08). INDEPENDENT COPY, for
+## the same reason `HOUSE_STYLE_LABELS` below is one: `_expected_style_label()` mirrors
+## `_label_for()`'s logic, so a mirror that read its strings from `StylePickerPopup._FOREST_LABELS`
+## would happily agree with a typo in the implementation. This constant is what actually fails
+## when a label changes without meaning to.
+##
+## Two things `capitalize()` cannot do are pinned here: the " - " in four of them, and "Bush"
+## for `bush_common` (which would otherwise humanize to "Bush Common").
+const FOREST_STYLE_LABELS: Dictionary = {
+	"common_tree_1": "Tree - Tall",
+	"common_tree_2": "Tree - Medium",
+	"common_tree_3": "Tree - Short",
+	"twisted_tree_1": "Tree - Twisted",
+	"bush_common": "Bush",
+}
+
+
 const HOUSE_STYLE_LABELS: Dictionary = {
 	"house_large": "House - Large",
 	"house_medium": "House - Medium",
@@ -1033,6 +1051,8 @@ func _expected_style_label(category: String, style_id: String) -> String:
 		return style_id.capitalize()
 	if category == "house" and HOUSE_STYLE_LABELS.has(style_id):
 		return HOUSE_STYLE_LABELS[style_id] as String
+	if category == "forest" and FOREST_STYLE_LABELS.has(style_id):
+		return FOREST_STYLE_LABELS[style_id] as String
 	return style_id.capitalize()
 
 
@@ -1561,3 +1581,41 @@ func _finish_real_long_press_timer_wait() -> void:
 	var button: Button = _hud.palette_button_for(_REAL_LONG_PRESS_CATEGORY)
 	if button != null:
 		button.button_up.emit()
+
+
+## The Forest picker offers exactly the five wired looks under the names the human gave them
+## (2026-09-08). Same shape and same purpose as the House check above: the generic loop earlier
+## in this suite derives its expectations the way the code does, so it would not notice a wrong
+## LABEL; this pins the actual strings.
+##
+## Worth pinning specifically because the ids do not spell the names — `common_tree_1` is
+## "Tree - Tall" and `common_tree_3` is "Tree - Short", so nothing about the id would catch a
+## label attached to the wrong tree. Two of these are also things `capitalize()` cannot produce
+## at all: the " - " in four, and plain "Bush" for `bush_common`.
+func _check_forest_style_picker_uses_the_authored_names() -> void:
+	var button: Button = _hud.palette_button_for("forest")
+	if not check(button != null, "forest has a palette button to anchor the popup to"):
+		return
+	_hud.open_style_picker("forest", button)
+	var popup: StylePickerPopup = _hud.style_picker()
+	if not check(popup != null and popup.is_open(), "the Forest style picker opens"):
+		return
+
+	var ids: PackedStringArray = _world.style_ids_for_category("forest")
+	check_eq(ids.size(), FOREST_STYLE_LABELS.size(),
+		"forest offers exactly the %d named looks" % FOREST_STYLE_LABELS.size())
+
+	var seen: Dictionary = {}
+	for i in popup.row_count():
+		seen[popup.row_label(i)] = true
+	for style_id: String in FOREST_STYLE_LABELS:
+		check(seen.has(FOREST_STYLE_LABELS[style_id]),
+			"the Forest picker shows \"%s\" for `%s`" % [FOREST_STYLE_LABELS[style_id], style_id],
+			"labels present: %s" % str(seen.keys()))
+	# The dash and the un-suffixed "Bush" are exactly what a derived label cannot produce, so
+	# prove the map is actually being consulted rather than coincidentally agreeing.
+	check(not seen.has("Common Tree 1"),
+		"...and NOT the capitalize() fallback \"Common Tree 1\" — the authored map is in use")
+	check(not seen.has("Bush Common"),
+		"...nor \"Bush Common\" for the shrub")
+	popup.close()

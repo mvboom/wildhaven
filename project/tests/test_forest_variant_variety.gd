@@ -170,7 +170,7 @@ func _check_a_chosen_style_governs_new_paint_only() -> void:
 			if _world.grid.get_terrain_id(x, z) == "forest":
 				before[Vector2i(x, z)] = _world.grid.get_tile_style(x, z)
 
-	_world.set_style_default("forest", "birch_tree")
+	_world.set_style_default("forest", "twisted_tree_1")
 	var changed: int = 0
 	for tile: Vector2i in before:
 		if _world.grid.get_tile_style(tile.x, tile.y) != before[tile]:
@@ -191,7 +191,7 @@ func _check_a_chosen_style_governs_new_paint_only() -> void:
 		return
 	if not check(_world.paint_tile(target.x, target.y, "forest"), "it paints to forest"):
 		return
-	check_eq(_world.grid.get_tile_style(target.x, target.y), "birch_tree",
+	check_eq(_world.grid.get_tile_style(target.x, target.y), "twisted_tree_1",
 		"a tile painted after the choice carries exactly that style — no re-rolling")
 
 
