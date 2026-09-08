@@ -49,6 +49,7 @@ func _initialize() -> void:
 	_check_region_grows_when_liked_terrain_is_painted()
 	_check_an_untouched_world_never_rebuilds()
 	_check_points_are_biased_away_from_threats()
+	_check_roamer_uses_the_region()
 
 	_navigation.free_navigation()
 	finish()
@@ -233,4 +234,34 @@ func _check_points_are_biased_away_from_threats() -> void:
 	check(away_from_threat > toward_threat * 2,
 		"points skew away from a nearby avoided species",
 		"%d away vs %d toward" % [away_from_threat, toward_threat])
+	grid.queue_free()
+
+
+## The roamer must actually USE the region, and must degrade to its disc without one — the
+## same idiom the file already uses for a null `world_navigation` (roaming.md §4.6).
+func _check_roamer_uses_the_region() -> void:
+	var grid := _grid_with_grass(Rect2i(3, 3, 5, 5))
+	var region := RoamRegion.new(grid, _navigation, HOME, _grass_mask(), RADIUS)
+	var home_world: Vector3 = grid.tile_to_world(HOME.x, HOME.y)
+
+	var node := Node3D.new()
+	node.position = home_world
+	root.add_child(node)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 20260908
+	var roamer := ResidentRoamer.new(
+		node, home_world, float(RADIUS), Rect2(), rng, "rabbit", [] as Array[String], null, region
+	)
+
+	var outside: int = 0
+	for _i in 200:
+		var waypoint: Vector3 = roamer._pick_waypoint()
+		if not region.has_tile(grid.world_to_tile(waypoint)):
+			outside += 1
+	check_eq(outside, 0, "a region-equipped roamer only picks waypoints inside its region")
+
+	# No region: the disc, exactly as before.
+	var bare := ResidentRoamer.new(node, home_world, float(RADIUS), Rect2(), rng)
+	check_eq(bare.wander_radius(), ResidentRoamer.WANDER_RADIUS_TILES,
+		"a roamer with no region still reports the disc radius")
 	grid.queue_free()
