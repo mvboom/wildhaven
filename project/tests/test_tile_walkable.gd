@@ -22,6 +22,16 @@ func _initialize() -> void:
 	check(not navigation.is_tile_walkable(grid, 3, 3),
 		"a den reservation is not walkable", "")
 
+	# Loaded directly rather than through a roster helper: `PlaceableDefinition` has NO
+	# `load_all()` — that lives on `BuildingPlacement` — and a direct `load()` is what the
+	# other suites in this repo do.
+	var building: PlaceableDefinition = load("res://data/buildings/house.tres") as PlaceableDefinition
+	check(building != null, "house.tres loads as a PlaceableDefinition", "")
+	if building != null:
+		grid.set_building(Vector2i(4, 4), building)
+		check(not navigation.is_tile_walkable(grid, 4, 4),
+			"an occupied tile is not walkable (is_occupied)", "")
+
 	check(not navigation.is_tile_walkable(grid, -1, 0), "out of bounds is not walkable", "")
 	check(not navigation.is_tile_walkable(null, 1, 1), "a null grid is not walkable", "")
 
