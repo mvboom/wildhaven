@@ -31,6 +31,34 @@ extends RefCounted
 ## is an invitation, not an assignment").
 const BASELINE_WEIGHT: float = 1.0
 
+## The species the early gate names while nothing at all is hosted. `human.tres`'s own id;
+## its `display_name` is "Villager".
+const VILLAGER_SPECIES_ID: String = "human"
+
+## PROPOSED — human owns this. The population at which a species stops being worth hinting
+## at: the player has visibly succeeded and does not need telling again.
+const PLENTY_THRESHOLD: int = 3
+
+## PROPOSED — human owns this. The three ranking tiers. The lowest is deliberately nonzero,
+## for `BASELINE_WEIGHT`'s own reason: a species that can never be named again reads as a
+## closed door, and gdd.md's Discovery layer is an invitation, not an assignment.
+const WEIGHT_NEVER_HOSTED: float = 4.0
+const WEIGHT_FEW_HOSTED: float = 1.0
+const WEIGHT_PLENTY_HOSTED: float = 0.15
+
+
+## A species' ranking multiplier: never hosted > hosted a little > hosted plenty.
+## Reads only accessors that already exist and already survive a save round trip
+## (`species_hosted_ids()`, `population_of()`), so this design adds NO new save state.
+static func species_weight(species: AnimalDefinition, world: WorldRoot) -> float:
+	if species == null or world == null or world.registry == null:
+		return WEIGHT_NEVER_HOSTED
+	if not world.species_hosted_ids().has(species.id):
+		return WEIGHT_NEVER_HOSTED
+	if world.registry.population_of(species.id) < PLENTY_THRESHOLD:
+		return WEIGHT_FEW_HOSTED
+	return WEIGHT_PLENTY_HOSTED
+
 
 ## Tallies every habitat tag over the WHOLE revealed grid, one pass, into `{tag: String ->
 ## count: int}`. `AnimalDefinition.HABITAT_TAGS` order is not assumed; a tag nobody's roster
@@ -60,40 +88,66 @@ static func candidates_with_pools(roster: SpeciesRoster) -> Array[AnimalDefiniti
 ## Picks one species to hint at. `near_miss_summary` empty (the only case that exists today)
 ## routes through terrain bias; a future non-empty summary is trusted as already-computed
 ## per-species weight and used directly, per the header note above.
+##
+## `world` is OPTIONAL and defaults to null. A null `world` reproduces today's pre-ranking
+## behaviour exactly (`species_weight()` returns `WEIGHT_NEVER_HOSTED` for every candidate, a
+## flat multiplier that changes nothing relative to itself, and the early Villager gate never
+## fires) — that is what keeps every pre-existing call site, and the suites written against
+## them, a real check rather than one quietly rewritten by this change.
 static func pick_species(
 	candidates: Array[AnimalDefinition],
 	grid: WorldGrid,
 	rng: RandomNumberGenerator,
-	near_miss_summary: Dictionary = {}
+	world: WorldRoot = null,
+	near_miss_summary: Dictionary = {},
+	last_species_id: String = ""
 ) -> AnimalDefinition:
 	if candidates.is_empty():
 		return null
-	if candidates.size() == 1:
-		return candidates[0]
+
+	# THE EARLY GATE — one branch. Nothing hosted at all means the player has not yet seen
+	# the loop work once, so the hint names the cheapest thing in the game and nothing else.
+	if world != null and world.species_hosted_count() == 0:
+		for species: AnimalDefinition in candidates:
+			if species.id == VILLAGER_SPECIES_ID:
+				return species
+
+	# Never the same species twice running (the Pillar 1 mitigation for the idle
+	# multiplier). Dropped only when it would empty the field.
+	var pool: Array[AnimalDefinition] = []
+	for species: AnimalDefinition in candidates:
+		if species.id != last_species_id:
+			pool.append(species)
+	if pool.is_empty():
+		pool = candidates
+
+	if pool.size() == 1:
+		return pool[0]
 
 	var tag_counts: Dictionary = {} if not near_miss_summary.is_empty() else tag_tile_counts(grid)
 	var weights: Array[float] = []
 	var total: float = 0.0
-	for species: AnimalDefinition in candidates:
+	for species: AnimalDefinition in pool:
 		var weight: float = BASELINE_WEIGHT
 		if not near_miss_summary.is_empty():
 			weight += maxf(0.0, float(near_miss_summary.get(species.id, 0.0)))
 		else:
 			for tag: String in species.habitat_needs:
 				weight += float(tag_counts.get(tag, 0))
+		weight *= species_weight(species, world)
 		weights.append(weight)
 		total += weight
 
 	if total <= 0.0:
-		return candidates[rng.randi_range(0, candidates.size() - 1)]
+		return pool[rng.randi_range(0, pool.size() - 1)]
 
 	var roll: float = rng.randf() * total
 	var cursor: float = 0.0
-	for i in range(candidates.size()):
+	for i in range(pool.size()):
 		cursor += weights[i]
 		if roll <= cursor:
-			return candidates[i]
-	return candidates[candidates.size() - 1]
+			return pool[i]
+	return pool[pool.size() - 1]
 
 
 ## One line from a species' pool, or "" if it has none (never errors on an empty pool — a

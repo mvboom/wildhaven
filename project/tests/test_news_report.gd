@@ -89,6 +89,15 @@ func _process(_delta: float) -> bool:
 	_check_content_tag_tile_counts()
 	_check_content_candidates_and_lines()
 	_check_content_terrain_bias()
+	# ORDER MATTERS: `_check_nothing_hosted_names_the_villager()` MUST run before any check that
+	# calls `restore_hosted()`. `HomeSiteRegistry.restore_hosted()` is additive-only — it can
+	# never clear an entry (gdd.md -> Economy: "Species Hosted (all-time, never decreases)") — so
+	# once ANY check below hosts a species on this suite's shared `_world`, there is no way to get
+	# back to `species_hosted_count() == 0` for the rest of this run. The villager gate only has
+	# anything to prove while the count is still genuinely zero.
+	_check_nothing_hosted_names_the_villager()
+	_check_ranking_prefers_species_not_yet_hosted()
+	_check_the_same_species_is_never_picked_twice_running()
 	_check_hint_line_composes_opening_and_needs()
 	_check_authored_opening_is_preferred()
 	_check_gameplay_settings_persistence()
@@ -360,6 +369,71 @@ func _check_content_terrain_bias() -> void:
 		+ "assignment toward only the land the player already has (rich=%d, scarce=%d)"
 			% [rich_picks, scarce_picks])
 	grid.free()
+
+
+## THE RANKING. Never-hosted outranks hosted; hosted-below-threshold outranks
+## hosted-at-threshold; and the bottom tier NEVER reaches zero — `BASELINE_WEIGHT` already
+## documents why (gdd.md: "a hint is an invitation, not an assignment"), and a species that
+## can never be named again reads as a closed door.
+func _check_ranking_prefers_species_not_yet_hosted() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = SEED
+	var roster: Array[AnimalDefinition] = _world.roster.species()
+
+	var never: float = NewsReportContent.species_weight(roster[0], _world)
+	check(never > 0.0, "a never-hosted species carries real weight")
+
+	# Host one, and its weight must drop without vanishing.
+	_world.registry.restore_hosted([roster[0].id] as Array[String])
+	var hosted: float = NewsReportContent.species_weight(roster[0], _world)
+	check(hosted < never,
+		"hosting a species demotes it (%.2f < %.2f)" % [hosted, never])
+	check(hosted > 0.0,
+		"...but never to zero — the door stays open (%.2f)" % hosted)
+
+
+## THE EARLY GATE, ruled 2026-09-08: one branch, not a two-stage sequence. With nothing
+## hosted the hint names the Villager, the cheapest thing in the game (a 15-wood house plus
+## one farm tile). After that the ordinary ranking runs unmodified, and "then whatever is
+## cheapest" falls out of it via the existing terrain bias rather than needing its own state.
+##
+## MUST RUN BEFORE ANY CHECK THAT CALLS `restore_hosted()` (see the call-order comment in
+## `_process()` above) — `HomeSiteRegistry.restore_hosted()` is additive-only per its own doc
+## comment ("Species Hosted (all-time, never decreases)"), so once another check hosts a
+## species on this suite's shared `_world`, `species_hosted_count()` can never return to 0
+## again for the rest of this run and this check's own fixture assertion below would fail.
+func _check_nothing_hosted_names_the_villager() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = SEED
+	check_eq(_world.species_hosted_count(), 0, "the fixture world hosts nothing yet")
+	for i in range(12):
+		var picked: AnimalDefinition = NewsReportContent.pick_species(
+			_world.roster.species(), _world.grid, rng, _world
+		)
+		if not check(picked != null, "a species is picked"):
+			return
+		if not check_eq(picked.id, NewsReportContent.VILLAGER_SPECIES_ID,
+			"with nothing hosted the pick is always the villager (attempt %d)" % i):
+			return
+
+
+## The Pillar 1 mitigation for the idle multiplier: an idle stretch must read as the world
+## talking about different animals, not one nag repeated.
+func _check_the_same_species_is_never_picked_twice_running() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = SEED
+	_world.registry.restore_hosted([NewsReportContent.VILLAGER_SPECIES_ID] as Array[String])
+	var previous: String = ""
+	for i in range(30):
+		var picked: AnimalDefinition = NewsReportContent.pick_species(
+			_world.roster.species(), _world.grid, rng, _world, {}, previous
+		)
+		if not check(picked != null, "a species is picked on attempt %d" % i):
+			return
+		if not check(picked.id != previous,
+			"attempt %d picked '%s' twice running" % [i, picked.id]):
+			return
+		previous = picked.id
 
 
 ## THE COMPOSER. An authored opening plus needs derived live, so a divisor retune updates
