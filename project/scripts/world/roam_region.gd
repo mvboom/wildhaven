@@ -30,6 +30,12 @@ const NEIGHBOURS: Array[Vector2i] = [
 ## into a pinned animal.
 const MIN_REGION_TILES: int = 6
 
+## PLACEHOLDER — the human owns this. **No GDD or spec.md number exists for it.** How many
+## candidate tiles are drawn while trying to land inside the away-from-threats cone
+## (`pick_point()`). Enough that a cone covering half the region is almost always hit, small
+## enough that the search stays free. Costs nothing at all when nothing is being avoided.
+const AVOID_BIAS_SAMPLES: int = 8
+
 
 var _grid: WorldGrid = null
 var _navigation: WorldNavigation = null
@@ -151,3 +157,61 @@ func _qualifies(x: int, z: int) -> bool:
 ## is affordable. Out of bounds reads 0 and so is never liked.
 func _likes(x: int, z: int) -> bool:
 	return (_grid.tile_tag_mask(x, z) & _needs_mask) != 0
+
+
+## A world position inside a randomly chosen region tile.
+##
+## `away_from` is the positions of nearby residents this one keeps distance from, supplied by
+## `ResidentRoamer`'s existing `_nearby_avoid_provider` and therefore resolved once per wander
+## cycle, never per frame. When it is non-empty the pick is REJECTION SAMPLED toward the
+## opposite side of home: up to `AVOID_BIAS_SAMPLES` candidates are drawn and the first inside
+## the away-cone wins, otherwise the last drawn does.
+##
+## THIS IS D-29'S BEHAVIOUR RE-EXPRESSED, NOT A NEW RULE. Both of its load-bearing properties
+## survive exactly: only WHICH point inside the already-bounded area gets chosen changes, and
+## the region is never widened by the presence of a threat.
+func pick_point(rng: RandomNumberGenerator, away_from: Array = []) -> Vector3:
+	_ensure_fresh()
+	if _tiles.is_empty():
+		return _grid.tile_to_world(_home_tile.x, _home_tile.y) if _grid != null else Vector3.ZERO
+
+	var away: Vector2 = _away_direction(away_from)
+	var chosen: Vector2 = _tiles[rng.randi_range(0, _tiles.size() - 1)]
+	if away != Vector2.ZERO:
+		for _i in AVOID_BIAS_SAMPLES:
+			chosen = _tiles[rng.randi_range(0, _tiles.size() - 1)]
+			var offset := Vector2(chosen.x - float(_home_tile.x), chosen.y - float(_home_tile.y))
+			if offset == Vector2.ZERO:
+				continue
+			if absf(offset.angle_to(away)) <= ResidentRoamer.AVOID_BIAS_HALF_ARC_RADIANS:
+				break
+	return _tile_point(chosen, rng)
+
+
+## The averaged unit direction pointing from the threats toward home — "away", in tile space.
+## `Vector2.ZERO` when there is nothing to avoid, or when threats surround home evenly enough
+## that no direction reads as away more than any other.
+func _away_direction(away_from: Array) -> Vector2:
+	if away_from.is_empty() or _grid == null:
+		return Vector2.ZERO
+	var home_world: Vector3 = _grid.tile_to_world(_home_tile.x, _home_tile.y)
+	var sum := Vector2.ZERO
+	for threat: Vector3 in away_from:
+		var delta := Vector2(home_world.x - threat.x, home_world.z - threat.z)
+		if delta.length() > 0.0001:
+			sum += delta.normalized()
+	if sum.length_squared() <= 0.0001:
+		return Vector2.ZERO
+	return sum.normalized()
+
+
+## A uniformly random point WITHIN the tile rather than its exact centre, so residents given
+## the same tile do not line up on one spot.
+func _tile_point(tile: Vector2, rng: RandomNumberGenerator) -> Vector3:
+	var world: Vector3 = _grid.tile_to_world(int(tile.x), int(tile.y))
+	var half: float = WorldGrid.TILE_SIZE * 0.5
+	return Vector3(
+		world.x + rng.randf_range(-half, half),
+		world.y,
+		world.z + rng.randf_range(-half, half)
+	)

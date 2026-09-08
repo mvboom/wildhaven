@@ -45,6 +45,10 @@ func _initialize() -> void:
 	_check_region_is_contiguous()
 	_check_home_is_always_present()
 	_check_small_region_is_not_usable()
+	_check_picked_points_land_inside_the_region()
+	_check_region_grows_when_liked_terrain_is_painted()
+	_check_an_untouched_world_never_rebuilds()
+	_check_points_are_biased_away_from_threats()
 
 	_navigation.free_navigation()
 	finish()
@@ -143,4 +147,90 @@ func _check_small_region_is_not_usable() -> void:
 		"an unpainted world yields a region below the usable floor",
 		"got %d tiles" % region.tile_count())
 	check(not region.is_usable(), "and it reports itself unusable", "")
+	grid.queue_free()
+
+
+func _check_picked_points_land_inside_the_region() -> void:
+	var grid := _grid_with_grass(Rect2i(3, 3, 5, 5))
+	var region := RoamRegion.new(grid, _navigation, HOME, _grass_mask(), RADIUS)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 20260908
+	var outside: int = 0
+	for _i in 400:
+		var point: Vector3 = region.pick_point(rng)
+		if not region.has_tile(grid.world_to_tile(point)):
+			outside += 1
+	check_eq(outside, 0, "400 picked points all land on region tiles")
+	grid.queue_free()
+
+
+## THE GROWTH PROPERTY, stated the way the player feels it: paint more of what a species
+## likes, and it roams there. This is the whole point of the feature (roaming.md §1).
+func _check_region_grows_when_liked_terrain_is_painted() -> void:
+	var grid := _grid_with_grass(Rect2i(4, 4, 3, 3))
+	var region := RoamRegion.new(grid, _navigation, HOME, _grass_mask(), RADIUS)
+	var before: int = region.tile_count()
+	check(not region.has_tile(Vector2i(8, 5)), "the far tile is outside the region to start", "")
+
+	for x in range(7, 10):
+		grid.set_terrain(x, 5, "grass")
+
+	check(region.tile_count() > before,
+		"painting liked terrain grows the region without anyone invalidating it",
+		"%d tiles before, %d after" % [before, region.tile_count()])
+	check(region.has_tile(Vector2i(8, 5)), "and the newly painted ground is now roamable", "")
+	grid.queue_free()
+
+
+## THE OTHER HALF OF LAZY REBUILDING, and the one worth an exact work counter: a world nobody
+## edited must do NO work at all. Asserted against `rebuilds_run` rather than against the tile
+## count, because a rebuild that happened to produce the same tiles would pass a count check
+## while quietly costing 0.3 ms per wander cycle forever.
+func _check_an_untouched_world_never_rebuilds() -> void:
+	var grid := _grid_with_grass(Rect2i(3, 3, 5, 5))
+	var region := RoamRegion.new(grid, _navigation, HOME, _grass_mask(), RADIUS)
+	region.tile_count()  # first read builds
+	var after_first: int = region.rebuilds_run
+	check(after_first > 0, "the first read builds the region", "")
+
+	for _i in 50:
+		region.tile_count()
+	check_eq(region.rebuilds_run, after_first,
+		"50 reads of an unedited world cost zero rebuilds")
+
+	# `set_terrain` early-returns when the terrain is already what was asked for, so the
+	# version does not move and this must STILL not rebuild.
+	grid.set_terrain(4, 4, "grass")
+	check_eq(region.rebuilds_run, after_first,
+		"a no-op terrain write does not move the version, so nothing rebuilds")
+
+	grid.set_terrain(4, 4, "meadow")
+	region.tile_count()
+	check(region.rebuilds_run > after_first, "a real edit does rebuild, once", "")
+	grid.queue_free()
+
+
+## Row 9's avoids distance-keeping (D-29) used to live in `ResidentRoamer._pick_angle()`,
+## which biased the ANGLE drawn from a disc. With waypoints drawn from a tile list there is no
+## angle being chosen, so the behaviour has to be re-expressed here or it is silently lost.
+func _check_points_are_biased_away_from_threats() -> void:
+	var grid := _grid_with_grass(Rect2i(0, 0, 16, 16))
+	var region := RoamRegion.new(grid, _navigation, HOME, _grass_mask(), RADIUS)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 20260908
+
+	# A threat sitting well to the +X side of home. Points should skew to -X.
+	var threat: Vector3 = grid.tile_to_world(HOME.x + 4, HOME.y)
+	var home_world: Vector3 = grid.tile_to_world(HOME.x, HOME.y)
+	var toward_threat: int = 0
+	var away_from_threat: int = 0
+	for _i in 400:
+		var point: Vector3 = region.pick_point(rng, [threat] as Array[Vector3])
+		if point.x > home_world.x:
+			toward_threat += 1
+		elif point.x < home_world.x:
+			away_from_threat += 1
+	check(away_from_threat > toward_threat * 2,
+		"points skew away from a nearby avoided species",
+		"%d away vs %d toward" % [away_from_threat, toward_threat])
 	grid.queue_free()
