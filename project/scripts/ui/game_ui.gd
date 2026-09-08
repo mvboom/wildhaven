@@ -47,7 +47,10 @@ const VILLAGER_SPECIES_ID: String = "human"
 @onready var menu_window: MenuWindow = %MenuWindow
 @onready var news_report_toast: NewsReportToast = %NewsReportToast
 @onready var crosshair: Crosshair = %Crosshair
-@onready var news_report_presenter: NewsReportPresenter = %NewsReportPresenter
+## Private so `news_report_presenter()` below can be a real accessor rather than colliding with
+## a same-named `@onready` property — `test_news_report.gd`'s
+## `_check_presenter_fires_a_composed_hint()` calls it as a function.
+@onready var _news_report_presenter: NewsReportPresenter = %NewsReportPresenter
 @onready var coach_chip: CoachChip = %CoachChip
 
 var _world: WorldRoot = null
@@ -173,7 +176,7 @@ func bind_world() -> void:
 		# Row 12. Binds (or rebinds) the nudge/News Report clock to this world, starting the
 		# ~3 s countdown on a brand-new save and skipping straight to the ambient cadence
 		# otherwise (`WorldRoot.is_new_world`).
-		news_report_presenter.bind(world, news_report_toast)
+		_news_report_presenter.bind(world, news_report_toast)
 
 	if camera != null:
 		_camera = camera
@@ -192,9 +195,14 @@ func bind_world() -> void:
 	if _world != null and _coach == null:
 		_coach = OnboardingCoach.new()
 		_coach.configure(_world.is_new_world, GameplaySettings.hints_enabled())
-		news_report_presenter.set_coach(_coach)
+		_news_report_presenter.set_coach(_coach)
 		coach_chip.dismissed.connect(func() -> void: _coach.dismiss(); coach_chip.hide_chip())
-		tap_router.tile_painted.connect(func() -> void: _coach.notice_painted())
+		# Activity reaches the pacer from the SAME call site the coach already uses (Task 7) —
+		# one input path, not two, so a future edit that changes what "activity" means cannot
+		# update one and forget the other.
+		tap_router.tile_painted.connect(
+			func() -> void: _coach.notice_painted(); _news_report_presenter.notice_activity()
+		)
 		hud.mode_changed.connect(func(_m: GameHud.Mode) -> void: _coach.notice_activity())
 		hud.palette_changed.connect(func() -> void: _coach.notice_activity())
 		hud.help_pressed.connect(func() -> void: _coach.notice_guide_opened())
@@ -217,6 +225,10 @@ func world() -> WorldRoot:
 
 func camera() -> Camera3D:
 	return _camera
+
+
+func news_report_presenter() -> NewsReportPresenter:
+	return _news_report_presenter
 
 
 ## Tier 1 row 11's three counters, read fresh from `WorldRoot` and handed to `GameHud` exactly

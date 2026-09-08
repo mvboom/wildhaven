@@ -11,6 +11,19 @@ var _world: WorldRoot = null
 var _content_rng := RandomNumberGenerator.new()
 var _coach: OnboardingCoach = null
 
+## The adaptive cadence (spec.md §11 / `hint_pacer.gd`). Built alongside the scheduler in
+## `bind()` and handed straight to it — this file's own copy exists only so `_process()` has
+## something to `advance()` and `notice_activity()` has something to poke; the scheduler is
+## what actually reads it.
+var _pacer: HintPacer = null
+
+## The species named LAST report, fed back into `pick_species()`'s no-repeat filter. Its own
+## field, not `_hinted_species_ids` below — "hinted at some point this session" (that dict) and
+## "hinted immediately previously" (this) are different questions, and `_hinted_species_ids`
+## is documented session-only/unpersisted for a future Field Guide column that has nothing to
+## do with ranking.
+var _last_species_id: String = ""
+
 ## Species a News Report has named this session, newest last. SESSION-ONLY — nothing here is
 ## saved or restored (see Proposals): a reload starts this empty again, which is honest given
 ## nothing persists it yet, rather than pretending a save-crossing memory that does not exist.
@@ -34,6 +47,8 @@ func bind(world: WorldRoot, toast: NewsReportToast) -> void:
 		return
 	_world = world
 	_scheduler = NewsReportScheduler.new()
+	_pacer = HintPacer.new()
+	_scheduler.set_pacer(_pacer)
 	_scheduler.set_hints_enabled(GameplaySettings.hints_enabled())
 	if not world.is_new_world:
 		# Only a brand-new save gets the first-time nudge (gdd.md -> Player Interface &
@@ -69,6 +84,9 @@ func set_coach(coach: OnboardingCoach) -> void:
 func _process(delta: float) -> void:
 	if _scheduler == null or _toast == null:
 		return
+	if _pacer != null:
+		_pacer.advance(delta)
+		_scheduler.set_hosted_count(_world.species_hosted_count())
 	match _scheduler.advance(delta):
 		NewsReportScheduler.EVENT_NUDGE:
 			if _coach != null:
@@ -77,15 +95,34 @@ func _process(delta: float) -> void:
 			_fire_report()
 
 
-func _fire_report() -> void:
+## Any placement. Fed from `GameUI`'s existing paint route — the same call site that already
+## drives `OnboardingCoach.notice_painted()`, so activity has ONE input path, not two.
+func notice_activity() -> void:
+	if _pacer != null:
+		_pacer.notice_activity()
+
+
+func built_recently() -> bool:
+	return _pacer != null and _pacer.built_recently()
+
+
+## The next report's text, composed but not shown. Split out of `_fire_report()` so a
+## headless suite can read what would be rendered without driving a real toast through a
+## real frame.
+func compose_next_report() -> String:
 	if _world == null or _world.roster == null:
-		return
-	var candidates: Array[AnimalDefinition] = NewsReportContent.candidates_with_pools(_world.roster)
+		return ""
 	var species: AnimalDefinition = NewsReportContent.pick_species(
-		candidates, _world.grid, _content_rng
+		_world.roster.species(), _world.grid, _content_rng, _world, {}, _last_species_id
 	)
 	if species == null:
-		return
-	var line: String = NewsReportContent.pick_line(species, _content_rng)
-	if _toast.show_text(line):
-		_hinted_species_ids[species.id] = true
+		return ""
+	_last_species_id = species.id
+	_hinted_species_ids[species.id] = true
+	return NewsReportContent.hint_line(species, _world, _content_rng)
+
+
+func _fire_report() -> void:
+	var line: String = compose_next_report()
+	if not line.is_empty():
+		_toast.show_text(line)

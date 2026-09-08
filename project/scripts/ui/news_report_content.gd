@@ -80,6 +80,12 @@ static func tag_tile_counts(grid: WorldGrid) -> Dictionary:
 
 
 ## Every roster species carrying at least one usable News Report line.
+##
+## NO LONGER GATES SELECTION (Task 7). `hint_line()` composes its report live from
+## `HabitatRecipe` rather than drawing from `news_reports`, so `NewsReportPresenter` now passes
+## the WHOLE roster to `pick_species()` — which is what closes the gap that limited hinting to
+## the three species (Fox, Human, Rabbit) that happened to carry authored flavour pools. Left
+## here as a query in case something still wants "which species have flavour copy" specifically.
 static func candidates_with_pools(roster: SpeciesRoster) -> Array[AnimalDefinition]:
 	var out: Array[AnimalDefinition] = []
 	if roster == null:

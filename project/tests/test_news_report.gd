@@ -108,6 +108,8 @@ func _process(_delta: float) -> bool:
 	_check_settings_overlay_reads_and_writes_the_one_source_of_truth()
 	_check_toast_behaviour()
 	_check_wiring_on_the_real_scene()
+	_check_presenter_fires_a_composed_hint()
+	_check_activity_reaches_the_pacer()
 	_check_coach_wiring_is_idempotent()
 	_check_is_new_world()
 	_check_help_button_opens_field_guide()
@@ -766,7 +768,7 @@ func _check_toast_behaviour() -> void:
 func _check_wiring_on_the_real_scene() -> void:
 	check(_ui.news_report_toast is NewsReportToast, "GameUI carries a NewsReportToast")
 	check(_ui.menu_window is MenuWindow, "GameUI carries a MenuWindow")
-	check(_ui.news_report_presenter is NewsReportPresenter, "GameUI carries a NewsReportPresenter")
+	check(_ui.news_report_presenter() is NewsReportPresenter, "GameUI carries a NewsReportPresenter")
 
 	# Settings moved off MenuWindow entirely (2026-08-25) onto its own Title-screen-reachable
 	# page — there is no in-game SettingsOverlay instance left for the live presenter to listen
@@ -791,6 +793,31 @@ func _check_wiring_on_the_real_scene() -> void:
 	fresh_presenter.free()
 	fresh_world.free()
 	GameplaySettings.reset_for_test()
+
+
+## END TO END ON THE REAL SCENE. The presenter must compose a hint (not a flavour line),
+## keep the pacer fed with the live hosted count, and remember the last species so the
+## no-repeat rule has something to work with.
+func _check_presenter_fires_a_composed_hint() -> void:
+	var presenter: NewsReportPresenter = _ui.news_report_presenter()
+	if not check(presenter != null, "GameUI exposes its presenter"):
+		return
+	var line: String = presenter.compose_next_report()
+	check(not line.is_empty(), "the presenter composes a report")
+	check(line.contains("tiles of") or line.contains("a house") or line.contains("villager"),
+		"...and it is a build hint, not a bare flavour line: '%s'" % line)
+	check(not line.contains("_"), "...with no raw tag: '%s'" % line)
+
+
+## Activity reaches the pacer from the same call sites the coach already uses, so there is no
+## second input path to keep in sync.
+func _check_activity_reaches_the_pacer() -> void:
+	var presenter: NewsReportPresenter = _ui.news_report_presenter()
+	if not check(presenter != null, "GameUI exposes its presenter"):
+		return
+	presenter.notice_activity()
+	check(presenter.built_recently(),
+		"a placement marks the player as building for pacing purposes")
 
 
 ## TASK 7's RE-ENTRANCY GUARD. `GameUI._process()` calls `bind_world()` every frame until both
