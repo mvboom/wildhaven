@@ -31,15 +31,15 @@ func _process(_delta: float) -> bool:
 		return false
 
 	# --- never chosen: returns the category's first catalog entry ----------------------
-	# RE-POINTED 2026-09-08 — was "common_tree_1". The RULE here is unchanged ("never chosen"
-	# reads as `valid_ids[0]`); what changed is the catalog, which now leads with
-	# `WorldRoot.MIXED_STYLE_ID` for a multi-variant TERRAIN category. That re-pointing IS the
-	# forest-variety fix: while the first entry was a specific tree, `resolve_style_scene()`
-	# always returned it and every forest tile in the world rendered CommonTree1. See
-	# `test_forest_variant_variety.gd` for the defect this value now prevents.
+	# RE-POINTED TWICE, AND THE RULE NEVER MOVED: "never chosen" has always read as
+	# `valid_ids[0]`. It was "common_tree_1", then `mixed` when D-54 put that at the head of the
+	# catalog, and it is "common_tree_1" again now that D-58 retired `mixed` outright. The
+	# variety `mixed` used to provide is not gone — it moved to
+	# `WorldRoot._randomise_initial_styles()`, which stamps a concrete id per tile at world
+	# generation, so it is stored state rather than a re-rolled render decision.
 	var forest_default: String = _world.get_style_default("forest")
-	check_eq(forest_default, WorldRoot.MIXED_STYLE_ID,
-		"forest, never chosen, returns `mixed` — the catalog's first entry, and per-tile variety")
+	check_eq(forest_default, "common_tree_1",
+		"forest, never chosen, returns the catalog's first REAL entry — no mode, just a tree")
 
 	var farm_default: String = _world.get_style_default("farm_building")
 	check_eq(farm_default, "barn",
@@ -56,8 +56,8 @@ func _process(_delta: float) -> bool:
 
 	# --- set to a stale/unresolvable id: degrades to first entry, never crashes --------
 	_world.set_style_default("forest", "this_variant_does_not_exist")
-	check_eq(_world.get_style_default("forest"), WorldRoot.MIXED_STYLE_ID,
-		"an unresolvable stored id degrades to the first catalog entry (`mixed`), not a crash")
+	check_eq(_world.get_style_default("forest"), "common_tree_1",
+		"an unresolvable stored id degrades to the first catalog entry, not a crash")
 
 	_world.set_style_default("farm_building", "not_a_real_building")
 	check_eq(_world.get_style_default("farm_building"), "barn",
@@ -118,11 +118,20 @@ func _process(_delta: float) -> bool:
 	# `set_style_default()`, which only ever stores what it's handed) simulates exactly
 	# that: a loaded save whose JSON had `"forest": 7` or `"forest": null`.
 	_world.style_defaults["forest"] = 7
-	check_eq(_world.get_style_default("forest"), WorldRoot.MIXED_STYLE_ID,
+	check_eq(_world.get_style_default("forest"), "common_tree_1",
 		"a non-String stored value (int) degrades to the first catalog entry instead of raising an invalid-cast runtime error")
 	_world.style_defaults["forest"] = null
-	check_eq(_world.get_style_default("forest"), WorldRoot.MIXED_STYLE_ID,
+	check_eq(_world.get_style_default("forest"), "common_tree_1",
 		"a non-String stored value (null) is equally safe")
+
+	# D-58 REGRESSION GUARD: a save written while `mixed` existed stores it as a real choice.
+	# It is no longer in any catalog, so it must take the SAME stale-id road as any other
+	# retired id — silently, with no migration and no crash.
+	_world.style_defaults["forest"] = "mixed"
+	check_eq(_world.get_style_default("forest"), "common_tree_1",
+		"a save that stored the retired `mixed` id degrades to the first catalog entry")
+	check(not _world.style_ids_for_category("forest").has("mixed"),
+		"...and `mixed` is gone from the catalog entirely, not merely deprioritised")
 	_world.style_defaults["farm_building"] = false
 	check_eq(_world.get_style_default("farm_building"), "barn",
 		"a non-String stored value (bool) is equally safe for the farm_building flavor too")

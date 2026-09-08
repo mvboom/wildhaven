@@ -74,6 +74,29 @@ var depth: int = DEFAULT_DEPTH
 ## Flat row-major stores, indexed `x * depth + z`. Flat rather than nested arrays because
 ## the capacity evaluator's hot path is one pass over a rectangle of tiles.
 var _terrain_ids: PackedStringArray = PackedStringArray()
+
+## PER-TILE CAPTURED STYLE, one entry per tile in lockstep with `_terrain_ids` (2026-09-08,
+## human ruling: "when you switch the type of tree, ALL trees switch to that tree" — it must
+## not). A style id here is the one the tile was PAINTED with; `WorldRoot.paint_tile()` stamps
+## it from the style default current at that moment, and nothing rewrites it afterwards. Empty
+## means "no captured style", which resolves exactly as it always did — `pick_variant()`'s
+## per-tile hash (D-42).
+##
+## This is what replaced D-54's world-wide look setting (-> D-57), and after D-58 it is the ONLY
+## thing deciding a tile's look. Under D-54 a style default was read at RENDER time, so changing
+## it restyled ground already placed; it is read at PAINT time and stored now, so a style behaves
+## like a brush — you pick what to put down and what you put down stays.
+##
+## NOT part of the tag mask and deliberately outside "THE ONE RULE" below: a style is purely
+## cosmetic and emits nothing, so a write here never needs `_refresh_tag_mask()`.
+var _tile_styles: PackedStringArray = PackedStringArray()
+
+## PER-BUILDING CAPTURED STYLE, keyed by footprint ORIGIN rather than stored per tile — a
+## building already anchors everything else it owns at its origin (`_building_origins`), and a
+## footprint has one look, not one per covered tile. Same paint-time capture rule as
+## `_tile_styles`; cleared by `clear_building()` so a freed origin cannot hand its look to
+## whatever is built there next.
+var _building_styles: Dictionary = {}   # Vector2i origin -> String style id
 var _building_defs: Array = []          # PlaceableDefinition or null, per tile
 var _building_origins: Array[Vector2i] = []  # footprint anchor, or Vector2i(-1, -1)
 
@@ -188,6 +211,9 @@ func build(
 	var count: int = width * depth
 	_terrain_ids = PackedStringArray()
 	_terrain_ids.resize(count)
+	_tile_styles = PackedStringArray()
+	_tile_styles.resize(count)
+	_building_styles = {}
 	_building_defs = []
 	_building_defs.resize(count)
 	_building_origins = []
@@ -285,6 +311,7 @@ func grow(requested_width: int, requested_depth: int, world_seed: int) -> Array[
 	var old_width: int = width
 	var old_depth: int = depth
 	var old_terrain: PackedStringArray = _terrain_ids
+	var old_styles: PackedStringArray = _tile_styles
 	var old_buildings: Array = _building_defs
 	var old_origins: Array[Vector2i] = _building_origins
 	var old_masks: PackedInt64Array = _tile_tag_masks
@@ -294,6 +321,8 @@ func grow(requested_width: int, requested_depth: int, world_seed: int) -> Array[
 	var count: int = width * depth
 	_terrain_ids = PackedStringArray()
 	_terrain_ids.resize(count)
+	_tile_styles = PackedStringArray()
+	_tile_styles.resize(count)
 	_building_defs = []
 	_building_defs.resize(count)
 	_building_origins = []
@@ -308,6 +337,7 @@ func grow(requested_width: int, requested_depth: int, world_seed: int) -> Array[
 			if x < old_width and z < old_depth:
 				var old_i: int = x * old_depth + z
 				_terrain_ids[i] = old_terrain[old_i]
+				_tile_styles[i] = old_styles[old_i]
 				_building_defs[i] = old_buildings[old_i]
 				_building_origins[i] = old_origins[old_i]
 				# A carried-over tile's occupancy is unchanged, so its mask is too.
@@ -316,6 +346,7 @@ func grow(requested_width: int, requested_depth: int, world_seed: int) -> Array[
 				# The revealed terrain is always wild grass (`MistReveal`'s own header explains
 				# why), so it can never be Forest — no `_forest_tile_count` bookkeeping needed.
 				_terrain_ids[i] = MistReveal.reveal_terrain_id(world_seed, x, z)
+				_tile_styles[i] = ""
 				_building_defs[i] = null
 				_building_origins[i] = Vector2i(-1, -1)
 				_tile_tag_masks[i] = _tag_mask_for_tile(x, z)
@@ -461,7 +492,7 @@ func forest_tile_count() -> int:
 
 ## Sets a tile's terrain with no cost check. Returns false when nothing changed.
 ## `WorldRoot.paint_tile()` is the checked public entry point — call that, not this.
-func set_terrain(x: int, z: int, terrain_id: String) -> bool:
+func set_terrain(x: int, z: int, terrain_id: String, style_id: String = "") -> bool:
 	if not in_bounds(x, z):
 		return false
 	var def: TerrainDefinition = terrain_definition(terrain_id)
@@ -476,9 +507,53 @@ func set_terrain(x: int, z: int, terrain_id: String) -> bool:
 	if normalized == FOREST_TERRAIN_ID:
 		_forest_tile_count += 1
 	_terrain_ids[i] = normalized
+	# THE STYLE IS WRITTEN HERE, BEFORE THE SIGNAL, AND THAT ORDER IS THE WHOLE REASON THIS
+	# PARAMETER EXISTS. `tile_changed` below is emitted SYNCHRONOUSLY and is what makes
+	# `TerrainView` build the tile's visual, so a caller that set the style on the next line
+	# stamped it too late: the tile was already drawn, with an empty style, through
+	# `pick_variant()`. That shipped as "it still cycles through different tree styles randomly
+	# when I select and place trees" — the player picked a tree, placed a row, and got an
+	# assortment. Passing the style in is what makes the write and the draw atomic.
+	#
+	# It also subsumes the old "clear on repaint" rule: a caller that supplies no style clears
+	# it, which is correct, because a stored id belongs to the terrain that was here and must not
+	# survive onto a different one.
+	_tile_styles[i] = style_id
 	_refresh_tag_mask(x, z)
 	tile_changed.emit(x, z)
 	return true
+
+
+## The style id `(x, z)` was painted with, or "" when it carries none (every tile of a terrain
+## with no picker, every tile of a pre-D-57 save, and every mist-revealed tile). Read by
+## `TerrainChunkLod._resolve_variant()`, where "" means "fall through to `pick_variant()`".
+## After D-58 an empty FOREST tile means a pre-v7 save, not a design — a new map's tiles are
+## stamped with concrete ids by `WorldRoot._randomise_initial_styles()`.
+func get_tile_style(x: int, z: int) -> String:
+	if not in_bounds(x, z):
+		return ""
+	return _tile_styles[_index(x, z)]
+
+
+## Stamps `(x, z)`'s captured style. Called by `WorldRoot.paint_tile()` immediately after a
+## successful `set_terrain()`; nothing else should write this, because "captured at paint time"
+## is the whole contract (-> D-57).
+func set_tile_style(x: int, z: int, style_id: String) -> void:
+	if in_bounds(x, z):
+		_tile_styles[_index(x, z)] = style_id
+
+
+## The style the building anchored at `origin` was PLACED with, or "" for none.
+func get_building_style(origin: Vector2i) -> String:
+	return WorldSnapshot.text_or(_building_styles.get(origin, ""), "")
+
+
+## Stamps a placed building's captured style. Same paint-time-only contract as tile styles.
+func set_building_style(origin: Vector2i, style_id: String) -> void:
+	if style_id.is_empty():
+		_building_styles.erase(origin)
+	else:
+		_building_styles[origin] = style_id
 
 
 ## Marks every tile of a footprint as occupied by `def`, anchored at `origin`. No cost or
@@ -510,6 +585,7 @@ func clear_building(origin: Vector2i) -> bool:
 	var def: PlaceableDefinition = get_building(origin.x, origin.y)
 	if def == null:
 		return false
+	_building_styles.erase(origin)
 	for tile: Vector2i in footprint_tiles(origin, def):
 		if not tile_in_bounds(tile):
 			continue

@@ -56,8 +56,9 @@ func _process(_delta: float) -> bool:
 	_check_update_camera_bounds_rebuilds_per_call()
 	_check_forest_style_default_resolves_variant()
 	_check_rock_ignores_style_defaults()
-	_check_style_change_repaints_existing_tiles()
-	_check_far_tier_preserves_variant_variety()
+	_check_style_is_captured_at_paint_time()
+	_check_far_tier_honours_per_tile_style()
+	_check_a_painted_tile_draws_its_style_immediately()
 
 	finish()
 	return true
@@ -408,119 +409,103 @@ func _check_update_camera_bounds_rebuilds_per_call() -> void:
 	)
 
 
-## THE REPORTED BUG, HALF ONE (2026-09-08): picking a tree style repainted nothing.
+
+## STYLE IS CAPTURED AT PAINT TIME, NOT APPLIED RETROACTIVELY (2026-09-08, second human ruling
+## on this behaviour — "when you switch the type of tree, ALL trees switch to that tree").
 ##
-## `WorldRoot.set_style_default()` was a bare `style_defaults[category] = style_id` write, and
-## `GameHud._on_style_picker_style_selected()` followed it with hotbar-button work only. Nothing
-## called back into the view, so ALREADY-BUILT near-tier tiles kept the visual they were holding
-## — the new style only took effect for tiles rebuilt later, which in practice meant "when you
-## zoomed far enough out and back in". Reported as: change the style, zoom out, zoom back in,
-## and only THEN does every tree flip to the chosen one.
+## History, because this assertion has now been inverted once and the reason matters. D-54 made
+## the style default a WORLD-WIDE look setting resolved at render time. That was working as
+## designed, but it only became visible when the morning's fix made the repaint immediate
+## instead of deferred until a zoom rebuilt the chunks — and seeing it, the human rejected the
+## premise. A style now behaves like a BRUSH: it decides what the next paint puts down and has
+## no authority over ground already placed.
 ##
-## Asserted on the tiles' REAL instantiated children (`scene_file_path` on each container's
-## visual), not on `resolve_style_scene()` — the resolver was always correct; it was the repaint
-## that never happened, so a resolver-level assertion would have passed against the bug.
-func _check_style_change_repaints_existing_tiles() -> void:
+## Asserted on the tiles' REAL instantiated children, not on the resolver, for the same reason
+## the pre-inversion version was: the resolver was never the broken half.
+func _check_style_is_captured_at_paint_time() -> void:
 	var chunk_lod: TerrainChunkLod = _world.view._chunk_lod
-	# `mixed` FIRST, then paint: an earlier check in this file leaves "birch_tree" stored, and
-	# painting under that would build 64 identical tiles and hand this check a false green.
-	_world.set_style_default("forest", WorldRoot.MIXED_STYLE_ID)
+	_world.set_style_default("forest", "common_tree_1")
 	for x in range(80, 88):
 		for z in range(80, 88):
 			_world.paint_tile(x, z, "forest")
 	chunk_lod.set_chunk_tier(Vector2i(10, 10), true)
 
-	var mixed_paths: Dictionary = _visible_scene_paths(80, 88)
-	check(
-		mixed_paths.size() > 1,
-		"setup: painted under `mixed`, these forest tiles show several models (%d distinct)"
-			% mixed_paths.size()
-	)
+	var before: Dictionary = _visible_scene_paths(80, 88)
+	check_eq(before.size(), 1,
+		"setup: painted under one chosen style, these tiles all show that one model (%d distinct)"
+			% before.size())
 
-	# The fix under test: this write alone must repaint, with NO tier flip and no camera move.
+	# THE RULING: changing the style must leave standing ground completely alone.
 	_world.set_style_default("forest", "birch_tree")
-	var chosen_paths: Dictionary = _visible_scene_paths(80, 88)
-	check(
-		chosen_paths.size() == 1,
-		"choosing a style repaints every already-built forest tile immediately (%d distinct "
-			% chosen_paths.size() + "models still on screen)",
-		"THE REPORTED BUG: >1 means the old visuals are still standing and will only flip "
-		+ "once a zoom rebuilds them"
-	)
-	if chosen_paths.size() == 1:
-		check(
-			(chosen_paths.keys()[0] as String).contains("BirchTree"),
-			"...and the model they repainted to is the one the player picked"
-		)
+	var after: Dictionary = _visible_scene_paths(80, 88)
+	check_eq(after.size(), before.size(),
+		"changing the style leaves already-painted forest untouched (%d models before, %d after)"
+			% [before.size(), after.size()])
+	var same: bool = true
+	for path: String in before:
+		if not after.has(path):
+			same = false
+	check(same, "...and it is the SAME set of models, not a coincidentally equal count")
 
-	# `mixed` must repaint back the same way, or the picker is a one-way door in practice even
-	# though `get_style_default()` happily stores the id.
-	_world.set_style_default("forest", WorldRoot.MIXED_STYLE_ID)
-	check(
-		_visible_scene_paths(80, 88).size() > 1,
-		"choosing `mixed` back again repaints the variety in without a zoom"
-	)
-
-
-## THE REPORTED BUG, HALF TWO (2026-09-08): the far tier flattened every tile of a terrain onto
-## `model_scenes[0]`.
-##
-## `_mesh_pieces_for_terrain()` batched from `terrain.model_scenes[0]` unconditionally, so a
-## far-tier forest chunk drew CommonTree1 on all 64 tiles no matter what the near tier showed —
-## exactly the "when we flip all the trees to Common Tree 1" the human observed on zooming out,
-## and it made a CHOSEN style wrong at range too, not just `mixed`. The far tier now groups tiles
-## by the same `_resolve_variant()` answer the near tier uses, so the two cannot disagree.
-##
-## MEASURED ON `instance_count` AND MESH IDENTITY, NOT ON INSTANCE TRANSFORMS: the headless
-## rendering driver returns an identity transform from `MultiMesh.get_instance_transform()` (it
-## reads back as (0,0,0) for every instance, verified with a throwaway probe), so a
-## "which tiles are covered" assertion written that way passes or fails for reasons that have
-## nothing to do with this fix. `instance_count` and `multimesh.mesh` both read back correctly.
-func _check_far_tier_preserves_variant_variety() -> void:
-	var chunk_lod: TerrainChunkLod = _world.view._chunk_lod
-	_world.set_style_default("forest", WorldRoot.MIXED_STYLE_ID)
+	# A tier flip is the specific thing that used to smuggle the change in, so prove it does not
+	# now: the old resolution read the world's CURRENT default on every rebuild.
 	chunk_lod.set_chunk_tier(Vector2i(10, 10), false)
+	chunk_lod.set_chunk_tier(Vector2i(10, 10), true)
+	var after_flip: Dictionary = _visible_scene_paths(80, 88)
+	check_eq(after_flip.size(), before.size(),
+		"a far/near round trip still shows the styles those tiles were PAINTED with (%d)"
+			% after_flip.size())
 
-	var mixed_meshes: Dictionary = {}
-	var mixed_total: int = 0
-	var mixed_max: int = 0
-	for mmi: MultiMeshInstance3D in _far_batches("Far_forest_10_10_"):
-		mixed_meshes[mmi.multimesh.mesh] = true
-		mixed_total += mmi.multimesh.instance_count
-		mixed_max = maxi(mixed_max, mmi.multimesh.instance_count)
-	check(mixed_total > 0, "setup: chunk (10,10) built far-tier batches under `mixed`")
-	check(
-		mixed_max < 64,
-		"under `mixed`, no single far-tier batch holds all 64 of the chunk's tiles "
-			+ "(largest holds %d)" % mixed_max,
-		"THE REPORTED BUG: a batch of 64 means every tile collapsed onto one variant "
-		+ "the moment the chunk went far-tier"
-	)
+	# ...and the new style does govern the next paint.
+	check(_world.paint_tile(70, 70, "forest"), "setup: a fresh tile paints to forest")
+	chunk_lod.set_chunk_tier(TerrainChunkLod.chunk_of(70, 70), true)
+	var fresh: Dictionary = _visible_scene_paths(70, 71)
+	if check(fresh.size() == 1, "a tile painted AFTER the change carries exactly one model"):
+		check((fresh.keys()[0] as String).contains("BirchTree"),
+			"...and it is the style that was current when that tile was painted")
+	_world.set_style_default("forest", "common_tree_1")
 
-	# The same chunk under a CHOSEN style is the control: one variant, so every batch is the
-	# full 64 and the distinct-mesh count collapses to that one scene's own pieces. Comparing
-	# the two states is what makes the `mixed` numbers above mean something — a bare
-	# "more than one mesh" check would pass on the broken code too, since CommonTree1 alone
-	# contributes several mesh pieces (trunk/canopy, slab, blotch patches).
+
+## The far tier resolves each tile's OWN captured style, so a chunk holding tiles painted under
+## different styles keeps showing all of them at range. This is the same near/far agreement the
+## morning's fix established — `_resolve_variant()` is still the single call both tiers make —
+## re-asserted against per-tile state rather than against the world default.
+func _check_far_tier_honours_per_tile_style() -> void:
+	var chunk_lod: TerrainChunkLod = _world.view._chunk_lod
+	# A single chunk deliberately painted in two passes under two different styles.
 	_world.set_style_default("forest", "birch_tree")
-	var chosen_meshes: Dictionary = {}
-	var chosen_batches: int = 0
-	for mmi: MultiMeshInstance3D in _far_batches("Far_forest_10_10_"):
-		chosen_meshes[mmi.multimesh.mesh] = true
-		chosen_batches += 1
-		check_eq(
-			mmi.multimesh.instance_count, 64,
-			"with one style chosen, each far-tier batch covers all 64 tiles of the chunk"
-		)
-	check(chosen_batches > 0, "setup: chunk (10,10) rebuilt its far-tier batches after the style change")
-	check(
-		mixed_meshes.size() > chosen_meshes.size(),
-		"`mixed` batches strictly more distinct meshes at range than a single chosen style "
-			+ "does (%d vs %d) — the variety survives the near/far flip"
-				% [mixed_meshes.size(), chosen_meshes.size()],
-		"equal counts mean the far tier is drawing the same one variant in both states"
-	)
-	_world.set_style_default("forest", WorldRoot.MIXED_STYLE_ID)
+	for x in range(64, 68):
+		for z in range(64, 72):
+			_world.paint_tile(x, z, "grass")
+			_world.paint_tile(x, z, "forest")
+	_world.set_style_default("forest", "common_tree_1")
+	for x in range(68, 72):
+		for z in range(64, 72):
+			_world.paint_tile(x, z, "grass")
+			_world.paint_tile(x, z, "forest")
+
+	var chunk: Vector2i = TerrainChunkLod.chunk_of(64, 64)
+	chunk_lod.set_chunk_tier(chunk, false)
+	var meshes: Dictionary = {}
+	var total: int = 0
+	for mmi: MultiMeshInstance3D in _far_batches("Far_forest_%d_%d_" % [chunk.x, chunk.y]):
+		meshes[mmi.multimesh.mesh] = true
+		total += mmi.multimesh.instance_count
+	check(total > 0, "setup: the chunk built far-tier forest batches")
+	check(meshes.size() > 1,
+		"a far-tier chunk painted under two styles batches both of them (%d distinct meshes)"
+			% meshes.size(),
+		"1 mesh means the far tier collapsed the chunk onto a single style again")
+
+	# And the world's CURRENT default has no say over any of it.
+	_world.set_style_default("forest", "bush")
+	var after: Dictionary = {}
+	for mmi: MultiMeshInstance3D in _far_batches("Far_forest_%d_%d_" % [chunk.x, chunk.y]):
+		after[mmi.multimesh.mesh] = true
+	check_eq(after.size(), meshes.size(),
+		"changing the default does not restyle far-tier ground either (%d vs %d)"
+			% [after.size(), meshes.size()])
+	_world.set_style_default("forest", "common_tree_1")
 
 
 ## Every far-tier `MultiMeshInstance3D` whose node name starts with `prefix`. Scoped by name so
@@ -556,3 +541,52 @@ func _visible_scene_paths(from: int, to: int) -> Dictionary:
 					continue
 				paths[visual.scene_file_path] = true
 	return paths
+
+
+## A PAINTED TILE MUST DRAW ITS CAPTURED STYLE ON THE PAINT ITSELF — no rebuild, no tier flip,
+## no second event. This is the assertion the rest of this suite was missing, and its absence
+## hid a real bug through two passes.
+##
+## THE BUG IT CATCHES: `WorldGrid.set_terrain()` emits `tile_changed` SYNCHRONOUSLY, and that
+## signal is what makes `TerrainView` build the tile's visual. `WorldRoot.paint_tile()` stamped
+## the captured style on the line AFTER that call, so every tile was drawn while its style was
+## still empty and fell through to `pick_variant()` — the player picked a tree, placed a row of
+## them, and got an assortment. Reported as "it still cycles through different tree styles
+## randomly when I select and place trees."
+##
+## WHY THE EXISTING CHECKS PASSED ANYWAY, which is the more useful lesson: every one of them
+## called `set_chunk_tier(..., true)` after painting, which rebuilds the chunk and re-resolves
+## each tile against the (correct) stored value. They were measuring the repair, not the paint.
+## This check paints into a chunk that is ALREADY near-tier and asserts nothing further happens.
+##
+## The identical ordering bug on the building side was caught by
+## `test_building_footprint_alignment.gd` and fixed there; terrain went unchecked because no
+## test looked at a tile at the moment it was painted.
+func _check_a_painted_tile_draws_its_style_immediately() -> void:
+	var chunk_lod: TerrainChunkLod = _world.view._chunk_lod
+	var chunk: Vector2i = TerrainChunkLod.chunk_of(56, 56)
+	# Establish the chunk as near-tier FIRST, so the paint below is the only thing that happens.
+	_world.paint_tile(56, 56, "grass")
+	chunk_lod.set_chunk_tier(chunk, true)
+
+	_world.set_style_default("forest", "birch_tree")
+	if not check(_world.paint_tile(56, 56, "forest"), "setup: the tile paints to forest"):
+		return
+	# NO set_chunk_tier(), NO refresh_tile(), NO camera move between the paint and this read.
+	var drawn: Dictionary = _visible_scene_paths(56, 57)
+	if check(drawn.size() == 1, "the painted tile drew exactly one model (%d)" % drawn.size()):
+		check((drawn.keys()[0] as String).contains("BirchTree"),
+			"...and it is the chosen style, drawn on the paint itself rather than after a rebuild",
+			"a different model means the tile was drawn before its style was stamped")
+
+	# A second tile under a DIFFERENT choice, to prove the first was not a coincidence of
+	# `pick_variant()` happening to land on birch for that coordinate.
+	_world.paint_tile(58, 58, "grass")
+	_world.set_style_default("forest", "common_tree_2")
+	if not check(_world.paint_tile(58, 58, "forest"), "setup: a second tile paints to forest"):
+		return
+	var second: Dictionary = _visible_scene_paths(58, 59)
+	if check(second.size() == 1, "the second painted tile drew exactly one model"):
+		check((second.keys()[0] as String).contains("CommonTree2"),
+			"...and it is that tile's own chosen style")
+	_world.set_style_default("forest", "common_tree_1")

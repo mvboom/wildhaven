@@ -180,6 +180,8 @@ func _process(_delta: float) -> bool:
 	_check_a_world_with_no_residents_arms_no_gesture_on_load()
 	_check_style_defaults_survive_a_reload()
 	_check_an_old_save_with_no_style_defaults_falls_back_cleanly()
+	_check_captured_tile_styles_survive_a_reload()
+	_check_the_migration_chain_stamps_the_current_version()
 	_report_the_measurements()
 
 	_teardown()
@@ -1472,8 +1474,8 @@ func _check_an_old_save_with_no_style_defaults_falls_back_cleanly() -> void:
 	# reading a different answer because the catalog now leads with `mixed` for a multi-variant
 	# terrain category. A pre-fix save that stored no forest choice therefore loads as *mixed*,
 	# which is the variety it visually had no way to express before.
-	check_eq(world.get_style_default("forest"), WorldRoot.MIXED_STYLE_ID,
-		"...falling back to the forest category's first catalog entry, now `mixed`")
+	check_eq(world.get_style_default("forest"), "common_tree_1",
+		"...falling back to the forest category's first catalog entry (D-58 retired `mixed`)")
 	check_eq(world.get_style_default("wild_grass"), "wild_grass",
 		"...and the wild_grass category's first catalog entry")
 	# RE-POINTED 2026-09-07 (house cull) — was "house". This is the same fallback, reading a
@@ -1547,3 +1549,63 @@ func _clean_the_scratch_directory() -> void:
 		return
 	for filename: String in dir.get_files():
 		dir.remove(filename)
+
+
+# --- v7: captured per-tile / per-building styles survive a reload ----------------------------
+#
+# D-57 moved style from a world-wide setting read at render time to state CAPTURED AT PAINT TIME
+# and stored per tile. That makes it save state for the first time, so it has to round-trip: a
+# world reloaded must show the styles its ground was painted with, not whatever the picker
+# happens to be set to afterwards.
+func _check_captured_tile_styles_survive_a_reload() -> void:
+	var packed: PackedScene = load(WORLD_PATH) as PackedScene
+	GameSession.clear()
+	var source: WorldRoot = packed.instantiate() as WorldRoot
+	root.add_child(source)
+	_take_off_process(source)
+	# Two tiles painted under two DIFFERENT styles, so the assertion cannot pass by everything
+	# happening to share one value.
+	source.set_style_default("forest", "birch_tree")
+	check(source.paint_tile(4, 4, "forest"), "setup: a tile paints under `birch_tree`")
+	source.set_style_default("forest", "common_tree_1")
+	check(source.paint_tile(6, 6, "forest"), "setup: a second tile paints under `common_tree_1`")
+	# ...and the picker left somewhere else entirely, so a reload that read the DEFAULT instead
+	# of the captured value would come back wrong rather than coincidentally right.
+	source.set_style_default("forest", "bush")
+
+	check_eq(source.grid.get_tile_style(4, 4), "birch_tree",
+		"the tile captured the style current when it was PAINTED, not the one set afterwards")
+	check_eq(source.grid.get_tile_style(6, 6), "common_tree_1", "...and so did the second tile")
+
+	var reloaded: WorldRoot = _reload_through_the_real_load_path(source, "Captured styles")
+	if not check(reloaded != null, "the world reloads"):
+		return
+	check_eq(reloaded.grid.get_tile_style(4, 4), "birch_tree",
+		"a captured tile style survives the round trip")
+	check_eq(reloaded.grid.get_tile_style(6, 6), "common_tree_1",
+		"...independently of its neighbour — the array is not collapsed to one value")
+	# THE TRANSPOSE GUARD. The grid stores tiles x-major internally while the save is written
+	# z-major; capturing through a grid-order helper would reload a mirrored world, and with two
+	# tiles on the diagonal that mistake is invisible. (4,4) and (6,6) are both on the diagonal,
+	# so this third tile is deliberately OFF it.
+	check_eq(reloaded.grid.get_tile_style(9, 3), source.grid.get_tile_style(9, 3),
+		"an off-diagonal tile keeps its own style — proves the save is not transposed")
+
+
+## Every migration step stamps `save_version` and they run in ASCENDING order, each overwriting
+## the last — so a step added out of order silently DOWNGRADES the stamp of every older file
+## that passes through it. That is a real bug this suite caught during the v7 work (the v7 step
+## was first written above `if version < 4`, so a v2 file came out stamped 4). Asserted from the
+## oldest version forward rather than at v6 only, because the failure needs a file old enough to
+## fall through every step to show up at all.
+func _check_the_migration_chain_stamps_the_current_version() -> void:
+	for from_version in [1, 2, 3, 4, 5, 6]:
+		var old: Dictionary = _captured.duplicate(true)
+		old["save_version"] = from_version
+		var migrated: Variant = WorldSnapshot.migrate(old)
+		if not check(typeof(migrated) == TYPE_DICTIONARY,
+				"a v%d file migrates to a dictionary" % from_version):
+			continue
+		check_eq(int((migrated as Dictionary).get("save_version", -1)), WorldSnapshot.SAVE_VERSION,
+			"a v%d file comes out stamped at the CURRENT version, not an intermediate one"
+				% from_version)

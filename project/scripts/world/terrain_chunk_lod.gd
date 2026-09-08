@@ -233,14 +233,27 @@ func _refresh_near_tile(tile: Vector2i) -> void:
 	container.add_child(visual)
 
 
-## Picker categories (forest, wild_grass) always resolve through the player's chosen style
-## default (`WorldRoot.resolve_style_scene()`); every other terrain (rock, water,
-## cultivated_field) keeps using `pick_variant()`'s stable per-tile hash, completely
-## unaffected by this feature — that split, not an oversight, is this task's whole scope.
+## The scene a tile draws: the style it was PAINTED with (`WorldGrid._tile_styles`, -> D-57),
+## falling through to `TerrainDefinition.pick_variant()`'s stable per-tile hash whenever it has
+## none. Both tiers call this and only this, so near and far can never disagree.
+##
+## CHANGED 2026-09-08. This used to route the picker categories through
+## `WorldRoot.resolve_style_scene()` — the category's CURRENT default — which is what made a
+## picker change restyle ground already placed. Reading captured state instead is the whole of
+## the fix; the near/far agreement built earlier the same day is untouched by it.
+##
+## AN EMPTY CAPTURED STYLE FALLS THROUGH TO `pick_variant()`, and after D-58 that path means
+## exactly two things: a terrain with no style catalog (rock, water, cultivated field), and a
+## tile from a pre-v7 save that predates captured styles. It is NOT how a new map gets its
+## variety any more — `WorldRoot._randomise_initial_styles()` stamps concrete ids for that — so
+## a forest tile arriving here empty is a legacy save, not a design.
 func _resolve_variant(terrain: TerrainDefinition, x: int, z: int) -> PackedScene:
-	if _world == null or (terrain.id != "forest" and terrain.id != "wild_grass"):
+	if _world == null or _grid == null:
 		return terrain.pick_variant(x, z)
-	var resolved: PackedScene = _world.resolve_style_scene(terrain.id)
+	var captured: String = _grid.get_tile_style(x, z)
+	if captured.is_empty():
+		return terrain.pick_variant(x, z)
+	var resolved: PackedScene = _world.resolve_style_scene_id(terrain.id, captured)
 	return resolved if resolved != null else terrain.pick_variant(x, z)
 
 
@@ -342,36 +355,6 @@ func _rebuild_chunk_far(chunk: Vector2i) -> void:
 				add_child(mmi)
 				built.append(mmi)
 	_far_multimeshes[chunk] = built
-
-
-## Re-resolves every tile of `terrain_id` against the world's CURRENT style default and
-## repaints it in place — the call that makes choosing a style take effect immediately.
-##
-## WHY THIS EXISTS: `WorldRoot.set_style_default()` used to be a bare dictionary write. The
-## resolvers were always correct, but nothing told the view to redraw, so tiles already built
-## kept the visual they were holding until something else happened to rebuild them. Zooming
-## out and back in was that something — which is why the human saw the trees flip only after
-## a zoom round-trip, and read it as the zoom causing the change rather than finally applying
-## it.
-##
-## Touches only the tiles that actually carry `terrain_id`; a chunk with none of it is left
-## completely alone, near or far. Near-tier tiles go through `_refresh_near_tile()`, which
-## REUSES the tile container and swaps only its child, so this cannot trip the node-rename
-## race `set_chunk_tier()`'s own SAFETY note describes.
-func restyle_terrain(terrain_id: String) -> void:
-	if _grid == null:
-		return
-	for chunk: Vector2i in _chunk_tiles.keys():
-		var near: bool = _chunk_tiers.get(chunk, true)
-		var affected: bool = false
-		for tile: Vector2i in _chunk_tiles[chunk]:
-			if _grid.get_terrain_id(tile.x, tile.y) != terrain_id:
-				continue
-			affected = true
-			if near:
-				_refresh_near_tile(tile)
-		if affected and not near:
-			_rebuild_chunk_far(chunk)
 
 
 ## Stable cache/grouping key for a variant scene. `resource_path` for anything loaded from

@@ -144,11 +144,6 @@ var style_defaults: Dictionary = {}
 ## header for why). Human ruling: grass, wild_grass, meadow and scrub collapse behind ONE
 ## hotbar button; snowfield stays its own top-level button and is deliberately NOT a
 ## member. `style_ids_for_category()` below is what actually resolves this.
-## THE "no single look — mix them" STYLE. Not a scene: a real, storable, player-selectable
-## style id that deliberately resolves to NOTHING, so `resolve_style_scene()` returns null and
-## the caller falls through to its own `pick_variant()` per-tile hash.
-const MIXED_STYLE_ID: String = "mixed"
-
 const TERRAIN_GROUP_ID: String = "grass_family"
 const TERRAIN_GROUP_MEMBERS: PackedStringArray = ["grass", "wild_grass", "meadow", "scrub"]
 
@@ -289,6 +284,12 @@ func _ready() -> void:
 
 	navigation = WorldNavigation.new()
 	navigation.rebuild_from_grid(grid)
+
+	# EVERY FOREST TILE ON A NEW MAP GETS ITS OWN RANDOMLY-CHOSEN, CONCRETE STYLE (-> D-58).
+	# Must run after `grid.build()` (the tiles have to exist) and before `view.attach()` (which
+	# draws them), which is why it sits here rather than with the other setup below.
+	if is_new_world:
+		_randomise_initial_styles()
 
 	view = TerrainView.new()
 	view.name = "TerrainView"
@@ -495,7 +496,13 @@ func paint_tile(x: int, z: int, terrain_id: String) -> bool:
 		return false
 	if not wood.spend(def.cost):
 		return false
-	if not grid.set_terrain(x, z, def.id):
+	# CAPTURE THE STYLE AT PAINT TIME (-> D-57), PASSED INTO `set_terrain()` RATHER THAN WRITTEN
+	# AFTER IT. That call emits `tile_changed` synchronously, which is what draws the tile, so a
+	# style stamped on the following line arrives after the draw and the tile renders through
+	# `pick_variant()` instead — the bug behind "it still cycles through different tree styles
+	# randomly when I select and place trees". Same ordering trap `place_building()` hit.
+	# For a terrain with no picker `get_style_default()` returns "" and the tile captures none.
+	if not grid.set_terrain(x, z, def.id, get_style_default(def.id)):
 		return false
 	var tile := Vector2i(x, z)
 	if removals != null:
@@ -533,7 +540,20 @@ func place_building(x: int, z: int, placeable_id: String) -> bool:
 	var origin := Vector2i(x, z)
 	_convert_wild_grass_footprint(origin, placeable_id)
 	var cost: int = buildings.cost_of(placeable_id)
+	# CAPTURE THE STYLE **BEFORE** THE PLACEMENT, NOT AFTER (-> D-57). `buildings.place()` calls
+	# `WorldGrid.set_building()`, which emits `tile_changed` synchronously, which is what makes
+	# `TerrainView` build the visual — so a style written afterwards arrives too late and the
+	# building renders with none, falling back to `model_scenes[0]`.
+	# `test_building_footprint_alignment.gd` caught exactly that.
+	#
+	# The previous value is restored on failure so a refused placement cannot leave a stray
+	# style at this origin — which would otherwise be inherited by whatever is built here next,
+	# or, worse, overwrite the style of the building already standing here that caused the
+	# refusal in the first place.
+	var previous_style: String = grid.get_building_style(origin)
+	grid.set_building_style(origin, get_style_default(placeable_id))
 	if not buildings.place(x, z, placeable_id):
+		grid.set_building_style(origin, previous_style)
 		return false
 	if removals != null:
 		removals.record_placement(origin, placeable_id, cost)
@@ -753,28 +773,57 @@ func get_style_default(category: String) -> String:
 	return valid_ids[0] if not valid_ids.is_empty() else ""
 
 
-## Stores `category`'s chosen style AND repaints what is already on screen.
+## Stamps a randomly-chosen, CONCRETE style onto every tile of every multi-variant picker
+## terrain — today that is Forest alone. New worlds only (-> D-58, human ruling: "when creating
+## a new world, randomize the style of trees that is chosen when creating the default map").
 ##
-## THE REPAINT IS THE 2026-09-08 BUG FIX. This was a bare dictionary write. Every resolver
-## downstream (`get_style_default()`, `resolve_style_scene()`) was correct, and
-## `TerrainChunkLod`/`TerrainView` both re-resolve at build time — but nothing told them to
-## rebuild, so tiles and buildings already standing kept the look they were holding. The
-## change then landed only when something else happened to rebuild them, which in practice was
-## a near/far LOD flip: the human reported picking a tree style, seeing nothing change, then
-## zooming out and back in and finding every tree switched. The zoom was not causing that; it
-## was the only thing applying it.
+## WHY THIS EXISTS AT ALL. Retiring `mixed` removed the mode that used to make a generated map
+## look varied, and without a replacement every forest tile would resolve to the same first
+## tree — the exact "every tree in the world is identical" complaint D-54 was originally written
+## to fix. The difference from `mixed` is that this writes STATE: each tile ends up holding a
+## real style id it will keep forever, rather than a marker meaning "re-roll me at render time".
+## That is what makes a painted tree stay put, and it is why the variety now survives a save.
 ##
-## Guarded on an actual change, because `GameHud._on_style_picker_style_selected()` fires on a
-## re-pick of the style that is already current (see `_rebuild_rows()`'s own header) and that
-## should cost nothing. `WorldSnapshot.text_or()` for the read, not a bare cast, for the same
-## reason `get_style_default()` uses it — this dictionary round-trips through hand-editable
-## save JSON and a corrupted entry must not raise here.
-func set_style_default(category: String, style_id: String) -> void:
-	if WorldSnapshot.text_or(style_defaults.get(category, ""), "") == style_id:
+## DETERMINISTIC FROM `world_seed`, so the same seed still regenerates the same world — the
+## guarantee `MistReveal` and `TerrainDefinition.pick_variant()` both already keep. Deliberately
+## NOT `pick_variant()`'s own hash: that is a rendering fallback and this is authored state, and
+## tying them would mean a future tweak to one silently rewrote every existing map's stored ids.
+##
+## Skips any category with fewer than two styles (nothing to randomise) and any tile whose
+## terrain has no style catalog at all, which leaves those tiles at "" exactly as before.
+func _randomise_initial_styles() -> void:
+	if grid == null:
 		return
+	var catalogs: Dictionary = {}   # terrain id -> PackedStringArray of style ids
+	for x in grid.width:
+		for z in grid.depth:
+			var terrain_id: String = grid.get_terrain_id(x, z)
+			if terrain_id.is_empty():
+				continue
+			if not catalogs.has(terrain_id):
+				catalogs[terrain_id] = style_ids_for_category(terrain_id)
+			var ids: PackedStringArray = catalogs[terrain_id]
+			if ids.size() < 2:
+				continue
+			var key: String = "%d_%d_%s_%d" % [x, z, terrain_id, world_seed]
+			grid.set_tile_style(x, z, ids[absi(hash(key)) % ids.size()])
+
+
+## Stores `category`'s chosen style. A PLAIN WRITE, and that is the whole point.
+##
+## THIS FUNCTION HAS BEEN BOTH THINGS, so the history matters. Under D-54 a style default was a
+## world-wide look setting read at RENDER time; it never repainted, which read as "the picker
+## does nothing" until a zoom rebuilt the chunks, and on 2026-09-08 this function was given a
+## `view.restyle_category()` call to make that immediate. Seeing the result, the human rejected
+## the premise rather than the timing: "when you switch the type of tree, ALL trees switch to
+## that tree." So the repaint call was removed again and the style moved to PAINT-TIME CAPTURE
+## (`WorldGrid._tile_styles` / `_building_styles`, -> D-57).
+##
+## DO NOT RE-ADD A REPAINT HERE. The original bug it was written for cannot come back: that bug
+## was "the world does not match the setting", and the setting no longer governs ground already
+## placed. A repaint would silently reinstate exactly the behaviour D-57 forbids.
+func set_style_default(category: String, style_id: String) -> void:
 	style_defaults[category] = style_id
-	if view != null:
-		view.restyle_category(category)
 
 
 ## Every valid style id for `category`, in the order a fresh save's "first entry" default
@@ -808,42 +857,14 @@ func style_ids_for_category(category: String) -> PackedStringArray:
 				out.append(id)
 		return out
 	var scenes: Array[PackedScene] = _model_scenes_for_category(category)
-	# `mixed` LEADS THE CATALOG, and leading it is the whole fix (2026-09-08). `get_style_default()`
-	# degrades an unchosen category to `valid_ids[0]`, so before this the first TREE was the
-	# unchosen default, `resolve_style_scene()` always returned it, and `TerrainChunkLod.
-	# _resolve_variant()`'s `pick_variant()` fallback was unreachable — every forest tile in the
-	# world rendered CommonTree1 while `forest.tres` shipped eight variants. Putting `mixed`
-	# first makes "the player has not chosen" mean *variety* instead of *the first entry*, with
-	# no change to `get_style_default()`'s own rule.
-	#
-	if _supports_mixed(category, scenes.size()):
-		out.append(MIXED_STYLE_ID)
+	# ONE ID PER SCENE, AND NOTHING ELSE. `mixed` used to lead this list (D-54); it was retired
+	# at D-58 because it made a style a MODE rather than a choice — the player picked a tree and
+	# the world kept showing an assortment. An unchosen category now falls back to the first real
+	# tree via `get_style_default()`'s existing rule, and the variety a new map wants is stamped
+	# per tile at world generation instead (`_randomise_initial_styles()`).
 	for scene: PackedScene in scenes:
 		out.append(_style_id_from_scene_path(scene))
 	return out
-
-
-## Whether `category` may offer the `mixed` style — TWO conditions, both necessary.
-##
-## 1. **MORE THAN ONE SCENE.** A single-variant category (wild_grass, today) would get a second
-##    name for the one look it already has, and a changed unchosen default for no gain.
-##
-## 2. **TERRAIN, NOT A BUILDING.** `mixed` is only meaningful where the caller has a per-item
-##    fallback to fall through to, and only terrain does: `TerrainChunkLod._resolve_variant()`
-##    calls `TerrainDefinition.pick_variant(x, z)` on a null. `PlaceableDefinition` deliberately
-##    has NO `pick_variant()` (see its `model_scenes` comment — every placed instance of a
-##    buildable wears the same look), so `TerrainView` falls back to `model_scenes[0]`. Offering
-##    `mixed` on "house" would therefore mean "always the first house", which is a duplicate of
-##    an existing row AND silently moves that category's unchosen default onto it.
-##
-## Asked of the terrain roster rather than matched against a literal list, so a future terrain
-## picker category is covered without editing this function. "house" and "farm_building" resolve
-## to no TerrainDefinition and are correctly excluded; `TERRAIN_GROUP_ID` never reaches here
-## (`style_ids_for_category()` returns before this point).
-func _supports_mixed(category: String, scene_count: int) -> bool:
-	if scene_count <= 1 or grid == null:
-		return false
-	return grid.terrain_definition(category) != null
 
 
 ## The raw `model_scenes` array behind `category` — "house" reads the House
@@ -881,15 +902,20 @@ func _model_scenes_for_category(category: String) -> Array[PackedScene]:
 ## `model_scenes[0]` for a building) exactly as they did before this feature existed, so a
 ## null here degrades to that pre-existing behaviour rather than to a missing visual.
 func resolve_style_scene(category: String) -> PackedScene:
+	return resolve_style_scene_id(category, get_style_default(category))
+
+
+## `resolve_style_scene()` for an EXPLICIT style id rather than the category's current default —
+## the entry point paint-time capture needs (-> D-57), since a tile or building renders the style
+## it was placed with and the current default is irrelevant to it.
+##
+## Split out rather than duplicated: the id-to-scene matching rule (derive each `model_scenes`
+## entry's id from its own resource path and compare) lives here once, so the two callers cannot
+## drift. `resolve_style_scene()` is now a one-line wrapper and keeps working for the one
+## remaining caller that legitimately wants "whatever is currently selected".
+func resolve_style_scene_id(category: String, style_id: String) -> PackedScene:
 	var scenes: Array[PackedScene] = _model_scenes_for_category(category)
 	if scenes.is_empty():
-		return null
-	var style_id: String = get_style_default(category)
-	# `mixed` RESOLVES TO NOTHING ON PURPOSE — it is the one style id that is not a scene. The
-	# null sends the caller to its own per-tile fallback (`pick_variant()` for terrain), which is
-	# exactly the variety the style id names. This is the only `return null` here that is a
-	# designed outcome rather than a defensive one.
-	if style_id == MIXED_STYLE_ID:
 		return null
 	for scene: PackedScene in scenes:
 		if _style_id_from_scene_path(scene) == style_id:

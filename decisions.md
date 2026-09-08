@@ -1506,6 +1506,16 @@ close in their own words.
 
 ### D-54 · "Mixed" is a real style, and it is what an unchosen terrain style means
 
+> **FULLY SUPERSEDED — D-57 then D-58 (both 2026-09-08).** Nothing in this entry is current.
+> D-57 took its retroactive premise: a style is captured at PAINT time and stored per tile, so it
+> governs only new ground. D-58 then retired `mixed` itself, the subject of this entry — a style
+> catalog is now one id per real scene, and a new map's variety is stamped as concrete per-tile
+> state at world generation instead of re-rolled at render time. **Kept for the reasoning, not
+> the conclusion:** the bug it describes (every forest tile rendering CommonTree1, because
+> "unchosen" collapsed onto "chose the first one") is real, still worth understanding, and is
+> what `_randomise_initial_styles()` now prevents by a different route.
+
+
 **Decision:** `WorldRoot.MIXED_STYLE_ID` (`"mixed"`) leads the style catalog for any picker
 category that is a terrain with more than one `model_scenes` entry — today, exactly `forest`.
 It is a style id that resolves to **no scene**: `resolve_style_scene()` returns null for it by
@@ -1667,3 +1677,120 @@ variant to do it is not.
 grass-family terrains. The terrain is transitional by design — one free Terraform tap converts
 it to true grass — so the repetition is on land the player is being invited to change, and the
 tag-inert "unclaimed" read matters more than the variety.
+
+---
+
+### D-57 · A style is captured at paint time, not applied to the whole world
+
+**Decision:** A style choice is a **brush setting**, not a world setting. `WorldRoot.paint_tile()`
+and `place_building()` stamp the style default current at that moment onto the tile
+(`WorldGrid._tile_styles`) or the footprint origin (`WorldGrid._building_styles`), and rendering
+reads that captured value. Changing a style default afterwards has **no effect on ground already
+placed** — it governs only what the next paint puts down. This covers buildings as well as
+terrain (human: "houses need fixing too").
+
+**This overturns D-54's premise, and D-54 should be read with that in mind.** D-54 made the
+style default a world-wide look setting resolved at *render* time. Everything it says about
+`mixed` remains true and in force — `mixed` is still a real, storable, selectable style id that
+resolves to no scene so `pick_variant()` runs, it still leads the catalog, and it is still what
+an unchosen terrain means. What does *not* survive is the retroactive half: "the choice applies
+to every tile of that terrain, everywhere."
+
+**How the premise came to be tested.** D-54's behaviour was invisible in practice, because
+nothing repainted when the default changed — the world only caught up when a near/far LOD flip
+happened to rebuild a chunk. That surfaced as a bug report ("change the tree style, zoom out,
+zoom back in, and only THEN does every tree flip"), and the fix made the repaint immediate. Made
+visible, the behaviour was rejected on sight: *"when you switch the type of tree, ALL trees
+switch to that tree."* The morning's `TerrainView.restyle_category()` /
+`TerrainChunkLod.restyle_terrain()` were therefore deleted the same day they were written. **The
+bug they fixed cannot return:** it was "the world does not match the setting", and the setting no
+longer has authority over standing ground.
+
+**Save format, `save_version` 7.** `tile_styles` (row-major, one entry per tile, alongside
+`terrain`) and a per-building `style` key. Both are additive and both have a correct meaning when
+absent, which is why v6 -> v7 is a version stamp and nothing else: no captured style means
+`pick_variant()` for terrain and `model_scenes[0]` for a building — exactly what a pre-v7 world
+already looked like. **Existing saves therefore load unchanged**, and every tile in them stays
+free to vary, which is the outcome to prefer given `mixed` is the default.
+
+**Three invariants worth stating, because all three are easy to break by accident:**
+
+- **`""` and `mixed` are the same answer at the resolver** and must stay that way. `""` is a
+  terrain with no picker, a pre-v7 save, and a mist-revealed tile; `mixed` is a deliberate
+  player choice. Both mean "no single look — hash it".
+- **The save is written z-major; `WorldGrid` stores tiles x-major.** `tile_styles` is built with
+  the same walk as `terrain` rather than from a grid-order helper, because a helper returning
+  internal order would reload a silently transposed world. `test_save_round_trip.gd` asserts an
+  off-diagonal tile specifically, since a diagonal-only check cannot see a transpose.
+- **The style must be captured BEFORE the draw, and the draw happens inside the mutator.** Both
+  `WorldGrid.set_terrain()` and `set_building()` emit `tile_changed` SYNCHRONOUSLY, and that
+  signal is what makes `TerrainView` build the visual — so a style written on the line *after*
+  either call arrives too late and the tile or building is drawn with an empty style, falling
+  through to `pick_variant()` / `model_scenes[0]`.
+  **This was gotten wrong twice, once on each side, and the second one shipped.** The building
+  case was caught immediately by `test_building_footprint_alignment.gd`; the terrain case was
+  not, because every test painted and then forced a tier rebuild, which re-resolved the tile
+  against the by-then-correct stored value — they were measuring the repair, not the paint. It
+  surfaced in play as "it still cycles through different tree styles randomly when I select and
+  place trees".
+  `set_terrain()` therefore TAKES the style as a parameter so the write and the draw are atomic;
+  `place_building()` stamps before placing and restores the previous value if refused;
+  `WorldSnapshot.apply()` orders it the same way.
+  `test_terrain_lod.gd`'s `_check_a_painted_tile_draws_its_style_immediately()` is the guard, and
+  it paints into an ALREADY near-tier chunk with no rebuild afterwards — that absence is the
+  whole point of the check. It also asserts a SECOND tile under a different style, because the
+  first coincidentally passed against the broken code when `pick_variant()` happened to land on
+  the chosen tree for that coordinate.
+
+**Not decided here:** whether re-styling an existing area should be possible at all as a separate
+deliberate gesture. It is not implemented, nobody has asked for it, and D-54's deleted machinery
+is not a head start on it — the useful part of that idea would be a scoped, player-initiated
+action, not a silent global rewrite.
+
+---
+
+### D-58 · "Mixed" is retired; a style is a brush, and new worlds stamp their variety
+
+**Decision:** `WorldRoot.MIXED_STYLE_ID` and `_supports_mixed()` are **deleted**. A style catalog
+is now one id per real scene and nothing else, so an unchosen category falls back to the first
+actual tree. The variety a freshly generated map wants is stamped instead:
+`WorldRoot._randomise_initial_styles()` writes a randomly-chosen **concrete** style id onto every
+tile of every multi-variant picker terrain (today, Forest alone) at world generation. Gated on
+`is_new_world` — the same D-53 gate the terrain mix uses — and derived from `world_seed`, so a
+seed still reproduces its world exactly.
+
+**This fully supersedes D-54.** Nothing of that entry is left standing: D-57 took its retroactive
+premise, and this takes `mixed` itself.
+
+**Why `mixed` had to go rather than be kept alongside paint-time capture.** It made a style a
+MODE. Even after D-57 stored a style per tile, a tile stamped `mixed` still meant "re-roll me at
+render time", so a generated map's forest was an assortment that no choice could govern and that
+nothing recorded — the player picked a tree, the world went on showing something else, and the
+reasonable reading was that the picker was broken: *"now the trees randomly change, like they are
+all set to mixed no matter what I choose."* The human's framing is the design in one line:
+**"what we want to work, is how buildings work — you pick what you want to put down, and what you
+put down stays the same."**
+
+**The variety is not lost, it changed kind.** It used to be a render-time decision recomputed on
+every draw; it is now authored state written once. Consequences, all of them wanted:
+
+- A starting map still looks varied, and now that variety **survives a save**, because
+  `save_version` 7 already stores `tile_styles`. Nothing re-rolls on load.
+- Every forest tile holds a real catalog id, so nothing anywhere depends on an absent style
+  meaning "be random". `""` now means only *a terrain with no style catalog* or *a pre-v7 save*.
+- `TerrainDefinition.pick_variant()` survives as the fallback for exactly those two cases. It is
+  no longer how a new world gets its look.
+
+**Deliberately not reusing `pick_variant()`'s hash to pick the stamped id.** They serve different
+purposes — one is a rendering fallback, the other is authored state — and tying them would mean a
+later tweak to the fallback silently rewrote the stored ids of every map already generated.
+
+**Consequence for existing saves, accepted:** a save that stored `"mixed"` as its forest choice
+takes the ordinary stale-id road and comes back as the first catalog entry. No migration, no
+crash; that player's brush changes, and their already-painted tiles are untouched.
+`test_style_defaults.gd` pins this specific case so it stays a silent degradation rather than
+becoming an error later.
+
+**Unaffected:** `wild_grass` never qualified for `mixed` (one variant), so **D-56 stands**
+unchanged. And the paint-time capture contract of D-57 is untouched — this entry removes a style
+*value*, not the mechanism.
