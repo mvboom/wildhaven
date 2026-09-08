@@ -1921,7 +1921,7 @@ into the sRGB `albedo_color` slot, so the house rendered ~3× too dark while its
 like an exact source match. Comparing `albedo_color` alone cannot distinguish the two importers;
 the eye test caught it and the arithmetic confirmed it.
 
-### D-61 · News Reports carry the Field Guide's counted build hints; D-40 demoted; cadence tuning left open
+### D-61 · News Reports carry the Field Guide's counted build hints; D-40's premise was already stale; cadence tuning left open
 
 **Note on numbering:** this decision was drafted as "D-60" against a plan written before D-60
 above (buildings sized to the people in them) was ruled, also on 2026-09-08. That entry claimed
@@ -1951,11 +1951,30 @@ voice now hands out tasks in substance, which is why gdd.md → Discovery is ame
 entry; the Field Guide reveal a report triggers loses most of its payload (below); and D-37's
 fixed cadence becomes activity-driven rather than a flat random interval.
 
-**D-40 demoted.** A report still reveals the species' Field Guide entry, but the entry's
-remaining payload is now the cap, the alternate tiers, and the avoids line — the report itself
-already states the starter tier's needs, so the reveal is no longer where a player learns those.
-Ruled sufficient by the operator; recorded here so the demotion is deliberate rather than
-discovered later as an unexplained overlap.
+**Correction (fix round 1, same day): there was no D-40 reveal left to demote.** This entry
+originally recorded, following spec §8.2, that a report "still reveals the species' Field Guide
+entry, but the entry's remaining payload is now the cap, the alternate tiers, and the avoids
+line." That was already false when written. `project/scripts/ui/field_guide.gd`'s own header
+records a superseding change that shipped **2026-08-31**, a full week before this feature
+existed: every roster species has rendered its real `display_name` and its **full** recipe
+unconditionally since that date, discovered or not — `_make_species_card()` gates on nothing,
+and `species_row_texts()`'s own comment confirms "there is no longer a silhouette state to
+distinguish." D-40's existence-gate (the thing that used to make a hint or a move-in the trigger
+that "revealed" a species' entry) was already overturned before spec §8.2 was drafted. There was
+therefore nothing left for this feature to demote: a report now simply points the player at a
+species whose Field Guide recipe was already visible unconditionally. The paragraph above is left
+in place rather than deleted, corrected here instead, because it is more useful to record that
+the design was built on a stale premise than to quietly restate that premise as fact.
+
+**Open gap, not filled here: the 2026-08-31 Field Guide change was never entered in
+`decisions.md`.** `field_guide.gd`'s header claims its superseding decision is "logged as
+`decisions.md` (amending D-40, which amended D-34 #5 and #6)" — no such entry exists; this
+paragraph is not it. A real design decision shipped in code without ever being ratified or
+recorded here. The full reasoning for it lives in `field_guide.gd`'s own header comment (top of
+the file) — that is the source to read, not a paraphrase of it as though it were already a
+ruling. This gap is recorded so it is visible and findable, not authored on the human's behalf:
+it still awaits the human's ratification as its own decision entry, whatever number is next free
+when that happens.
 
 **The eight tuning constants are NOT decided here and remain PROPOSED, awaiting a human
 ruling — do not read this entry as settling them:** the base cadence per hosted-count band (0,
