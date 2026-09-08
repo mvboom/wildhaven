@@ -881,6 +881,50 @@ static func starter_tier(species: AnimalDefinition) -> HabitatTier:
 	return tiers[0]
 
 
+## THE SHARED SEAM — the starter tier's needs as bare prose phrases, for a caller that wants
+## the card's numbers in a sentence rather than a bullet list (`NewsReportContent`).
+##
+## Reads `starter_tier()` — the cheapest way in — never a herd tier, because a hint's job is
+## to name a reachable first step, not the best possible outcome.
+##
+## `shows_each` is FALSE: "4 tiles of forest for each fox, 5 tiles of open grass for each
+## fox, 6 tiles of water for each fox" is technically the same information and unreadable as
+## one sentence. The divisor is identical to the card's; only the suffix differs.
+##
+## `seen` threads through exactly as `_describe_tier()` does it, so Cow's `barn` and `silo`
+## — two different buildings behind one palette button — both survive here too.
+static func starter_need_phrases(species: AnimalDefinition, world: WorldRoot) -> Array[String]:
+	var out: Array[String] = []
+	if species == null:
+		return out
+	var tier: HabitatTier = starter_tier(species)
+	if tier == null:
+		return out
+	var noun: String = species.display_name.to_lower()
+	var seen: Dictionary = {}
+	for need: HabitatNeed in tier.needs:
+		var phrase: String = _need_line(need, noun, false, world, seen)
+		if not phrase.is_empty():
+			out.append(phrase)
+	return out
+
+
+## The starter tier's exclusions, as the same phrases the card's limit sentence is built
+## from ("away from buildings", "far from any buildings"). Returned bare, WITHOUT
+## `LIMIT_SENTENCE`'s "Pick a spot %s." wrapper, so a caller can fold them into a sentence
+## of its own shape.
+static func starter_limit_phrases(species: AnimalDefinition) -> Array[String]:
+	var out: Array[String] = []
+	if species == null:
+		return out
+	var tier: HabitatTier = starter_tier(species)
+	if tier == null:
+		return out
+	for limit: HabitatLimit in tier.limits:
+		out.append(_describe_limit(limit))
+	return out
+
+
 ## `recipe_for()`'s exact shape (satisfiable + deduped, palette-button-keyed entries), over
 ## a TIER's `needs` instead of a species' flat fields. Deliberately ignores `HabitatLimit`s,
 ## the same scope `recipe_for()` has always had — a "what to place" answer, not a "where not

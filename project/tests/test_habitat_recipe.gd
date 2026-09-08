@@ -97,6 +97,7 @@ func _process(_delta: float) -> bool:
 	_check_multi_source_gate_reads_differently()
 	_check_resident_needs_are_never_buildable()
 	_check_upgrade_tiers_read_as_additions_only_when_they_are()
+	_check_starter_phrases_expose_the_cards_own_numbers()
 
 	finish()
 	return true
@@ -910,3 +911,51 @@ func _check_upgrade_tiers_read_as_additions_only_when_they_are() -> void:
 			and not deer_lines[1].begins_with(add_many),
 			("deer's herd tier is a needs-superset but tightens its `built` limit, so it "
 			+ "must NOT read as an addition: '%s'") % deer_lines[1])
+
+
+## THE SHARED SEAM. The News Report toast and the Field Guide card must state the SAME
+## numbers, and the only way to guarantee that is one derivation with two renderers. These
+## phrases are what the toast composes; `describe_tiers()` renders the same `_need_line()`
+## output as bullets. A second derivation would be a second thing to keep in sync, which is
+## the defect the counted-tile rewrite already paid for once.
+##
+## `shows_each` is FALSE here where the card passes true: "4 tiles of forest for each fox"
+## three times in one flowing sentence is unreadable. The COUNT is identical either way,
+## which is the part the cross-surface test in Task 8 pins.
+func _check_starter_phrases_expose_the_cards_own_numbers() -> void:
+	var fox: AnimalDefinition = load(FOX_PATH) as AnimalDefinition
+	if not check(fox != null, "fox.tres loads"):
+		return
+	var phrases: Array[String] = HabitatRecipe.starter_need_phrases(fox, _world)
+	check_eq(phrases.size(), 3, "fox's starter tier yields one phrase per need")
+	check(phrases.has("4 tiles of forest"),
+		"forest's divisor (4) renders with no 'for each' suffix: %s" % str(phrases))
+	check(phrases.has("5 tiles of open grass"),
+		"open_grass's divisor (5) renders: %s" % str(phrases))
+	check(phrases.has("6 tiles of water"),
+		"water's divisor (6) renders: %s" % str(phrases))
+	for phrase: String in phrases:
+		check(not phrase.contains("for each"),
+			"no per-individual suffix in the prose form: '%s'" % phrase)
+
+	var limits: Array[String] = HabitatRecipe.starter_limit_phrases(fox)
+	check_eq(limits.size(), 1, "fox's starter tier has one limit")
+	check(limits.has("far from any buildings"),
+		"the built limit (max_count 0) renders strict: %s" % str(limits))
+
+	# A gate-only need is a building, and must survive into the prose form too.
+	var cow: AnimalDefinition = load(COW_PATH) as AnimalDefinition
+	if check(cow != null, "cow.tres loads"):
+		var cow_phrases: Array[String] = HabitatRecipe.starter_need_phrases(cow, _world)
+		var joined: String = " / ".join(cow_phrases)
+		check(joined.contains("barn"), "cow's barn gate survives: %s" % joined)
+		check(joined.contains("silo"), "cow's silo gate survives too: %s" % joined)
+
+	# A species with a living need renders it as residents, never as tiles.
+	var pig: AnimalDefinition = load(PIG_PATH) as AnimalDefinition
+	if check(pig != null, "pig.tres loads"):
+		var pig_joined: String = " / ".join(HabitatRecipe.starter_need_phrases(pig, _world))
+		check(pig_joined.contains("2 villagers"),
+			"pig's living need keeps the roster's own word: %s" % pig_joined)
+		check(not pig_joined.contains("tiles of villagers"),
+			"...and is not measured in tiles: %s" % pig_joined)
