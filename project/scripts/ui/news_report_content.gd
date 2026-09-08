@@ -50,12 +50,17 @@ const WEIGHT_PLENTY_HOSTED: float = 0.15
 ## A species' ranking multiplier: never hosted > hosted a little > hosted plenty.
 ## Reads only accessors that already exist and already survive a save round trip
 ## (`species_hosted_ids()`, `population_of()`), so this design adds NO new save state.
+##
+## Reads through `world`'s own three accessors throughout (`species_hosted_ids()`,
+## `population_of()`), never `world.registry` directly, so every read here sits at the same
+## abstraction level as the early gate in `pick_species()` (`species_hosted_count()`) — and
+## gets the same registry-null safety `WorldRoot.population_of()` already provides for free.
 static func species_weight(species: AnimalDefinition, world: WorldRoot) -> float:
-	if species == null or world == null or world.registry == null:
+	if species == null or world == null:
 		return WEIGHT_NEVER_HOSTED
 	if not world.species_hosted_ids().has(species.id):
 		return WEIGHT_NEVER_HOSTED
-	if world.registry.population_of(species.id) < PLENTY_THRESHOLD:
+	if world.population_of(species.id) < PLENTY_THRESHOLD:
 		return WEIGHT_FEW_HOSTED
 	return WEIGHT_PLENTY_HOSTED
 

@@ -371,10 +371,24 @@ func _check_content_terrain_bias() -> void:
 	grid.free()
 
 
-## THE RANKING. Never-hosted outranks hosted; hosted-below-threshold outranks
-## hosted-at-threshold; and the bottom tier NEVER reaches zero — `BASELINE_WEIGHT` already
-## documents why (gdd.md: "a hint is an invitation, not an assignment"), and a species that
-## can never be named again reads as a closed door.
+## THE RANKING. Never-hosted outranks hosted-a-little; hosted-a-little outranks
+## hosted-at-or-past-`PLENTY_THRESHOLD`; and the bottom tier NEVER reaches zero —
+## `BASELINE_WEIGHT` already documents why (gdd.md: "a hint is an invitation, not an
+## assignment"), and a species that can never be named again reads as a closed door.
+##
+## THE THIRD TIER NEEDS A REAL POPULATION, NOT JUST `restore_hosted()`. Fix round 1 finding 1:
+## `HomeSiteRegistry.restore_hosted()` only ever sets `_ever_hosted` (its own doc comment: it
+## exists for the half of Species Hosted with no home site left) — it never touches
+## `population_of()`, which stays 0 forever after it, always below `PLENTY_THRESHOLD`. A check
+## that reaches the "hosted" tier only via `restore_hosted()` can therefore never observe
+## `WEIGHT_PLENTY_HOSTED` or the `<` boundary at `PLENTY_THRESHOLD` at all — a
+## `WEIGHT_FEW_HOSTED`/`WEIGHT_PLENTY_HOSTED` swap, or a `<` flipped to `<=`, would pass
+## silently. `HomeSiteRegistry.register()` plus appending directly to `site.residents` is the
+## same fixture idiom `test_capacity_formula.gd`
+## (`site.residents.append(null)  # population 1, with no model needed`) and
+## `test_resident_tags.gd` already use to give a site a real population without routing
+## through the full move-in simulation — `null` residents are enough because `population()`
+## only ever reads `residents.size()`.
 func _check_ranking_prefers_species_not_yet_hosted() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = SEED
@@ -383,13 +397,52 @@ func _check_ranking_prefers_species_not_yet_hosted() -> void:
 	var never: float = NewsReportContent.species_weight(roster[0], _world)
 	check(never > 0.0, "a never-hosted species carries real weight")
 
-	# Host one, and its weight must drop without vanishing.
+	# Host one via `restore_hosted()` alone (population stays 0) — the FEW tier.
 	_world.registry.restore_hosted([roster[0].id] as Array[String])
-	var hosted: float = NewsReportContent.species_weight(roster[0], _world)
-	check(hosted < never,
-		"hosting a species demotes it (%.2f < %.2f)" % [hosted, never])
-	check(hosted > 0.0,
-		"...but never to zero — the door stays open (%.2f)" % hosted)
+	var few: float = NewsReportContent.species_weight(roster[0], _world)
+	check(few < never,
+		"hosting a species demotes it (%.2f < %.2f)" % [few, never])
+	check(few > 0.0,
+		"...but never to zero — the door stays open (%.2f)" % few)
+
+	# A DIFFERENT species, driven to a REAL population of exactly `PLENTY_THRESHOLD` — the
+	# PLENTY tier, genuinely exercised rather than inferred from the constants alone.
+	var plenty_species: AnimalDefinition = roster[1]
+	var site: HomeSite = _world.registry.register(
+		Vector2i(1, 1), plenty_species.id, plenty_species.scout_radius
+	)
+	for i in range(NewsReportContent.PLENTY_THRESHOLD):
+		site.residents.append(null)
+	check_eq(_world.population_of(plenty_species.id), NewsReportContent.PLENTY_THRESHOLD,
+		"fixture: the species has really reached PLENTY_THRESHOLD, not merely been hosted")
+
+	var plenty: float = NewsReportContent.species_weight(plenty_species, _world)
+	check(plenty < few,
+		"a species AT the plenty threshold ranks below one merely hosted (%.2f < %.2f)"
+			% [plenty, few])
+	check(plenty > 0.0,
+		"...but never to zero here either — the door stays open (%.2f)" % plenty)
+
+	# THE `<` BOUNDARY ITSELF. One resident short of `PLENTY_THRESHOLD` must still rank as
+	# FEW, not PLENTY — a `<` flipped to `<=` in `species_weight()` would pass every assertion
+	# above (both populations tested so far sit strictly on one side of the boundary) but
+	# fail this one.
+	site.residents.pop_back()
+	check_eq(_world.population_of(plenty_species.id), NewsReportContent.PLENTY_THRESHOLD - 1,
+		"fixture: one resident short of the threshold")
+	var just_under: float = NewsReportContent.species_weight(plenty_species, _world)
+	check_eq(just_under, NewsReportContent.WEIGHT_FEW_HOSTED,
+		"PLENTY_THRESHOLD - 1 residents still ranks as FEW, not PLENTY (%.2f)" % just_under)
+
+	# THE FULL ORDERING, on the constants themselves.
+	check(NewsReportContent.WEIGHT_NEVER_HOSTED > NewsReportContent.WEIGHT_FEW_HOSTED
+			and NewsReportContent.WEIGHT_FEW_HOSTED > NewsReportContent.WEIGHT_PLENTY_HOSTED
+			and NewsReportContent.WEIGHT_PLENTY_HOSTED > 0.0,
+		"the full ordering holds: never (%.2f) > few (%.2f) > plenty (%.2f) > 0" % [
+			NewsReportContent.WEIGHT_NEVER_HOSTED,
+			NewsReportContent.WEIGHT_FEW_HOSTED,
+			NewsReportContent.WEIGHT_PLENTY_HOSTED,
+		])
 
 
 ## THE EARLY GATE, ruled 2026-09-08: one branch, not a two-stage sequence. With nothing
