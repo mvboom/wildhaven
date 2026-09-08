@@ -176,7 +176,7 @@ correctly in code. Full detail in
 | Terrain (emits) | Assets available | Notes |
 |---|---|---|
 | **Forest** (`forest`) | Huge surplus — MegaKit CommonTree/Pine/Twisted; Nature Pack Birch/Common/Pine/Palm/Willow (+ seasonal); Trees pack (45 models) | Pick a small "common" set |
-| **Rock** (`cover`, `rocks`) | Nature Pack `Rock_1..7`, `Rock_Moss_*`; MegaKit `Rock_Medium`, Pebbles; RTS `Rock`/`Mountain` | Load-bearing — the Fox/Rabbit `cover` source. `Rock_Moss` = the nudge's "mossy boulders" |
+| **Rock** (`cover`, `rocks`) | Nature Pack `Rock_1..7`, `Rock_Moss_*`; MegaKit `Rock_Medium`, Pebbles; RTS `Rock`/`Mountain` | Load-bearing — the `rocks` source (Donkey, Alpaca, Shiba Inu, Stag). It also emits `cover`, which has had no consuming species since D-52. `Rock_Moss` = the nudge's "mossy boulders" |
 | **Cultivated field** (`cultivated`) | Nature Crops Pack — Wheat, Corn, Carrot, Beet, Lettuce, Tomato, Pumpkin, Watermelon, Rice, with growth stages (`_Crop`/`_Harvested`); RTS `Farm_*` modeled plots | Villager need |
 | **Grass** (`open_grass`) | MegaKit Grass_Common/Wispy, Nature Pack Grass, Crops Grass, Clover, Fern | |
 | **Water** (`water`) | Surface is a shader/plane, no model | Dress edges with Nature Pack `Lilypad`, reeds |

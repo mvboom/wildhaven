@@ -16,7 +16,8 @@ terrain via **Build Mode**: pick a building, tap an eligible tile to place its w
 footprint at its Wood cost. Unlike terrain, a building occupies its footprint
 exclusively — a tile under a building stops emitting its terrain tags while occupied,
 and the building's own `emitted_tags` are what that ground now says (see gdd.md →
-Habitat Suitability). v1 ships one buildable, the House. (Farms are not buildings — a
+Habitat Suitability). v1 ships **ten** buildables (2026-09-04, → D-52): House, Farmhouse, and eight farm
+buildings. Each declares its own `emitted_tags`, and every one of them emits `built`. (Farms are not buildings — a
 farm is cultivated terrain painted in Terraform Mode; see [terrain.md](terrain.md).)
 
 ## Attributes Required (PlaceableDefinition)
@@ -66,24 +67,51 @@ and render.
 
 ## Already-Defined Buildings
 
-**House** — the only v1 buildable, satisfying the `house` tag:
+**Ten buildables ship** (2026-09-04, → D-52). Until that ruling the House was the only
+one carrying `emitted_tags`; the eight farm buildings were imported, licence-cleared,
+costed and hotbar-categorised but emitted **nothing**, making them placeable decoration
+with no simulation meaning. They now have a job.
 
-| Form | Footprint | Allowed terrain | Cost |
+| Buildable | Footprint | Emits | Cost |
 |---|---|---|---|
-| Floor (Tier 1) | 1×1 | grass only | ~15 Wood |
-| Full | 2×2 | grass only | ~30 Wood |
+| House | 1×1 | `built` · `house` | ~15 Wood |
+| **Farmhouse** *(new)* | 2×2 | `built` · `house` · `large_house` | ~30 Wood |
+| Small Barn | 1×1 | `built` · `barn` | ~15 Wood |
+| Barn | 2×2 | `built` · `barn` · `large_barn` | ~30 Wood |
+| Open Barn | 1×1 | `built` · `barn` · `stable` | ~15 Wood |
+| Chicken Coop | 1×1 | `built` · `coop` | ~15 Wood |
+| Silo | 1×1 | `built` · `silo` | ~15 Wood |
+| Windmill | 1×1 | `built` · `mill` | ~15 Wood |
+| Well | 1×1 | `built` · `water` | ~15 Wood |
+| Water Tower | 1×1 | `built` · `water` | ~15 Wood |
 
-A House is a home site with a fixed footprint. It supports villager families via
-carrying capacity exactly like any other species' home site: cultivated tiles within
-radius set how many families it supports (floor: the 1×1 House supports one family,
-since Human's `tiles_per_individual` divisor is 1 against a single-tile footprint; the
-2×2 form lets a broad farm support up to four — see [roster.md](roster.md)). **A
-villager moves in when its habitat is met** ships whole at the floor — the USP requires
-the proof, not the building (see gdd.md → Scope, row 4).
+*Costs and footprints beyond House's are **proposals awaiting sign-off**, stated in each
+`.tres` header — see the note at the end of this section.*
 
-**Floor building (Tier 1):** House at 1×1, grass only. Depth buys the 2×2 footprint and
-its placement-validation family; the 1×1 asset is retained post-deepening as a **Shed**
-placeable rather than thrown away (deferred — [future.md](future.md)).
+**Every placeable emits `built`, and that is load-bearing.** It lets a wild species carry
+one exclusion limit (`built ≤ N`) instead of enumerating nine building tags, and it means
+any building added later automatically participates in every wild species' exclusion
+without touching a single species file.
+
+**Three subsumptions are deliberate.** A large barn *is* a barn, so Barn satisfies both
+`barn` and `large_barn`. An open-sided barn *is* a stable, so Open Barn serves cows or
+horses from one building. A farmhouse *is* a house, so it still shelters dogs and single
+villagers while also unlocking villager families.
+
+**Well and Water Tower emit `water`** — the same tag a lake emits. That is what delivers
+"a pond and/or a water tower" with no new tag: a lake and a tower satisfy the same need,
+trading tiles against Wood.
+
+**Farmhouse replaces the House's old 2×2 "form".** The 2×2 role is now its own buildable,
+not a House variant — which is what lets `large_house` exist as a requirement at all, and
+is what a villager *family* gates on (see [roster.md](roster.md)). A House is still a home
+site with a fixed footprint, supporting villagers via carrying capacity exactly like any
+other species' home site. **A villager moves in when its habitat is met** ships whole at
+the floor — the USP requires the proof, not the building (see gdd.md → Scope, row 4).
+
+**Floor building (Tier 1):** House at 1×1, grass only. The 1×1 asset is retained
+post-deepening as a **Shed** placeable rather than thrown away (deferred —
+[future.md](future.md)).
 
 **Deferred buildings** (designed, not yet built — full detail: [future.md](future.md)):
 Fence and Birdhouse (small placeables, allowed-terrain list open), the Shed (the
@@ -91,6 +119,13 @@ retained 1×1 House asset), Townscaper-style building joining (adjacent same-typ
 buildings merge and re-style), and species amenities (a special placeable that
 delights or attracts a particular species, for every species — Well/School/Market for
 villagers exactly as a birdhouse is for birds).
+
+**Values awaiting sign-off.** Every cost, footprint and model choice for the nine
+buildables beyond House is a **proposal, not a decision** — each `.tres` says so in its
+own header, per the project rule that all tuning values are the human's. Farmhouse's
+`cost = 30` and `footprint = 2×2` were copied from Barn's own unresolved proposal, and its
+model (`HouseSecondage1Level3`) was picked as the largest already-wired House variant so it
+reads as bigger than the 1×1 House.
 
 ## Open Questions Touching Buildings
 

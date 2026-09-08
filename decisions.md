@@ -1341,3 +1341,86 @@ in-game screen renders changed.
 **Tests:** `test_credits_screen.gd` rewritten to assert against `load_entries()` (all 7)
 rather than `binding_entries()` (1), plus an explicit check that the Sherkiz
 `required_notice` still appears verbatim in the rendered list.
+
+---
+
+### D-52 · Habitat tiers replace the flat one-recipe habitat model
+
+> **DRAFTED BY AGENT, AWAITING HUMAN REVIEW.** The rulings recorded below were made by the
+> human on 2026-09-04; this entry transcribes them. The *values* the ruling produced are
+> still proposals — see "What is NOT decided here" at the end.
+
+**Decision:** a species no longer carries one flat habitat recipe. It carries an ordered
+list of **tiers**, each with its own needs, its own exclusion limits, its own population
+cap and its own arrival group size. Capacity becomes `max` over tiers of the existing
+Liebig `min` within a tier. Each **need** carries its own radius and its own divisor, where
+a divisor of 0 means *gate-only* — must be present, contributes no cap. Each **limit** says
+*"at most N of tag X within radius R"* and gates rather than scales. A species may also
+declare `emits_tags`, so a **resident** contributes tags to its own tile, counted per
+individual.
+
+**Why:** the shipped roster had a measurable distinctness defect. Horse, Cow, Bull and
+Alpaca all carried the identical recipe `open_grass, cultivated` — and because different
+species never compete for tiles (D-46), a single pasture attracted **all four at once**.
+The human's framing was *"more distinct on what animals will appear, when… so they don't
+all compete for the same land."* Tiers make animals want different *amounts* of land;
+exclusion limits make them want different *land*. Fifteen species now have fifteen distinct
+habitat signatures.
+
+The design also unlocked eight buildings that were already imported, licence-cleared,
+costed and hotbar-categorised but emitted **nothing** — placeable decoration with no
+simulation meaning. They now have a job.
+
+**The six open questions ruled the same day:**
+
+- **A — Stag.** A stag appears only where deer already live: *"it can't be a herd if there
+  is no stag with the deer."* Expressed as `Deer.emits_tags = ["deer"]` plus a `deer/4`
+  need on Stag, so four deer support one stag. **No new machinery** — an ordinary need
+  against a resident-emitted tag. Rarity stopped being a hand-tuned `max_individuals` and
+  became something the player earns.
+- **B — Radius band.** Per-need radii run **2–16**, replacing the old ~8–12. The band had
+  to move: this design's own central cases sit outside it (a building gate close in — the shipped
+  stable gate is 5 — and Stag at 14).
+- **C — Values.** The shipped table stands as a starting point, expected to move in
+  playtest.
+- **D — Villager families.** A family needs the larger house plus cultivated land at ≥2
+  tiles per person. "Larger house" had to become a *tag*, which is why **Farmhouse** is now
+  its own placeable rather than a 2×2 "form" of House.
+- **E — Snowfield.** Snow may border grass; the game is not restricted to real-world
+  climate adjacency. No placement or neighbour gating.
+- **F — `quiet` retired.** It had no source and no consumer, and a `built` exclusion limit
+  does its job strictly better — it is actually enforced and needs no terrain to emit it.
+
+**Also ruled during execution**, where review found the plan itself wrong:
+
+- **The legacy tier preserves the radius sentinel** rather than baking a concrete radius.
+  The original instruction to bake was withdrawn: baking into a *cached* tier meant a later
+  `scout_radius` retune stopped being tracked, and `capacity_from_counts()` could then
+  return 0 for every need — surfacing as "unsuitable" rather than as an error.
+- **The Terraform palette groups Grass, Wild Grass, Meadow and Scrub behind one button;
+  Snowfield stays standalone.** Three new terrains took the palette from 8 buttons to 11,
+  overflowing the HUD band into the Rotate/Erase cluster. Grouping returns it to 8.
+- **The onboarding starter species is pinned to Rabbit**, not derived from a cost score.
+  Reading real tier data made the derived pick Deer (free terrain beats Rabbit's Wood-costed
+  field). Rabbit is Bold, so a child's first animal is one they can actually see; Deer is
+  Shy and its tier carries a `!built≤1` limit, which would teach a constraint first. A
+  derived starter also changes silently whenever tuning moves.
+
+**Not a predation change.** Limits describe *disturbance*, not danger: a wild species keeps
+its distance from buildings, never from another animal. The Avoids system is untouched, and
+the no-predation invariant holds by construction.
+
+**Tests:** 128 suites, 5,049 assertions, 0 failures. The invariants that no single change
+owned were verified end to end: the inert-land invariant (wild grass still emits nothing),
+`qualifies ≡ capacity ≥ 1` still one function, no lower clamp, an acyclic emission graph,
+and a human-gated vocabulary.
+
+**What is NOT decided here.** Every habitat value across the fifteen species, and
+Farmhouse's cost, footprint and model, remain **proposals awaiting sign-off** — each
+`.tres` says so in its own header. Suite-green confirms the mechanics work as specified; it
+does not confirm the numbers are final. No ✅ has been recorded in
+`content-pipeline-status.md` or `tier1-status.md` on the strength of this work.
+
+**Open for playtest** (neither is headless-checkable): that a tier fall reads as a herd
+*thinning* rather than a vanishing, and that a two-level cascade (`deer → stag`,
+`human → people → dogs`) produces **one** warning per settled gesture rather than a chain.

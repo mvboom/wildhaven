@@ -482,9 +482,10 @@ func validate(known_ids: PackedStringArray = PackedStringArray()) -> Array[Strin
 		problems.append("`avoids` lists this species itself.")
 
 	# THE RADIUS BAND, replaced 2026-09-04 (spec OQ-B). The old 8-12 band predates
-	# per-need radii and would hard-fail this design's own central cases: a barn gate at
-	# radius 4 and Stag counting at radius 14. Cost scales as `max_radius^2 * roster *
-	# tiers`, so RADIUS_MAX is the performance budget, not a style preference.
+	# per-need radii and would hard-fail this design's own central cases: a close-in
+	# building gate (the shipped stable gate is 5) and Stag counting at radius 14.
+	# Cost scales as `max_radius^2 * roster * tiers`, so RADIUS_MAX is the performance
+	# budget, not a style preference.
 	if scout_radius < HabitatNeed.RADIUS_MIN or scout_radius > HabitatNeed.RADIUS_MAX:
 		problems.append("`scout_radius` %d is outside the %d-%d band." % [
 			scout_radius, HabitatNeed.RADIUS_MIN, HabitatNeed.RADIUS_MAX
