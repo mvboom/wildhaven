@@ -18,6 +18,13 @@ extends RefCounted
 ## This row's `constants` cell in tier1-status.md records the reasoning; nothing here re-opens
 ## either number.
 ##
+## AS OF THE BUILD-HINT PACING DESIGN (spec.md §11 / `hint_pacer.gd`), `CADENCE_MIN_SECONDS`/
+## `CADENCE_MAX_SECONDS` are the NO-PACER FALLBACK, not the ambient rule: `set_pacer()` lets a
+## caller hand this scheduler a `HintPacer`, and once one is attached, `_next_cadence()` asks
+## it instead of rolling D-37's range. Nothing here reopens D-37 — a scheduler nobody attaches
+## a pacer to (including every pre-existing test in this suite) still rolls exactly D-37's
+## 90-150 s, unchanged.
+##
 ## THE HINTS TOGGLE IS A PILLAR INVARIANT (spec.md -> "Not depth axes"), enforced HERE rather
 ## than by hiding a control: `advance()` returns "" on every call while hints are off, so no
 ## caller can accidentally fire a nudge or a report by forgetting to check a flag first.
@@ -41,6 +48,15 @@ const EVENT_REPORT: String = "report"
 const EVENT_NONE: String = ""
 
 var hints_enabled: bool = true
+
+## The adaptive cadence, when one is attached. NULL IS A SUPPORTED STATE, not a degraded
+## one: with no pacer this file behaves exactly as it did before the build-hint design, on
+## D-37's decided constants. Every pre-existing cadence test runs on that path.
+var _pacer: HintPacer = null
+
+## Species hosted, pushed in by the presenter rather than read from a world here — this file
+## has never held a world reference and gains no reason to.
+var _hosted_count: int = 0
 
 var _nudge_fired: bool = false
 var _nudge_remaining: float = NUDGE_DELAY_SECONDS
@@ -93,7 +109,19 @@ func set_hints_enabled(enabled: bool) -> void:
 	hints_enabled = enabled
 
 
+## `set_pacer(null)` is a valid call, not an error — it puts this scheduler straight back on
+## the D-37 fallback path, which is also its state before any `set_pacer()` call at all.
+func set_pacer(pacer: HintPacer) -> void:
+	_pacer = pacer
+
+
+func set_hosted_count(count: int) -> void:
+	_hosted_count = count
+
+
 func _next_cadence() -> float:
+	if _pacer != null:
+		return _pacer.next_interval(_hosted_count)
 	return _rng.randf_range(CADENCE_MIN_SECONDS, CADENCE_MAX_SECONDS)
 
 

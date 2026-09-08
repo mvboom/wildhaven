@@ -86,6 +86,9 @@ func _process(_delta: float) -> bool:
 	_check_scheduler_cadence_timing()
 	_check_scheduler_hints_toggle_suppresses_live()
 	_check_scheduler_hints_off_retires_nudge_forever()
+	_check_scheduler_without_a_pacer_is_unchanged()
+	_check_scheduler_with_a_pacer_uses_its_interval()
+	_check_hints_off_silences_the_feed_at_every_pacer_state()
 	_check_content_tag_tile_counts()
 	_check_content_candidates_and_lines()
 	_check_content_terrain_bias()
@@ -96,6 +99,7 @@ func _process(_delta: float) -> bool:
 	# back to `species_hosted_count() == 0` for the rest of this run. The villager gate only has
 	# anything to prove while the count is still genuinely zero.
 	_check_nothing_hosted_names_the_villager()
+	_check_hosted_count_survives_a_round_trip()
 	_check_ranking_prefers_species_not_yet_hosted()
 	_check_the_same_species_is_never_picked_twice_running()
 	_check_hint_line_composes_opening_and_needs()
@@ -284,6 +288,56 @@ func _check_scheduler_hints_off_retires_nudge_forever() -> void:
 		"pausing mid-cadence and resuming leaves the SAME remaining wait — a pause, not a reset")
 
 
+## THE FALLBACK IS THE POINT. A scheduler with no pacer must behave EXACTLY as it does
+## today — that is what keeps every pre-existing cadence assertion in this suite a real
+## check rather than one quietly rewritten to match new behaviour. D-37's decided constants
+## are not deleted; they stop being the ambient rule and become the no-pacer answer.
+func _check_scheduler_without_a_pacer_is_unchanged() -> void:
+	var scheduler := NewsReportScheduler.new(SEED)
+	scheduler.advance(NewsReportScheduler.NUDGE_DELAY_SECONDS + 0.01)
+	var remaining: float = scheduler.report_remaining()
+	check(remaining >= NewsReportScheduler.CADENCE_MIN_SECONDS,
+		"the no-pacer cadence still lands at or above D-37's floor (%.1f)" % remaining)
+	check(remaining <= NewsReportScheduler.CADENCE_MAX_SECONDS,
+		"...and at or below its ceiling (%.1f)" % remaining)
+
+
+## With a pacer attached, the hosted count drives the interval instead.
+func _check_scheduler_with_a_pacer_uses_its_interval() -> void:
+	var scheduler := NewsReportScheduler.new(SEED)
+	var pacer := HintPacer.new()
+	scheduler.set_pacer(pacer)
+	scheduler.set_hosted_count(0)
+	scheduler.advance(NewsReportScheduler.NUDGE_DELAY_SECONDS + 0.01)
+	var learning: float = scheduler.report_remaining()
+	check_eq(learning, pacer.next_interval(0),
+		"the learning band drives the interval verbatim (%.1f)" % learning)
+
+	var settled := NewsReportScheduler.new(SEED)
+	settled.set_pacer(HintPacer.new())
+	settled.set_hosted_count(9)
+	settled.advance(NewsReportScheduler.NUDGE_DELAY_SECONDS + 0.01)
+	check(settled.report_remaining() > learning,
+		"a player hosting nine species waits longer than one hosting none")
+
+
+## PILLAR INVARIANT. The Hints toggle silences the feed regardless of pacer state — the
+## pacer sits BELOW that gate and changes the interval, never whether an event may fire.
+func _check_hints_off_silences_the_feed_at_every_pacer_state() -> void:
+	for hosted: int in [0, 2, 4, 9]:
+		var scheduler := NewsReportScheduler.new(SEED)
+		scheduler.set_pacer(HintPacer.new())
+		scheduler.set_hosted_count(hosted)
+		scheduler.set_hints_enabled(false)
+		var fired: bool = false
+		for i in range(2000):
+			if scheduler.advance(1.0) != NewsReportScheduler.EVENT_NONE:
+				fired = true
+				break
+		check(not fired,
+			"hints off fires nothing at hosted_count %d, over 2000 simulated seconds" % hosted)
+
+
 # --- 3. The pick -------------------------------------------------------------------------------
 
 func _check_content_tag_tile_counts() -> void:
@@ -468,6 +522,37 @@ func _check_nothing_hosted_names_the_villager() -> void:
 		if not check_eq(picked.id, NewsReportContent.VILLAGER_SPECIES_ID,
 			"with nothing hosted the pick is always the villager (attempt %d)" % i):
 			return
+
+
+## SPEC §11's ROUND-TRIP CHECK. The decay driver was chosen over a wall clock precisely
+## because it already survives a save; that is only true if the restored count actually
+## reaches the pacer. `restore_hosted()` is the same path `world_snapshot.gd` uses on load.
+##
+## MUST RUN AFTER `_check_nothing_hosted_names_the_villager()` (see that check's own ordering
+## note) — `restore_hosted()` is additive-only, so this check reads whatever
+## `species_hosted_count()` actually is post-restore rather than asserting it lands on any
+## particular number: the property under test is that a restored count paces IDENTICALLY to
+## the same count held in memory, not that the count itself is some fixture-chosen value.
+func _check_hosted_count_survives_a_round_trip() -> void:
+	var ids: Array[String] = ["human", "rabbit", "fox", "deer"] as Array[String]
+	_world.registry.restore_hosted(ids)
+	var observed: int = _world.species_hosted_count()
+	check(observed >= ids.size(),
+		"restoring %d ids raises the hosted count to at least %d (observed %d)"
+			% [ids.size(), ids.size(), observed])
+
+	var from_memory := NewsReportScheduler.new(SEED)
+	from_memory.set_pacer(HintPacer.new())
+	from_memory.set_hosted_count(observed)
+	from_memory.advance(NewsReportScheduler.NUDGE_DELAY_SECONDS + 0.01)
+
+	var from_restore := NewsReportScheduler.new(SEED)
+	from_restore.set_pacer(HintPacer.new())
+	from_restore.set_hosted_count(_world.species_hosted_count())
+	from_restore.advance(NewsReportScheduler.NUDGE_DELAY_SECONDS + 0.01)
+
+	check_eq(from_restore.report_remaining(), from_memory.report_remaining(),
+		"the restored count paces identically to the same count held in memory")
 
 
 ## The Pillar 1 mitigation for the idle multiplier: an idle stretch must read as the world
