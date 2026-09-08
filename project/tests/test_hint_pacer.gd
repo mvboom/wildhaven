@@ -12,7 +12,7 @@ func _initialize() -> void:
 	begin("hint pacer")
 	_check_bands_widen_as_species_are_hosted()
 	_check_band_boundaries()
-	_check_activity_halves_and_idleness_doubles()
+	_check_idleness_shortens_and_activity_lengthens_the_interval()
 	_check_the_idle_boost_cannot_compound()
 	_check_activity_expires()
 	finish()
@@ -56,9 +56,13 @@ func _check_band_boundaries() -> void:
 			"hosted_count %d maps to the %.0f s band" % [hosted_count, band])
 
 
-## Exactly one multiplier always applies — "built recently" and "idle" are two sides of one
-## predicate, never summed. See the spec's §9 note.
-func _check_activity_halves_and_idleness_doubles() -> void:
+## Corrected 2026-09-08 against the operator's stated requirement: "if they are not building,
+## we show more hints; if they are we show less often." A stuck/idle player gets the SHORTER
+## interval (more frequent hints, since they're the one the feature exists to help); an
+## engaged player who just placed something gets the LONGER interval (left alone). Exactly
+## one multiplier always applies — "built recently" and "idle" are two sides of one
+## predicate, never summed. See spec §9/§10.1.
+func _check_idleness_shortens_and_activity_lengthens_the_interval() -> void:
 	var idle := HintPacer.new()
 	var idle_interval: float = idle.next_interval(0)
 
@@ -66,12 +70,12 @@ func _check_activity_halves_and_idleness_doubles() -> void:
 	busy.notice_activity()
 	var busy_interval: float = busy.next_interval(0)
 
-	check(busy_interval < idle_interval,
-		"a player who just built waits less for the next hint (%.0f < %.0f)"
-		% [busy_interval, idle_interval])
-	check(is_equal_approx(idle_interval / busy_interval, 4.0),
-		"the two multipliers are x2.0 and x0.5, so idle is 4x busy: got %.2f"
-		% (idle_interval / busy_interval))
+	check(idle_interval < busy_interval,
+		"a player who has NOT built recently is offered the next hint sooner (%.0f < %.0f)"
+		% [idle_interval, busy_interval])
+	check(is_equal_approx(busy_interval / idle_interval, 4.0),
+		"the two multipliers are x0.5 (idle) and x2.0 (built recently), so an engaged player "
+		+ "waits 4x longer than an idle one: got %.2f" % (busy_interval / idle_interval))
 
 
 ## PILLAR 1 GUARD. gdd.md: "hints never expire or repeat with urgency." spec §10.1: "the idle

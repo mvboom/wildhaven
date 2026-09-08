@@ -29,10 +29,15 @@ const EARLY_MAX_HOSTED: int = 2
 const SETTLED_MAX_HOSTED: int = 5
 
 ## PROPOSED — human owns this. Exactly one of these always applies; they are two sides of one
-## predicate and are never summed. A player who built inside the window waits half as long;
-## one who did not waits twice as long.
-const BUILT_RECENTLY_MULTIPLIER: float = 0.5
-const IDLE_MULTIPLIER: float = 2.0
+## predicate and are never summed. Named for the STATE each applies to, not for their value —
+## do not infer direction from the name alone; read the comment on each constant.
+##
+## BUILT_RECENTLY_MULTIPLIER lengthens the interval: an engaged player — one who placed
+## something inside the window — is left alone, hearing from News Report less often.
+const BUILT_RECENTLY_MULTIPLIER: float = 2.0
+## IDLE_MULTIPLIER shortens the interval: a player who has NOT placed anything inside the
+## window is the one the whole feature exists to help, so they are offered a hint sooner.
+const IDLE_MULTIPLIER: float = 0.5
 
 ## PROPOSED — human owns this. How long a placement counts as "just built". Long enough to
 ## span one deliberate build gesture. Deliberately NOT `SettlementWindow.GRACE_WINDOW_SECONDS`
