@@ -1,8 +1,20 @@
 [gd_resource type="Resource" script_class="WorldPreset" load_steps=2 format=3]
 
-; base_terrain_id is deliberately "wild_grass", same as meadow_start — see barren.tres's own
-; header for why (Open Question #10's real terrain differentiation is deferred, human
-; decision 2026-08-24).
+; THE MIX BELOW IS THE DECIDED VALUE (human ruling, 2026-09-07 -> D-53). See
+; meadow_start.tres's header for the shared reasoning; what is specific to this card:
+;
+;   trees + bush -> ONE `forest` entry, for the reason meadow_start.tres gives (bushes are two
+;     of forest.tres's eight model_scenes, not a terrain). At pick_variant()'s equal weights
+;     that reads as roughly 3/4 trees, 1/4 bushes.
+;   the remaining 60% -> split evenly, 15% each, across meadow, scrub, water and wild grass.
+;
+; **FOREST WAS 40%, NOT 60%, FROM THE SECOND RULING (human, 2026-09-08).** The originally
+; authored 50% trees + 10% bush made 60% of this map impassable — forest.tres sets
+; blocks_movement = true, and it is a TERRAIN flag, not a per-variant one, so a bush tile is as
+; impassable as a pine. 40% leaves a clear walkable majority; clumping (TerrainScatter) is what
+; keeps that majority connected rather than shredded into pockets. The four remaining terrains
+; absorbed the freed 20% evenly rather than one of them taking it, because nothing in the
+; ruling favoured one over another — still a tuning value, still a one-line edit here.
 
 [ext_resource type="Script" path="res://scripts/definitions/world_preset.gd" id="1_schema"]
 
@@ -13,3 +25,10 @@ display_name = "Forested"
 width = 36
 depth = 36
 base_terrain_id = "wild_grass"
+terrain_mix = {
+"forest": 0.4,
+"meadow": 0.15,
+"scrub": 0.15,
+"water": 0.15,
+"wild_grass": 0.15
+}

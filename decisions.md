@@ -1440,3 +1440,107 @@ does not confirm the numbers are final. No ✅ has been recorded in
 **Open for playtest** (neither is headless-checkable): that a tier fall reads as a herd
 *thinning* rather than a vanishing, and that a two-level cascade (`deer → stag`,
 `human → people → dogs`) produces **one** warning per settled gesture rather than a chain.
+
+---
+
+### D-53 · The three New Game cards build three different worlds (Open Question #10, second half)
+
+**Decision:** `WorldPreset` gains a `terrain_mix` field — terrain id -> relative weight —
+and `WorldGrid.build()` fills a new world from it. The shipped values:
+
+| | Barren | Meadow Start | Forested |
+|---|---|---|---|
+| wild_grass | 100% | 10% | 15% |
+| meadow | — | 40% | 15% |
+| forest | — | 20% | 40% |
+| scrub | — | 20% | 15% |
+| water | — | 10% | 15% |
+
+**Forested's forest share was ruled down from 60% to 40% on 2026-09-08**, one day after the
+rest of this entry, on the movement-blocking concern flagged below; the freed 20% was split
+evenly across the other four terrains. The 60% figure survives only in this sentence.
+
+Placement is **clumped**, not per-tile independent: each terrain is ranked by its own
+seeded noise field and takes the highest-scoring tiles, so a share arrives as ponds and
+stands. Counts are **exact**, fixed as integer quotas by largest-remainder before any tile
+is placed, so 10% water on a 36x36 is exactly 130 tiles at every seed.
+
+**Why:** the three cards existed from the 2026-08-24 New Game redesign but all three built
+identical tag-inert wild grass — each `.tres` header said terrain differentiation was
+"deferred to a separate, deliberate ruling." "Choose a starting land" with one land behind
+three labels is a promise the build did not keep. This is that ruling.
+
+**What this deliberately relaxes.** A Meadow or Forested start **emits habitat tags from
+frame one** — Rabbit can qualify on the meadow, the water species on the ponds, before the
+player has touched anything. That is the point of the card, not an oversight. The
+inert-land invariant still holds everywhere it was written for: revealed mist land
+(`MistReveal` is unchanged), `wild_grass` itself (`TerrainDefinition.validate()` still
+refuses to let it emit), and `base_terrain_id`, which stays tag-inert on all three presets
+and is asserted per-preset in `test_world_preset.gd`. **Barren is the control** — an empty
+mix, byte-identical to the world every build before this one produced, and the suite fails
+if it ever gains an entry.
+
+**Two things authored and not delivered as asked**, both accepted at ruling time:
+
+- **"10% bush" has no terrain to point at.** Bush and BushBerries are two of `forest.tres`'s
+  eight equal-weight `model_scenes`, so bushes were folded into the forest share and appear
+  via `pick_variant()`'s stable hash (D-42) at roughly 2/8 of forest tiles. Meadow Start
+  therefore reads ~15% trees / 5% bushes against an authored 10/10, and Forested ~45%/15%
+  against an authored 50%/10%. Splitting them exactly needs a real `bush` terrain with its
+  own tag and `blocks_movement` ruling — deliberately not this change.
+- **Forested was 60% impassable as authored, and is now 40%.** `blocks_movement` is a terrain
+  flag, not a per-variant one, so a bush tile blocks like a pine. Clumping keeps the walkable
+  remainder connected where a uniform draw would shred it into pockets, but 60% was dense
+  enough that the human ruled it down the next day (see the table). `TerrainScatter.
+  CLUMP_FREQUENCY` (0.09), which sets blob size, remains proposed rather than decided.
+
+**The one gate that is not cosmetic:** the mix is applied **only on a real `"new"` intent**.
+The `"none"` path — every other suite in the project, and an editor F6 — resolves to
+`meadow_start`, which now carries a mix; passing it unconditionally would rewrite the
+starting world of every suite at once. A load doesn't want it either, since `WorldSnapshot.apply()` restores terrain per tile.
+
+**Not decided here:** Open Question **#10**'s own wording in `spec.md`, left for the human to
+close in their own words.
+
+---
+
+### D-54 · "Mixed" is a real style, and it is what an unchosen terrain style means
+
+**Decision:** `WorldRoot.MIXED_STYLE_ID` (`"mixed"`) leads the style catalog for any picker
+category that is a terrain with more than one `model_scenes` entry — today, exactly `forest`.
+It is a style id that resolves to **no scene**: `resolve_style_scene()` returns null for it by
+design, and the caller falls through to `TerrainDefinition.pick_variant()`'s per-tile hash
+(D-42). Since `get_style_default()` degrades an unchosen category to its first catalog entry,
+a brand-new world's forest style is now `mixed`, and forest tiles show all eight of
+`forest.tres`'s variants — six trees plus Bush and BushBerries.
+
+**Why: this fixes a reported bug.** Every forest tile in the world was rendering CommonTree1.
+Both halves were behaving exactly as written — `TerrainChunkLod._resolve_variant()` routes the
+picker categories through the chosen style and falls back to `pick_variant()` only on a null,
+and `get_style_default()`'s documented contract is that it *never* returns "". So on a world
+where the player had chosen nothing, forest resolved to the first tree in the catalog, every
+tile, and the `pick_variant()` fallback was unreachable code. The gap was that there was no way
+to say *"no single tree — mix them"*, so "unchosen" collapsed onto "chose the first one".
+
+Making `mixed` a real catalog entry rather than a special case in the resolver means
+`get_style_default()` is untouched, the picker gets its new row for free (it builds from
+`style_ids_for_category()`), the choice saves and loads like any other style, and — the part a
+narrower fix would have missed — a player who picks a specific tree can pick **Mixed** back.
+
+**Two conditions, both necessary, for a category to offer it:**
+
+- **More than one scene.** `wild_grass` ships a single variant; a `mixed` row there would be a
+  second name for the one look it already has, and would move its unchosen default for no gain.
+- **Terrain, not a building.** `PlaceableDefinition` deliberately has no `pick_variant()` —
+  every placed instance of a buildable wears the same look — so `TerrainView` falls back to
+  `model_scenes[0]`. `mixed` on `house` would mean "always the first house": a duplicate of an
+  existing row that also silently moves that category's default onto it. The first draft of
+  this fix gated only on scene count and did exactly that; `test_hud_hotbar.gd` caught it.
+
+**Consequence for existing saves, accepted:** a world saved before this with no explicit forest
+choice loads as `mixed` rather than CommonTree1 — it gains the variety it previously had no way
+to express. A world with an explicit choice is unaffected. `test_save_round_trip.gd` pins this.
+
+**Not a content change.** No asset was added, removed or re-wired; `forest.tres` shipped all
+eight variants since the 2026-08-16 look pass. This is only about which of them the game asks
+for.

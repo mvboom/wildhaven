@@ -144,6 +144,11 @@ var style_defaults: Dictionary = {}
 ## header for why). Human ruling: grass, wild_grass, meadow and scrub collapse behind ONE
 ## hotbar button; snowfield stays its own top-level button and is deliberately NOT a
 ## member. `style_ids_for_category()` below is what actually resolves this.
+## THE "no single look — mix them" STYLE. Not a scene: a real, storable, player-selectable
+## style id that deliberately resolves to NOTHING, so `resolve_style_scene()` returns null and
+## the caller falls through to its own `pick_variant()` per-tile hash.
+const MIXED_STYLE_ID: String = "mixed"
+
 const TERRAIN_GROUP_ID: String = "grass_family"
 const TERRAIN_GROUP_MEMBERS: PackedStringArray = ["grass", "wild_grass", "meadow", "scrub"]
 
@@ -269,7 +274,16 @@ func _ready() -> void:
 		preset.width if preset != null else WorldGrid.DEFAULT_WIDTH)
 	var d: int = _dimension_from_save(saved, "depth",
 		preset.depth if preset != null else WorldGrid.DEFAULT_DEPTH)
-	grid.build(TerrainDefinition.load_all(), w, d)
+	# THE PRESET'S TERRAIN MIX IS APPLIED ONLY ON A REAL `"new"` INTENT (D-53), and that gate is
+	# load-bearing rather than tidy. The `"none"` path — every suite in this project, and an
+	# editor F6 — falls through to `WorldPreset.default_preset()`, which is `meadow_start`, which
+	# now carries a mix. Passing it unconditionally would rewrite the starting world of all 57
+	# suites at once, breaking the byte-identical guarantee this function's own header states.
+	# A load doesn't want it either: `WorldSnapshot.apply()` restores terrain per tile from the
+	# file, so generating a mix first would be work thrown away, and work that would show through
+	# anywhere the save is shorter than the grid.
+	var mix: Dictionary = preset.terrain_mix if (is_new_world and preset != null) else {}
+	grid.build(TerrainDefinition.load_all(), w, d, mix, world_seed)
 	grid.tile_changed.connect(_on_tile_changed)
 	grid.grown.connect(_on_grid_grown)  # Tier 1 row 13 (mist)
 
@@ -773,9 +787,43 @@ func style_ids_for_category(category: String) -> PackedStringArray:
 			if grid != null and grid.terrain_definition(id) != null:
 				out.append(id)
 		return out
-	for scene: PackedScene in _model_scenes_for_category(category):
+	var scenes: Array[PackedScene] = _model_scenes_for_category(category)
+	# `mixed` LEADS THE CATALOG, and leading it is the whole fix (2026-09-08). `get_style_default()`
+	# degrades an unchosen category to `valid_ids[0]`, so before this the first TREE was the
+	# unchosen default, `resolve_style_scene()` always returned it, and `TerrainChunkLod.
+	# _resolve_variant()`'s `pick_variant()` fallback was unreachable — every forest tile in the
+	# world rendered CommonTree1 while `forest.tres` shipped eight variants. Putting `mixed`
+	# first makes "the player has not chosen" mean *variety* instead of *the first entry*, with
+	# no change to `get_style_default()`'s own rule.
+	#
+	if _supports_mixed(category, scenes.size()):
+		out.append(MIXED_STYLE_ID)
+	for scene: PackedScene in scenes:
 		out.append(_style_id_from_scene_path(scene))
 	return out
+
+
+## Whether `category` may offer the `mixed` style — TWO conditions, both necessary.
+##
+## 1. **MORE THAN ONE SCENE.** A single-variant category (wild_grass, today) would get a second
+##    name for the one look it already has, and a changed unchosen default for no gain.
+##
+## 2. **TERRAIN, NOT A BUILDING.** `mixed` is only meaningful where the caller has a per-item
+##    fallback to fall through to, and only terrain does: `TerrainChunkLod._resolve_variant()`
+##    calls `TerrainDefinition.pick_variant(x, z)` on a null. `PlaceableDefinition` deliberately
+##    has NO `pick_variant()` (see its `model_scenes` comment — every placed instance of a
+##    buildable wears the same look), so `TerrainView` falls back to `model_scenes[0]`. Offering
+##    `mixed` on "house" would therefore mean "always the first house", which is a duplicate of
+##    an existing row AND silently moves that category's unchosen default onto it.
+##
+## Asked of the terrain roster rather than matched against a literal list, so a future terrain
+## picker category is covered without editing this function. "house" and "farm_building" resolve
+## to no TerrainDefinition and are correctly excluded; `TERRAIN_GROUP_ID` never reaches here
+## (`style_ids_for_category()` returns before this point).
+func _supports_mixed(category: String, scene_count: int) -> bool:
+	if scene_count <= 1 or grid == null:
+		return false
+	return grid.terrain_definition(category) != null
 
 
 ## The raw `model_scenes` array behind `category` — "house" reads the House
@@ -817,6 +865,12 @@ func resolve_style_scene(category: String) -> PackedScene:
 	if scenes.is_empty():
 		return null
 	var style_id: String = get_style_default(category)
+	# `mixed` RESOLVES TO NOTHING ON PURPOSE — it is the one style id that is not a scene. The
+	# null sends the caller to its own per-tile fallback (`pick_variant()` for terrain), which is
+	# exactly the variety the style id names. This is the only `return null` here that is a
+	# designed outcome rather than a defensive one.
+	if style_id == MIXED_STYLE_ID:
+		return null
 	for scene: PackedScene in scenes:
 		if _style_id_from_scene_path(scene) == style_id:
 			return scene

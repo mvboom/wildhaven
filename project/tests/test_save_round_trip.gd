@@ -1468,8 +1468,12 @@ func _check_an_old_save_with_no_style_defaults_falls_back_cleanly() -> void:
 	# THE FALLBACK, one per picker "flavor" (a derived filename-slug and a real placeable id —
 	# see `WorldRoot.get_style_default()`'s own doc comment), each category's FIRST catalog entry,
 	# not a crash and not an invented choice.
-	check_eq(world.get_style_default("forest"), "common_tree_1",
-		"...falling back to the forest category's first catalog entry")
+	# RE-POINTED 2026-09-08 (forest-variety fix) — was "common_tree_1". Same fallback rule,
+	# reading a different answer because the catalog now leads with `mixed` for a multi-variant
+	# terrain category. A pre-fix save that stored no forest choice therefore loads as *mixed*,
+	# which is the variety it visually had no way to express before.
+	check_eq(world.get_style_default("forest"), WorldRoot.MIXED_STYLE_ID,
+		"...falling back to the forest category's first catalog entry, now `mixed`")
 	check_eq(world.get_style_default("wild_grass"), "wild_grass",
 		"...and the wild_grass category's first catalog entry")
 	# RE-POINTED 2026-09-07 (house cull) — was "house". This is the same fallback, reading a

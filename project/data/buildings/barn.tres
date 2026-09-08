@@ -38,6 +38,24 @@
 ; a deliberate subsumption, not redundancy: species that only need "a barn" (any barn) are
 ; satisfied by this one too. See docs/superpowers/specs/2026-09-04-habitat-tiers-design.md
 ; § 8.
+; RENAMED 2026-09-07 (human ruling): `display_name` was "Barn", now "Large Barn" — so the name
+; itself says this is the big one. The 2x2 footprint was the only thing distinguishing it from
+; `small_barn` ("Small Barn") and `open_barn` ("Open Barn") in the Farm Building picker, and a
+; footprint is not visible in a list of names; a player reading "Barn / Small Barn / Open Barn"
+; has to infer that the unqualified one is the large one. Now all three barns are qualified.
+;
+; `id` IS DELIBERATELY STILL "barn" — ONLY the display name changed. The id is the save-file key
+; (placed buildings are stored by placeable id), the `farm_building` style id
+; (`WorldRoot.style_ids_for_category()` returns real PlaceableDefinition ids for that category,
+; not filename slugs), and the key `HabitatRecipe`/`BuildingPlacement` look this definition up
+; by. Changing it would invalidate every existing save's placed Barns for a cosmetic gain.
+; Likewise `emitted_tags` keeps `barn` + `large_barn` — those are the shared habitat vocabulary
+; in AnimalDefinition.HABITAT_TAGS, not player-facing copy.
+;
+; NOTE the display name and the tag now agree by accident of wording ("Large Barn" / `large_barn`)
+; but they are still separate facts; buildings.md's subsumption rule ("a large barn *is* a barn,
+; so Barn satisfies both `barn` and `large_barn`") is unchanged by this rename.
+;
 [gd_resource type="Resource" script_class="PlaceableDefinition" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/definitions/placeable_definition.gd" id="1_schema"]
@@ -46,11 +64,11 @@
 [resource]
 script = ExtResource("1_schema")
 id = "barn"
-display_name = "Barn"
+display_name = "Large Barn"
 hotbar_category = "farm_building"
 cost = 30
 footprint = Vector2i(2, 2)
 allowed_terrain = Array[String](["grass"])
 emitted_tags = Array[String](["built", "barn", "large_barn"])
 model_scenes = Array[PackedScene]([ExtResource("2_model")])
-fact_text = "PLACEHOLDER — flavor copy for the Barn pending Content Pipeline step 5."
+fact_text = "PLACEHOLDER — flavor copy for the Large Barn pending Content Pipeline step 5."

@@ -158,7 +158,17 @@ func _ready() -> void:
 
 ## Builds (or rebuilds) the grid from a terrain roster. Every tile starts as
 ## `START_TERRAIN_ID`. Separated from `_ready()` so tests and tools can drive it directly.
-func build(terrain_defs: Array, new_width: int = DEFAULT_WIDTH, new_depth: int = DEFAULT_DEPTH) -> void:
+## `terrain_mix` and `world_seed` DEFAULT TO THE PRE-D-53 BEHAVIOUR and must keep doing so: an
+## empty mix takes the uniform `START_TERRAIN_ID` fill this function has always done, which is
+## what leaves every suite's world — and the editor's F6 world — byte-identical. Only a real
+## New Game passes a mix; see `WorldRoot._ready()`'s call.
+func build(
+	terrain_defs: Array,
+	new_width: int = DEFAULT_WIDTH,
+	new_depth: int = DEFAULT_DEPTH,
+	terrain_mix: Dictionary = {},
+	world_seed: int = 0
+) -> void:
 	width = max(1, new_width)
 	depth = max(1, new_depth)
 
@@ -186,14 +196,54 @@ func build(terrain_defs: Array, new_width: int = DEFAULT_WIDTH, new_depth: int =
 	_tile_tag_masks.resize(count)
 	# Every tile starts as the same terrain with no building, so the mask is the same one
 	# value everywhere — resolved once, not per tile.
-	var start_def: TerrainDefinition = terrain_definition(START_TERRAIN_ID)
-	var start_mask: int = 0 if start_def == null else tags_mask(start_def.emitted_tags)
+	if terrain_mix.is_empty():
+		var start_def: TerrainDefinition = terrain_definition(START_TERRAIN_ID)
+		var start_mask: int = 0 if start_def == null else tags_mask(start_def.emitted_tags)
+		for i in count:
+			_terrain_ids[i] = START_TERRAIN_ID
+			_building_defs[i] = null
+			_building_origins[i] = Vector2i(-1, -1)
+			_tile_tag_masks[i] = start_mask
+		_forest_tile_count = 0
+	else:
+		_fill_from_mix(terrain_mix, count, world_seed)
+
+
+## The `terrain_mix` half of `build()` — a preset's starting terrain proportions, placed by
+## `TerrainScatter` and written straight into the flat stores.
+##
+## NO `set_terrain()` CALLS. The obvious wiring — walk the grid calling the public setter — is
+## ~1,296 signal emissions into a `TerrainView` that does not exist yet at this point in
+## `WorldRoot._ready()`, plus 1,296 redundant tag-mask resolutions. Writing the stores directly
+## is both correct and the only version that is cheap, and it is safe here specifically because
+## `build()` owns the arrays outright: nothing is listening and no tile has a building on it yet.
+##
+## THE TAG MASK IS RESOLVED PER DISTINCT TERRAIN, not per tile. A mix has a handful of ids and
+## a grid has thousands of tiles, and `tags_mask()` is a String round trip per call — the same
+## reason `_tile_tag_masks` exists at all (see its header).
+func _fill_from_mix(terrain_mix: Dictionary, count: int, world_seed: int) -> void:
+	var ids: PackedStringArray = TerrainScatter.generate(terrain_mix, width, depth, world_seed)
+
+	var mask_by_id: Dictionary = {}
+	var is_forest_by_id: Dictionary = {}
+	var forest_id: String = TerrainDefinition.normalize_id(FOREST_TERRAIN_ID)
+
+	_forest_tile_count = 0
 	for i in count:
-		_terrain_ids[i] = START_TERRAIN_ID
+		var id: String = ids[i]
+		if not mask_by_id.has(id):
+			var def: TerrainDefinition = terrain_definition(id)
+			# An id the shipped terrain set does not carry contributes no tags rather than
+			# taking the build down — the same non-fatal degradation `WorldSnapshot.apply()`
+			# uses. `test_world_preset.gd` is what makes a mis-authored mix loud.
+			mask_by_id[id] = 0 if def == null else tags_mask(def.emitted_tags)
+			is_forest_by_id[id] = TerrainDefinition.normalize_id(id) == forest_id
+		_terrain_ids[i] = id
 		_building_defs[i] = null
 		_building_origins[i] = Vector2i(-1, -1)
-		_tile_tag_masks[i] = start_mask
-	_forest_tile_count = 0
+		_tile_tag_masks[i] = int(mask_by_id[id])
+		if bool(is_forest_by_id[id]):
+			_forest_tile_count += 1
 
 
 # --- Mist reveal (Tier 1 row 13, D-38) ---------------------------------------------------

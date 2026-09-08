@@ -5,6 +5,14 @@ extends QATestCase
 ## alphabetical order, which would put Barren before Meadow), and selecting one is a real
 ## radio — exactly one card is ever pressed.
 ##
+## ALSO PINNED (2026-09-08): this screen's player-facing copy is WRITTEN, not stubbed. Both
+## captions shipped as `[COPY]` placeholders — the marker this project uses for text the human
+## has not ruled on — and a playtester would have read "[COPY] choose a starting land" on
+## screen. `_check_copy_is_written()` below asserts the marker is gone rather than asserting the
+## exact wording: the words are the human's to change at any time, the placeholder state is not
+## something to drift back into. Same posture, opposite direction, to
+## `test_neighborhood_preview.gd`'s assertion that ITS two band strings are still stubs.
+##
 ## Run:
 ##   bash scripts/run-tests.sh new_game_screen
 
@@ -36,6 +44,7 @@ func _process(_delta: float) -> bool:
 	_check_cards_render_in_curated_order()
 	_check_meadow_is_the_default_selection()
 	_check_selecting_a_card_is_a_real_radio()
+	_check_copy_is_written()
 
 	finish()
 	return true
@@ -77,3 +86,26 @@ func _check_selecting_a_card_is_a_real_radio() -> void:
 	check(forested.button_pressed, "pressing Forested selects it")
 	check(not barren.button_pressed,
 		"...and un-selects Barren — exactly one card is ever pressed, not an accumulating set")
+
+
+## THE COPY IS RULED. Asserts the `[COPY]` marker is absent from every Label on this screen —
+## not that any specific string is present. Wording is the human's call and may change without
+## touching this suite; regressing to a placeholder, or adding a new stubbed caption, may not.
+func _check_copy_is_written() -> void:
+	var labels: Array[Node] = []
+	_collect_labels(_screen, labels)
+	check(not labels.is_empty(), "the screen has captions to check")
+	for node: Node in labels:
+		var label: Label = node as Label
+		check(
+			not label.text.contains("[COPY]"),
+			"`%s` reads as finished copy, not a placeholder" % label.name,
+			"on screen a player would literally read: %s" % label.text
+		)
+
+
+func _collect_labels(node: Node, out: Array[Node]) -> void:
+	if node is Label:
+		out.append(node)
+	for child: Node in node.get_children():
+		_collect_labels(child, out)

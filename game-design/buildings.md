@@ -77,7 +77,7 @@ with no simulation meaning. They now have a job.
 | House | 1×1 | `built` · `house` | ~15 Wood |
 | **Farmhouse** *(new)* | 2×2 | `built` · `house` · `large_house` | ~30 Wood |
 | Small Barn | 1×1 | `built` · `barn` | ~15 Wood |
-| Barn | 2×2 | `built` · `barn` · `large_barn` | ~30 Wood |
+| Large Barn | 2×2 | `built` · `barn` · `large_barn` | ~30 Wood |
 | Open Barn | 1×1 | `built` · `barn` · `stable` | ~15 Wood |
 | Chicken Coop | 1×1 | `built` · `coop` | ~15 Wood |
 | Silo | 1×1 | `built` · `silo` | ~15 Wood |
@@ -93,7 +93,7 @@ one exclusion limit (`built ≤ N`) instead of enumerating nine building tags, a
 any building added later automatically participates in every wild species' exclusion
 without touching a single species file.
 
-**Three subsumptions are deliberate.** A large barn *is* a barn, so Barn satisfies both
+**Three subsumptions are deliberate.** A large barn *is* a barn, so Large Barn satisfies both
 `barn` and `large_barn`. An open-sided barn *is* a stable, so Open Barn serves cows or
 horses from one building. A farmhouse *is* a house, so it still shelters dogs and single
 villagers while also unlocking villager families.
@@ -123,7 +123,7 @@ villagers exactly as a birdhouse is for birds).
 **Values awaiting sign-off.** Every cost, footprint and model choice for the nine
 buildables beyond House is a **proposal, not a decision** — each `.tres` says so in its
 own header, per the project rule that all tuning values are the human's. Farmhouse's
-`cost = 30` and `footprint = 2×2` were copied from Barn's own unresolved proposal, and its
+`cost = 30` and `footprint = 2×2` were copied from Large Barn's own unresolved proposal, and its
 model (`HouseSecondage1Level3`, now `HouseMedium` — see the look-pool note below) was picked
 as the largest already-wired House variant so it reads as bigger than the 1×1 House.
 

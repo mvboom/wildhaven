@@ -2,10 +2,14 @@ extends Control
 ## NEW GAME — Tier 1 row 1's "fixed preset -> name -> in".
 ##
 ## 2026-08-24: Open Question #10 grew from one preset to three (Meadow/Barren/Forested),
-## rendered as selectable radio-style cards — human decision this session. Deliberately
-## STILL DEFERRED: `base_terrain_id` differentiation. All three presets currently build the
-## same tag-inert `wild_grass` start (see each `.tres`'s own header) — the cards are real and
-## selectable today, but which terrain each one actually produces is a separate ruling.
+## rendered as selectable radio-style cards — human decision that session.
+##
+## 2026-09-07 (-> D-53): the cards now build three DIFFERENT worlds. Each preset carries a
+## `terrain_mix` (see each `.tres`'s own header), placed in clumps by `TerrainScatter` from
+## the seed `new_seed()` draws below — so the seed this screen generates is what decides where
+## the ponds and stands land, not just row 13's mist reveal. Barren keeps an empty mix and is
+## still the pre-D-53 uniform wild grass. Nothing on this screen reads the mix; it hands the
+## chosen `WorldPreset` to `GameSession` exactly as before and `WorldRoot` applies it.
 ##
 ## THE NAME FIELD IS PRE-FILLED so a six-year-old can press the big button without typing
 ## anything. Naming is never destructive: a colliding name auto-suffixes inside

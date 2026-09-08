@@ -13,6 +13,28 @@ background_color = Color(0.53, 0.72, 0.86, 1)
 ambient_light_source = 2
 ambient_light_color = Color(0.6, 0.63, 0.68, 1)
 ambient_light_energy = 0.6
+; NO `tonemap_mode` HERE IS DELIBERATE — it is Godot's default, TONE_MAPPER_LINEAR, and that is
+; the ruling (2026-09-07, "drop the tonemapping, ship C alone"). Recorded because the absence of
+; a line is not self-evidently a decision, and because the question WAS opened and answered:
+;
+; Godot's "linear" tonemapper CLAMPS above 1.0 rather than rolling off, and this scene's own
+; light (`light_energy` 1.1 plus ambient (0.6, 0.63, 0.68) x 0.6 = a x1.460/1.478/1.508
+; multiplier on a sun-facing face) used to push several materials past it — the farm pack's
+; `White` at albedo 0.8210 and the RTS houses' `Stone_Light` at 0.7042 both pinned to a literal
+; #ffffff, against art.md's "no pure black or pure white".
+;
+; THAT IS FIXED AT THE ALBEDO INSTEAD, in assets/materials/farm/ — with the corrected neutrals
+; nothing exceeds 1.0 any more, so the clamp is never reached and a tonemapper is not needed to
+; avoid it. Filmic was tried and dropped: being a per-channel curve it desaturated the pack's
+; reds from ~0.58 to ~0.42 (LightRed lit #e9a79e -> #ddb5ae) and NARROWED the neutral spread
+; (0.759 -> 0.562), working against both art.md's "saturated but gentle" and the added greys
+; that were the point of the exercise.
+;
+; SO THE STANDING TRADE IS: full saturation and the widest neutral range, in exchange for no
+; headroom — raising `light_energy`, or importing a pack with brighter albedos, puts the hard
+; clip straight back. If that happens, revisit the tonemapper (ACES, `tonemap_mode = 3`, is the
+; untested alternative; Godot's ACES is matrix-based and was never modelled here) rather than
+; rediscovering the clamp from scratch.
 
 [node name="Main" type="Node3D"]
 script = ExtResource("1")

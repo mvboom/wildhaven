@@ -35,7 +35,9 @@ const EXPECTED: Array[Dictionary] = [
 		"tres": "res://data/buildings/barn.tres",
 		"model": "res://assets/buildings/barn/Barn.tscn",
 		"id": "barn",
-		"display_name": "Barn",
+		# RE-POINTED 2026-09-07 (human ruling): was "Barn". The id stays "barn" — see barn.tres's
+		# header for why only the display name moved.
+		"display_name": "Large Barn",
 		"cost": 30,
 		"footprint": Vector2i(2, 2),
 		"emitted_tags": ["built", "barn", "large_barn"],

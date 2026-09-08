@@ -1,0 +1,48 @@
+; Shared farm-building palette — White.
+;
+; ONE FILE PER COLOUR, SHARED BY THE WHOLE PACK. The Quaternius "Farm Buildings" pack reuses the
+; same material NAMES across all eight buildings, so each `.fbx.import` points its slot here via
+; `_subresources` -> `use_external`. Retuning the farm palette is a one-file edit, not a hunt
+; through eight importers. THESE VALUES ARE TUNING — the human's to move.
+;
+; Nothing but colour changed: roughness 1.0, metallic 0, specular 0.5 and per-pixel shading all
+; match the imported originals. `emission_enabled` is deliberately not carried over — the
+; originals set it true but with `emission_energy_multiplier` measured at 0.000, so it is an
+; inert FBX-import artefact, not a look decision.
+;
+; VALUE: linear 0.6600, 0.6450, 0.6100 (sRGB #d4d2cd). Pack original was linear 0.8210 (sRGB #eaeaea).
+;
+; --- WHY IT MOVED, TWICE -------------------------------------------------------------------
+; PASS 1 (2026-09-07) cut the neutrals hard, because the pack's `White` at linear 0.8210 was
+; rendering as a literal #ffffff: this scene's own light (`light_energy` 1.1 + ambient
+; (0.6, 0.63, 0.68) x 0.6) is a x1.46-1.51 multiplier on a sun-facing face, and the Environment's
+; default LINEAR tonemapper clamps rather than rolls off. Anything above ~0.663 linear pinned to
+; white, against art.md's "no pure black or pure white".
+;
+; PASS 2 (2026-09-08) LIFTED THEM BACK, on the report that the buildings had gone "overly grey,
+; greyer than the example images". Pass 1 overshot: it fixed the clipping but crushed the set,
+; and it made every neutral EXACTLY neutral when art.md asks for "warm-leaning". Both are
+; corrected here — values raised toward the clip ceiling, and each carries a slight warm lean
+; (R > G > B) rather than being a pure grey.
+; This is the one that was reported wrong, and the report was right.
+;
+; WHAT THIS FILE CANNOT FIX, measured and recorded so it is not re-litigated from scratch:
+; the "grey" reading comes mostly from SHADED faces, not lit ones, and shaded faces are most of a
+; building under a fixed 45 degree camera. A lit face multiplies albedo by ~1.5; a shaded one sees
+; ambient only, ~0.38 — and that ambient is (0.6, 0.63, 0.68), which is BLUE-leaning. So shadows
+; land cold and dark whatever this file says: at the pass-1 value a shaded `White` was #82858a,
+; and this pass only moves it to #868789. Four levels. Imperceptible.
+;
+; The pack's own Preview.png was sampled to check this. Its trim, its olive roofs and its grey
+; water tank all share the same warm ratio (G/R ~0.78-0.80, B/R ~0.44-0.54) despite having very
+; different albedos — one warm LIGHT explains all three, and the pack's FBX materials are in fact
+; all neutral. The example images get their warmth from lighting, not from materials. Matching
+; them properly means warming and lifting the ambient (and dropping the key to compensate), which
+; is a scene-wide change to Main.tscn affecting terrain, animals and trees — raised with numbers,
+; NOT decided, and deliberately not done from inside a materials file.
+; -------------------------------------------------------------------------------------------
+[gd_resource type="StandardMaterial3D" format=3]
+
+[resource]
+resource_name = "White"
+albedo_color = Color(0.6600, 0.6450, 0.6100, 1)
