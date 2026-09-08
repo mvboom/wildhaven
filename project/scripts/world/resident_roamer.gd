@@ -253,6 +253,12 @@ var _path_index: int = 0
 ## than erroring.
 var _world_navigation: WorldNavigation = null
 
+## Bound at construction (`_init()`'s last argument). Null is a supported, tested state — a
+## roamer with no region, or one holding fewer than `RoamRegion.MIN_REGION_TILES` tiles, falls
+## back to the uniform disc this class has always used. Same degradation idiom as
+## `_world_navigation` above.
+var _roam_region: RoamRegion = null
+
 
 ## `home_world` is the home site's world position; `home_radius_tiles` is the site's own
 ## radius, which the wander radius is clamped to. `bounds_xz` is the walkable surface in world
@@ -267,7 +273,8 @@ func _init(
 	rng: RandomNumberGenerator,
 	species_id: String = "",
 	avoid_ids: Array[String] = [],
-	world_navigation: WorldNavigation = null
+	world_navigation: WorldNavigation = null,
+	roam_region: RoamRegion = null
 ) -> void:
 	_resident = resident
 	_home = home_world
@@ -277,6 +284,7 @@ func _init(
 	_species_id = AnimalDefinition.normalize_id(species_id)
 	_avoid_ids = avoid_ids
 	_world_navigation = world_navigation
+	_roam_region = roam_region
 
 	_player = AnimalClips.find_player(_resident)
 	_idle_clip = AnimalClips.idle_clip(_player)
@@ -427,13 +435,25 @@ func _pick_idle_clip() -> String:
 	return flavors[_rng.randi_range(0, flavors.size() - 1)]
 
 
-## A point in the disc of `_radius` around the home site, clamped to the walkable surface.
-## `sqrt` on the radius keeps the distribution uniform over AREA rather than bunching every
-## waypoint near the den. The ANGLE alone is biased away from a nearby avoided species when
-## one is within reach (`_pick_angle()`) — the disc, the radius and the area distribution are
-## exactly what they were before row 9.
+## A point in the disc of `_radius` around the home site, clamped to the walkable surface —
+## OR, when a usable `RoamRegion` is bound, a point inside that region instead (roaming.md
+## §4.6: terrain-aware roaming replaces the disc entirely once the region is big enough to be
+## worth roaming; a null or too-small region degrades back to the disc unchanged).
+##
+## Threats are resolved ONCE per wander cycle, here, and handed to whichever picker runs — the
+## provider must never be called twice for one waypoint (it used to live inside
+## `_pick_angle()` alone, back when the disc was the only picker).
 func _pick_waypoint() -> Vector3:
-	var angle: float = _pick_angle()
+	var threats: Array = []
+	if _nearby_avoid_provider.is_valid():
+		var reported: Variant = _nearby_avoid_provider.call()
+		if reported != null:
+			threats = reported
+
+	if _roam_region != null and _roam_region.is_usable():
+		return _roam_region.pick_point(_rng, threats)
+
+	var angle: float = _pick_angle(threats)
 	var distance: float = _radius * sqrt(_rng.randf())
 	var point := Vector3(
 		_home.x + cos(angle) * distance,
@@ -447,16 +467,13 @@ func _pick_waypoint() -> Vector3:
 
 
 ## Uniform over `[0, TAU)` with nothing nearby to avoid — the pre-row-9 behaviour, byte
-## identical. Once the provider reports at least one avoided resident within
-## `AVOID_DISTANCE_TILES`, the angle is instead drawn from a cone of half-width
-## `AVOID_BIAS_HALF_ARC_RADIANS` centred on the direction FROM the average threat position
-## TOWARD the home site — "away", in the same (x maps to cos, z maps to sin) convention
-## `_pick_waypoint()` already uses, so this never needs its own coordinate mapping.
-func _pick_angle() -> float:
-	if not _nearby_avoid_provider.is_valid():
-		return _rng.randf_range(0.0, TAU)
-	var threats: Array = _nearby_avoid_provider.call()
-	if threats == null or threats.is_empty():
+## identical. Once `threats` (already resolved by `_pick_waypoint()`) holds at least one
+## avoided resident within `AVOID_DISTANCE_TILES`, the angle is instead drawn from a cone of
+## half-width `AVOID_BIAS_HALF_ARC_RADIANS` centred on the direction FROM the average threat
+## position TOWARD the home site — "away", in the same (x maps to cos, z maps to sin)
+## convention `_pick_waypoint()` already uses, so this never needs its own coordinate mapping.
+func _pick_angle(threats: Array) -> float:
+	if threats.is_empty():
 		return _rng.randf_range(0.0, TAU)
 
 	var away_x: float = 0.0

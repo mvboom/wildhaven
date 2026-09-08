@@ -108,6 +108,25 @@ func present(resident: Node3D, site: HomeSite) -> void:
 	if species != null:
 		avoid_ids = species.normalized_avoids()
 
+	# `mini(capacity_radius, site.radius)`: gdd.md bounds roaming by the home NEIGHBOURHOOD,
+	# and `test_resident_wander.gd` asserts containment against `site.radius` specifically.
+	# Every shipped species has `capacity_radius = 0` (follow scout), which already lands at or
+	# under `site.radius`, so this clamp is not binding today — it is here so that stays true
+	# by construction rather than by luck if a species ever sets an explicit capacity radius.
+	#
+	# The region needs both the grid and the species, and this is the only place that holds
+	# both. A caller that passed no roster gets `species == null` and therefore no region,
+	# which is the pre-terrain-awareness uniform disc — not an error.
+	var roam_region: RoamRegion = null
+	if species != null and _grid != null:
+		roam_region = RoamRegion.new(
+			_grid,
+			_navigation,
+			site.position,
+			WorldGrid.tags_mask(species.habitat_needs),
+			mini(species.effective_capacity_radius(), site.radius)
+		)
+
 	var roamer := ResidentRoamer.new(
 		resident,
 		_home_world(site),
@@ -116,7 +135,8 @@ func present(resident: Node3D, site: HomeSite) -> void:
 		_rng,
 		site.species_id,
 		avoid_ids,
-		_navigation
+		_navigation,
+		roam_region
 	)
 	# Bound AFTER construction: the provider closes over `roamer`, which does not exist until
 	# `ResidentRoamer.new()` returns.

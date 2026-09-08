@@ -13,6 +13,7 @@ for its own slice; nothing supersedes the GDD, but the GDD defers to these for d
 | [gdd.md](../game-design/gdd.md) | The design contract — pillars, loop, systems, scope, the 15-row Tier 1 table |
 | [spec.md](../game-design/spec.md) | The field-level build contract — data schemas, screen layouts, pacing constants, Open Questions |
 | [roster.md](../game-design/roster.md) · [terrain.md](../game-design/terrain.md) · [buildings.md](../game-design/buildings.md) | Per-content-type design — the decided values, i.e. the artifact of Content Pipeline step 3 |
+| [roaming.md](../game-design/roaming.md) | Terrain-aware roaming — how a resident chooses where it may walk |
 | [art.md](../game-design/art.md) | Art direction, sourcing policy, licensing decisions |
 | [asset-import-pipeline.md](../game-design/asset-import-pipeline.md) | The runnable import procedure (tech-art's slice of the content flow) |
 | [fact-card-pipeline.md](../game-design/fact-card-pipeline.md) | The runnable fact-card generation procedure (content-writer's automated slice of the content flow) |

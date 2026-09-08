@@ -68,6 +68,19 @@ const START_TERRAIN_ID: String = "wild_grass"
 const FOREST_TERRAIN_ID: String = "forest"
 
 
+## Bumped by every writer that changes what a tile emits. **Monotonic and never reset** — it
+## is only ever compared for equality against a value someone cached earlier, never read as a
+## count of anything.
+##
+## This exists for `RoamRegion` (game-design/roaming.md §4.4), which caches a set of tiles and
+## needs to know in O(1) that the cache is stale. The bump lives in `_refresh_tag_mask()`
+## rather than in each writer because that function's own doc already promises it is "called by
+## every writer that changes what a tile holds" — making it the one seam a new writer cannot
+## forget. `build()` (both its uniform-fill and mix-fill branches, in one bump after the
+## `if`/`else` so a rebuild counts once, not per tile) and `grow()` write `_tile_tag_masks`
+## directly rather than through `_refresh_tag_mask()`, so they bump explicitly instead.
+var terrain_version: int = 0
+
 var width: int = DEFAULT_WIDTH
 var depth: int = DEFAULT_DEPTH
 
@@ -233,6 +246,11 @@ func build(
 		_forest_tile_count = 0
 	else:
 		_fill_from_mix(terrain_mix, count, world_seed)
+	# Both branches above write `_tile_tag_masks` straight into the arrays rather than through
+	# `_refresh_tag_mask()`, so a `build()` call — including a REBUILD of an already-live grid,
+	# per this function's own header — needs its own bump. One bump here, after both branches,
+	# rather than one inside each: a rebuild invalidates the whole grid once, not once per tile.
+	terrain_version += 1
 
 
 ## The `terrain_mix` half of `build()` — a preset's starting terrain proportions, placed by
@@ -352,6 +370,7 @@ func grow(requested_width: int, requested_depth: int, world_seed: int) -> Array[
 				_tile_tag_masks[i] = _tag_mask_for_tile(x, z)
 				new_tiles.append(Vector2i(x, z))
 
+	terrain_version += 1
 	grown.emit(new_tiles)
 	return new_tiles
 
@@ -479,6 +498,7 @@ func _refresh_tag_mask(x: int, z: int) -> void:
 	var i: int = _index(x, z)
 	if i < _tile_tag_masks.size():
 		_tile_tag_masks[i] = _tag_mask_for_tile(x, z)
+	terrain_version += 1
 
 
 ## Forest tiles currently on the map, maintained incrementally so the economy never scans
