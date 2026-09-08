@@ -28,7 +28,7 @@ mouse_filter = 2
 theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
 theme_override_font_sizes/font_size = 26
 autowrap_mode = 3
-text = "[COPY] Wildhaven uses art from other creators. Thank you!"
+text = "Wildhaven uses art from other creators. Thank you!"
 
 [node name="Rule" type="HSeparator" parent="Stack"]
 layout_mode = 2
@@ -52,5 +52,5 @@ layout_mode = 2
 mouse_filter = 2
 theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
 theme_override_font_sizes/font_size = 26
-text = "[COPY] Nothing to credit yet."
+text = "Nothing to credit yet."
 autowrap_mode = 3

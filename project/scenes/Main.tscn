@@ -11,8 +11,35 @@
 background_mode = 1
 background_color = Color(0.53, 0.72, 0.86, 1)
 ambient_light_source = 2
-ambient_light_color = Color(0.6, 0.63, 0.68, 1)
-ambient_light_energy = 0.6
+; WARM, LIFTED AMBIENT — DECIDED 2026-09-08 (human A/B, kept). See decisions.md -> D-55. Paired
+; with `light_energy` 1.1 -> 0.75 on DirectionalLight3D below; the two only make sense together
+; and must be changed together. Previous values, for the record: ambient (0.6, 0.63, 0.68) at
+; 0.6 energy, key at 1.1.
+;
+; WHY. The farm buildings read "greyer than the example images". Two passes at the ALBEDO (see
+; assets/materials/farm/) could not fix it, and the measurement says why: under a fixed ~45
+; degree camera most of a building is SHADED, a shaded face sees ambient only (~x0.38 where a
+; sun-facing one sees ~x1.5), and this ambient was (0.6, 0.63, 0.68) — BLUE-leaning. So shadows
+; landed cold and dark no matter what the materials said. Lifting `White` between the two
+; material passes moved a shaded face from #82858a to #868789: four levels, imperceptible.
+;
+; The pack's own Preview.png was sampled to find the target. Its cream trim, olive roofs and grey
+; water tank all share one warm ratio (G/R ~0.78-0.80, B/R ~0.44-0.54) despite very different
+; albedos — and the pack's FBX materials are measurably all NEUTRAL. One warm light explains all
+; three. The reference look is a LIGHTING property, which is why it was unreachable from a
+; materials file.
+;
+; The key drops as the ambient rises so sun-facing faces stay put and nothing starts clipping —
+; the whole point is to lift the SHADOWS, not to brighten the scene. Measured, on `White`:
+;   sun-facing  #fbfaf6 -> #fdf8ec   (no clip either way; ceiling even rises 0.663 -> 0.671)
+;   shaded      #868789 -> #bab3a6
+;   RoofBlack shaded #484847 -> #666258
+;
+; THIS IS SCENE-WIDE — terrain, animals, houses, trees and the mist all shift warm, not just the
+; farm buildings it was diagnosed from. That is the thing to judge in the A/B: the buildings were
+; the symptom, but the change is to the whole game's mood. Nothing here is signed off.
+ambient_light_color = Color(0.78, 0.74, 0.66, 1)
+ambient_light_energy = 0.95
 ; NO `tonemap_mode` HERE IS DELIBERATE — it is Godot's default, TONE_MAPPER_LINEAR, and that is
 ; the ruling (2026-09-07, "drop the tonemapping, ship C alone"). Recorded because the absence of
 ; a line is not self-evidently a decision, and because the question WAS opened and answered:
@@ -45,7 +72,12 @@ environment = SubResource("Environment_1")
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
 unique_name_in_owner = true
 transform = Transform3D(0.707107, -0.5, 0.5, 0, 0.707107, 0.707107, -0.707107, -0.5, 0.5, 4, 10, 4)
-light_energy = 1.1
+; DECIDED 2026-09-08 (decisions.md -> D-55) — was 1.1. The key comes DOWN by almost exactly what
+; the warm ambient above goes UP, so the sun-facing total barely moves and nothing starts
+; clipping; what changes is the key-to-fill RATIO, which is what actually controls how dark and
+; how cold a shadow reads. Contrast on a shaded vs lit face goes from about 4:1 to about 2:1.
+; Change this together with the three ambient values above — neither half is meaningful alone.
+light_energy = 0.75
 shadow_enabled = true
 
 ; THE CAMERA (D-41). Fixed orthographic, yaw=45/pitch≈-26.565 (IsoCameraFraming).

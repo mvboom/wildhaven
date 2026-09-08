@@ -39,7 +39,7 @@ layout_mode = 2
 mouse_filter = 2
 theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
 theme_override_font_sizes/font_size = 26
-text = "[COPY] Master Volume"
+text = "Master Volume"
 
 [node name="MasterVolumeSlider" type="HSlider" parent="Stack/MasterVolumeRow"]
 unique_name_in_owner = true
@@ -70,4 +70,4 @@ mouse_filter = 2
 theme_override_colors/font_color = Color(0.42, 0.29, 0.169, 1)
 theme_override_font_sizes/font_size = 26
 button_pressed = true
-text = "[COPY] Gameplay Hints"
+text = "Gameplay Hints"

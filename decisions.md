@@ -1544,3 +1544,83 @@ to express. A world with an explicit choice is unaffected. `test_save_round_trip
 **Not a content change.** No asset was added, removed or re-wired; `forest.tres` shipped all
 eight variants since the 2026-08-16 look pass. This is only about which of them the game asks
 for.
+
+---
+
+### D-55 · The reference look is lighting, not materials — warm, lifted ambient over a lower key
+
+**Decision:** `Main.tscn`'s Environment goes warm and bright in the fill while the key comes down
+to compensate — `ambient_light_color` (0.6, 0.63, 0.68) → **(0.78, 0.74, 0.66)**,
+`ambient_light_energy` 0.6 → **0.95**, `DirectionalLight3D.light_energy` 1.1 → **0.75**. The three
+move together or not at all. Alongside it, the Quaternius Farm Buildings pack's four neutrals get
+a shared albedo override in `project/assets/materials/farm/` (one `.tres` per colour, wired into
+all eight `.fbx.import` files via `_subresources` → `use_external`).
+
+**The reported problem:** the farm buildings' whites "seem very white, like we're lacking some
+greys," and later — after a first albedo pass — "overly grey, greyer than the example images."
+
+**What the measurements found, in order.** Three separate causes, and only the third was the one
+that mattered:
+
+1. **The whites were literally clipping.** A sun-facing face sees `light_energy` plus ambient,
+   which at the old values was a ×1.46–1.51 multiplier, and the Environment carries no
+   `tonemap_mode` — so Godot's default LINEAR tonemapper *clamps* rather than rolling off.
+   Anything above ~0.663 linear albedo pinned to a literal `#ffffff`: the farm pack's `White`
+   (0.8210) and the RTS houses' `Stone_Light` (0.7042) both did, against art.md's stated
+   "no pure black or pure white."
+2. **The pack's neutral range was compressed and pale.** Its darkest neutral is *named*
+   `RoofBlack` and measured `#979797` — a mid grey. Nothing anchored the bottom of the value
+   range, which is what "lacking some greys" describes.
+3. **The scene was lit cold, and that is where the grey actually lived.** Under a fixed ~45°
+   camera most of a building is SHADED, and a shaded face sees ambient only (~×0.38, against
+   ~×1.5 for a lit one). The old ambient was (0.6, 0.63, 0.68) — *blue*-leaning. So shadows
+   landed cold and dark regardless of what any material said.
+
+**Why materials could not fix it, proven by trying twice.** Pass 1 cut the neutrals hard; that
+removed the clipping but crushed the set and made every neutral *exactly* neutral, producing the
+"overly grey" report. Pass 2 lifted them back toward the clip ceiling with a warm lean. Between
+those two passes a shaded `White` moved from `#82858a` to `#868789` — **four levels,
+imperceptible.** The albedo simply cannot reach the shadows.
+
+**The evidence that settled it.** The pack ships its own `Preview.png`, and sampling it shows its
+cream trim, its olive roofs and its grey water tank all share one warm ratio (G/R ≈ 0.78–0.80,
+B/R ≈ 0.44–0.54) *despite having very different albedos* — while the pack's FBX materials measure
+as perfectly neutral. One warm **light** explains all three surfaces at once. The look the
+reference images have is a lighting property, which is exactly why it was unreachable from a
+materials file.
+
+**What the change does, measured.** On `White`: sun-facing `#fbfaf6` → `#fdf8ec` (no clipping
+either way — the ceiling even rises 0.663 → 0.671), shaded `#868789` → **`#bab3a6`**.
+`RoofBlack` shaded `#484847` → `#666258`. Key-to-fill contrast goes from about 4:1 to about 2:1.
+The lit faces are deliberately near-identical; the entire visible change is in the shadows.
+
+**Alternatives considered and rejected:**
+
+- **A tonemapper (Filmic).** Tried and dropped. Godot's filmic is a per-channel curve, so it
+  desaturated the pack's reds from ~0.58 to ~0.42 saturation and *narrowed* the neutral spread
+  (0.759 → 0.562) — working against both art.md's "saturated but gentle" and the added greys that
+  were the whole point. It also became redundant: once the albedos are legal, nothing exceeds 1.0
+  and the clamp is never reached. ACES was never modelled (matrix-based; could not be predicted
+  as reliably as filmic) and remains the untested fallback.
+- **Baking the reference's warmth into each albedo.** Rejected as structurally dishonest: the
+  warmth is one light, not eight materials, and faking it per-material would have to be undone
+  the moment the lighting changed.
+- **Leaving `light_energy` at 1.1 and only raising ambient.** Rejected — it pushes sun-facing
+  faces back into clipping. Dropping the key is what buys the headroom.
+
+**Accepted consequences:**
+
+- **This is scene-wide.** Terrain, animals, houses, trees and the mist all shift warm; the farm
+  buildings were only where the problem was diagnosed. Judged in an A/B and kept.
+- **Flatter shadows.** Halving the key-to-fill ratio is what fixes the coldness, and it also
+  reduces form-reading. If it ever reads too flat, `light_energy` back up toward 0.85–0.90 keeps
+  most of the warmth with more shape.
+- **No headroom.** With linear tonemapping and no clipping margin to spare, raising
+  `light_energy` or importing a pack with brighter albedos puts the hard clip straight back. That
+  is when to revisit ACES.
+- **`background_color` is untouched** at (0.53, 0.72, 0.86) — still a cool blue sky behind a now
+  warmer world. Deliberately left for a separate look at whether it wants to follow.
+
+**Not decided here:** the farm palette's four values are tuning and remain the human's to move —
+they live in one file per colour precisely so retuning is a one-file edit rather than a hunt
+through eight importers.

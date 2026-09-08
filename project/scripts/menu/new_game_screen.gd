@@ -31,7 +31,7 @@ const DEFAULT_WORLD_NAME: String = "Wildhaven"
 ## alphabetical order (which would put Barren before Meadow). Any preset id not in this list
 ## still renders, appended after — future presets #10 might add later aren't silently lost,
 ## they just don't get a curated position yet.
-const PRESET_ORDER: Array[String] = ["meadow_start", "barren_start", "forested_start"]
+const PRESET_ORDER: Array[String] = ["barren_start","meadow_start", "forested_start"]
 
 @onready var _preset_row: HBoxContainer = %PresetRow
 @onready var _name_field: LineEdit = %NameField

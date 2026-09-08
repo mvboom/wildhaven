@@ -57,7 +57,7 @@ func _check_cards_render_in_curated_order() -> void:
 	var labels: Array[String] = []
 	for i: int in row.get_child_count():
 		labels.append((row.get_child(i) as Button).text)
-	check_eq(labels, ["Meadow Start", "Barren", "Forested"],
+	check_eq(labels, ["Meadow", "Barren", "Forested"],
 		"cards render in the curated PRESET_ORDER, not WorldPreset.load_all()'s own "
 		+ "alphabetical order (which would put Barren before Meadow)")
 
