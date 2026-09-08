@@ -36,10 +36,12 @@ func _init() -> void:
 	# --- human-decided values -------------------------------------------------
 	check_eq(rabbit.id, "rabbit", "id")
 	check_eq(rabbit.display_name, "Rabbit", "display_name")
-	# Rabbit gained `cover` on 2026-07-21 (-> D-22). `open_grass` alone was satisfiable by
-	# untouched revealed land, which would have let rabbits settle ground the player never
-	# made — see the inert-land invariant in animal_definition.gd.
-	check_eq(rabbit.habitat_needs, ["open_grass", "cover"] as Array[String], "habitat_needs")
+	# Rabbit gained `cover` on 2026-07-21 (-> D-22) so `open_grass` alone would not be
+	# satisfiable by untouched revealed land (the inert-land invariant in
+	# animal_definition.gd). `cover` was RETIRED 2026-09-07 (habitat-tiers re-spec moved
+	# Rabbit's real needs onto `tiers`: open_grass/cultivated); this legacy flat field is
+	# inert and now reads `["open_grass"]` alone.
+	check_eq(rabbit.habitat_needs, ["open_grass"] as Array[String], "habitat_needs")
 	check_eq(rabbit.personality, AnimalDefinition.PERSONALITY_BOLD, "personality == \"Bold\"")
 	check_eq(rabbit.personality, "Bold", "personality is the literal string \"Bold\"")
 	check(AnimalDefinition.PERSONALITIES.has(rabbit.personality),

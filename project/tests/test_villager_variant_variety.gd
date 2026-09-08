@@ -30,7 +30,9 @@ extends QATestCase
 ## numbers in the header above are the numbers being asserted.
 const VILLAGER_LOOKS: int = 18
 
-## Fixture habitat. Four blocks of `cover`, far enough apart (20 tiles, against a scout radius
+## Fixture habitat. Four blocks of `rocks` (`cover` RETIRED 2026-09-07, habitat-tiers
+## re-spec — re-pointed to `rocks`, which the `rock` terrain painted below still emits), far
+## enough apart (20 tiles, against a scout radius
 ## of 8) that no two can share a tile — which is what guarantees SEVERAL home sites, and several
 ## home sites is the exact condition the bug needed to show itself.
 const BLOCK_ORIGINS: Array[Vector2i] = [
@@ -200,8 +202,9 @@ func _check_a_single_variant_species_is_unaffected() -> void:
 # --- fixture ----------------------------------------------------------------------------------
 
 ## A scene-free world: real grid, real registry, real queue, and a one-species synthetic roster
-## whose only need is `cover`. Mirrors `test_event_driven_simulation.gd`'s fixture, with a
-## multi-look species in place of its single grey box.
+## whose only need is `rocks` (`cover` RETIRED 2026-09-07). Mirrors
+## `test_event_driven_simulation.gd`'s fixture, with a multi-look species in place of its single
+## grey box.
 func _fixture(look_count: int) -> Dictionary:
 	var grid := WorldGrid.new()
 	grid.build(TerrainDefinition.load_all(), 36, 36)
@@ -209,7 +212,7 @@ func _fixture(look_count: int) -> Dictionary:
 	var species := AnimalDefinition.new()
 	species.id = "villager_fixture"
 	species.display_name = "Villager Fixture"
-	species.habitat_needs = ["cover"] as Array[String]
+	species.habitat_needs = ["rocks"] as Array[String]
 	species.personality = AnimalDefinition.PERSONALITY_BOLD
 	species.tiles_per_individual = 4
 	species.scout_radius = 8

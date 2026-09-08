@@ -36,8 +36,9 @@ const TERRAIN_IDS: PackedStringArray = [
 
 ## terrain.md -> Already-Defined Terrain, "v1 tag-source mapping" (#5 closed -> D-25).
 ## Transcribed exactly, INCLUDING ORDER, so a reordering edit is visible as a diff rather
-## than silently tolerated. Rock's two-tag row is the load-bearing one: rock, not forest,
-## is the `cover` source, and both floor species need `cover`.
+## than silently tolerated. Rock's row USED TO carry `cover` alongside `rocks`; `cover` was
+## RETIRED 2026-09-07 (habitat-tiers re-spec moved every shipped consumer off it), so Rock's
+## job is now `rocks` alone, consumed by Donkey, Alpaca, Shiba Inu and Stag.
 ##
 ## Wild grass's EMPTY entry is a decided value, not an unfinished row (spec.md -> Shared
 ## Patterns, the inert-land invariant).
@@ -51,7 +52,7 @@ const EXPECTED_TAGS: Dictionary = {
 	"forest": ["forest"],
 	"grass": ["open_grass"],
 	"meadow": ["open_grass", "flowers"],
-	"rock": ["cover", "rocks"],
+	"rock": ["rocks"],
 	"scrub": ["browse", "rocks"],
 	"snowfield": ["snow"],
 	"water": ["water"],

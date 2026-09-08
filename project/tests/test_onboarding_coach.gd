@@ -256,9 +256,14 @@ func _check_bind_content_beat_two_uses_rabbits_real_tier_not_the_stale_flat_fiel
 	# Pins this fixture's own premise. If rabbit.tres's flat fields are ever brought back in
 	# sync with its real tier (or removed), this fails LOUDLY rather than this whole check
 	# silently proving nothing.
-	check_eq(rabbit.habitat_needs, ["open_grass", "cover"] as Array[String],
-		"rabbit.tres's flat `habitat_needs` is still the pre-tier ['open_grass', 'cover'] "
-		+ "pair (left in place only 'so a rollback is a one-line edit' — rabbit.tres's own "
+	#
+	# `cover` was RETIRED 2026-09-07 (habitat-tiers re-spec), which also dropped it from this
+	# stale flat field, so the pre-tier pair is now the single entry `['open_grass']` — still
+	# stale relative to the real base tier (which also needs `cultivated`), so the premise
+	# below still holds.
+	check_eq(rabbit.habitat_needs, ["open_grass"] as Array[String],
+		"rabbit.tres's flat `habitat_needs` is still the stale pre-tier ['open_grass'] "
+		+ "value (left in place only 'so a rollback is a one-line edit' — rabbit.tres's own "
 		+ "header) — this fixture's whole premise depends on that field staying stale")
 
 	var real_roster: SpeciesRoster = _world.roster

@@ -62,10 +62,15 @@ func _init() -> void:
 		"...and pairing it with `open_grass` no longer trips the invariant either — `quiet` is no longer in BARE_TAGS, so `only_bare` cannot go true")
 
 	# --- legitimate species pass ------------------------------------------------
-	check(not _has_invariant_problem(_make(["open_grass", "cover"] as Array[String])),
-		"the retuned Rabbit (`open_grass, cover`) is ACCEPTED")
-	check(not _has_invariant_problem(_make(["forest", "cover"] as Array[String])),
-		"Fox (`forest, cover`) is ACCEPTED")
+	# `cover` RETIRED 2026-09-07 (habitat-tiers re-spec moved every shipped consumer off
+	# it): these two fixtures used to be `["open_grass", "cover"]` (Rabbit) and
+	# `["forest", "cover"]` (Fox). Re-pointed to real post-retirement legacy pairs —
+	# Rabbit's real base tier (open_grass, cultivated) and Stag's legacy field
+	# (forest, rocks) — rather than to a tag no shipped species names any more.
+	check(not _has_invariant_problem(_make(["open_grass", "cultivated"] as Array[String])),
+		"Rabbit-style (`open_grass, cultivated`) is ACCEPTED")
+	check(not _has_invariant_problem(_make(["forest", "rocks"] as Array[String])),
+		"Stag-style (`forest, rocks`) is ACCEPTED")
 	check(not _has_invariant_problem(_make(["cultivated", "open_grass"] as Array[String])),
 		"Chicken (`cultivated, open_grass`) is ACCEPTED — `cultivated` is player-made")
 

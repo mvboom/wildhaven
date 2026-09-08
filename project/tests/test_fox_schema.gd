@@ -45,7 +45,9 @@ func _init() -> void:
 	# --- human-decided values -------------------------------------------------
 	check_eq(fox.id, "fox", "id")
 	check_eq(fox.display_name, "Fox", "display_name")
-	check_eq(fox.habitat_needs, ["forest", "cover"] as Array[String], "habitat_needs")
+	# `cover` RETIRED 2026-09-07 (habitat-tiers re-spec moved Fox's real needs onto `tiers`:
+	# forest/open_grass/water); this legacy flat field is inert and now reads `["forest"]`.
+	check_eq(fox.habitat_needs, ["forest"] as Array[String], "habitat_needs")
 	check_eq(fox.personality, AnimalDefinition.PERSONALITY_SHY, "personality == \"Shy\"")
 	check_eq(fox.personality, "Shy", "personality is the literal string \"Shy\" (self-documenting on disk)")
 	check(AnimalDefinition.PERSONALITIES.has(fox.personality),

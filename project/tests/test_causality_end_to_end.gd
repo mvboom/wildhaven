@@ -199,8 +199,11 @@ func _check_negative_control_before_any_edit() -> void:
 func _check_wild_species_causality() -> void:
 	var rabbit: AnimalDefinition = _world.roster.by_id("rabbit")
 	check(rabbit != null, "the rabbit is in the shipped roster")
-	check_eq(rabbit.habitat_needs, ["open_grass", "cover"] as Array[String],
-		"rabbit needs open_grass + cover — and rock, not forest, is the `cover` source")
+	# `cover` RETIRED 2026-09-07 (habitat-tiers re-spec moved Rabbit's real needs onto
+	# `tiers`: open_grass/cultivated); this legacy flat field is inert and now reads
+	# `["open_grass"]` alone.
+	check_eq(rabbit.habitat_needs, ["open_grass"] as Array[String],
+		"rabbit's legacy habitat_needs is now open_grass alone")
 
 	# RE-POINTED 2026-09-04 (habitat-tiers ruling): `capacity_at()` now reads
 	# `AnimalDefinition.effective_tiers()`, which prefers the real `tiers` rabbit.tres now

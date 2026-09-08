@@ -11,13 +11,15 @@ func _init() -> void:
 	var species := AnimalDefinition.new()
 	species.id = "probe"
 	species.display_name = "Probe"
-	species.habitat_needs = ["cover"] as Array[String]
+	# `cover` RETIRED 2026-09-07 (habitat-tiers re-spec) — re-pointed to `rocks`, which the
+	# `rock` terrain painted below still emits.
+	species.habitat_needs = ["rocks"] as Array[String]
 	species.tiles_per_individual = 4
 	species.scout_radius = 8
 	var sim := HabitatSimulation.new()
 	sim.attach(grid, SpeciesRoster.new([species]), registry, arrivals, null)
 
-	# Eight cover tiles in a row.
+	# Eight rock tiles in a row.
 	var a := Vector2i(18, 18)
 	for i in 8:
 		grid.set_terrain(a.x + i, a.y, "rock")

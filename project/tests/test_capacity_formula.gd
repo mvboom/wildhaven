@@ -18,6 +18,13 @@ extends QATestCase
 ## below state what the *formula* does, so retuning `rabbit.tres` or `fox.tres` must never
 ## move them. The shipped roster's own values are pinned in the per-species schema suites.
 ##
+## RE-POINTED 2026-09-07 (`cover` retirement): every synthetic species below used to need
+## `cover`, satisfied by painting real `rock` terrain tiles (Rock used to emit BOTH `cover`
+## and `rocks`). `cover` was RETIRED — Rock's job is now `rocks` alone — so every fixture
+## species here now needs `rocks` instead. The terrain painted is still literal `"rock"`
+## throughout; only the TAG name changed, so the radius/divisor arithmetic under test is
+## byte-for-byte the same as before.
+##
 ## Run:
 ##   $GODOT_PATH --headless --path project --import
 ##   $GODOT_PATH --headless --path project --script res://tests/test_capacity_formula.gd
@@ -165,24 +172,24 @@ func _check_capacity_radius_is_consumed() -> void:
 	var empty := HomeSiteRegistry.new()
 	var origin := Vector2i(18, 18)
 
-	# Three cover tiles at exactly distance 10 — outside a radius of 8, inside one of 12.
+	# Three rock tiles at exactly distance 10 — outside a radius of 8, inside one of 12.
 	for tile: Vector2i in [
 		origin + Vector2i(10, 0), origin + Vector2i(-10, 0), origin + Vector2i(0, 10)
 	] as Array[Vector2i]:
 		grid.set_terrain(tile.x, tile.y, "rock")
 
 	# Divisor 1 so the count reads straight off as capacity and nothing is hidden by flooring.
-	var far: AnimalDefinition = _species("far", ["cover"] as Array[String], 1, 8)
+	var far: AnimalDefinition = _species("far", ["rocks"] as Array[String], 1, 8)
 	far.capacity_radius = 12
-	var near: AnimalDefinition = _species("near", ["cover"] as Array[String], 1, 8)
+	var near: AnimalDefinition = _species("near", ["rocks"] as Array[String], 1, 8)
 	# `near` keeps the sentinel, so it counts over scout_radius = 8.
 
 	var near_counts: Dictionary = CapacityEvaluator.tag_counts(grid, empty, origin, near)
 	var far_counts: Dictionary = CapacityEvaluator.tag_counts(grid, empty, origin, far)
 
-	check_eq(int(near_counts.get("cover", -1)), 0,
+	check_eq(int(near_counts.get("rocks", -1)), 0,
 		"scout_radius 8, capacity_radius following it: the three tiles at distance 10 count 0")
-	check_eq(int(far_counts.get("cover", -1)), 3,
+	check_eq(int(far_counts.get("rocks", -1)), 3,
 		"capacity_radius 12 with scout_radius STILL 8: the same three tiles count 3 — a tile "
 		+ "inside capacity_radius but outside scout_radius is counted")
 	check_eq(near.scout_radius, far.scout_radius,
@@ -196,7 +203,7 @@ func _check_capacity_radius_is_consumed() -> void:
 	# NEGATIVE CONTROL, and the reason this section exists: an assertion that passes whether or
 	# not `capacity_radius` is consumed is worthless. If the evaluator still walked scout_radius,
 	# these two counts would be equal — so the INEQUALITY is the actual measurement.
-	check(int(near_counts.get("cover", -1)) != int(far_counts.get("cover", -1)),
+	check(int(near_counts.get("rocks", -1)) != int(far_counts.get("rocks", -1)),
 		"NEGATIVE CONTROL: the two counts DIFFER (0 vs 3) on one identical world at one identical "
 		+ "origin — an evaluator still walking scout_radius would return the same number twice",
 		"near=%s far=%s" % [str(near_counts), str(far_counts)])
@@ -204,9 +211,9 @@ func _check_capacity_radius_is_consumed() -> void:
 	# THE OTHER DIRECTION, which the case above does not cover: a tile inside `scout_radius` but
 	# OUTSIDE `capacity_radius` must NOT count. Without this, an evaluator that took the max of
 	# the two radii, or the union, would pass everything above.
-	var wide_scout: AnimalDefinition = _species("widescout", ["cover"] as Array[String], 1, 12)
+	var wide_scout: AnimalDefinition = _species("widescout", ["rocks"] as Array[String], 1, 12)
 	wide_scout.capacity_radius = 8
-	check_eq(int(CapacityEvaluator.tag_counts(grid, empty, origin, wide_scout).get("cover", -1)), 0,
+	check_eq(int(CapacityEvaluator.tag_counts(grid, empty, origin, wide_scout).get("rocks", -1)), 0,
 		"scout_radius 12 but capacity_radius 8: the distance-10 tiles count 0 — capacity does not "
 		+ "quietly widen to scout_radius, and the walk is not a union of the two")
 
@@ -228,7 +235,7 @@ func _check_sentinel_follows_scout_radius() -> void:
 	] as Array[Vector2i]:
 		grid.set_terrain(tile.x, tile.y, "rock")
 
-	var s: AnimalDefinition = _species("sentinel", ["cover"] as Array[String], 1, 8)
+	var s: AnimalDefinition = _species("sentinel", ["rocks"] as Array[String], 1, 8)
 	check_eq(s.capacity_radius, AnimalDefinition.CAPACITY_RADIUS_FOLLOWS_SCOUT,
 		"the schema default IS the sentinel, so a `.tres` that omits the field follows scout")
 	check_eq(AnimalDefinition.CAPACITY_RADIUS_FOLLOWS_SCOUT, 0,
@@ -242,7 +249,7 @@ func _check_sentinel_follows_scout_radius() -> void:
 	grid.set_terrain(origin.x, origin.y, "rock")
 	grid.set_terrain(origin.x + 3, origin.y, "rock")
 	var counts: Dictionary = CapacityEvaluator.tag_counts(grid, empty, origin, s)
-	check_eq(int(counts.get("cover", -1)), 2,
+	check_eq(int(counts.get("rocks", -1)), 2,
 		"the sentinel counts the origin AND the tile 3 away (2 tiles) — a literal radius of zero "
 		+ "would have counted only the origin, and the distance-10 tiles stay out at radius 8")
 
@@ -254,13 +261,13 @@ func _check_sentinel_follows_scout_radius() -> void:
 		"capacity_radius is STILL the untouched sentinel after the retune")
 	check_eq(s.effective_capacity_radius(), 12,
 		"...and effective_capacity_radius() followed scout_radius to 12 — the relation held")
-	check_eq(int(CapacityEvaluator.tag_counts(grid, empty, origin, s).get("cover", -1)), 5,
+	check_eq(int(CapacityEvaluator.tag_counts(grid, empty, origin, s).get("rocks", -1)), 5,
 		"...and the tile walk followed too: the three distance-10 tiles are now IN, 2 -> 5")
 
 	# NEGATIVE CONTROL for the retune. If `effective_capacity_radius()` had baked scout_radius in
 	# at construction, or if the evaluator cached a radius, the count would not have moved.
 	s.scout_radius = 8
-	check_eq(int(CapacityEvaluator.tag_counts(grid, empty, origin, s).get("cover", -1)), 2,
+	check_eq(int(CapacityEvaluator.tag_counts(grid, empty, origin, s).get("rocks", -1)), 2,
 		"NEGATIVE CONTROL: retuning scout_radius back to 8 puts the count back to 2 — the "
 		+ "sentinel tracks the field live in both directions, and nothing is cached")
 
@@ -289,7 +296,7 @@ func _check_qualifies_is_the_same_function() -> void:
 	var grid: WorldGrid = _grid()
 	var registry := HomeSiteRegistry.new()
 	# 4 rock tiles per individual, so the sweep crosses the qualification boundary at 4.
-	var s: AnimalDefinition = _species("sweep", ["cover"] as Array[String], 4, 8)
+	var s: AnimalDefinition = _species("sweep", ["rocks"] as Array[String], 4, 8)
 	var origin := Vector2i(18, 18)
 
 	var mismatches: PackedStringArray = PackedStringArray()
@@ -322,12 +329,12 @@ func _check_qualifies_is_the_same_function() -> void:
 	for i in 3:
 		boundary.set_terrain(10 + i, 10, "rock")
 	check_eq(CapacityEvaluator.capacity(boundary, empty, Vector2i(10, 10), s), 0,
-		"3 cover tiles at divisor 4: capacity 0, does not qualify")
+		"3 rock tiles at divisor 4: capacity 0, does not qualify")
 	check(not CapacityEvaluator.qualifies(boundary, empty, Vector2i(10, 10), s),
 		"...and qualifies() agrees")
 	boundary.set_terrain(13, 10, "rock")
 	check_eq(CapacityEvaluator.capacity(boundary, empty, Vector2i(10, 10), s), 1,
-		"the 4th cover tile makes it capacity 1")
+		"the 4th rock tile makes it capacity 1")
 	check(CapacityEvaluator.qualifies(boundary, empty, Vector2i(10, 10), s),
 		"...and qualifies() agrees")
 
@@ -341,12 +348,12 @@ func _check_arrival_predicate() -> void:
 	var grid: WorldGrid = _grid()
 	var registry := HomeSiteRegistry.new()
 	var arrivals := ArrivalQueue.new(20260727)
-	var species: AnimalDefinition = _species("predicate", ["cover"] as Array[String], 4, 8)
+	var species: AnimalDefinition = _species("predicate", ["rocks"] as Array[String], 4, 8)
 	var sim := HabitatSimulation.new()
 	sim.attach(grid, SpeciesRoster.new([species]), registry, arrivals, null)
 
 	var origin := Vector2i(18, 18)
-	# 8 cover tiles at divisor 4 -> capacity 2. Chosen so the predicate can be exercised at
+	# 8 rock tiles at divisor 4 -> capacity 2. Chosen so the predicate can be exercised at
 	# population 1 (enqueues) and population 2 (does not) without touching the land between.
 	for i in 8:
 		grid.set_terrain(origin.x - 4 + i, origin.y, "rock")
@@ -354,7 +361,7 @@ func _check_arrival_predicate() -> void:
 	var site: HomeSite = registry.register(origin, species.id, species.scout_radius)
 	site.residents.append(null)  # population 1, with no model needed
 
-	check_eq(sim.capacity_at(origin, species), 2, "site capacity is 2 (8 cover tiles / 4)")
+	check_eq(sim.capacity_at(origin, species), 2, "site capacity is 2 (8 rock tiles / 4)")
 	check_eq(sim.population_at(origin, species), 1, "site population is 1")
 
 	sim.on_terraform(origin)
@@ -373,16 +380,16 @@ func _check_arrival_predicate() -> void:
 	check_eq(arrivals.size(), 0,
 		"capacity 2 >= population 2 + 1 is FALSE -> nothing enqueued (a full site does not grow)")
 
-	# And the predicate is strict, not >=: one more cover tile does not help, four do.
+	# And the predicate is strict, not >=: one more rock tile does not help, four do.
 	grid.set_terrain(origin.x + 4, origin.y, "rock")   # 9 tiles -> still capacity 2
 	sim.on_terraform(origin)
 	sim.tick(0.0)
-	check_eq(arrivals.size(), 0, "a 9th cover tile still yields capacity 2 — no arrival")
+	check_eq(arrivals.size(), 0, "a 9th rock tile still yields capacity 2 — no arrival")
 	for i in 3:
 		grid.set_terrain(origin.x + 5 + i, origin.y, "rock")  # 12 tiles -> capacity 3
 	sim.on_terraform(origin)
 	sim.tick(0.0)
-	check_eq(sim.capacity_at(origin, species), 3, "12 cover tiles / 4 == capacity 3")
+	check_eq(sim.capacity_at(origin, species), 3, "12 rock tiles / 4 == capacity 3")
 	check_eq(arrivals.size(), 1, "capacity 3 >= population 2 + 1 -> one arrival enqueued")
 
 	sim.free()

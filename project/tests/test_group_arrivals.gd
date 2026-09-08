@@ -70,7 +70,7 @@ func _check_partial_landing_arithmetic() -> void:
 # `HabitatSimulation._land_or_drop()`'s actual loop, re-checking capacity against the
 # POPULATION EACH `_move_in()` JUST CHANGED, the way the real due-time re-check must.
 
-## A habitat with room for 3 (`cover` at 12 tiles / 4 per individual), one resident already
+## A habitat with room for 3 (`rocks` at 12 tiles / 4 per individual), one resident already
 ## settled, and a group of 3 enqueued to land there. Only 2 more fit — the group must land
 ## exactly 2, not all 3 and not 0.
 func _check_partial_landing_lands_exactly_what_fits() -> void:
@@ -120,9 +120,11 @@ func _check_partial_landing_lands_exactly_what_fits() -> void:
 # --- fixture -----------------------------------------------------------------------------------
 
 ## A world with no scene: real grid, real registry, real queue, and a one-species SYNTHETIC
-## roster whose only need is `cover` at 4 tiles per individual — the same shape
-## `test_event_driven_simulation.gd`'s fixture uses. A 3x4 block of rock (12 tiles, all well
-## inside the 8-tile scout radius) supports exactly 3 individuals: `12 / 4 == 3`.
+## roster whose only need is `rocks` at 4 tiles per individual — the same shape
+## `test_event_driven_simulation.gd`'s fixture uses. `cover` RETIRED 2026-09-07
+## (habitat-tiers re-spec) — re-pointed to `rocks`, which `rock` terrain still emits. A 3x4
+## block of rock (12 tiles, all well inside the 8-tile scout radius) supports exactly 3
+## individuals: `12 / 4 == 3`.
 func _fixture() -> Dictionary:
 	var grid := WorldGrid.new()
 	grid.build(TerrainDefinition.load_all(), 36, 36)
@@ -130,7 +132,7 @@ func _fixture() -> Dictionary:
 	var species := AnimalDefinition.new()
 	species.id = "critter"
 	species.display_name = "Critter"
-	species.habitat_needs = ["cover"] as Array[String]
+	species.habitat_needs = ["rocks"] as Array[String]
 	species.tiles_per_individual = 4
 	species.scout_radius = 8
 	# A grey-box stands in for the model -- a species with no `model_scenes` would push a

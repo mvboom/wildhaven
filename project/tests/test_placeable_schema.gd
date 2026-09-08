@@ -221,7 +221,9 @@ func _init() -> void:
 	var synthetic := AnimalDefinition.new()
 	synthetic.id = "testspecies"
 	synthetic.display_name = "Test Species"
-	synthetic.habitat_needs = ["forest", "cover"] as Array[String]
+	# `cover` RETIRED 2026-09-07 (habitat-tiers re-spec) — re-pointed to `rocks`, an equally
+	# arbitrary still-valid tag; this fixture's needs are otherwise unexamined here.
+	synthetic.habitat_needs = ["forest", "rocks"] as Array[String]
 	synthetic.personality = AnimalDefinition.PERSONALITY_BOLD
 	synthetic.scout_radius = 10
 	synthetic.tiles_per_individual = 12

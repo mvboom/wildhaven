@@ -533,7 +533,7 @@ func _check_dequalified_arrival_is_silently_dropped() -> void:
 
 	var origin := Vector2i(10, 10)
 	for i in 4:
-		grid.set_terrain(origin.x + i, origin.y, "rock")   # 4 cover tiles / 4 -> capacity 1
+		grid.set_terrain(origin.x + i, origin.y, "rock")   # 4 rock tiles / 4 -> capacity 1
 	sim.on_terraform(origin)
 	sim.tick(0.0)
 
@@ -663,7 +663,9 @@ func _check_settlement_timers_are_not_idle_work() -> void:
 # --- fixture -----------------------------------------------------------------------------------
 
 ## A world with no scene: real grid, real registry, real queue, and a one-species SYNTHETIC
-## roster whose only need is `cover` at 4 tiles per individual.
+## roster whose only need is `rocks` at 4 tiles per individual. `cover` RETIRED 2026-09-07
+## (habitat-tiers re-spec) — re-pointed to `rocks`, which the `rock` terrain painted below
+## still emits.
 func _fixture() -> Dictionary:
 	var grid := WorldGrid.new()
 	grid.build(TerrainDefinition.load_all(), 36, 36)
@@ -671,7 +673,7 @@ func _fixture() -> Dictionary:
 	var species := AnimalDefinition.new()
 	species.id = "critter"
 	species.display_name = "Critter"
-	species.habitat_needs = ["cover"] as Array[String]
+	species.habitat_needs = ["rocks"] as Array[String]
 	species.tiles_per_individual = 4
 	species.scout_radius = 8
 	# A grey-box stands in for the model. Not cosmetic: a species with no `model_scene` makes

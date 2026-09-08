@@ -32,9 +32,13 @@ const PERSONALITIES: PackedStringArray = [PERSONALITY_SHY, PERSONALITY_BOLD]
 ## Extended 2026-09-04 by the habitat-tiers ruling. `quiet` was RETIRED: it had no source
 ## and no consumer, and a `built` limit does its job strictly better because it is actually
 ## enforced and needs no terrain to emit it.
+##
+## `cover` RETIRED 2026-09-07: the habitat-tiers re-spec moved every shipped consumer off
+## it (Fox -> forest/open_grass/water, Rabbit -> open_grass/cultivated), leaving it a
+## source (Rock) with no consumer — the same shape `quiet` had when it was retired above.
 const HABITAT_TAGS: PackedStringArray = [
 	# Terrain-emitted
-	"water", "forest", "open_grass", "browse", "cover", "flowers", "sand", "rocks",
+	"water", "forest", "open_grass", "browse", "flowers", "sand", "rocks",
 	"cultivated", "snow",
 	# Building-emitted
 	"built", "house", "large_house", "barn", "large_barn", "stable", "coop", "silo", "mill",

@@ -56,6 +56,12 @@
 ; The legacy flat fields (habitat_needs / tiles_per_individual / max_individuals) are LEFT
 ; IN PLACE and are now inert: `effective_tiers()` prefers `tiers` when non-empty. They are
 ; retained so a rollback is a one-line edit rather than a re-authoring.
+;
+; LEGACY ROLLBACK NO LONGER FAITHFUL (2026-09-07): `cover` was retired from the shared
+; vocabulary (validate() would reject it), so habitat_needs below dropped its "cover" entry,
+; leaving Stag's legacy form as `["forest", "rocks"]` — still two tags for Stag specifically,
+; but the rollback no longer reproduces the original three-tag "forest + cover + rocks"
+; framing described above, so it is not a faithful one-line revert of the tiered form.
 [gd_resource type="Resource" script_class="AnimalDefinition" load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://scripts/definitions/animal_definition.gd" id="1_schema"]
@@ -100,7 +106,7 @@ arrival_group_size = 1
 script = ExtResource("1_schema")
 id = "stag"
 display_name = "Stag"
-habitat_needs = Array[String](["forest", "cover", "rocks"])
+habitat_needs = Array[String](["forest", "rocks"])
 personality = "Shy"
 avoids = Array[String]([])
 farm_tolerant = false

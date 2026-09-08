@@ -1,13 +1,13 @@
 ; Rock — TerrainDefinition data entry (spec.md -> Data Schemas; terrain.md ->
 ; Already-Defined Terrain, v1 tag-source mapping).
 ;
-; emitted_tags = ["cover", "rocks"] is DECIDED (terrain.md's tag-source mapping, #5 closed
-; -> D-25) and is the single most load-bearing terrain row in the floor: ROCK, NOT FOREST,
-; IS THE `cover` SOURCE. Both floor species need `cover` (Fox: forest + cover; Rabbit:
-; open_grass + cover), so this entry is what makes either of them possible, and moving
-; `cover` to any other terrain changes the shape of the whole floor.
+; emitted_tags = ["rocks"] — `cover` RETIRED 2026-09-07 (habitat-tiers re-spec moved every
+; shipped consumer off it: Fox -> forest/open_grass/water, Rabbit -> open_grass/cultivated),
+; leaving `rocks` as Rock's sole job. `rocks` is consumed by Donkey, Alpaca, Shiba Inu and
+; Stag, so Rock keeps earning its place in the floor even without `cover`.
 ;
-; `rocks` has no consuming species in v1 and ships anyway — free to keep (terrain.md).
+; Originally emitted_tags = ["cover", "rocks"] was DECIDED (terrain.md's tag-source mapping,
+; #5 closed -> D-25); that history is preserved below for context.
 ;
 ; cost = 0 — nature is free (terrain.md's one pricing rule).
 ;
@@ -77,7 +77,7 @@
 script = ExtResource("1_schema")
 id = "rock"
 display_name = "Rock"
-emitted_tags = Array[String](["cover", "rocks"])
+emitted_tags = Array[String](["rocks"])
 cost = 0
 model_scenes = Array[PackedScene]([ExtResource("2_model"), ExtResource("3_model"), ExtResource("4_model"), ExtResource("5_model"), ExtResource("6_model"), ExtResource("7_model")])
 harvestable = null

@@ -113,7 +113,9 @@ func _check_schema_field_exists() -> void:
 	# minimal fix — it makes this fixture Person, the same category a real needs-`people`
 	# species like Pig resolves to — without touching what this check is actually about
 	# (that `news_reports` stays optional).
-	fresh.habitat_needs = ["cover", "people"] as Array[String]
+	# `cover` RETIRED 2026-09-07 (habitat-tiers re-spec) — re-pointed to `open_grass`, an
+	# equally arbitrary still-valid tag; this fixture's needs are otherwise unexamined here.
+	fresh.habitat_needs = ["open_grass", "people"] as Array[String]
 	fresh.model_scenes = [load("res://assets/placeholder/grass/Grass.tscn") as PackedScene]
 	fresh.fact_text_pool = ["A critter fact."]
 	check(fresh.validate().is_empty(),

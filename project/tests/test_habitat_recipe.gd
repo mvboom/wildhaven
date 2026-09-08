@@ -3,10 +3,15 @@ extends QATestCase
 ## copy, avoids, and starter-species selection built on top of it.
 ##
 ## The two arithmetic traps this suite exists to pin:
-##   * Rock emits BOTH `cover` and `rocks`, so Stag's three needs must collapse to TWO
-##     chips, not three;
-##   * and a rock tile qualifies for both tags independently, so the merged chip's count is
-##     `tiles_per_individual` (8), NOT double it.
+##   * a single source serving two of a species' needs must collapse to ONE chip, not two
+##     (was: Rock emitting BOTH `cover` and `rocks` collapsed Stag's three legacy needs to
+##     two chips — no longer exercisable by real data since `cover` was RETIRED 2026-09-07,
+##     leaving Rock a single-tag terrain; `_check_rock_is_the_source_of_rocks()` below pins
+##     the retirement itself, and `_check_stag_no_longer_dedupes_after_cover_retirement()`
+##     pins that Stag's now-two legacy needs resolve to two DISTINCT chips instead);
+##   * and a shared tile qualifies for both tags independently, so a merged chip's count is
+##     `tiles_per_individual`, NOT doubled — still checked per-entry below even though no
+##     shipped species currently exercises the merge itself.
 ##
 ## It also pins three more traps once `describe()`, `avoids_for()` and `easiest_species()`
 ## landed on top of `recipe_for()`:
@@ -58,9 +63,9 @@ func _process(_delta: float) -> bool:
 	if _frames < 3:
 		return false
 
-	_check_rock_is_the_source_of_both_its_tags()
-	_check_stag_dedupes_to_two_chips_at_single_count()
-	_check_fox_reads_forest_and_rock()
+	_check_rock_is_the_source_of_rocks()
+	_check_stag_no_longer_dedupes_after_cover_retirement()
+	_check_fox_reads_forest()
 	_check_unsourced_need_is_unsatisfiable()
 	_check_description_never_repeats_a_shared_source()
 	_check_avoids_unions_both_directions()
@@ -79,31 +84,44 @@ func _process(_delta: float) -> bool:
 	return true
 
 
-func _check_rock_is_the_source_of_both_its_tags() -> void:
+## `cover` RETIRED 2026-09-07 (habitat-tiers re-spec moved every shipped consumer off it):
+## Rock's job is now `rocks` alone. Pins both halves of the retirement — `rocks` still
+## resolves, and `cover` resolves to nothing at all, not merely to an unconsumed tag.
+func _check_rock_is_the_source_of_rocks() -> void:
 	var sources: Dictionary = HabitatRecipe.tag_sources(_world)
-	for tag: String in ["cover", "rocks"]:
-		var entries: Array = sources.get(tag, []) as Array
-		if not check(not entries.is_empty(), "tag '%s' has a source" % tag):
-			continue
-		check_eq((entries[0] as Dictionary)["id"], "rock", "'%s' resolves to the Rock button" % tag)
+	var rocks_entries: Array = sources.get("rocks", []) as Array
+	if not check(not rocks_entries.is_empty(), "tag 'rocks' has a source"):
+		return
+	check_eq((rocks_entries[0] as Dictionary)["id"], "rock", "'rocks' resolves to the Rock button")
+	check(rocks_entries.size() >= 2,
+		"'rocks' has more than one source now (Rock and Scrub both emit it)")
+	check(not sources.has("cover"), "'cover' no longer resolves to any source at all")
 
 
-func _check_stag_dedupes_to_two_chips_at_single_count() -> void:
+## Stag's legacy `habitat_needs` used to be `["forest", "cover", "rocks"]`, and Rock's
+## shared `cover`+`rocks` emission collapsed the last two into one chip. `cover` was
+## RETIRED 2026-09-07, leaving Stag's legacy field `["forest", "rocks"]` — two needs with
+## two DISTINCT terrain sources (Forest, Rock), so no dedup fires any more. This pins the
+## new, un-collapsed shape rather than silently losing the regression coverage.
+func _check_stag_no_longer_dedupes_after_cover_retirement() -> void:
 	var stag: AnimalDefinition = load(STAG_PATH) as AnimalDefinition
 	if not check(stag != null, "stag.tres loads"):
 		return
 	var recipe: Dictionary = HabitatRecipe.recipe_for(stag, _world)
 	check(recipe["satisfiable"] as bool, "stag is satisfiable")
 	var entries: Array = recipe["entries"] as Array
-	check_eq(entries.size(), 2, "stag's 3 needs collapse to 2 chips (Rock serves two tags)")
+	check_eq(entries.size(), 2, "stag's 2 legacy needs resolve to 2 distinct chips (no shared source left)")
 	for entry: Dictionary in entries:
 		check_eq(entry["count"], stag.tiles_per_individual,
 			"chip '%s' counts tiles_per_individual, not a per-tag multiple" % entry["id"])
-		if (entry["id"] as String) == "rock":
-			check_eq((entry["tags"] as Array).size(), 2, "the Rock chip carries both its tags")
+		check_eq((entry["tags"] as Array).size(), 1,
+			"chip '%s' carries exactly one tag — nothing is deduped any more" % entry["id"])
 
 
-func _check_fox_reads_forest_and_rock() -> void:
+## Fox's legacy `habitat_needs` used to be `["forest", "cover"]`, resolving to Forest + Rock.
+## `cover` was RETIRED 2026-09-07 (habitat-tiers re-spec), dropping it from this legacy field
+## too, so Fox's legacy needs now resolve to Forest alone.
+func _check_fox_reads_forest() -> void:
 	var fox: AnimalDefinition = load(FOX_PATH) as AnimalDefinition
 	if not check(fox != null, "fox.tres loads"):
 		return
@@ -112,7 +130,7 @@ func _check_fox_reads_forest_and_rock() -> void:
 	for entry: Dictionary in (recipe["entries"] as Array):
 		ids.append(entry["id"] as String)
 	ids.sort()
-	check_eq(ids, ["forest", "rock"] as Array[String], "fox resolves to Forest + Rock")
+	check_eq(ids, ["forest"] as Array[String], "fox resolves to Forest alone")
 
 
 func _check_unsourced_need_is_unsatisfiable() -> void:
@@ -130,7 +148,10 @@ func _check_description_never_repeats_a_shared_source() -> void:
 	if not check(stag != null, "stag.tres loads"):
 		return
 	var text: String = HabitatRecipe.describe(stag, _world)
-	# Rock supplies both of stag's rock-ish needs; its phrase must appear ONCE.
+	# Rock supplies stag's `rocks` need; its phrase must appear exactly once regardless.
+	# (Before `cover`'s 2026-09-07 retirement, Rock supplied BOTH of stag's rock-ish legacy
+	# needs from one tile — see `_check_stag_no_longer_dedupes_after_cover_retirement()` for
+	# where that dedup-arithmetic coverage now lives.)
 	var phrase: String = HabitatRecipe.SOURCE_PHRASES["rock"] as String
 	check_eq(text.count(phrase), 1, "the Rock phrase appears once, not once per tag")
 	# The `[COPY]` stub marker was retired 2026-09-01 when the human approved this wording.
