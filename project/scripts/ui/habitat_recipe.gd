@@ -261,7 +261,7 @@ static func describe(species: AnimalDefinition, world: WorldRoot) -> String:
 			# `SOURCE_PHRASES`, not code.
 			phrase = (entry["display_name"] as String).to_lower()
 		phrases.append(phrase)
-	return DESCRIBE_LEAD + _join_and(phrases) + "."
+	return DESCRIBE_LEAD + join_and(phrases) + "."
 
 
 ## ---------------------------------------------------------------------------------------
@@ -526,7 +526,7 @@ static func _describe_tier(
 	for limit: HabitatLimit in tier.limits:
 		limit_phrases.append(_describe_limit(limit))
 	if not limit_phrases.is_empty():
-		block.append(LIMIT_SENTENCE % _join_and(limit_phrases))
+		block.append(LIMIT_SENTENCE % join_and(limit_phrases))
 
 	if tier.max_individuals == 1:
 		block.append(CAP_ONE % noun)
@@ -984,7 +984,7 @@ static func describe_tier_needs(tier: HabitatTier, world: WorldRoot) -> String:
 		if phrase.is_empty():
 			phrase = (entry["display_name"] as String).to_lower()
 		phrases.append(phrase)
-	return DESCRIBE_LEAD + _join_and(phrases) + "."
+	return DESCRIBE_LEAD + join_and(phrases) + "."
 
 
 ## The cheapest species to invite, ranked over each species' OWN starter tier —
@@ -1061,8 +1061,11 @@ static func starter_species(world: WorldRoot) -> AnimalDefinition:
 
 
 ## "a", "a and b", "a, b and c" — Oxford-comma-free, matching the register of the rest of the
-## player-facing copy.
-static func _join_and(parts: Array[String]) -> String:
+## player-facing copy. PUBLIC, not private: `NewsReportContent.hint_line()` joins its own
+## needs and limit lists with the exact same joiner (fix round 1 finding #2 — the spec's
+## binding principle is one derivation, two renderers, so a second file growing its own
+## byte-for-byte copy of this was the defect, not a style choice).
+static func join_and(parts: Array[String]) -> String:
 	if parts.is_empty():
 		return ""
 	if parts.size() == 1:
@@ -1071,7 +1074,7 @@ static func _join_and(parts: Array[String]) -> String:
 	return ", ".join(head) + " and " + parts[parts.size() - 1]
 
 
-## `_join_and()`'s other half — "a house or a farmhouse". A gate need with several
+## `join_and()`'s other half — "a house or a farmhouse". A gate need with several
 ## interchangeable sources is an OR, and rendering it with "and" would tell a child to build
 ## every one of them.
 static func _join_or(parts: Array[String]) -> String:

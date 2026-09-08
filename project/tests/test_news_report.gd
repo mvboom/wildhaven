@@ -364,8 +364,11 @@ func _check_content_terrain_bias() -> void:
 
 ## THE COMPOSER. An authored opening plus needs derived live, so a divisor retune updates
 ## every report with no copy edit. A species with NO authored opening still produces a whole,
-## grammatical report — which is what lets the hint layer cover all fifteen species on day
-## one instead of the three that happen to carry copy.
+## grammatical report — which is what lets the hint layer cover all fifteen species today: zero
+## species carry `discovery_openings` copy yet (that field is separate from, and much sparser
+## than, the `news_reports` ambient-flavour pool three species already carry), so every hint
+## line rendered right now runs through `GENERIC_OPENING`, and the composer has to make that
+## fallback read as a whole sentence on its own.
 func _check_hint_line_composes_opening_and_needs() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = SEED

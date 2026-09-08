@@ -111,8 +111,18 @@ static func pick_line(species: AnimalDefinition, rng: RandomNumberGenerator) -> 
 const GENERIC_OPENING: String = "Word has it %s is looking for a home"
 
 ## [COPY] — content-writer's. Joins the two halves. `%s` is the opening (no trailing
-## punctuation), then the needs clause.
+## punctuation), then the body — the needs clause, with `LIMIT_CLAUSE` already folded on if
+## the starter tier carries one.
 const HINT_TEMPLATE: String = "%s — it'd want %s."
+
+## [COPY] — content-writer's. Fix round 1 finding #1: a limit is not a thing an animal can
+## WANT, so it is never a member of the needs list `HINT_TEMPLATE`'s "it'd want" governs —
+## "it'd want 4 tiles of forest ... and far from any buildings" doesn't parse. Appended as a
+## trailing comma clause onto the needs sentence instead, the same shape a spoken aside takes
+## ("...want three things, well away from the road."). `%s` is the limit phrase(s), already
+## joined by `HabitatRecipe.join_and()` if there is more than one — no leading comma, this
+## constant supplies it.
+const LIMIT_CLAUSE: String = ", %s"
 
 
 ## THE COMPOSER — an authored opening plus needs derived live from `HabitatRecipe`.
@@ -122,18 +132,24 @@ const HINT_TEMPLATE: String = "%s — it'd want %s."
 ## change. That split is the whole point of the design: the numbers have one source, shared
 ## with the Field Guide card.
 ##
-## Returns "" only for a null species or one whose starter tier yields no phrases at all —
-## never for a species that merely lacks authored copy, which is the common case and the
-## reason `GENERIC_OPENING` exists.
+## Returns "" only for a null species or one whose starter tier has no NEEDS at all — never
+## for a species that merely lacks authored copy, which is the common case and the reason
+## `GENERIC_OPENING` exists. A tier's LIMITS do not affect this guard even when needs are
+## empty: a limit on its own ("far from any buildings") is not something a player can go and
+## build, so a report with no need to name has nothing to invite the player toward.
 static func hint_line(
 	species: AnimalDefinition, world: WorldRoot, rng: RandomNumberGenerator
 ) -> String:
 	if species == null:
 		return ""
-	var phrases: Array[String] = HabitatRecipe.starter_need_phrases(species, world)
-	if phrases.is_empty():
+	var needs: Array[String] = HabitatRecipe.starter_need_phrases(species, world)
+	if needs.is_empty():
 		return ""
-	phrases.append_array(HabitatRecipe.starter_limit_phrases(species))
+	var limits: Array[String] = HabitatRecipe.starter_limit_phrases(species)
+
+	var body: String = HabitatRecipe.join_and(needs)
+	if not limits.is_empty():
+		body += LIMIT_CLAUSE % HabitatRecipe.join_and(limits)
 
 	var opening: String = ""
 	if not species.discovery_openings.is_empty():
@@ -143,15 +159,4 @@ static func hint_line(
 	else:
 		opening = GENERIC_OPENING % HabitatRecipe.with_article(species.display_name.to_lower())
 
-	return HINT_TEMPLATE % [opening, _join_and(phrases)]
-
-
-## "a, b and c" — the same joiner shape `HabitatRecipe` uses, kept local so this file has no
-## reason to reach into another's private helper.
-static func _join_and(parts: Array[String]) -> String:
-	if parts.is_empty():
-		return ""
-	if parts.size() == 1:
-		return parts[0]
-	var head: Array[String] = parts.slice(0, parts.size() - 1)
-	return ", ".join(head) + " and " + parts[parts.size() - 1]
+	return HINT_TEMPLATE % [opening, body]
