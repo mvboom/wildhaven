@@ -104,6 +104,7 @@ func _process(_delta: float) -> bool:
 	_check_the_same_species_is_never_picked_twice_running()
 	_check_hint_line_composes_opening_and_needs()
 	_check_authored_opening_is_preferred()
+	_check_toast_and_card_state_the_same_numbers()
 	_check_gameplay_settings_persistence()
 	_check_settings_overlay_reads_and_writes_the_one_source_of_truth()
 	_check_toast_behaviour()
@@ -670,6 +671,54 @@ func _check_authored_opening_is_preferred() -> void:
 		"the authored opening leads the sentence verbatim: '%s'" % line)
 	check(line.contains("5 tiles of open grass"),
 		"...and the derived half follows it: '%s'" % line)
+
+
+## THE PROPERTY THE WHOLE DESIGN RESTS ON. The toast and the Field Guide card must state the
+## SAME number for the same need, because they are two renderings of one derivation. If this
+## ever fails, someone has added a second source of truth for a divisor — the exact defect
+## the counted-tile rewrite paid for once already.
+##
+## Anchors on the DATA, not on a rebuilt sentence: for each starter-tier need, the divisor in
+## `tiles_per_individual` must appear in front of that need's noun in BOTH surfaces. Rebuild
+## a sentence and compare, and the test passes by construction while proving nothing.
+##
+## Does not host anything, so it has no ordering dependency on `_check_nothing_hosted_names_
+## the_villager()`'s `species_hosted_count() == 0` fixture assertion — but it is placed after
+## it anyway, alongside the rest of the composer checks it belongs with.
+func _check_toast_and_card_state_the_same_numbers() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = SEED
+	for species: AnimalDefinition in _world.roster.species():
+		var tier: HabitatTier = HabitatRecipe.starter_tier(species)
+		if tier == null:
+			continue
+		var toast: String = NewsReportContent.hint_line(species, _world, rng)
+		var card_lines: Array[String] = HabitatRecipe.describe_tiers(species, _world)
+		if not check(not card_lines.is_empty(), "%s renders a card" % species.id):
+			continue
+		var card: String = card_lines[0]
+		for need: HabitatNeed in tier.needs:
+			if need.is_gate_only():
+				continue
+			var noun: String = HabitatRecipe.need_noun(need.tag, _world)
+			if noun.is_empty():
+				continue
+			var expected: String = "%d %s" % [need.tiles_per_individual, noun]
+			var expected_tiles: String = "%d tiles of %s" % [need.tiles_per_individual, noun]
+			var expected_one: String = "1 tile of %s" % noun
+			var wanted: bool = (
+				toast.contains(expected)
+				or toast.contains(expected_tiles)
+				or toast.contains(expected_one)
+			)
+			check(wanted,
+				"%s's toast states %s's real divisor (%d): '%s'"
+				% [species.id, noun, need.tiles_per_individual, toast])
+			check(
+				card.contains(expected)
+				or card.contains(expected_tiles)
+				or card.contains(expected_one),
+				"...and %s's card states the same one: '%s'" % [species.id, card])
 
 
 # --- 4. The setting persists ---------------------------------------------------------------
