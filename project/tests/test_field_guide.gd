@@ -131,6 +131,23 @@ func _check_every_species_shows_its_recipe() -> void:
 ## pre-fix dedup (keyed on the shared button, not the resolved building) silently dropped
 ## whichever was seen second. A player would build a Barn, wait, and nothing on screen would
 ## explain why no cow arrived. This asserts the rendered card actually names BOTH.
+##
+## ASSERTION LOOSENED FROM "EVERY LINE" TO "EVERY STANDALONE LINE", 2026-09-08 — the counted-
+## tile copy rewrite, not a regression being accommodated. Cow's herd tier is the first tier
+## plus `water/3`, with every other need and number unchanged, so it now renders as an
+## explicit addendum ("Add this too, and there's room for up to 6: ...") rather than as a
+## second full recipe — the human-approved mock's own shape. The silo requirement is not
+## erased by that: it is stated once, on the line above, and "add this TOO" is what carries
+## it down. Re-asserting it on the addendum line would force the copy back into repeating a
+## whole recipe per tier, which is the wordiness the rewrite exists to remove.
+##
+## What still has to hold, and what this now checks, is the property the original assertion
+## was reaching for: NO LINE MAY READ AS A COMPLETE RECIPE WHILE OMITTING THE SILO. So the
+## first line — the only one that stands alone — must name both buildings, and every later
+## line must EITHER name the silo itself or be visibly an addendum (its lead-in derived from
+## `HabitatRecipe.LEAD_ADD_*`, not spelled out here, so a reworded lead-in cannot silently
+## turn a full recipe into an exempt one). A button-keyed dedup regression fails the first
+## assertion exactly as before.
 func _check_cow_names_both_barn_and_silo() -> void:
 	var cow: AnimalDefinition = _world.roster.by_id("cow")
 	if not check(cow != null, "the roster carries cow"):
@@ -138,5 +155,17 @@ func _check_cow_names_both_barn_and_silo() -> void:
 	var rendered: Array[String] = _guide.tier_line_texts_for("cow")
 	if not check(not rendered.is_empty(), "cow's card shows at least one tier line"):
 		return
-	for line: String in rendered:
-		check(line.contains("silo"), "cow's tier line names Silo, not just Barn: '%s'" % line)
+	check(rendered[0].contains("silo"),
+		"cow's first tier line names Silo, not just Barn: '%s'" % rendered[0])
+	check(rendered[0].contains("barn"),
+		"...and still names a barn-family building too: '%s'" % rendered[0])
+
+	var add_one: String = HabitatRecipe.LEAD_ADD_ONE.get_slice("%", 0)
+	var add_many: String = HabitatRecipe.LEAD_ADD_MANY.get_slice("%", 0)
+	for i in range(1, rendered.size()):
+		var line: String = rendered[i]
+		check(
+			line.contains("silo") or line.begins_with(add_one) or line.begins_with(add_many),
+			("cow's tier line either names Silo itself or is visibly an addendum to the line "
+			+ "above — never a complete-looking recipe with the silo missing: '%s'") % line
+		)

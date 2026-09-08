@@ -30,17 +30,17 @@ extends RefCounted
 ##
 ## THE COUNT IS EXACT, NOT AN ESTIMATE. Capacity is
 ## `min over t ( floor(count_t / tiles_per_individual) )`, so one individual needs
-## `tiles_per_individual` tiles of EACH need. The copy says "about" for warmth.
-
-## Final review finding #3 ruling: these are NOT independently marked with the `[COPY]`
-## literal prefix, even though they are content-writer's and player-facing. Each value here is
-## a FRAGMENT composed into `DESCRIBE_LEAD + _join_and(phrases) + "."` below, never rendered on
-## its own — `DESCRIBE_LEAD` carries the approved lead-in for the whole assembled sentence,
-## so marking the fragments too would put the literal `[COPY]` text once per source in the
-## middle of a rendered line ("[COPY] Likes [COPY] woods and [COPY] rocky cover.") instead of
-## once at the front of it. One marker per rendered sentence, not one per ingredient.
+## `tiles_per_individual` tiles of EACH need — and since 2026-09-08 the Field Guide's tier
+## lines say the number out loud rather than hedging it ("5 tiles of open grass for each
+## alpaca"). See `describe_tiers()`'s own header for the three defects that rewrite fixed;
+## the short version is that a hedge a player cannot plan against is not warmth.
 ##
-## [COPY] — content-writer's, one phrase per PALETTE BUTTON (not per tag; see the header).
+## NOTHING IN THIS FILE CARRIES THE `[COPY]` STUB MARKER ANY MORE. Every player-facing
+## string here was ruled on: `DESCRIBE_LEAD` and `FieldGuide.HERE_TEMPLATE` on 2026-09-01,
+## and `DESCRIBE_UNKNOWN` plus the whole `describe_tiers()` template on 2026-09-08.
+## `test_habitat_recipe.gd`'s roster-wide scan asserts the marker never comes back.
+##
+## Content-writer's, one phrase per PALETTE BUTTON (not per tag; see the header).
 ## Keying by button is what keeps this sentence and the chips under it from ever disagreeing,
 ## and means waking a currently-inert building costs exactly one new entry here.
 ##
@@ -48,22 +48,52 @@ extends RefCounted
 ## dictionary used to hold whatever read naturally as the object of `describe()`'s "Likes "
 ## sentence, which doesn't care whether its object carries an article or not — so some
 ## entries got one baked in ("a house", "a farm field") and others didn't ("open grass",
-## "woods"). `describe_tiers()`'s two templates DO care, and disagreed with each other: the
-## scaling clause ("more X means room for more") never added an article, so a baked-in one
-## produced nothing ("more a farm field..."); the gate clause (`_with_article()`) always adds
-## one, so a baked-in one produced two ("needs an a house"). Two different bugs, same root
-## cause: THE GRAMMAR IS THIS FILE'S JOB, NOT THE CONTENT WRITER'S — a phrase here is a noun,
-## full stop, and each template decides for itself whether ITS sentence needs an article in
-## front of it. `_need_phrase()` also normalizes any leading article off of whatever it
-## returns (`_bare_noun()`), belt-and-suspenders against a future rewording that puts one
-## back in here by habit; the entries below are meant to need no normalizing at all.
+## "woods"). `describe_tiers()`'s templates DO care: `_gate_line()` puts an article in front
+## of what it gets (`_with_article()`), so a baked-in one produced two ("needs an a house"),
+## and `_need_line()` puts a NUMBER in front of it, where an article is simply wrong.
+## Same root cause both times: THE GRAMMAR IS THIS FILE'S JOB, NOT THE CONTENT WRITER'S — a
+## phrase here is a noun, full stop, and each template decides for itself what belongs in
+## front of it. `need_noun()` also normalizes any leading article off of whatever it returns
+## (`_bare_noun()`), belt-and-suspenders against a future rewording that puts one back in
+## here by habit; the entries below are meant to need no normalizing at all.
+##
+## THE COUNTED-TILE REWRITE (2026-09-08) CHANGED TWO ENTRIES, and the reason is the same for
+## both: these nouns now appear inside "N tiles of X", not only inside "Likes X".
+##   * `forest`: "woods" -> "forest". "4 tiles of woods" is not English; "4 tiles of forest"
+##     is, and it matches the Terraform palette's own button label ("Forest") — which is the
+##     thing a six-year-old has to go find and press. Costs `describe()` the slightly warmer
+##     "Likes woods."; the build list is the screen that has to be actionable.
+##   * `water`: "water nearby" -> "water". The baked-in "nearby" was a second grammar
+##     smuggled into a bare-noun table ("3 tiles of water nearby for each cow"), and every
+##     sentence that reads this table already says "nearby" itself when it means to.
 const SOURCE_PHRASES: Dictionary = {
 	"grass": "open grass",
-	"forest": "woods",
+	"forest": "forest",
 	"rock": "rocky cover",
 	"cultivated_field": "farm field",
-	"water": "water nearby",
+	"water": "water",
 	"house": "house",
+}
+
+## Content-writer's, one phrase per RESIDENT-EMITTED TAG — the tags `tag_sources()` can never
+## resolve, because nothing in the terrain or placeable catalogs emits them. `people` and
+## `deer` come from residents living on a tile (`AnimalDefinition.emits_tags`), so there is
+## no button to press and no tile to paint: YOU CANNOT BUILD A VILLAGER. Keyed by tag rather
+## than by palette button for exactly that reason.
+##
+## Two jobs, not one. Naming the noun is the obvious one. The other is telling
+## `describe_tiers()` that this requirement is ALIVE, which changes two things in the
+## rendered line: no "tiles of" (a villager is not a tile), and the whole tier's lead-in
+## switches from "build these nearby" to "you'll need these nearby", because a sentence that
+## tells a child to build a villager is simply false.
+##
+## "villagers", not "people" — the roster-wide terminology check (D-19's "kits"/"kittens"
+## case). `human.tres`'s `display_name` is "Villager" and the Field Guide row directly above
+## these lines says "Villager", so a tier line reading "3 people" would be the only place in
+## the game that calls them anything else.
+const RESIDENT_PHRASES: Dictionary = {
+	"people": "villagers",
+	"deer": "deer",
 }
 
 ## PROPOSED — human owns this. How much a wood cost outweighs raw tile count when ranking
@@ -186,20 +216,30 @@ static func _cheapest(candidates: Array) -> Dictionary:
 	return best
 
 
-## [COPY] — content-writer's. Shown for a species whose needs no buildable thing supplies.
-const DESCRIBE_UNKNOWN: String = "[COPY] We don't know how to invite these yet."
+## Content-writer's, APPROVED 2026-09-08 (the `[COPY]` stub marker came off with the counted-
+## tile rewrite; the wording itself is unchanged). Shown for a species whose needs no
+## buildable thing supplies — and it is deliberately an admission rather than a guess: a
+## half-recipe is worse than an honest "not yet", because a child would build it and wait
+## forever (`recipe_for()`'s `satisfiable` flag, same reasoning). No fail framing, nothing
+## the player did wrong, and "yet" keeps the door open.
+const DESCRIBE_UNKNOWN: String = "We don't know how to invite these yet."
 
-## [COPY] — content-writer's. `describe()`'s lead-in. The species name is deliberately absent:
-## the card heading already says "Fox", and omitting it means `AnimalDefinition` needs no
-## `plural_name` field purely so this sentence can conjugate. Carries the literal `[COPY]`
-## prefix (final review finding #3) so the rendered sentence — lead-in plus the `SOURCE_PHRASES`
-## fragments joined onto it — reads as an obvious stub rather than finished prose; see the
-## `SOURCE_PHRASES` header comment for why the fragments themselves stay unmarked.
+## Content-writer's, approved 2026-09-01. `describe()`'s and `describe_tier_needs()`'s
+## lead-in — still live on the onboarding coach's beat 2, which is why it is here and not
+## retired with the rest of the flat-field path. The species name is deliberately absent: the
+## card heading already says "Fox", and omitting it means `AnimalDefinition` needs no
+## `plural_name` field purely so this sentence can conjugate — the same constraint
+## `describe_tiers()`'s own cap sentence works around further down.
 const DESCRIBE_LEAD: String = "Likes "
 
-## [COPY] — content-writer's. `%s` is a comma-joined list of species display names. Two full
-## sentences, not composed fragments (unlike `DESCRIBE_LEAD`), so each carries its own `[COPY]`
-## marker directly.
+## Content-writer's, approved. `%s` is a comma-joined list of species display names.
+##
+## THE AVOIDS LINE IS THE ONE PLACE A PREDATOR-PREY DYAD COULD LEAK INTO PLAYER COPY, and it
+## does not: it names only the subject species' own comfort ("Keeps away from Rabbit."),
+## never an actor and a target, so Fox's card and Rabbit's card say the mirror-image of each
+## other and neither says why. That is roster.md -> Compatibility's written position
+## verbatim — "names only the relocating animal's own comfort" — and it is what the graph
+## check asserts in voice, on top of the symmetry it asserts in data.
 const AVOIDS_TEMPLATE: String = "Keeps away from %s."
 
 
@@ -215,11 +255,10 @@ static func describe(species: AnimalDefinition, world: WorldRoot) -> String:
 		var phrase: String = SOURCE_PHRASES.get(id, "") as String
 		if phrase.is_empty():
 			# A source with no authored phrase yet (a newly-woken building) degrades to its
-			# own display name rather than dropping the requirement out of the sentence. This
-			# emits unmarked player-facing text on its own ("barn"), but it sits inside the
-			# sentence `DESCRIBE_LEAD` leads ("Likes barn."), so the rendered
-			# line still reads as an obvious stub as a whole — final review finding #3, folded
-			# into the same ruling as `SOURCE_PHRASES` above: one marker per sentence.
+			# own display name rather than dropping the requirement out of the sentence —
+			# "Likes barn." reads a little raw, but a silently-missing requirement is the
+			# failure that actually strands a player. The fix for a raw one is one entry in
+			# `SOURCE_PHRASES`, not code.
 			phrase = (entry["display_name"] as String).to_lower()
 		phrases.append(phrase)
 	return DESCRIBE_LEAD + _join_and(phrases) + "."
@@ -274,83 +313,425 @@ static func describe(species: AnimalDefinition, world: WorldRoot) -> String:
 ## `AnimalDefinition.BUILDING_TAGS`'s own comment), so a `built` LIMIT reads as "away from
 ## buildings", not "build one of every building" — see `_describe_limit()`.
 ##
-## Every string this composes is NEW player-facing copy with no prior sign-off, hence the
-## single `[COPY]` marker at the front of each line — one per rendered sentence, matching
-## the ruling `SOURCE_PHRASES`' own header already established, not one per fragment.
+## ---------------------------------------------------------------------------------------
+## THE COUNTED-TILE REWRITE, 2026-09-08 — human-ruled shape, replacing the one-sentence
+## "[COPY] Up to 6: needs an open barn; more open grass and rocky cover means room for more."
+## that shipped from Task 10. THREE DEFECTS, and every rule below exists to hold one shut.
+##
+## 1. IT READ AS "REQUIRED, PLUS SOME OPTIONAL EXTRAS", WHICH IS BACKWARDS. The old sentence
+##    split on GATE_ONLY vs. scaling and gave the two halves different grammatical weight —
+##    "needs X" against "more Y means room for more". But `CapacityEvaluator.
+##    tier_capacity_from_counts()` takes a `min` over EVERY scaling need, and `floor(0 / 6)`
+##    is 0: zero rock tiles means zero alpacas no matter how many barns are standing. The
+##    old copy told a child the exact opposite of the arithmetic. THE FIX IS STRUCTURAL, not
+##    a reword: every need — gate and scaling alike — is now one bullet in ONE list under
+##    ONE lead-in ("build these nearby"), with no grammar anywhere that ranks them. There is
+##    no "optional" register left in the template to fall into.
+## 2. NO NUMBERS. "More" is unplannable. Every count is now rendered, and EVERY COUNT IS
+##    INTERPOLATED FROM DATA — `need.tiles_per_individual` and `tier.max_individuals`,
+##    never authored into a string. A retune is a `.tres` edit with no copy change, which is
+##    the same property `SOURCE_PHRASES` gives tag naming.
+## 3. IT NAMED THE CHEAPEST SOURCE AND IMPLIED IT WAS THE ONLY ONE. `_cheapest()` picks Open
+##    Barn for `barn`, so Alpaca's card said "an open barn" — while Small Barn and Large Barn
+##    work identically. See `_gate_line()` for how the two cases (one true source vs. several
+##    interchangeable ones) are now told apart from `tag_sources()` data rather than assumed.
+##
+## THE COPY MUST BE TRUE TO `tier_capacity_from_counts()`, WHICH IS THE AUTHORITY:
+##     capacity = min(tier.max_individuals, over scaling needs: floor(count / divisor))
+##     ...and 0 if any limit is exceeded, or any GATE_ONLY need has count < 1.
+## Read the rendered block back against that formula and each clause maps to one term: the
+## bullets are the needs, "for each <animal>" is the divisor, the limit sentence is the
+## zeroing gate, and the cap sentence is `max_individuals`.
+##
+## MULTI-LINE BY DESIGN — ONE STRING PER TIER, `\n`-SEPARATED. `field_guide.gd` renders one
+## `Label` per returned string with `AUTOWRAP_WORD_SMART`, and a Godot `Label` honours a hard
+## `\n` inside an autowrapped string, so a bulleted build list needs no UI change at all.
+## Returning one string per BULLET instead was considered and rejected: `field_guide.gd`
+## would then have no way to tell where one tier's block ends and the next begins, and
+## `test_field_guide.gd` compares the rendered `Label` texts against this function's return
+## element by element — one element per tier is what keeps that comparison meaningful.
+##
+## NO PLURAL OF THE SPECIES NAME IS EVER FORMED. `AnimalDefinition` carries no `plural_name`
+## (see `DESCRIBE_LEAD`), and deriving one is a trap this roster is full of: sheep/sheep,
+## deer/deer, fox/foxes, husky/huskies. Every sentence here is written to need the SINGULAR
+## only — "for each sheep", "Room for up to 8 here." — which is why the cap sentence counts
+## without naming, and why the human's mock line "Double everything for 2 alpacas" became
+## the per-bullet "for each alpaca" instead. Reported as a deviation, not slipped in.
 static func describe_tiers(species: AnimalDefinition, world: WorldRoot = null) -> Array[String]:
 	var lines: Array[String] = []
 	if species == null:
 		return lines
-	for tier: HabitatTier in species.effective_tiers():
-		lines.append(_describe_tier(tier, world))
+	var tiers: Array[HabitatTier] = species.effective_tiers()
+	for i in range(tiers.size()):
+		# The PREVIOUS tier is passed in so `_describe_tier()` can tell an upgrade ("add a
+		# windmill to what you already built") from an alternative ("or build a farmhouse
+		# instead") — see `_upgrade_needs()`. `null` for the first tier, which is always a
+		# standalone recipe.
+		var previous: HabitatTier = null
+		if i > 0:
+			previous = tiers[i - 1]
+		lines.append(_describe_tier(species, tiers[i], previous, world))
 	return lines
 
 
-## "[COPY] Up to N: needs ...; more ... means room for more; away from buildings."
-static func _describe_tier(tier: HabitatTier, world: WorldRoot) -> String:
+## Content-writer's. `%s` is the species, articled — "an alpaca", "a shiba inu".
+## Two forms, chosen by whether every requirement is something a player can actually place:
+## Husky needs `people`, and no amount of tapping the palette builds a villager, so telling a
+## child to "build" one would be a plain lie. `LEAD_NEED` covers both kinds at once.
+const LEAD_BUILD: String = "To invite %s, build these nearby:"
+const LEAD_NEED: String = "To invite %s, you'll need these nearby:"
+
+## Content-writer's. A second tier that is NOT a superset of the first — Horse (its grass
+## divisor changes, 6 each to 4 each), Villager (`house` becomes `large_house`), Deer (its
+## `built` limit tightens). "Instead" is the load-bearing word: this is a whole separate
+## recipe, not something to add on top, and a child who reads it as an addition would build
+## the wrong thing.
+##
+## NO EM DASH, AND NOT FOR TASTE. Same reasoning as `BULLET` below: the project ships no font
+## file, `FieldGuide.HERE_TEMPLATE` proves `·` has a glyph in Godot's built-in face, and
+## nothing proves `—` does. Every rendered string in this file stays inside ASCII plus that
+## one measured codepoint, so a full stop does the work the dash would have.
+const LEAD_ALT_BUILD: String = "Or here's another way. Build these nearby instead:"
+const LEAD_ALT_NEED: String = "Or here's another way. You'll need these nearby instead:"
+
+## Content-writer's. A second tier that IS the first plus more, with every shared number
+## unchanged — Cow (add water), Sheep (add a windmill), Rabbit (add flowers). `%d` is the new
+## cap. The cap rides the lead-in here rather than getting its own sentence, because "add
+## this AND you get up to six" is one thought, and splitting it invites the reader to treat
+## the bullet as decoration again.
+const LEAD_ADD_ONE: String = "Add this too, and there's room for up to %d:"
+const LEAD_ADD_MANY: String = "Add these too, and there's room for up to %d:"
+
+## Content-writer's. The cap sentence — `HabitatTier.max_individuals`, the outer term of the
+## capacity formula. `CAP_ONE`'s `%s` is the bare singular species name.
+##
+## `CAP_ONE` IS NOT `CAP_MANY` WITH A 1 IN IT. A tier capped at one (Bull's pen, Villager's
+## single) must never render "double it" arithmetic or a "for each" divisor, because there
+## is no second individual to divide for — `_need_line()` drops the "for each" suffix at
+## `max_individuals == 1` for the same reason. gdd.md Pillar 1's indicator test applies to
+## both: these state what the land holds, and nothing reads them back or rewards reaching
+## them.
+const CAP_ONE: String = "Just 1 %s can live here."
+const CAP_MANY: String = "Room for up to %d here."
+
+## Content-writer's. One requirement, one bullet. `·` rather than `•` is deliberate and
+## measured, not a stylistic preference: the project ships no font file at all, so every
+## `Label` renders in Godot's built-in default face, and `FieldGuide.HERE_TEMPLATE`
+## ("Resident · %d") is the standing proof that THIS codepoint has a glyph in it. A missing
+## glyph would render as tofu at the front of every line on the screen.
+const BULLET: String = "· "
+
+## Content-writer's. `%d` is `HabitatNeed.tiles_per_individual` — read from data, never
+## authored. `%s` are the noun and then the singular species name.
+##
+## THE SINGULAR/PLURAL SPLIT IS NOT COSMETIC. Villager's `cultivated/1` renders through
+## `NEED_TILES_ONE`; "1 tiles of farm field" is the exact kind of stub-looking artefact that
+## makes a child's parent stop trusting the screen.
+const NEED_TILES_ONE: String = "1 tile of %s"
+const NEED_TILES_MANY: String = "%d tiles of %s"
+
+## Content-writer's. The same count for a RESIDENT-emitted need (`RESIDENT_PHRASES`), which
+## has no tiles: "4 deer", "3 villagers". A count of 1 needs no special case here because
+## `RESIDENT_PHRASES` is already plural where English wants it to be and invariant where it
+## does not ("deer"), and no shipped tier asks for exactly one.
+const NEED_LIVING: String = "%d %s"
+
+## Content-writer's. Appended to a scaling bullet wherever the tier can hold more than one —
+## this is where the divisor stops being a mystery. `%s` is the singular species name.
+const NEED_EACH_SUFFIX: String = " for each %s"
+
+## Content-writer's. The limit sentence, kept OUT of the bullet list on purpose: a bullet
+## under "build these nearby" reads as a thing to place, and "build away from buildings" is
+## nonsense. `%s` is `_describe_limit()`'s phrase, or several joined with "and".
+const LIMIT_SENTENCE: String = "Pick a spot %s."
+
+
+## One tier's whole block. `previous` is the tier rendered directly above this one, or `null`
+## for the first — see `_upgrade_needs()` for what it is used for.
+static func _describe_tier(
+	species: AnimalDefinition, tier: HabitatTier, previous: HabitatTier, world: WorldRoot
+) -> String:
+	var noun: String = species.display_name.to_lower()
+	var shows_each: bool = tier.max_individuals > 1
+
+	# THE UPGRADE CASE, checked first because it renders a DIFFERENT (much shorter) block.
+	# Runs against its OWN `seen` dictionary, deliberately: if it renders nothing (every added
+	# need deduped away) this function falls through to the full render below, which must
+	# start from a clean slate rather than from a half-consumed one.
+	var upgrade: Array[HabitatNeed] = _upgrade_needs(tier, previous)
+	if not upgrade.is_empty():
+		var upgrade_seen: Dictionary = {}
+		var added: Array[String] = []
+		for need: HabitatNeed in upgrade:
+			var bullet: String = _need_line(need, noun, shows_each, world, upgrade_seen)
+			if not bullet.is_empty():
+				added.append(BULLET + bullet)
+		if not added.is_empty():
+			var lead_add: String = LEAD_ADD_MANY
+			if added.size() == 1:
+				lead_add = LEAD_ADD_ONE
+			return (lead_add % tier.max_individuals) + "\n" + "\n".join(added)
+
+	# GATES FIRST, THEN SCALING NEEDS — a deliberate re-sort of authoring order (Sheep's
+	# flock tier authors its `mill` gate last). A build list is read as an order of
+	# operations by anyone under ten: place the one building, then paint the tiles around it.
+	# Authoring order is documented as presentational only (`HabitatTier`'s own header), so
+	# nothing downstream depends on it.
 	var seen: Dictionary = {}
-	var gate_phrases: Array[String] = []
-	var scaling_phrases: Array[String] = []
+	var gates: Array[String] = []
+	var scaling: Array[String] = []
+	var all_buildable: bool = true
 	for need: HabitatNeed in tier.needs:
-		var phrase: String = _need_phrase(need.tag, world, seen)
-		if phrase.is_empty():
+		if RESIDENT_PHRASES.has(need.tag):
+			all_buildable = false
+		var bullet: String = _need_line(need, noun, shows_each, world, seen)
+		if bullet.is_empty():
 			continue
 		if need.is_gate_only():
-			gate_phrases.append(_with_article(phrase))
+			gates.append(BULLET + bullet)
 		else:
-			scaling_phrases.append(phrase)
+			scaling.append(BULLET + bullet)
 
-	var clauses: Array[String] = []
-	if not gate_phrases.is_empty():
-		clauses.append("needs " + _join_and(gate_phrases))
-	if not scaling_phrases.is_empty():
-		clauses.append("more " + _join_and(scaling_phrases) + " means room for more")
+	if gates.is_empty() and scaling.is_empty():
+		return DESCRIBE_UNKNOWN
+
+	var lead: String = ""
+	if previous == null:
+		var lead_first: String = LEAD_NEED
+		if all_buildable:
+			lead_first = LEAD_BUILD
+		lead = lead_first % _with_article(noun)
+	elif all_buildable:
+		lead = LEAD_ALT_BUILD
+	else:
+		lead = LEAD_ALT_NEED
+
+	var block: Array[String] = [lead]
+	block.append_array(gates)
+	block.append_array(scaling)
+
+	var limit_phrases: Array[String] = []
 	for limit: HabitatLimit in tier.limits:
-		clauses.append(_describe_limit(limit))
+		limit_phrases.append(_describe_limit(limit))
+	if not limit_phrases.is_empty():
+		block.append(LIMIT_SENTENCE % _join_and(limit_phrases))
 
-	var body: String = "; ".join(clauses) if not clauses.is_empty() else "no requirements yet"
-	return "[COPY] Up to %d: %s." % [tier.max_individuals, body]
+	if tier.max_individuals == 1:
+		block.append(CAP_ONE % noun)
+	else:
+		block.append(CAP_MANY % tier.max_individuals)
+	return "\n".join(block)
 
 
-## The readable phrase for one need's tag, deduped against `seen` by whichever identity
-## actually decides whether two needs are solved the SAME way. Keyed on `resolved_id`
-## (`tag_sources()`'s own doc comment), NOT `id` — a fix-round-1 correction: `id` is the
-## palette BUTTON (e.g. "farm_building"), and Cow needs both `barn` and `silo`, two
-## DIFFERENT buildings sharing that one button. Deduping on `id` silently dropped whichever
-## of the two was seen second — the exact regression this file's own header now warns
+## One need, as one bullet's worth of text — no leading `BULLET`, no trailing period.
+## Returns "" for a need whose source was already named by an earlier need in this tier
+## (`seen`), which the caller drops rather than rendering the same requirement twice.
+static func _need_line(
+	need: HabitatNeed, noun: String, shows_each: bool, world: WorldRoot, seen: Dictionary
+) -> String:
+	if need.is_gate_only():
+		return _gate_line(need.tag, world, seen)
+	var resolved: Dictionary = _resolve_need(need.tag, world, seen)
+	if not (resolved["ok"] as bool):
+		return ""
+	var phrase: String = resolved["phrase"] as String
+	var body: String = ""
+	if resolved["living"] as bool:
+		body = NEED_LIVING % [need.tiles_per_individual, phrase]
+	elif need.tiles_per_individual == 1:
+		body = NEED_TILES_ONE % phrase
+	else:
+		body = NEED_TILES_MANY % [need.tiles_per_individual, phrase]
+	# The divisor only means something where a second individual can exist; at a cap of one
+	# "for each bull" is noise at best and a suggestion that a second bull is coming at worst.
+	if not shows_each:
+		return body
+	return body + (NEED_EACH_SUFFIX % noun)
+
+
+## THE GATE BULLET, AND THE HONESTY PROBLEM IT EXISTS TO SOLVE. A gate-only need is one
+## specific thing to go and place, so unlike a scaling need it has to name a BUILDING — and
+## naming the wrong one, or naming one of several as if it were the only one, is the defect
+## that put "needs an open barn" on Alpaca's card while a Small Barn worked just as well.
+##
+## `tag_sources()` already carries everything needed to tell the two cases apart, so this is
+## derived, never a hand-maintained list of which tags are "the special ones":
+##   * ONE source ("stable" -> Open Barn alone, "mill" -> Windmill, "silo" -> Silo,
+##     "large_house" -> Farmhouse): name it. Any hedge here would be a lie in the other
+##     direction — nothing but a Windmill satisfies `mill`.
+##   * SEVERAL sources sharing a last word ("barn" -> Open Barn, Small Barn, Large Barn):
+##     "a barn (any kind)", the human's own wording from the approved mock. The shared word
+##     is READ OFF the display names rather than authored, so a fourth barn shipping later
+##     changes nothing here, and a tag whose sources do NOT share a word can never
+##     accidentally fall into this branch.
+##   * SEVERAL sources with nothing in common ("house" -> House, Farmhouse): list them all,
+##     joined with "or". Complete and unambiguous; it only gets long if a future tag has
+##     many unrelated sources, which no tag does today.
+## Terrain-backed gates (none in the roster) fall through to the cheapest source's ordinary
+## noun — a gate is a thing you place, and where that thing is a tile the material name is
+## already the honest answer.
+static func _gate_line(tag: String, world: WorldRoot, seen: Dictionary) -> String:
+	var resolved: Dictionary = _resolve_need(tag, world, seen)
+	if not (resolved["ok"] as bool):
+		return ""
+	var sources: Array = resolved["sources"] as Array
+	var names: Array[String] = []
+	var all_placeable: bool = not sources.is_empty()
+	for source: Dictionary in sources:
+		if (source["kind"] as String) != "placeable":
+			all_placeable = false
+			break
+		var display: String = _bare_noun((source["display_name"] as String).to_lower())
+		if not names.has(display):
+			names.append(display)
+	if not all_placeable or names.size() < 2:
+		return _with_article(resolved["phrase"] as String)
+
+	var shared: String = names[0].get_slice(" ", names[0].get_slice_count(" ") - 1)
+	for display: String in names:
+		if display.get_slice(" ", display.get_slice_count(" ") - 1) != shared:
+			shared = ""
+			break
+	if not shared.is_empty():
+		return "%s (any kind)" % _with_article(shared)
+
+	var articled: Array[String] = []
+	for display: String in names:
+		articled.append(_with_article(display))
+	return _join_or(articled)
+
+
+## `{"ok", "phrase", "living", "sources"}` for one need's tag, deduped against `seen` by
+## whichever identity actually decides whether two needs are solved the SAME way. Keyed on
+## `resolved_id` (`tag_sources()`'s own doc comment), NOT `id` — a fix-round-1 correction:
+## `id` is the palette BUTTON (e.g. "farm_building"), and Cow needs both `barn` and `silo`,
+## two DIFFERENT buildings sharing that one button. Deduping on `id` silently dropped
+## whichever of the two was seen second — the exact regression this file's own header warns
 ## about. `resolved_id` is the specific building (or terrain, where the two already agree),
-## so Rock's `cover` and `rocks` still collapse into one "rocky cover" phrase (both resolve
-## to `resolved_id == "rock"`), while Cow's `barn` and `silo` — different buildings, same
-## button — both survive. Falls back to the bare tag itself when there is no `world` to
-## resolve against, or no source is catalogued for it (an unsourced tag still deserves a
-## readable line rather than a blank one; that honesty lives in `recipe_for()`'s
-## `satisfiable` flag, not here). Returns "" for an already-seen key, which the caller drops
-## instead of rendering the same requirement twice.
-static func _need_phrase(tag: String, world: WorldRoot, seen: Dictionary) -> String:
+## so two tags served by one Rock tile still collapse into one "rocky cover" bullet, while
+## Cow's `barn` and `silo` — different buildings, same button — both survive.
+##
+## ONE THING TO WATCH NOW THAT COUNTS ARE VISIBLE: the collapse keeps the FIRST need's
+## divisor and drops the second's. That was harmless while the copy said only "more X means
+## room for more", and it is still correct for the case it was built for — two tags on one
+## tile with the SAME divisor, which is the only shape the roster has ever shipped (Rock's
+## retired `cover`+`rocks` pair). Two same-source needs with DIFFERENT divisors would now
+## understate one of them. Flagged rather than defended: no live instance exists, and
+## `HabitatTier._duplicate_bucket_problems()` already rejects the closest relative of it.
+##
+## `living` marks a RESIDENT-emitted tag (`RESIDENT_PHRASES`) — `people`, `deer` — which
+## `tag_sources()` structurally cannot resolve because no terrain or placeable emits them.
+## Falls back to the bare tag, spaced out, when there is no `world` and no resident phrase
+## (an unsourced tag still deserves a readable line rather than a blank one; that honesty
+## lives in `recipe_for()`'s `satisfiable` flag, not here).
+static func _resolve_need(tag: String, world: WorldRoot, seen: Dictionary) -> Dictionary:
+	var miss: Dictionary = {"ok": false, "phrase": "", "living": false, "sources": []}
 	if world != null:
 		var candidates: Array = (tag_sources(world) as Dictionary).get(tag, []) as Array
 		if not candidates.is_empty():
 			var chosen: Dictionary = _cheapest(candidates)
 			var dedup_key: String = chosen["resolved_id"] as String
 			if seen.has(dedup_key):
-				return ""
+				return miss
 			seen[dedup_key] = true
 			var phrase: String = SOURCE_PHRASES.get(chosen["id"] as String, "") as String
 			if phrase.is_empty():
 				phrase = (chosen["display_name"] as String).to_lower()
-			return _bare_noun(phrase)
+			return {
+				"ok": true,
+				"phrase": _bare_noun(phrase),
+				"living": false,
+				"sources": candidates,
+			}
 	if seen.has(tag):
-		return ""
+		return miss
 	seen[tag] = true
-	return _bare_noun(tag.replace("_", " "))
+	if RESIDENT_PHRASES.has(tag):
+		return {
+			"ok": true,
+			"phrase": RESIDENT_PHRASES[tag] as String,
+			"living": true,
+			"sources": [],
+		}
+	return {
+		"ok": true,
+		"phrase": _bare_noun(tag.replace("_", " ")),
+		"living": false,
+		"sources": [],
+	}
+
+
+## The needs `tier` adds on top of `previous`, or EMPTY if `tier` is not a clean upgrade of
+## it — which is the interesting half of this function, because getting it wrong ships a lie.
+##
+## "Add a windmill and you get eight sheep" is only true if everything ELSE about the two
+## tiers is identical. Three of the roster's five two-tier species pass that bar (Cow adds
+## water, Sheep adds a mill, Rabbit adds flowers) and three do not:
+##   * HORSE re-tunes a shared need — `open_grass` goes from 6 tiles each to 4, and from
+##     radius 8 to radius 14. "Add water" would leave a child building against the old
+##     number.
+##   * VILLAGER SWAPS a need — `house` becomes `large_house`. Nothing is added at all; a
+##     House is replaced by a Farmhouse.
+##   * DEER tightens a LIMIT — `built` goes from "at most 1" to "none at all". The needs
+##     really are a superset, so a needs-only comparison would call this an upgrade and then
+##     silently drop the one requirement that changed.
+## So the test is exact on all three axes: same limits, and every previous need matched on
+## (tag, radius, divisor) — radius included because Deer's herd tier keeps every divisor and
+## moves every radius, which a (tag, divisor) comparison would wave straight through. A tier
+## that fails any of it renders in full, under `LEAD_ALT_*`'s "instead".
+static func _upgrade_needs(tier: HabitatTier, previous: HabitatTier) -> Array[HabitatNeed]:
+	var none: Array[HabitatNeed] = []
+	if previous == null or tier.max_individuals <= previous.max_individuals:
+		return none
+	if not _limits_match(tier, previous):
+		return none
+
+	var previous_keys: Dictionary = {}
+	for need: HabitatNeed in previous.needs:
+		previous_keys[_need_key(need)] = true
+	var added: Array[HabitatNeed] = []
+	var matched: int = 0
+	for need: HabitatNeed in tier.needs:
+		if previous_keys.has(_need_key(need)):
+			matched += 1
+		else:
+			added.append(need)
+	if matched < previous_keys.size():
+		return none
+	return added
+
+
+static func _need_key(need: HabitatNeed) -> String:
+	return "%s@%d/%d" % [need.tag, need.radius, need.tiles_per_individual]
+
+
+static func _limits_match(tier: HabitatTier, previous: HabitatTier) -> bool:
+	if tier.limits.size() != previous.limits.size():
+		return false
+	var keys: Dictionary = {}
+	for limit: HabitatLimit in previous.limits:
+		keys["%s@%d<=%d" % [limit.tag, limit.radius, limit.max_count]] = true
+	for limit: HabitatLimit in tier.limits:
+		if not keys.has("%s@%d<=%d" % [limit.tag, limit.radius, limit.max_count]):
+			return false
+	return true
+
+
+## The bare noun for one tag, with no count, no article and no dedup — the counted-tile
+## rewrite's one public seam, so `test_habitat_recipe.gd` can assert that the NUMBER rendered
+## beside a noun matches `HabitatNeed.tiles_per_individual` without re-implementing (and
+## therefore trivially agreeing with) the sentence templates it is supposed to be checking.
+static func need_noun(tag: String, world: WorldRoot) -> String:
+	return _resolve_need(tag, world, {})["phrase"] as String
 
 
 ## Strips a leading "a ", "an " or "the " (case-insensitively) off `phrase`, if present.
 ## Fix round 2's structural fix: `SOURCE_PHRASES` is documented as bare nouns, but this is
 ## the defensive half of that contract, applied at the one point every phrase passes
-## through on its way into `describe_tiers()`'s two templates — so a future rewording that
-## puts an article back in (out of habit, since `describe()`'s "Likes X" sentence never
-## minded one) still cannot reproduce the "needs an a house" / "more a farm field" defects.
+## through on its way into `describe_tiers()`'s templates — so a future rewording that puts
+## an article back in (out of habit, since `describe()`'s "Likes X" sentence never minded
+## one) still cannot reproduce the "needs an a house" defect, nor the counted-tile
+## rewrite's own version of it, "5 tiles of a farm field".
 ## A no-op on every phrase this file produces today, which is already bare.
 static func _bare_noun(phrase: String) -> String:
 	var lower: String = phrase.to_lower()
@@ -360,10 +741,12 @@ static func _bare_noun(phrase: String) -> String:
 	return phrase
 
 
-## "a stable", "an open barn" — the indefinite article a gate-only need reads with. A plain
-## first-letter-is-a-vowel heuristic, adequate for the tag vocabulary this reads over; not a
-## general-purpose English rule. Safe to apply unconditionally: every phrase it receives has
-## already passed through `_need_phrase()`'s `_bare_noun()` normalization.
+## "a stable", "an open barn", "an alpaca" — the indefinite article a gate-only need, or a
+## lead-in's species name, reads with. A plain first-letter-is-a-vowel heuristic, adequate
+## for the tag and roster vocabulary this reads over; not a general-purpose English rule
+## (it would say "an hour" wrong, and "a unicorn" wrong the other way — neither is a word
+## this file can reach). Safe to apply unconditionally: every phrase it receives has already
+## passed through `_resolve_need()`'s `_bare_noun()` normalization.
 static func _with_article(phrase: String) -> String:
 	if phrase.is_empty():
 		return phrase
@@ -382,10 +765,16 @@ static func _with_article(phrase: String) -> String:
 ## tolerated"), because a six-year-old parsing "at most 1" gets no mental picture at all.
 ## A non-`built` limit (none in the roster today) degrades to a generic phrase naming its
 ## own tag, since there is no real content yet to justify a bespoke one.
+##
+## Content-writer's, and returned as a BARE PHRASE that slots into `LIMIT_SENTENCE` ("Pick a
+## spot %s.") — never a sentence of its own, and deliberately never a bullet: a bullet under
+## "build these nearby" reads as a thing to go and place, and "build away from buildings" is
+## nonsense. This is where the tier's zeroing condition goes, and it must not look optional
+## any more than a need does.
 static func _describe_limit(limit: HabitatLimit) -> String:
 	if limit.tag == "built":
 		return "far from any buildings" if limit.max_count == 0 else "away from buildings"
-	return "not too much %s nearby" % limit.tag.replace("_", " ")
+	return "with not much %s nearby" % limit.tag.replace("_", " ")
 
 
 ## Display names of every species this one keeps distance from, BOTH directions unioned —
@@ -620,3 +1009,15 @@ static func _join_and(parts: Array[String]) -> String:
 		return parts[0]
 	var head: Array[String] = parts.slice(0, parts.size() - 1)
 	return ", ".join(head) + " and " + parts[parts.size() - 1]
+
+
+## `_join_and()`'s other half — "a house or a farmhouse". A gate need with several
+## interchangeable sources is an OR, and rendering it with "and" would tell a child to build
+## every one of them.
+static func _join_or(parts: Array[String]) -> String:
+	if parts.is_empty():
+		return ""
+	if parts.size() == 1:
+		return parts[0]
+	var head: Array[String] = parts.slice(0, parts.size() - 1)
+	return ", ".join(head) + " or " + parts[parts.size() - 1]

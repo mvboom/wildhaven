@@ -35,6 +35,14 @@ const HORSE_PATH: String = "res://data/animals/horse.tres"
 const COW_PATH: String = "res://data/animals/cow.tres"
 const SHEEP_PATH: String = "res://data/animals/sheep.tres"
 const HUMAN_PATH: String = "res://data/animals/human.tres"
+# Added 2026-09-08 for the counted-tile copy rewrite's own checks: Alpaca is the species
+# whose card carried the defect verbatim, Bull and Villager are the roster's only cap-1
+# tiers, Pug carries the second real multi-source gate (`house`), and Pig carries a
+# resident-emitted need (`people`) that nothing in the palette can build.
+const ALPACA_PATH: String = "res://data/animals/alpaca.tres"
+const BULL_PATH: String = "res://data/animals/bull.tres"
+const PUG_PATH: String = "res://data/animals/pug.tres"
+const PIG_PATH: String = "res://data/animals/pig.tres"
 
 var _world: WorldRoot = null
 var _frames: int = 0
@@ -79,6 +87,16 @@ func _process(_delta: float) -> bool:
 	_check_grasslands_tags_stay_distinct()
 	_check_grouped_building_tags_name_the_carrying_member()
 	_check_no_article_defects_across_the_roster()
+	# The 2026-09-08 counted-tile copy rewrite — the Field Guide's tier lines becoming a
+	# build list a six-year-old can act on. `_check_alpaca_reads_as_a_build_list()` is the
+	# failing test the rewrite was written against; the four after it generalise its three
+	# defects across the roster.
+	_check_alpaca_reads_as_a_build_list()
+	_check_rendered_counts_match_the_data()
+	_check_cap_of_one_never_pluralizes()
+	_check_multi_source_gate_reads_differently()
+	_check_resident_needs_are_never_buildable()
+	_check_upgrade_tiers_read_as_additions_only_when_they_are()
 
 	finish()
 	return true
@@ -479,14 +497,19 @@ func _check_grasslands_tags_stay_distinct() -> void:
 ## mislabeling it. This asserts all four read the ACTUAL building against real `.tres` data
 ## and the real world catalog, and that Cow specifically names both.
 ##
-## COW'S "barn" TAG RESOLVES TO "open barn", NOT LITERALLY "Barn" — flagged for the human,
-## not silently forced otherwise. THREE placeables carry `barn` (Barn cost 30, Small Barn
-## and Open Barn both cost 15), and `_cheapest()` — this file's one, consistent tie-break
-## rule, used everywhere else in this file (`easiest_species()`, `recipe_for()`) — picks the
-## cheapest, ties broken by catalog order (`open_barn.tres` sorts before `small_barn.tres`).
-## This is arguably a BETTER answer than the literal "Barn" ("cheaper barn-family option
-## exists") but is not what was assumed when this fix was scoped, so it is pinned here
-## explicitly rather than glossed over.
+## COW'S "barn" TAG USED TO RESOLVE TO "open barn" AND SAY SO, WHICH WAS THE HONEST-LOOKING
+## HALF OF A REAL DEFECT. THREE placeables carry `barn` (Barn cost 30, Small Barn and Open
+## Barn both cost 15), and `_cheapest()` — this file's one consistent tie-break rule, used by
+## `easiest_species()` and `recipe_for()` alike — picks the cheapest, ties broken by catalog
+## order (`open_barn.tres` sorts before `small_barn.tres`). Naming that winner was fine as an
+## ANSWER and wrong as a SENTENCE: "needs an open barn" told a child the Small Barn they had
+## already built did not count. As of the 2026-09-08 counted-tile rewrite a gate need with
+## several interchangeable sources reads "a barn (any kind)" — derived from the shared last
+## word of the sources' display names, so nothing here is hand-listed — while a gate with
+## exactly one real source still names it outright, because "a windmill (any kind)" would be
+## a lie in the other direction. `_check_multi_source_gate_reads_differently()` below pins
+## both halves of that distinction; this function keeps pinning WHICH BUILDING each of the
+## four affected species resolves to.
 func _check_grouped_building_tags_name_the_carrying_member() -> void:
 	var horse: AnimalDefinition = load(HORSE_PATH) as AnimalDefinition
 	var cow: AnimalDefinition = load(COW_PATH) as AnimalDefinition
@@ -523,45 +546,360 @@ func _check_grouped_building_tags_name_the_carrying_member() -> void:
 	# different buildings behind the SAME "Farm Building" palette button. The pre-fix
 	# button-keyed dedup silently dropped whichever was seen second; a child would build a
 	# barn-family building, wait, and nothing on screen would explain why no cow arrived.
+	#
+	# SCOPED FROM "EVERY LINE" TO "EVERY STANDALONE LINE", 2026-09-08 (counted-tile copy
+	# rewrite). Cow's herd tier is its pair tier plus `water/3` with every other number
+	# unchanged, so it renders as an explicit addendum ("Add this too, and there's room for
+	# up to 6:") instead of a second full recipe — the human-approved mock's own shape. The
+	# silo is stated once, on the line above, and "add this TOO" is what carries it down;
+	# re-asserting it here would force every tier to repeat a whole recipe, which is the
+	# wordiness this rewrite removes. The property that actually matters is unchanged and
+	# still checked: no line may READ AS A COMPLETE RECIPE while omitting the silo. See
+	# `test_field_guide.gd`'s `_check_cow_names_both_barn_and_silo()`, which pins the same
+	# reading against the live scene tree.
 	var cow_lines: Array[String] = HabitatRecipe.describe_tiers(cow, _world)
 	if check(cow_lines.size() >= 2, "cow presents its pair and herd tiers"):
-		for line: String in cow_lines:
-			check(line.contains("silo"),
-				"cow's tier line names Silo — the requirement a button-keyed dedup would "
-				+ "have silently erased: '%s'" % line)
-			check(line.contains("barn"),
-				"...and still names a barn-family building too (open barn, tied-cheapest "
-				+ "with small barn — see the doc comment above) — two different buildings, "
-				+ "one button, BOTH rendered: '%s'" % line)
+		check(cow_lines[0].contains("silo"),
+			"cow's standalone tier line names Silo — the requirement a button-keyed dedup "
+			+ "would have silently erased: '%s'" % cow_lines[0])
+		check(cow_lines[0].contains("barn"),
+			"...and still names a barn-family building too — two different buildings, one "
+			+ "button, BOTH rendered: '%s'" % cow_lines[0])
+		var add_one: String = HabitatRecipe.LEAD_ADD_ONE.get_slice("%", 0)
+		var add_many: String = HabitatRecipe.LEAD_ADD_MANY.get_slice("%", 0)
+		for i in range(1, cow_lines.size()):
+			var line: String = cow_lines[i]
+			check(
+				line.contains("silo")
+					or line.begins_with(add_one)
+					or line.begins_with(add_many),
+				("cow's later tier line either names Silo itself or is visibly an addendum "
+				+ "to the line above: '%s'") % line
+			)
 
 
 ## FIX ROUND 2, CRITICAL. `SOURCE_PHRASES` used to bake an article into some entries ("a
 ## house", "a farm field") because they were written for `describe()`'s "Likes X" sentence,
-## which never minded either way. `describe_tiers()`'s two templates DID mind, and
-## disagreed with each other: the scaling clause never adds its own article, so a baked-in
-## one produced NOTHING ("more a farm field means room for more" — Human's cultivated
-## scaling need, also Bull/Pig/Rabbit); the gate clause always adds one, so a baked-in one
-## produced TWO ("needs an a house" — Human/Pug/Shiba Inu's `house`/`large_house` gate).
+## which never minded either way. `describe_tiers()`'s templates DID mind, and disagreed
+## with each other: the scaling clause never added its own article, so a baked-in one
+## produced NOTHING ("more a farm field means room for more" — Human's cultivated scaling
+## need, also Bull/Pig/Rabbit); the gate clause always adds one, so a baked-in one produced
+## TWO ("needs an a house" — Human/Pug/Shiba Inu's `house`/`large_house` gate).
 ##
-## Scans EVERY roster species' rendered tier lines for both symptom patterns, rather than
-## pinning six hardcoded strings — a single check that would also catch this defect
-## reappearing for a SEVENTH species (or the fifteen-and-growing roster's sixteenth) that
-## six literals never would. `" a a "`/`" a an "`/`" an a "`/`" an an "` catch article
-## doubling anywhere in the line, not just at "needs "; `"more a "`/`"more an "` catch the
-## scaling clause's missing-article symptom specifically.
+## Scans EVERY roster species' rendered tier lines for each symptom pattern, rather than
+## pinning hardcoded strings — a single check that would also catch this defect reappearing
+## for a species (or the fifteen-and-growing roster's sixteenth) that literals never would.
+##
+## THE SECOND PATTERN LIST WAS REPLACED, NOT DELETED, 2026-09-08 (counted-tile copy
+## rewrite). `"more a "`/`"more an "` were the symptom of the OLD scaling clause ("more X
+## means room for more"), which no longer exists — the clause is now a numbered bullet
+## ("5 tiles of open grass for each alpaca"), so those two patterns became vacuous and would
+## have gone on passing forever while checking nothing. What replaces them is the same idea
+## re-derived for the new wording: the numbered-bullet template has its own three ways to
+## produce a stub-looking artefact, and each is one substring away.
+##   * `" 0 tiles"` — a GATE_ONLY need (`tiles_per_individual == 0`) leaking into the scaling
+##     template. This is the STRUCTURAL half of the defect the rewrite exists to fix: a gate
+##     is a building to place, never a quantity of tiles, and "0 tiles of barn" is what it
+##     looks like when the two get crossed. Leading space so a future divisor of 10 cannot
+##     false-positive off "10 tiles".
+##   * `" 1 tiles"` — the singular/plural split failing. Villager's `cultivated/1` is the one
+##     live need that exercises it (`NEED_TILES_ONE`), and it is exactly the kind of artefact
+##     that makes a parent stop trusting the screen. Leading space for the same reason
+##     ("11 tiles").
+##   * `"_"` — a raw habitat tag reaching the player ("open_grass", "large_house"). No
+##     authored string in this template contains an underscore, so this is a total check
+##     rather than a list of the tags that happen to have one today; it is the same class of
+##     defect `_check_built_limit_reads_as_plain_english()` pins for `built` specifically.
+## `"[COPY]"` rides along for the same reason `test_new_game_screen.gd` scans for it: this
+## copy was ruled on 2026-09-08 and the marker must never come back on a rendered line.
 func _check_no_article_defects_across_the_roster() -> void:
 	if not check(_world.roster != null and not _world.roster.species().is_empty(),
 		"the roster loaded and is non-empty"):
 		return
 	var doubling_patterns: Array[String] = ["a a ", "a an ", "an a ", "an an "]
-	var scaling_patterns: Array[String] = ["more a ", "more an "]
+	var stub_patterns: Array[String] = [" 0 tiles", " 1 tiles", "_", "[COPY]"]
 	for species: AnimalDefinition in _world.roster.species():
 		for line: String in HabitatRecipe.describe_tiers(species, _world):
 			for pattern: String in doubling_patterns:
 				check(not line.contains(pattern),
 					"%s's tier line has no article doubling ('%s'): '%s'"
 					% [species.id, pattern, line])
-			for pattern: String in scaling_patterns:
+			for pattern: String in stub_patterns:
 				check(not line.contains(pattern),
-					"%s's tier line has no missing-article scaling clause ('%s'): '%s'"
+					"%s's tier line has no stub artefact ('%s'): '%s'"
 					% [species.id, pattern, line])
+
+
+## THE DEFECT THE 2026-09-08 COUNTED-TILE REWRITE EXISTS TO FIX, pinned as a failing test
+## first. Alpaca's card read:
+##
+##     [COPY] Up to 6: needs an open barn; more open grass and rocky cover means room for more.
+##
+## An adult could not answer "what do I actually need?" from that, three ways over, and every
+## assertion below is one of them:
+##   1. IT SPLIT THE NEEDS INTO REQUIRED AND OPTIONAL, BACKWARDS. "needs X" against "more Y
+##      means room for more" gave the two halves different grammatical weight — but
+##      `CapacityEvaluator.tier_capacity_from_counts()` takes a `min` over every scaling
+##      need, and `floor(0 / 6) == 0`. Zero rock tiles means zero alpacas, barn or not. So no
+##      line may carry the old "means room for more" register at all, and the alpaca line
+##      must present its gate and BOTH scaling needs as one flat list of equals.
+##   2. NO NUMBERS. `_check_rendered_counts_match_the_data()` below is the general form; here
+##      it is enough to pin that Alpaca's two real divisors (5 and 6) actually appear.
+##   3. IT NAMED THE CHEAPEST SOURCE AS THOUGH IT WERE THE ONLY ONE — "an open barn" while a
+##      Small Barn or a Large Barn works identically.
+func _check_alpaca_reads_as_a_build_list() -> void:
+	var alpaca: AnimalDefinition = load(ALPACA_PATH) as AnimalDefinition
+	if not check(alpaca != null, "%s loads" % ALPACA_PATH):
+		return
+	var lines: Array[String] = HabitatRecipe.describe_tiers(alpaca, _world)
+	if not check(lines.size() == 1, "alpaca presents its one highland tier"):
+		return
+	var line: String = lines[0]
+
+	check(not line.contains("means room for more"),
+		"the optional-sounding scaling register is gone: '%s'" % line)
+	check(not line.contains("needs "),
+		"...and so is the 'needs X' clause that made the gate sound like the only rule: '%s'"
+		% line)
+	# One bullet per requirement: the `barn` gate and BOTH scaling needs, in one list under
+	# one lead-in, with no grammar anywhere that ranks one above another.
+	check_eq(line.count(HabitatRecipe.BULLET), 3,
+		"all three of alpaca's requirements render as equal bullets: '%s'" % line)
+	check(line.contains("5 tiles of open grass"),
+		"open_grass's real divisor (5) is on screen: '%s'" % line)
+	check(line.contains("6 tiles of rocky cover"),
+		"rocks' real divisor (6) is on screen: '%s'" % line)
+	check(not line.contains("an open barn"),
+		("the `barn` gate no longer names the cheapest source as if it were the only one — "
+		+ "Small Barn and Large Barn work identically: '%s'") % line)
+	check(line.contains("barn"),
+		"...but a barn is still named, because one is genuinely required: '%s'" % line)
+
+
+## EVERY NUMBER ON THE CARD IS READ FROM DATA, NEVER AUTHORED — the property that makes a
+## divisor retune a `.tres` edit with no copy change, exactly as `SOURCE_PHRASES` makes a
+## tag rename one.
+##
+## Deliberately NOT written as "rebuild the expected sentence from the template constants and
+## compare": that reduces to `template == template` and would pass against any arithmetic at
+## all. Instead it takes the one thing the template does NOT decide — the noun, via the
+## public `HabitatRecipe.need_noun()` seam — finds that noun in the rendered line, and reads
+## back whatever number sits immediately in front of it. That number has to equal
+## `HabitatNeed.tiles_per_individual`. Off-by-one, a hardcoded literal, or a count taken from
+## the wrong need all turn this red.
+##
+## GATE-ONLY NEEDS ARE SKIPPED, not asserted at zero: a gate has no count by definition
+## (`HabitatNeed.GATE_ONLY`), and the "no `0 tiles` anywhere" scan above is what pins that it
+## never grows one. `max_individuals` is checked separately, since the cap sentence names no
+## noun to anchor on.
+func _check_rendered_counts_match_the_data() -> void:
+	if not check(_world.roster != null and not _world.roster.species().is_empty(),
+		"the roster loaded and is non-empty"):
+		return
+	for species: AnimalDefinition in _world.roster.species():
+		var tiers: Array[HabitatTier] = species.effective_tiers()
+		var lines: Array[String] = HabitatRecipe.describe_tiers(species, _world)
+		if lines.size() != tiers.size():
+			check(false, "%s renders one line per tier" % species.id)
+			continue
+		for i in range(tiers.size()):
+			var line: String = lines[i]
+			for need: HabitatNeed in tiers[i].needs:
+				if need.is_gate_only():
+					continue
+				var noun: String = HabitatRecipe.need_noun(need.tag, _world)
+				if noun.is_empty() or not line.contains(noun):
+					# A need whose source was already named by an earlier need in the same
+					# tier renders once, not twice (`_resolve_need()`'s dedup), and an upgrade
+					# tier restates nothing it inherits from the tier above. Neither is a
+					# missing count. Every roster tag's noun is plain lowercase words, so it
+					# is safe to drop straight into the pattern below unescaped.
+					continue
+				var re := RegEx.new()
+				re.compile("(\\d+) (?:tiles? of )?" + noun)
+				var hit: RegExMatch = re.search(line)
+				if not check(hit != null,
+					"%s tier %d renders a number in front of '%s': '%s'"
+					% [species.id, i, noun, line]):
+					continue
+				check_eq(hit.get_string(1).to_int(), need.tiles_per_individual,
+					"%s tier %d's '%s' count is tiles_per_individual (%d), read from data"
+					% [species.id, i, noun, need.tiles_per_individual])
+			check(line.contains(str(tiers[i].max_individuals)),
+				"%s tier %d states its own max_individuals (%d): '%s'"
+				% [species.id, i, tiers[i].max_individuals, line])
+
+
+## A CAP OF ONE MUST NEVER GROW PLURAL ARITHMETIC. Bull's pen tier and Villager's single tier
+## both cap at 1, and `AnimalDefinition` carries no `plural_name` (see
+## `HabitatRecipe.DESCRIBE_LEAD`), so any "double it for 2 bulls" phrasing would be both
+## un-formable and false — `tier_capacity_from_counts()` caps at `max_individuals` outright.
+## The "for each <animal>" divisor suffix is the live form of that hazard: it is correct
+## everywhere a second individual can exist and meaningless where one cannot.
+func _check_cap_of_one_never_pluralizes() -> void:
+	var bull: AnimalDefinition = load(BULL_PATH) as AnimalDefinition
+	var human: AnimalDefinition = load(HUMAN_PATH) as AnimalDefinition
+	if not check(bull != null and human != null, "bull.tres and human.tres load"):
+		return
+
+	var bull_lines: Array[String] = HabitatRecipe.describe_tiers(bull, _world)
+	if check(bull_lines.size() == 1, "bull presents its one pen tier"):
+		check(not bull_lines[0].contains("for each"),
+			"a tier capped at 1 renders no per-individual divisor: '%s'" % bull_lines[0])
+		check(not bull_lines[0].to_lower().contains("double"),
+			"...and no doubling arithmetic either: '%s'" % bull_lines[0])
+		check(bull_lines[0].contains(HabitatRecipe.CAP_ONE % "bull"),
+			"...it says outright that just one lives here: '%s'" % bull_lines[0])
+
+	# Villager's SINGLE tier caps at 1 and its FAMILY tier at 4 — the same species proving
+	# the suffix is driven by the tier's own cap, not by the species.
+	var human_lines: Array[String] = HabitatRecipe.describe_tiers(human, _world)
+	if check(human_lines.size() == 2, "villager presents its single and family tiers"):
+		check(not human_lines[0].contains("for each"),
+			"villager's cap-1 tier renders no divisor: '%s'" % human_lines[0])
+		check(human_lines[1].contains("for each villager"),
+			"villager's cap-4 tier does render one: '%s'" % human_lines[1])
+
+
+## A TAG WITH SEVERAL INTERCHANGEABLE SOURCES MUST NOT READ LIKE ONE WITH A SINGLE SOURCE.
+## This is defect 3 of the counted-tile rewrite, generalised past Alpaca: `_cheapest()` picks
+## one winner per tag, and naming that winner as though it were the only answer is wrong for
+## `barn` (Open Barn, Small Barn and Large Barn all carry it) and RIGHT for `silo`, `mill`,
+## `stable` and `large_house` (one real source each — hedging those would be a lie in the
+## other direction). Cow is the fixture that carries one of each in a single tier line.
+##
+## Checked as a CONTRAST rather than as two literals: the multi-source gate and the
+## single-source gate on the same line must not render the same shape. A regression that
+## dropped the distinction — going back to naming the cheapest everywhere, or "(any kind)"-ing
+## everything — fails one half or the other.
+func _check_multi_source_gate_reads_differently() -> void:
+	var cow: AnimalDefinition = load(COW_PATH) as AnimalDefinition
+	var pug: AnimalDefinition = load(PUG_PATH) as AnimalDefinition
+	if not check(cow != null and pug != null, "cow.tres and pug.tres load"):
+		return
+
+	var sources: Dictionary = HabitatRecipe.tag_sources(_world)
+	check((sources.get("barn", []) as Array).size() >= 2,
+		"the fixture holds: `barn` really does have several sources")
+	check_eq((sources.get("silo", []) as Array).size(), 1,
+		"...and `silo` really does have exactly one")
+
+	var cow_lines: Array[String] = HabitatRecipe.describe_tiers(cow, _world)
+	var pug_lines: Array[String] = HabitatRecipe.describe_tiers(pug, _world)
+	if not check(not cow_lines.is_empty() and not pug_lines.is_empty(),
+		"cow and pug each present at least one tier"):
+		return
+
+	# Cow's pair tier carries BOTH gates, so one line proves the contrast: exactly one of the
+	# two hedges, and the silo named flat.
+	var cow_line: String = cow_lines[0]
+	check(cow_line.contains("barn (any kind)"),
+		"cow's multi-source `barn` gate says any of them will do: '%s'" % cow_line)
+	check_eq(cow_line.count("(any kind)"), 1,
+		"...and exactly one requirement on the line is hedged that way: '%s'" % cow_line)
+	check(cow_line.contains("a silo"),
+		"...the single-source `silo` gate is named flat, with no hedge: '%s'" % cow_line)
+
+	# `house` is the other real multi-source gate (House and Farmhouse), and its sources share
+	# no common word, so it takes the other branch: name them all, joined with "or".
+	check((sources.get("house", []) as Array).size() >= 2, "`house` has several sources too")
+	var pug_line: String = pug_lines[0]
+	check(pug_line.contains("house") and pug_line.contains("farmhouse"),
+		"pug's `house` gate names both real sources rather than only the cheaper: '%s'"
+		% pug_line)
+	check(pug_line.contains(" or "),
+		"...joined as alternatives, not as a list of things to build: '%s'" % pug_line)
+
+
+## YOU CANNOT BUILD A VILLAGER. `people` and `deer` are RESIDENT-emitted
+## (`AnimalDefinition.emits_tags`), so `tag_sources()` structurally cannot resolve them and
+## no palette button places one. Two things follow, and both are copy correctness rather than
+## polish: the tier's lead-in must not tell a child to build one, and the count must not be
+## measured in tiles.
+##
+## `"villagers"`, not `"people"`, is the roster-wide terminology check — `human.tres`'s
+## `display_name` is "Villager" and the Field Guide row directly above these lines says
+## "Villager", so a tier line reading "3 people" would be the only place in the game calling
+## them anything else. Stag's `deer/4` is the other half: a species requirement on another
+## species, rendered as company rather than as anything a stag does to a deer.
+func _check_resident_needs_are_never_buildable() -> void:
+	var stag: AnimalDefinition = load(STAG_PATH) as AnimalDefinition
+	var pig: AnimalDefinition = load(PIG_PATH) as AnimalDefinition
+	if not check(stag != null and pig != null, "stag.tres and pig.tres load"):
+		return
+
+	var pig_lines: Array[String] = HabitatRecipe.describe_tiers(pig, _world)
+	var stag_lines: Array[String] = HabitatRecipe.describe_tiers(stag, _world)
+	if not check(not pig_lines.is_empty() and not stag_lines.is_empty(),
+		"pig and stag each present at least one tier"):
+		return
+
+	var pig_line: String = pig_lines[0]
+	check(pig_line.contains("2 villagers"),
+		"pig's `people/2` need names villagers, the roster's own word: '%s'" % pig_line)
+	check(not pig_line.contains("people"),
+		"...and never the raw tag: '%s'" % pig_line)
+	check(not pig_line.contains("tiles of villagers"),
+		"...and is not measured in tiles: '%s'" % pig_line)
+	# Compared against the WHOLE rendered lead-in, not a prefix: both lead-ins open "To
+	# invite ", so a prefix comparison would pass against either one and check nothing.
+	check(pig_line.begins_with(HabitatRecipe.LEAD_NEED % "a pig"),
+		"a species needing villagers is told it NEEDS them, not that it can build them: '%s'"
+		% pig_line)
+	check(not pig_line.contains(HabitatRecipe.LEAD_BUILD % "a pig"),
+		"...and never carries the buildable lead-in: '%s'" % pig_line)
+
+	var stag_line: String = stag_lines[0]
+	check(stag_line.contains("4 deer"),
+		"stag's `deer/4` need renders its real divisor: '%s'" % stag_line)
+	check(not stag_line.contains("tiles of deer"),
+		"...and is not measured in tiles either: '%s'" % stag_line)
+
+
+## THE UPGRADE READING — the payoff of the whole habitat-tiers branch, restated for the
+## counted-tile copy. A second tier is one of two completely different things, and telling a
+## child the wrong one makes them build the wrong thing:
+##   * COW's herd tier is its pair tier plus `water/3`, every other need and number identical,
+##     so it reads as an ADDITION ("Add this too, and there's room for up to 6").
+##   * VILLAGER's family tier SWAPS `house` for `large_house` and re-tunes `cultivated` from
+##     1 tile each to 2, so it reads as an ALTERNATIVE ("...build these nearby instead").
+##     Rendering that as "add a farmhouse" would leave a child building against the old
+##     number and wondering why nobody came.
+## Deer is the third shape and the trap a needs-only comparison falls into: its herd tier's
+## needs really are a superset of its base tier's, but its `built` limit tightens from "at
+## most 1" to "none at all", so it must NOT read as an addition either.
+func _check_upgrade_tiers_read_as_additions_only_when_they_are() -> void:
+	var cow: AnimalDefinition = load(COW_PATH) as AnimalDefinition
+	var human: AnimalDefinition = load(HUMAN_PATH) as AnimalDefinition
+	var deer: AnimalDefinition = load(DEER_PATH) as AnimalDefinition
+	if not check(cow != null and human != null and deer != null,
+		"cow.tres, human.tres and deer.tres load"):
+		return
+
+	var add_one: String = HabitatRecipe.LEAD_ADD_ONE.get_slice("%", 0)
+	var add_many: String = HabitatRecipe.LEAD_ADD_MANY.get_slice("%", 0)
+
+	var cow_lines: Array[String] = HabitatRecipe.describe_tiers(cow, _world)
+	if check(cow_lines.size() == 2, "cow presents two tiers"):
+		check(cow_lines[1].begins_with(add_one) or cow_lines[1].begins_with(add_many),
+			"cow's herd tier reads as an addition to the pair tier: '%s'" % cow_lines[1])
+		check(cow_lines[1].contains("3 tiles of water"),
+			"...and names the one need that unlocks it, with its real divisor: '%s'"
+			% cow_lines[1])
+
+	var human_lines: Array[String] = HabitatRecipe.describe_tiers(human, _world)
+	if check(human_lines.size() == 2, "villager presents two tiers"):
+		check(not human_lines[1].begins_with(add_one)
+			and not human_lines[1].begins_with(add_many),
+			("villager's family tier swaps a gate and re-tunes a divisor, so it must NOT "
+			+ "read as an addition: '%s'") % human_lines[1])
+		check(human_lines[1].contains("2 tiles of farm field"),
+			("...it restates the RE-TUNED cultivated divisor (2, not the single tier's 1): "
+			+ "'%s'") % human_lines[1])
+
+	var deer_lines: Array[String] = HabitatRecipe.describe_tiers(deer, _world)
+	if check(deer_lines.size() == 2, "deer presents two tiers"):
+		check(not deer_lines[1].begins_with(add_one)
+			and not deer_lines[1].begins_with(add_many),
+			("deer's herd tier is a needs-superset but tightens its `built` limit, so it "
+			+ "must NOT read as an addition: '%s'") % deer_lines[1])
