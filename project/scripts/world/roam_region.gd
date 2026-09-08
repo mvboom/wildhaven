@@ -40,9 +40,11 @@ const AVOID_BIAS_SAMPLES: int = 8
 var _grid: WorldGrid = null
 var _navigation: WorldNavigation = null
 var _home_tile: Vector2i = Vector2i.ZERO
-## `WorldGrid.tags_mask()` of the species' `habitat_needs`. Zero (a species with no needs, or
-## only unrecognised ones) makes nothing liked, which collapses the region to the home tile
-## and hands the roamer back to its disc — a safe degradation, not an error.
+## `WorldGrid.tags_mask()` of the species' `habitat_needs`. Zero makes nothing liked, which
+## collapses the region to the home tile and hands the roamer back to its disc — a safe
+## degradation, not an error. Only an EMPTY `habitat_needs` yields zero: `tags_mask()` maps an
+## unrecognised tag to `UNKNOWN_TAG_BIT`, never to 0, so a species with tags — recognised or
+## not — never lands here.
 var _needs_mask: int = 0
 var _radius: int = 0
 
@@ -52,6 +54,13 @@ var _tiles: PackedVector2Array = PackedVector2Array()
 ## The `WorldGrid.terrain_version` this set was built at. -1 means "never built", so the first
 ## read always builds.
 var _built_version: int = -1
+## The `WorldNavigation.rebuilds_run` this set was built at, same shape as `_built_version`.
+## Needed because a den reservation (`WorldNavigation.set_den_tile_blocked()`) changes what
+## `_qualifies()` returns without moving `WorldGrid.terrain_version` — that method deliberately
+## touches only navigation's own dirty flag, not terrain's version, since a den reservation is
+## not a terrain change (roaming.md §4.4). `rebuilds_run` is the seam that actually moves when
+## navigation's walkability answer moves, so it is the other half of "is this cache stale?".
+var _built_nav_rebuilds: int = -1
 
 ## How many full fills have actually run. Same shape and purpose as
 ## `WorldNavigation.rebuilds_run` and `HabitatSimulation.evaluations_run` — an exact work
@@ -94,12 +103,32 @@ func has_tile(tile: Vector2i) -> bool:
 	return _tiles.has(Vector2(tile.x, tile.y))
 
 
-## Rebuilds only when the world has changed under us. One integer compare, so the steady-state
-## cost of holding a region is nothing.
+## Rebuilds only when the world has changed under us. Two integer compares, so the
+## steady-state cost of holding a region is nothing.
+##
+## Compares BOTH `WorldGrid.terrain_version` and `WorldNavigation.rebuilds_run` — terrain and
+## navigation each move the walkability predicate independently. A den reservation
+## (`WorldNavigation.set_den_tile_blocked()`) changes what `_qualifies()` returns without
+## touching `terrain_version` at all (roaming.md §4.4), so `terrain_version` alone would miss
+## it; `rebuilds_run` is the seam that actually moves when that happens.
+##
+## An invalid `_grid` (unreachable in production — `ResidentPresentation` always passes a live
+## one) has nothing to compare a version against, so it short-circuits here rather than falling
+## through to `rebuild()` on every single accessor call: `rebuild()` with no grid can only ever
+## produce an empty set, which `_tiles` already starts as, so repeating it buys nothing and
+## would otherwise run `rebuilds_run` up without bound.
 func _ensure_fresh() -> void:
-	if _grid != null and _built_version == _grid.terrain_version:
+	if _grid == null or not is_instance_valid(_grid):
+		return
+	if _built_version == _grid.terrain_version and _built_nav_rebuilds == _nav_rebuilds():
 		return
 	rebuild()
+
+
+func _nav_rebuilds() -> int:
+	if _navigation != null and is_instance_valid(_navigation):
+		return _navigation.rebuilds_run
+	return 0
 
 
 ## Breadth-first from the home tile across qualifying tiles ONLY. Crossing only qualifying
@@ -109,10 +138,12 @@ func _ensure_fresh() -> void:
 func rebuild() -> void:
 	rebuilds_run += 1
 	_tiles = PackedVector2Array()
-	if _grid == null:
+	if _grid == null or not is_instance_valid(_grid):
 		_built_version = -1
+		_built_nav_rebuilds = -1
 		return
 	_built_version = _grid.terrain_version
+	_built_nav_rebuilds = _nav_rebuilds()
 	if not _grid.in_bounds(_home_tile.x, _home_tile.y):
 		return
 
@@ -125,7 +156,7 @@ func rebuild() -> void:
 	var reach: int = _radius * _radius
 
 	while not queue.is_empty():
-		var tile: Vector2i = queue.pop_back()
+		var tile: Vector2i = queue.pop_front()
 		for step: Vector2i in NEIGHBOURS:
 			var next: Vector2i = tile + step
 			if seen.has(next):
@@ -173,7 +204,9 @@ func _likes(x: int, z: int) -> bool:
 func pick_point(rng: RandomNumberGenerator, away_from: Array = []) -> Vector3:
 	_ensure_fresh()
 	if _tiles.is_empty():
-		return _grid.tile_to_world(_home_tile.x, _home_tile.y) if _grid != null else Vector3.ZERO
+		if _grid == null or not is_instance_valid(_grid):
+			return Vector3.ZERO
+		return _grid.tile_to_world(_home_tile.x, _home_tile.y)
 
 	var away: Vector2 = _away_direction(away_from)
 	var chosen: Vector2 = _tiles[rng.randi_range(0, _tiles.size() - 1)]
@@ -192,7 +225,7 @@ func pick_point(rng: RandomNumberGenerator, away_from: Array = []) -> Vector3:
 ## `Vector2.ZERO` when there is nothing to avoid, or when threats surround home evenly enough
 ## that no direction reads as away more than any other.
 func _away_direction(away_from: Array) -> Vector2:
-	if away_from.is_empty() or _grid == null:
+	if away_from.is_empty() or _grid == null or not is_instance_valid(_grid):
 		return Vector2.ZERO
 	var home_world: Vector3 = _grid.tile_to_world(_home_tile.x, _home_tile.y)
 	var sum := Vector2.ZERO
@@ -207,6 +240,16 @@ func _away_direction(away_from: Array) -> Vector2:
 
 ## A uniformly random point WITHIN the tile rather than its exact centre, so residents given
 ## the same tile do not line up on one spot.
+##
+## UNLIKE THE DISC PATH (`ResidentRoamer._pick_waypoint()`'s clamp to `_bounds`), a point from
+## here is never clamped to `ResidentPresentation._walkable_bounds()`. That rect runs CENTRE to
+## CENTRE — `_grid.tile_to_world(0, 0)` to `tile_to_world(width - 1, depth - 1)` — so it is
+## already half a tile narrower than the world's true physical edge on every side. The ±half-
+## tile jitter here can therefore land up to that same half-tile past `_walkable_bounds()` at a
+## boundary region tile, but never past the tile itself, which is inside the actual world and
+## already a qualifying, walkable tile. Benign — nobody strolls off the world — and arguably
+## more correct than the disc's clamp, which cuts that legitimate half-tile off rather than
+## letting a resident use the whole of the tile it was actually assigned.
 func _tile_point(tile: Vector2, rng: RandomNumberGenerator) -> Vector3:
 	var world: Vector3 = _grid.tile_to_world(int(tile.x), int(tile.y))
 	var half: float = WorldGrid.TILE_SIZE * 0.5

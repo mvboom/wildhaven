@@ -48,6 +48,8 @@ func _initialize() -> void:
 	_check_picked_points_land_inside_the_region()
 	_check_region_grows_when_liked_terrain_is_painted()
 	_check_an_untouched_world_never_rebuilds()
+	_check_den_reservation_invalidates_the_region()
+	_check_null_navigation_treats_everything_as_walkable()
 	_check_points_are_biased_away_from_threats()
 	_check_roamer_uses_the_region()
 
@@ -208,6 +210,50 @@ func _check_an_untouched_world_never_rebuilds() -> void:
 	grid.set_terrain(4, 4, "meadow")
 	region.tile_count()
 	check(region.rebuilds_run > after_first, "a real edit does rebuild, once", "")
+	grid.queue_free()
+
+
+## A DEN RESERVATION MOVES THE PREDICATE WITHOUT MOVING `terrain_version`.
+## `WorldNavigation.set_den_tile_blocked()` only calls `mark_dirty()` — it never bumps
+## `WorldGrid.terrain_version`, which is the only thing the OLD `_ensure_fresh()` compared
+## (roaming.md §4.4). This proves the region notices anyway, via `WorldNavigation.rebuilds_run`,
+## with nobody calling `rebuild()` explicitly — `has_tile()` alone must pick it up.
+func _check_den_reservation_invalidates_the_region() -> void:
+	var grid := _grid_with_grass(Rect2i(3, 3, 5, 5))
+	# Registers `grid` with `_navigation` so `set_den_tile_blocked()`'s `mark_dirty()` has
+	# something to flush — same precondition `test_navigation_rebuild_coalescing.gd` relies on.
+	# `RoamRegion` itself never reads this internal state; it always passes `grid` explicitly.
+	_navigation.rebuild_from_grid(grid)
+	var region := RoamRegion.new(grid, _navigation, HOME, _grass_mask(), RADIUS)
+	var target := Vector2i(4, 4)
+	check(region.has_tile(target), "the target tile starts in the region", "")
+
+	_navigation.set_den_tile_blocked(target, true)
+	# Forces the deferred navmesh flush synchronously, exactly as
+	# `test_navigation_rebuild_coalescing.gd` does — no frame gets pumped under
+	# `--headless --script`, so a read is what settles the pending edit.
+	_navigation.find_path(grid.tile_to_world(0, 0), grid.tile_to_world(1, 1))
+
+	check(not region.has_tile(target),
+		"a den reservation removes the tile from the region with no explicit rebuild() call", "")
+
+	_navigation.set_den_tile_blocked(target, false)
+	_navigation.find_path(grid.tile_to_world(0, 0), grid.tile_to_world(1, 1))
+	check(region.has_tile(target), "releasing the reservation restores the tile", "")
+	grid.queue_free()
+
+
+## `_qualifies()` treats a null `_navigation` as EVERYTHING walkable — correct as a degradation
+## (the same idiom as a roamer with no `world_navigation`), but surprising enough to pin: a fox
+## bound to a region with no navigation would roam inside the trees. Unreachable in production —
+## `ResidentPresentation` always supplies a live `WorldNavigation` — but worth a test regardless.
+func _check_null_navigation_treats_everything_as_walkable() -> void:
+	# Same fixture as `_check_blocked_tiles_are_excluded()`, but with no `WorldNavigation` bound.
+	var grid := _grid_with_grass(Rect2i(3, 3, 5, 5))
+	grid.set_terrain(6, 5, "forest")
+	var region := RoamRegion.new(grid, null, HOME, _grass_mask(), RADIUS)
+	check(region.has_tile(Vector2i(6, 5)),
+		"with no navigation bound, a normally-blocked tile is treated as walkable", "")
 	grid.queue_free()
 
 
