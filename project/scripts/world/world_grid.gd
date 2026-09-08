@@ -76,8 +76,9 @@ const FOREST_TERRAIN_ID: String = "forest"
 ## needs to know in O(1) that the cache is stale. The bump lives in `_refresh_tag_mask()`
 ## rather than in each writer because that function's own doc already promises it is "called by
 ## every writer that changes what a tile holds" — making it the one seam a new writer cannot
-## forget. `_fill_from_mix()` and `grow()` write masks directly rather than through it, so they
-## bump explicitly.
+## forget. `build()` (both its uniform-fill and mix-fill branches, in one bump after the
+## `if`/`else` so a rebuild counts once, not per tile) and `grow()` write `_tile_tag_masks`
+## directly rather than through `_refresh_tag_mask()`, so they bump explicitly instead.
 var terrain_version: int = 0
 
 var width: int = DEFAULT_WIDTH
@@ -245,6 +246,11 @@ func build(
 		_forest_tile_count = 0
 	else:
 		_fill_from_mix(terrain_mix, count, world_seed)
+	# Both branches above write `_tile_tag_masks` straight into the arrays rather than through
+	# `_refresh_tag_mask()`, so a `build()` call — including a REBUILD of an already-live grid,
+	# per this function's own header — needs its own bump. One bump here, after both branches,
+	# rather than one inside each: a rebuild invalidates the whole grid once, not once per tile.
+	terrain_version += 1
 
 
 ## The `terrain_mix` half of `build()` — a preset's starting terrain proportions, placed by
@@ -282,7 +288,6 @@ func _fill_from_mix(terrain_mix: Dictionary, count: int, world_seed: int) -> voi
 		_tile_tag_masks[i] = int(mask_by_id[id])
 		if bool(is_forest_by_id[id]):
 			_forest_tile_count += 1
-	terrain_version += 1
 
 
 # --- Mist reveal (Tier 1 row 13, D-38) ---------------------------------------------------

@@ -39,4 +39,12 @@ func _initialize() -> void:
 	grid.grow(12, 12, 1)
 	check(grid.terrain_version > before_grow, "grow bumps the version", "")
 
+	# `build()`'s uniform-fill branch (empty mix, exercised above) and its mix-fill branch
+	# both write `_tile_tag_masks` directly and share one bump after the `if`/`else` — this
+	# is the mix branch's coverage.
+	var before_mix_rebuild: int = grid.terrain_version
+	grid.build(TerrainDefinition.load_all(), 10, 10, {"grass": 1.0})
+	check(grid.terrain_version > before_mix_rebuild,
+		"build() with a non-empty terrain mix bumps the version too", "")
+
 	finish()
