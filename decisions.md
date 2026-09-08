@@ -1948,8 +1948,10 @@ find the Field Guide on their own:
 
 Ruling 1 was taken with its costs named and accepted, not discovered afterward: the bulletin
 voice now hands out tasks in substance, which is why gdd.md → Discovery is amended alongside this
-entry; the Field Guide reveal a report triggers loses most of its payload (below); and D-37's
-fixed cadence becomes activity-driven rather than a flat random interval.
+entry; a Field Guide payload loss was named as one of those costs at the time, but see the
+correction below — that cost was never real, because the reveal it presumed no longer existed as
+of 2026-08-31; and D-37's fixed cadence becomes activity-driven rather than a flat random
+interval.
 
 **Correction (fix round 1, same day): there was no D-40 reveal left to demote.** This entry
 originally recorded, following spec §8.2, that a report "still reveals the species' Field Guide
@@ -1981,5 +1983,5 @@ ruling — do not read this entry as settling them:** the base cadence per hoste
 1–2, 3–5, 6+ hosted), the built-recently and idle cadence multipliers, the "recently built"
 window, and `PLENTY_THRESHOLD`. All eight ship in code marked `## PROPOSED — human owns this.`,
 sourced in spec `2026-09-08-news-report-hints-design.md` §9. Per project rule, agents propose
-with sources and the human decides; this entry logs the four rulings and the D-40 demotion above,
-nothing more.
+with sources and the human decides; this entry logs the four rulings and the correction of the
+stale D-40 premise above, nothing more.
