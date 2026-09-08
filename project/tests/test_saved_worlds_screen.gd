@@ -41,7 +41,17 @@ func _process(_delta: float) -> bool:
 	if _frames < 2:
 		return false
 
-	_check_selecting_enables_actions()
+	if _frames == 2:
+		_check_selecting_enables_actions()
+		# THE CENTERED GRID is checked a couple of frames later: `Container` sorts its children
+		# through the deferred message queue, so the row widths written by the `_refresh()`
+		# inside the check above are not on the nodes yet on this same frame.
+		_seed_a_full_grid_row()
+		return false
+	if _frames < 4:
+		return false
+
+	_check_grid_is_centered()
 	_check_rename_flow()
 	_check_delete_flow()
 	# BEFORE `_check_double_click_loads()`: that check double-clicks too, so it also raises the
@@ -64,6 +74,31 @@ func _clean() -> void:
 		DirAccess.remove_absolute(
 			ProjectSettings.globalize_path("%s/%s" % [SaveStore.SAVE_DIR, filename])
 		)
+
+
+## Fills the first grid row so the centring check below has a grid wider than one column.
+func _seed_a_full_grid_row() -> void:
+	for name: String in ["Wide One", "Wide Two"]:
+		SaveStore.write(SaveStore.unique_path_for(name), {"save_version": 1, "name": name})
+	_screen.call("_refresh")
+
+
+## CENTRED, NOT LEFT-ALIGNED (2026-09-08). Save rows are a fixed 220px wide, so a three-column
+## grid stays ~700px however wide the window is — it used to sit hard against the left margin
+## with the rest of the screen empty to its right. The two expanding spacers in `GridRow` split
+## the leftover width, which is what this asserts: equal gaps, and a real one on the left.
+func _check_grid_is_centered() -> void:
+	var list: GridContainer = _screen.get_node("%SaveList") as GridContainer
+	var row: Control = list.get_parent() as Control
+	var left: float = list.global_position.x - row.global_position.x
+	var right: float = (row.global_position.x + row.size.x) - (list.global_position.x + list.size.x)
+
+	if not check(list.size.x < row.size.x,
+			"the fixed-width grid is narrower than the space it sits in — there is room to centre it"):
+		return
+	check(left > 1.0, "THE FIX: the grid no longer starts at the left edge")
+	check(absf(left - right) <= 1.0,
+		"...it is centred — the gap either side of it matches (left %.1f, right %.1f)" % [left, right])
 
 
 func _check_selecting_enables_actions() -> void:

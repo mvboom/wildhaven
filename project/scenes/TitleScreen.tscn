@@ -326,7 +326,7 @@ theme_override_colors/font_hover_pressed_color = Color(0.42, 0.29, 0.169, 1)
 theme_override_colors/font_focus_color = Color(0.42, 0.29, 0.169, 1)
 theme_override_colors/font_disabled_color = Color(0.42, 0.29, 0.169, 1)
 theme_override_font_sizes/font_size = 22
-text = "Read Text Aloud"
+text = "Parent Sound Sanity:"
 
 [node name="BuildTag" type="Label" parent="."]
 unique_name_in_owner = true

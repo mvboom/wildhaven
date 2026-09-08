@@ -40,17 +40,22 @@ func _process(_delta: float) -> bool:
 
 	_check_layout_is_not_collapsed()
 
-	check_eq((_screen.get_node("%BuildTag") as Label).text, "Built %s" % BuildInfo.BUILD_TIMESTAMP,
+	check_eq((_screen.get_node("%BuildTag") as Label).text, "Build %s" % BuildInfo.BUILD_TIMESTAMP,
 		"the build tag reads BuildInfo.BUILD_TIMESTAMP live — scripts/build-game.sh stamps "
 		+ "that constant at export time, this just renders whatever it holds")
 
 	check_eq(_screen.speaking_checked(), false,
 		"a freshly-instantiated title screen paints the checkbox from GameplaySettings' live value")
 
-	_screen._on_speaking_toggled(true)
+	# The box is "Parent Sound Sanity:", so it reads INVERTED against the speaking flag —
+	# ticked means narration is OFF. Untick it and narration comes back on.
+	check_eq((_screen.get_node("%SpeakingCheck") as CheckButton).button_pressed, true,
+		"speaking OFF paints the sanity box TICKED — the label is the parent's side of the flag")
+
+	_screen._on_speaking_toggled(false)
 	check_eq(GameplaySettings.speaking_enabled(), true,
-		"toggling the checkbox writes straight through to GameplaySettings — no second copy of "
-		+ "the value, same shape as SettingsOverlay's Hints checkbox")
+		"unticking the sanity box writes straight through to GameplaySettings — no second copy "
+		+ "of the value, same shape as SettingsOverlay's Hints checkbox")
 
 	check_eq((_screen.get_node("%SpeakingCheck") as Control).visible, false,
 		"there is no TTS voice in this headless container, so the toggle degrades the same way "
