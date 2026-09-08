@@ -23,6 +23,12 @@ const RING_MARGIN: float = 6.0
 
 const DISMISS_GLYPH: String = "×"
 
+## PROPOSED — human owns this. Pixels of clear space between the chip's wrapped text and the
+## × button overlaid in its top-right corner, so no line ever runs under the button. Was
+## `NotificationFeed.DISMISS_GUTTER` until that widget was deleted; the chip is the only
+## surface with this layout now, so the number lives where it is used.
+const DISMISS_GUTTER: float = 12.0
+
 var _target: Control = null
 var _elapsed: float = 0.0
 
@@ -44,16 +50,13 @@ func _ready() -> void:
 	_dismiss.pressed.connect(func() -> void: dismissed.emit())
 	# Final review finding (deferred item folded in): `CoachChip.tscn` used to hardcode the
 	# dismiss button's size (72) and the content's `margin_right` gutter (84 = 72 + 12) as pixel
-	# literals — a `.tscn` cannot call a static method at author time, so it could not derive
-	# them the way `notification_feed.gd::_make_entry()` does for the IDENTICAL layout (a
-	# `PanelContainer` with a `MarginContainer` reserving room for a corner-anchored dismiss
-	# button). `_ready()` can call statics, so it does the same derivation here instead of
-	# carrying a second, independently-drifting copy of those two numbers.
+	# literals — a `.tscn` cannot call a static method at author time. `_ready()` can call
+	# statics, so it derives both here instead of carrying pixel numbers that drift.
 	var button_size: float = UiPalette.scaled(UiPalette.HIT_TARGET)
 	_dismiss.custom_minimum_size = Vector2(button_size, button_size)
 	var content := _panel.get_node("Content") as MarginContainer
 	content.add_theme_constant_override(
-		"margin_right", int(button_size + NotificationFeed.DISMISS_GUTTER)
+		"margin_right", int(button_size + DISMISS_GUTTER)
 	)
 	hide_chip()
 

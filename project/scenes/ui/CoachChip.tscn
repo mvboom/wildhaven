@@ -2,7 +2,7 @@
 
 ; Task 7 — the onboarding coach's one visible element. See scripts/ui/coach_chip.gd.
 ;
-; LAYOUT MIRRORS `NotificationFeed._make_entry()` EXACTLY, for the same reason: `PanelContainer`
+; LAYOUT: a `PanelContainer`
 ; forces every DIRECT child to fill its whole content rect, so a `Dismiss` button parented
 ; straight onto `Panel` would be stretched panel-tall instead of sitting compact in a corner.
 ; `Panel` holds two direct children instead — `Content` (a `MarginContainer` that reserves a
@@ -20,7 +20,7 @@
 ; Every colour/style override happens at runtime in `coach_chip.gd::_ready()` (`UiPalette` is
 ; the one authority) — this file only lays out structure and reserves the dismiss gutter, which
 ; the script has no hook to compute (there is no `_ready()`-time pass here, unlike
-; `NotificationFeed`, which builds this same structure in script and can size it there).
+; a script-built panel, which can size the same structure at runtime).
 
 [ext_resource type="Script" path="res://scripts/ui/coach_chip.gd" id="1"]
 
@@ -41,8 +41,8 @@ layout_mode = 1
 anchors_preset = 0
 mouse_filter = 2
 
-; Reserves room for `Dismiss` (72px, matching `NotificationFeed`'s own `HIT_TARGET`-wide hit
-; area) plus a 12px gutter — the same two numbers `notification_feed.gd::_make_entry()` uses
+; Reserves room for `Dismiss` (72px, one `HIT_TARGET`-wide hit area) plus a 12px gutter — the
+; two numbers `coach_chip.gd::_ready()` derives from `UiPalette.HIT_TARGET` and `DISMISS_GUTTER`
 ; (`button_size` + `DISMISS_GUTTER`) — so no wrapped line of `Label` ever runs under the button.
 [node name="Content" type="MarginContainer" parent="Panel"]
 layout_mode = 2

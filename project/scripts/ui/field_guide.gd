@@ -66,9 +66,9 @@ const UNDISCOVERED_GLYPH: String = "???"
 const HERE_TEMPLATE: String = "Resident · %d"
 
 ## PROPOSED — human owns this. This screen's own type scale, deliberately NOT UiPalette's
-## shared FONT_CARD_BODY/FONT_NOTICE_LINE/FONT_HUD_SECONDARY: those are also read by FactCard,
-## NotificationFeed and DisplacementNotice, so shrinking them here would resize screens this
-## change never touched. Human direction 2026-09-01: the list reads smaller; the window title
+## shared FONT_CARD_BODY/FONT_NOTICE_LINE/FONT_HUD_SECONDARY: those are also read by FactCard
+## and DisplacementNotice, so shrinking them here would resize screens this change never
+## touched. Human direction 2026-09-01: the list reads smaller; the window title
 ## and the Species Hosted header keep their existing size.
 const FONT_SPECIES_NAME: int = 22
 const FONT_SPECIES_BODY: int = 18

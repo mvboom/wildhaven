@@ -354,14 +354,15 @@ func _check_priority_rule_while_moving_in_all_three_modes() -> void:
 	var live: Vector2 = _step_to_a_walking_tap()
 	check_eq(_router.handle_tap(live), TapRouter.RESULT_RESIDENT,
 		"INSPECT: a tap on the MOVING animal resolves to the animal")
-	# REPOINTED (Task 5, notification-surfaces): the replay routes to the feed now, never the
-	# big card — see `test_fact_card.gd`'s `_check_tap_to_replay_in_inspect()` for the same
-	# pattern.
-	check(not _card.is_open(), "...and does NOT reopen the big card — the replay routes to the feed instead")
-	var feed: NotificationFeed = _ui.notification_feed
+	# REPOINTED (remove-notification-feed): the replay opens the FACT CARD again — the rolling
+	# feed it briefly routed to is deleted. See `test_fact_card.gd`'s
+	# `_check_tap_to_replay_in_inspect()` for the same pattern, and note the dismiss below: a
+	# tap with the card up dismisses it, so every later tap in this check needs a closed card.
+	check(_card.is_open(), "...and reopens the big card — the replay is the card again")
 	var rabbit: AnimalDefinition = _world.roster.by_id("rabbit")
-	check_eq(feed.entry_texts()[0], "%s. %s" % [rabbit.display_name, rabbit.effective_fact_text()],
-		"...the feed gains the replay entry instead, with the same verbatim copy")
+	check_eq(_card.spoken_text(), "%s. %s" % [rabbit.display_name, rabbit.effective_fact_text()],
+		"...with the same verbatim copy")
+	_card.dismiss()
 
 	# TERRAFORM — on a tile where the paint WOULD have succeeded, so a real conversion proves
 	# the tile action ran rather than merely failing to find the resident.

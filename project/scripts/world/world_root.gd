@@ -66,6 +66,12 @@ signal resident_arrived(species_id: String, world_position: Vector3)
 ## deterrence ... no plea, no judgment, no residue afterward". The player's undo path is the
 ## ordinary one every other edit has — `remove_at()`, or painting it back — and it works
 ## because the grace window has not closed yet at the moment the warning is read.
+##
+## **THE PAYLOAD CARRIES `player_caused`, AND THE UI GATES ON IT.** `GentleDisplacement` opens a
+## settlement gesture from two places: a player edit, and an animal landing. Only the first is
+## the pillar's "player's own settled choice", so only the first shows a panel. This signal
+## fires for both — see `gentle_displacement.gd`'s header for why suppression belongs in the
+## presentation layer and not here.
 signal displacement_warned(warning: Dictionary)
 
 ## A home actually moved. Fires after `displacement_warned`, once per relocated home.

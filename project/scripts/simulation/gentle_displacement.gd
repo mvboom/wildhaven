@@ -55,6 +55,15 @@ extends Node
 ## not rate-limited, and never suppressed while its consequence proceeds. Emitted immediately
 ## BEFORE the consequences run, which is gdd.md's "warning first and acting after".
 ##
+## **`player_caused` DECIDES WHETHER A PANEL IS SHOWN — not whether this signal fires.** Two
+## things open a gesture: `on_edit()` (the player) and `on_arrival()` (an animal landing, which
+## rebuilds the tile-exclusivity map and can push a neighbour over capacity). The pillar promises
+## disclosure for "the player's own settled choice, never the game's initiative", and the second
+## opener is exactly the game's initiative — in a settled world it fires continuously, and it
+## rendered `DisplacementCopy.LEAD_MIXED` ("This will be a different kind of place.") about a
+## change nobody made. The flag rides in the payload and the presentation layer decides;
+## `warnings_raised` still counts every real displacement, warned on screen or not.
+##
 ## Payload — pure structured data, **no player-facing copy** (that is content-writer's, and
 ## `project/data/animals/` is not this dispatch's directory):
 ##   {
@@ -62,6 +71,7 @@ extends Node
 ##     "homes":       Array[Dictionary],   # one entry per affected home, see below
 ##     "species_ids": Array[String],       # distinct, in first-affected order
 ##     "read_aloud":  bool,                # row 10 carries the Read-Aloud slice: always true
+##     "player_caused": bool,              # did the player's OWN edit cause this? see below
 ##   }
 ## and each home entry:
 ##   {
@@ -149,6 +159,10 @@ var settlements_resolved: int = 0
 var warnings_raised: int = 0
 var relocations: int = 0
 var departures: int = 0
+## Consequences that were planned but did not run, because the world had already changed by the
+## time they came up. See `_apply()` — this is the counter that proves the re-check is doing
+## something rather than being dead code.
+var consequences_skipped: int = 0
 
 var _grid: WorldGrid = null
 var _roster: SpeciesRoster = null
@@ -202,7 +216,10 @@ func pending_gestures() -> int:
 func on_edit(tile: Vector2i) -> void:
 	if _window == null or _registry == null:
 		return
-	_window.touch(tile, _occupied_neighbourhood_keys(tile))
+	# `player_caused = true` — THIS is the case gdd.md's pillar promises a warning for: "the
+	# warned, reversible result of the player's own settled choice". `on_arrival()` below is
+	# the other opener and passes false. See `SettlementWindow.touch()`.
+	_window.touch(tile, _occupied_neighbourhood_keys(tile), true)
 
 
 ## The identity of a home neighbourhood, for the window's merge/restart bookkeeping. Position
@@ -252,7 +269,15 @@ func on_arrival(tile: Vector2i, species_id: String) -> void:
 		# re-derives sites from the gesture's tiles via `sites_covering()`, and a site always
 		# covers its own position, so this is guaranteed to find `other` again at settlement
 		# regardless of exactly which tiles changed hands.
-		_window.touch(other.position, [neighbourhood_key(other)])
+		# `player_caused` LEFT FALSE, AND THIS IS THE WHOLE POINT OF THE FLAG. Nothing the player
+		# did opened this gesture — an animal landed. The consequence still runs (the defect this
+		# function exists for is real), but the WARNING is not shown, because the pillar's own
+		# words are "the player's own settled choice, never the game's initiative" and this is
+		# squarely the second. It also removes an outright falsehood from the screen: with no
+		# player mode to attribute, the panel rendered `DisplacementCopy.LEAD_MIXED` — "This will
+		# be a different kind of place." — about a change the player never made. If a real edit
+		# later joins this gesture, `touch()`'s OR makes the whole settlement player-caused again.
+		_window.touch(other.position, [neighbourhood_key(other)], false)
 
 
 ## True when two home sites' tile-counting reach could plausibly touch the same tile — the
@@ -336,7 +361,27 @@ func reconcile_after_load() -> int:
 		# Touched at the site's OWN tile with its OWN key, exactly as `on_arrival()` does, and
 		# for the reason spelled out there: `_affected_homes()` re-derives sites from the
 		# gesture's tiles via `sites_covering()`, and a site always covers its own position.
-		_window.touch(site.position, [neighbourhood_key(site)])
+		#
+		# `player_caused = false`, THE SAME AS `on_arrival()`, AND THIS WAS GOT WRONG ONCE.
+		#
+		# It first shipped as `true`, reasoning that the cause is unknowable across a reload
+		# (nothing pre-edit is persisted, by design — D-32) so the unknown should resolve toward
+		# disclosure, and that this was bounded to one settlement per over-capacity home.
+		#
+		# MEASURED, AND THE REASONING WAS WRONG ON ITS FACTS. That bound is not small: this
+		# function re-arms every home that is over capacity AT THE MOMENT OF THE LOAD **from any
+		# cause**, and the dominant cause is the relocation cascade, not a pending player edit.
+		# On a played-in world the probe re-armed **38 homes and produced 38 player-caused
+		# warnings — 38 panels — on a load with no player input at all**, which is exactly the
+		# symptom the flag was introduced to remove.
+		#
+		# WHAT THIS COSTS, STATED PLAINLY. A player who made a displacing edit and quit before it
+		# settled gets the consequence with no panel after the reload. That is a real, narrow
+		# breach of "nothing blinks out unexplained" — narrower than the 38 false panels it
+		# replaces, but not nothing. Closing it properly needs one persisted bit ("a player edit
+		# was pending at capture"), which is a save-schema change and a partial reversal of D-32's
+		# Option A ruling: a human decision, not an agent's.
+		_window.touch(site.position, [neighbourhood_key(site)], false)
 		armed += 1
 	return armed
 
@@ -396,11 +441,17 @@ func _settle(gesture: Dictionary) -> void:
 	# WARNING FIRST. Emitted before a single resident moves, and never suppressed — the
 	# consequences below run whether or not anything is listening.
 	warnings_raised += 1
+	# STILL EMITTED UNCONDITIONALLY, INCLUDING FOR AN ARRIVAL-CAUSED SETTLEMENT. The signal is
+	# the simulation's disclosure and is "never suppressed while its consequence proceeds";
+	# suppressing it HERE would put a presentation decision inside the simulation and would make
+	# `warnings_raised` stop counting real displacements. `player_caused` rides along instead,
+	# and `GameUI._on_displacement_warned()` decides whether a panel appears.
 	displacement_warned.emit({
 		"gesture_id": gesture.get("id", 0),
 		"homes": homes,
 		"species_ids": species_ids,
 		"read_aloud": true,
+		"player_caused": SettlementWindow.is_player_caused(gesture),
 	})
 
 	# ACTING AFTER.
@@ -471,22 +522,76 @@ func _describe(
 	}
 
 
+## EVERY CONSEQUENCE IS RE-CHECKED AGAINST THE LIVE WORLD IMMEDIATELY BEFORE IT RUNS, and that
+## is the whole point of this function.
+##
+## THE DEFECT THIS FIXES, measured before it was written: `_settle()` calls `_affected_homes()`,
+## which plans EVERY affected home — capacity, outcome, and the relocation destination
+## `_find_relocation()` picked — **before a single one of them moves**. The moves are then
+## applied one at a time, and each `_relocate()` calls `HomeSiteRegistry.relocate()`, which
+## rebuilds the whole tile-exclusivity map (nearest site wins). So the first move in a batch
+## invalidates the destination already chosen for every later one. On a dense fixture, **84% of
+## relocations landed in a spot that was already over capacity the instant the family arrived**
+## — which made them eligible for the next settlement, which planned another stale batch. One
+## arrival cascaded into over a thousand home moves before the map converged.
+##
+## The old code re-searched only when another site had literally TAKEN the destination tile
+## (`any_site_at()`). That is the rare case. The common one is a destination that is still empty
+## but no longer owns enough tiles to support the household, which that check cannot see.
+##
+## THREE OUTCOMES NOW, and the third is new:
+##   1. The home is fine again — an earlier move in this same batch freed the ground it needed.
+##      Do nothing at all. This is the single biggest source of avoided churn.
+##   2. It still needs to move and a live destination exists. Move it there, not to the stale one.
+##   3. It still needs to move and NO destination exists any more. **Stay put**, and leave it for
+##      the next settlement to re-plan honestly.
+##
+## WHY CASE 3 STAYS RATHER THAN DEPARTING. `_describe()` already resolves "no suitable spot" to a
+## DEPARTURE at plan time (gdd.md's "otherwise moving away"), so case 3 only arises when a spot
+## existed when the player read the warning and stopped existing before the move. Departing there
+## would contradict a warning that said "moves" with the one outcome gdd.md ranks worse, and
+## would be a resident vanishing for a reason nothing on screen explained. Staying is the smaller
+## breach and the stable one: nothing is lost, and the next settlement re-plans from the live
+## world and either relocates or departs the home properly.
 func _apply(home: Dictionary) -> void:
 	var site: HomeSite = home["_site"]
-	if home["outcome"] != OUTCOME_RELOCATE:
-		_depart(site, int(home["individuals"]))
+	var population: int = site.population()
+	if population <= 0:
+		consequences_skipped += 1
+		return  # already emptied by an earlier consequence in this same batch
+
+	var species: AnimalDefinition = null if _roster == null else _roster.by_id(site.species_id)
+	if species == null or _grid == null or _registry == null:
+		# No way to re-read the world; fall back to the plan rather than dropping the
+		# consequence, which is the pre-existing behaviour and still the safe one here.
+		if home["outcome"] != OUTCOME_RELOCATE:
+			_depart(site, int(home["individuals"]))
+		else:
+			_relocate(site, home["destination_tile"])
 		return
 
-	# Destinations were chosen for the whole gesture before any of them moved, so an earlier
-	# relocation in this same settlement could have taken this one's spot. Re-search if so —
-	# but **never downgrade to a departure here**, because the warning the player already read
-	# said "moves", and a warning is not allowed to be contradicted by what follows it.
-	var destination: Vector2i = home["destination_tile"]
-	if _registry != null and _registry.any_site_at(destination):
-		var species: AnimalDefinition = _roster.by_id(site.species_id)
-		var retry: Vector2i = _find_relocation(site, species, site.population())
-		if retry != Vector2i(-1, -1):
-			destination = retry
+	# OUTCOME 1, and it applies to departures as much as to relocations: is this home actually
+	# still over capacity, right now? A batch is planned against one world and applied to
+	# another, so by the time a home comes up the ground it needed may already be back.
+	var capacity: int = CapacityEvaluator.capacity(_grid, _registry, site.position, species, site)
+	if capacity >= population:
+		consequences_skipped += 1
+		return
+
+	if home["outcome"] != OUTCOME_RELOCATE:
+		# The overflow is re-derived from the LIVE numbers too, so a home cannot shed more than
+		# it currently needs to. The copy names a family and never a headcount, so a changed
+		# count cannot contradict anything the player read.
+		_depart(site, population - maxi(capacity, 0))
+		return
+
+	# OUTCOMES 2 AND 3. Re-searched unconditionally now — the stale destination is never trusted,
+	# because "still empty" and "still big enough" are different questions and only the second
+	# one matters.
+	var destination: Vector2i = _find_relocation(site, species, population)
+	if destination == Vector2i(-1, -1):
+		consequences_skipped += 1
+		return
 	_relocate(site, destination)
 
 

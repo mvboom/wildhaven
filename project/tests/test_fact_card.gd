@@ -84,7 +84,7 @@ func _process(_delta: float) -> bool:
 
 	_check_card_starts_closed()
 	_check_fires_on_resident_arrived()
-	_check_repeat_arrival_routes_to_feed()
+	_check_repeat_arrival_shows_nothing()
 	_check_text_equals_the_data_for_every_roster_species()
 	_check_tap_to_replay_in_inspect()
 	_check_dismiss_routes()
@@ -159,25 +159,46 @@ func _check_fires_on_resident_arrived() -> void:
 	check(not _card.is_open(), "the card dismisses")
 
 
-func _check_repeat_arrival_routes_to_feed() -> void:
-	var feed: NotificationFeed = _ui.notification_feed
-	check(feed != null, "GameUI wires a %NotificationFeed")
-	var before_count: int = feed.entry_count()
+## A REPEAT ARRIVAL SHOWS NO TEXT ANYWHERE. It used to open an entry on a right-side rolling
+## feed; that widget is deleted, because `HabitatSimulation._move_in()` emits this signal once
+## per INDIVIDUAL and a neighbourhood fills one at a time, so N settled sites announce something
+## every (20-60)/N seconds forever — and `_known_before_session` is seeded from
+## `species_hosted_ids()` at load, making that EVERY arrival in every session after the first.
+##
+## Asserted as an absence on two axes, because "shows nothing" has no widget to interrogate:
+## the payoff card stays shut, and `GameUI` no longer carries a feed at all.
+func _check_repeat_arrival_shows_nothing() -> void:
+	var ui_property_names: PackedStringArray = PackedStringArray()
+	for entry: Dictionary in _ui.get_property_list():
+		ui_property_names.append(entry["name"] as String)
+	check(not ui_property_names.has("notification_feed"),
+		"GameUI wires NO notification feed — the right-side rolling surface is deleted")
+	check(ui_property_names.has("fact_card") and ui_property_names.has("displacement_notice"),
+		"...and that name list really enumerates GameUI's surfaces (%d properties), so the "
+			% ui_property_names.size()
+		+ "absence above is a measurement rather than an empty search")
 
 	# "rabbit" already arrived once in _check_fires_on_resident_arrived() above. That test
 	# fires a RAW signal emit, not a real simulation arrival, so the registry's own
 	# species_hosted_ids() was never touched — what actually makes this second emit a REPEAT
 	# is GameUI's own `_known_before_session` bookkeeping: `_on_resident_arrived()` appends a
 	# species_id to that set the first time it sees it, specifically so a second arrival of
-	# the same species routes differently without needing the registry to agree. That's the
-	# behavior this check exercises.
+	# the same species is silent without needing the registry to agree. That's the behavior
+	# this check exercises.
 	_world.resident_arrived.emit("rabbit", _world.grid_to_world(11, 11))
 
 	check(not _card.is_open(), "a REPEAT arrival does NOT reopen the big card")
-	check_eq(feed.entry_count(), before_count + 1, "...it goes to the feed instead, one new entry")
-	var rabbit: AnimalDefinition = _world.roster.by_id("rabbit")
-	check_eq(feed.entry_texts()[0], "%s. %s" % [rabbit.display_name, rabbit.effective_fact_text()],
-		"...carrying the SAME verbatim copy the big card would have shown")
+	check(not _ui.displacement_notice.warning_visible(),
+		"...and does not spill onto the consent surface either — it shows nothing at all")
+
+	# NON-VACUITY: the FIRST arrival of a species genuinely does open the card, so "closed"
+	# above is a real distinction rather than a card that never opens in this fixture.
+	var fox: AnimalDefinition = _world.roster.by_id("fox")
+	check(fox != null and not _card.is_open(), "the fox has not arrived yet in this fixture")
+	_world.resident_arrived.emit("fox", _world.grid_to_world(12, 12))
+	check(_card.is_open(),
+		"...while a FIRST-EVER arrival still opens it — the silence is per-repeat, not blanket")
+	_card.dismiss()
 
 
 # --- The card is the data ---------------------------------------------------------------------------
@@ -247,21 +268,24 @@ func _check_tap_to_replay_in_inspect() -> void:
 
 	_hud.set_mode(GameHud.Mode.INSPECT)
 	check(not _card.is_open(), "the card is closed before the replay tap")
-	var feed: NotificationFeed = _ui.notification_feed
-	var before_count: int = feed.entry_count()
 
 	check_eq(_router.handle_tap(screen), TapRouter.RESULT_RESIDENT,
 		"TAP-TO-REPLAY: an Inspect tap on a resident resolves to that resident")
-	check(not _card.is_open(),
-		"...and the BIG card does NOT open — replay routes to the feed, not the payoff card")
-	check_eq(feed.entry_count(), before_count + 1, "...the feed gains one entry")
-	check_eq(feed.entry_texts()[0], "%s. %s" % [rabbit.display_name, rabbit.effective_fact_text()],
+	check(_card.is_open(),
+		"...and OPENS the fact card — a player-driven tap earns the full card, blocking and all")
+	check_eq(_card.spoken_text(), "%s. %s" % [rabbit.display_name, rabbit.effective_fact_text()],
 		"...with the same verbatim copy — one composition path, so the two entry points cannot diverge")
 
-	# Replayable forever, not once.
-	_router.handle_tap(screen)
-	check_eq(feed.entry_count(), before_count + 2,
+	# Replayable forever, not once. The first tap while the card is up dismisses it (the card's
+	# own scrim swallows taps; `handle_tap()` mirrors that for the scripted path), so the replay
+	# is the tap AFTER that — which is exactly what a player does.
+	check_eq(_router.handle_tap(screen), TapRouter.RESULT_CARD_OPEN,
+		"a tap with the card up dismisses it rather than replaying underneath")
+	check(not _card.is_open(), "...the card is closed again")
+	check_eq(_router.handle_tap(screen), TapRouter.RESULT_RESIDENT,
 		"the replay works a second time — Pillar 4 does not run out")
+	check(_card.is_open(), "...and the card reopens")
+	_card.dismiss()
 
 	site.residents.clear()
 	_world.registry.unregister(site)

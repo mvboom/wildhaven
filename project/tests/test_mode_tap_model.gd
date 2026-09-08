@@ -382,13 +382,14 @@ func _check_priority_rule_in_all_three_modes() -> void:
 	_hud.set_mode(GameHud.Mode.INSPECT)
 	check_eq(_router.handle_tap(screen), TapRouter.RESULT_RESIDENT,
 		"PRIORITY RULE in Inspect: the animal wins the tap (this is the replay path)")
-	# REPOINTED (Task 5, notification-surfaces): the replay routes to the feed now, never the
-	# big card — see `test_fact_card.gd`'s `_check_tap_to_replay_in_inspect()` for the same
-	# pattern.
-	check(not _card.is_open(), "...and the card does NOT replay — the tap routes to the feed instead")
-	var feed: NotificationFeed = _ui.notification_feed
-	check_eq(feed.entry_texts()[0], "%s. %s" % [species.display_name, species.effective_fact_text()],
-		"...the feed gains the replay entry instead, with the same verbatim copy")
+	# REPOINTED (remove-notification-feed): the replay opens the FACT CARD again — the rolling
+	# feed it briefly routed to is deleted. See `test_fact_card.gd`'s
+	# `_check_tap_to_replay_in_inspect()` for the same pattern, and note the dismiss below: a
+	# tap with the card up dismisses it, so every later tap in this check needs a closed card.
+	check(_card.is_open(), "...and the card DOES replay — a player-driven tap earns the card")
+	check_eq(_card.spoken_text(), "%s. %s" % [species.display_name, species.effective_fact_text()],
+		"...carrying the same verbatim copy a move-in would have shown")
+	_card.dismiss()
 
 	# --- THE WANDER HALF: the hitbox travels with the animal (Inspect only) -------------------
 	# Residents roam (row 6). gameplay-engineer measured the arrival-time hit point 43.1 px from
@@ -407,10 +408,11 @@ func _check_priority_rule_in_all_three_modes() -> void:
 
 	check_eq(_router.handle_tap(live_screen), TapRouter.RESULT_RESIDENT,
 		"A TAP AT THE ANIMAL'S LIVE POSITION HITS IT (still Inspect)")
-	# REPOINTED (Task 5, notification-surfaces): same routing change as above.
-	check(not _card.is_open(), "...and does NOT open its card — the feed gains an entry instead")
-	check_eq(feed.entry_texts()[0], "%s. %s" % [species.display_name, species.effective_fact_text()],
+	# REPOINTED (remove-notification-feed): same routing change as above.
+	check(_card.is_open(), "...and opens its card")
+	check_eq(_card.spoken_text(), "%s. %s" % [species.display_name, species.effective_fact_text()],
 		"...still the same verbatim copy")
+	_card.dismiss()
 
 	# RE-POINTED (-> D-29 #7): this used to prove the STALE hitbox misses. Terraform no longer
 	# runs the resident query at all, so a tap at the animal's old arrival position paints in
