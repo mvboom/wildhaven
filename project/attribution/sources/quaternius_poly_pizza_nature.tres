@@ -18,7 +18,7 @@ license_file = "res://assets/licenses/Quaternius_UltimateAnimatedAnimals_License
 attribution_required = false
 required_notice = ""
 conditions = ""
-assets_used = PackedStringArray("Rock (poly.pizza/m/4MUaQTcDdc)", "Rock Medium (poly.pizza/m/s1OJ3bBzqc)", "Rocks (poly.pizza/m/OQvi8PIZ40)", "Grass (poly.pizza/m/UGTOzcO3P2)", "Crops (poly.pizza/m/Ro6K0Yg7mx)", "Wheat (poly.pizza/m/lPspzfC8Pu)", "Pine Tree (poly.pizza/m/gX8WmgkeEm)")
+assets_used = PackedStringArray("Crops (poly.pizza/m/Ro6K0Yg7mx)", "Wheat (poly.pizza/m/lPspzfC8Pu)")
 per_file_licensing = false
 notes = "CC0 — crediting is courtesy, not compliance. Reuses
 Quaternius_UltimateAnimatedAnimals_License.txt as license_file rather than duplicating an
@@ -63,4 +63,18 @@ DISTINCT FROM quaternius_ultimate_nature_pack.tres and
 quaternius_stylized_nature_megakit.tres: those are two specific named/versioned pack
 downloads with their own pack pages; these six are standalone poly.pizza model downloads
 whose parent pack (if any) was not identified, same relationship as
-quaternius_poly_pizza_characters.tres has to the two named animal packs."
+quaternius_poly_pizza_characters.tres has to the two named animal packs.
+
+PRUNED 2026-09-08 -- assets_used now records what the SHIPPED BUILD contains, not everything ever
+imported from this pack. The 2026-09-08 Forest MegaKit standardisation, the house cull and the
+Snowfield retirement unwired part of this pack from gameplay. project/export_presets.cfg now
+drops those files from all three presets via exclude_filter, so they are no longer distributed
+and no longer credited here. THE FILES REMAIN IN THE REPO under project/assets/ and their import
+tests still run -- if one is rewired it must be added back to assets_used AND removed from
+exclude_filter, or it will ship uncredited.
+Removed in this pass: Rock, Rock Medium, Rocks, Grass and Pine Tree (5 in all).
+What survives is CropsPlot.glb and Wheat.glb, still composed into CultivatedCropsPlot.tscn and
+CultivatedWheatRow.tscn. CORRECTS A CLAIM MADE ELSEWHERE: assets/terrain/pine_1/Pine1.tscn's
+header calls the removed PineTree the project's only Poly Pizza asset. It was not -- these two
+crop models are from this same standalone-download set and still ship. GrassTufts was already
+recorded above as imported but never wired."

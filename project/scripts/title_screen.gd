@@ -27,8 +27,11 @@ const CREDITS_SCENE: String = "res://scenes/menu/CreditsScreen.tscn"
 const SETTINGS_SCENE: String = "res://scenes/menu/SettingsScreen.tscn"
 
 ## Decided directly by the human this session (not a content-writer stub) — see the mockup
-## conversation. Godot's own CheckButton draws the toggle glyph; this is the label beside it.
-const SPEAKING_LABEL: String = "Read Text Aloud"
+## conversation. The control is phrased from the PARENT's side, so it reads INVERTED against
+## `GameplaySettings.speaking_enabled()`: ticked means narration is off (sanity preserved),
+## empty means the game reads text aloud. `_ready()` swaps CheckButton's switch graphics for
+## CheckBox's tick/empty-box glyphs so the box sits to the right of this label.
+const SPEAKING_LABEL: String = "Parent Sound Sanity:"
 
 @onready var _new_game_button: Button = %NewGameButton
 @onready var _load_game_button: Button = %LoadGameButton
@@ -51,10 +54,15 @@ func _ready() -> void:
 
 	# `BuildInfo.BUILD_TIMESTAMP` is stamped by scripts/build-game.sh at export time — see
 	# that file's own header.
-	_build_tag.text = "Built %s" % BuildInfo.BUILD_TIMESTAMP
+	_build_tag.text = "Build %s" % BuildInfo.BUILD_TIMESTAMP
 
 	_speaking_check.text = SPEAKING_LABEL
-	_speaking_check.button_pressed = GameplaySettings.speaking_enabled()
+	# Borrow CheckBox's tick/empty-box icons: a checkmark when the parent has silenced
+	# narration, an empty box when it's on. CheckButton's own switch graphic doesn't read as
+	# "checked", and CheckButton (unlike CheckBox) keeps the glyph on the RIGHT, past the label.
+	_speaking_check.add_theme_icon_override("checked", get_theme_icon("checked", "CheckBox"))
+	_speaking_check.add_theme_icon_override("unchecked", get_theme_icon("unchecked", "CheckBox"))
+	_speaking_check.button_pressed = not GameplaySettings.speaking_enabled()
 	# A control that cannot do anything is worse than no control (Pillar 1) — same rule
 	# `FactCard`'s own 🔊 button follows for a machine with no TTS voice.
 	_speaking_check.visible = ReadAloud.available()
@@ -63,12 +71,14 @@ func _ready() -> void:
 
 ## The player's choice BEFORE the game even starts — writes straight through to
 ## `GameplaySettings`, the same one source of truth `FactCard`'s own toggle reads and writes.
+## Reports SPEAKING, not the box: a ticked "Parent Sound Sanity:" means narration is off.
 func speaking_checked() -> bool:
-	return _speaking_check.button_pressed
+	return not _speaking_check.button_pressed
 
 
-func _on_speaking_toggled(enabled: bool) -> void:
-	GameplaySettings.set_speaking_enabled(enabled)
+## `sanity` is the box's own state — ticked = quiet — so it inverts into the speaking flag.
+func _on_speaking_toggled(sanity: bool) -> void:
+	GameplaySettings.set_speaking_enabled(not sanity)
 
 
 func _go(path: String) -> void:

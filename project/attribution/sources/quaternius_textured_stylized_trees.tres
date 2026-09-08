@@ -17,7 +17,7 @@ license_file = "res://assets/licenses/Quaternius_UltimateAnimatedAnimals_License
 attribution_required = false
 required_notice = ""
 conditions = ""
-assets_used = PackedStringArray("DeadTree_3", "Pine_2")
+assets_used = PackedStringArray()
 per_file_licensing = false
 notes = "CC0 — crediting is courtesy, not compliance. FIRST use of this pack in the project
 (2026-08-26, content-variety pass Task 5) — no prior entry existed, so this is a new
@@ -48,4 +48,17 @@ duplicated verbatim under two sibling `source-content/assets/` extraction folder
 `diff -rq` before sourcing from either; not two different packs.
 
 The pack ships more trees (Pine_1, Birch_*, DeadBirch_*, DeadTree_1/2, etc.) beyond these
-two; append to assets_used as each is imported, do NOT create a second entry for this pack."
+two; append to assets_used as each is imported, do NOT create a second entry for this pack.
+
+PRUNED 2026-09-08 -- assets_used now records what the SHIPPED BUILD contains, not everything ever
+imported from this pack. The 2026-09-08 Forest MegaKit standardisation, the house cull and the
+Snowfield retirement unwired part of this pack from gameplay. project/export_presets.cfg now
+drops those files from all three presets via exclude_filter, so they are no longer distributed
+and no longer credited here. THE FILES REMAIN IN THE REPO under project/assets/ and their import
+tests still run -- if one is rewired it must be added back to assets_used AND removed from
+exclude_filter, or it will ship uncredited.
+Removed in this pass: DeadTree_3, Pine_2.
+THIS LEAVES assets_used EMPTY: nothing from this pack reaches the shipped build any more. The
+entry is deliberately KEPT rather than deleted -- the pack's files are still in the repo, its
+License.txt record should outlive any single wiring decision, and a future rewire should extend
+this entry rather than recreate it."

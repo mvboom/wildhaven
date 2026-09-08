@@ -83,7 +83,7 @@ mkdir -p "$OUTPUT_DIR_ABS"
 # freshly-written constant (not a stale cached one) is what actually gets exported. See
 # build_info.gd's own header — this is the only place BUILD_TIMESTAMP is ever written.
 BUILD_INFO_FILE="$PROJECT_DIR/scripts/build_info.gd"
-BUILD_TIMESTAMP="$(date -u '+%Y-%m-%d %H:%M UTC')"
+BUILD_TIMESTAMP="$(date -u '+%Y-%m-%d-%H-%M')"
 cat > "$BUILD_INFO_FILE" << EOF
 class_name BuildInfo
 extends RefCounted

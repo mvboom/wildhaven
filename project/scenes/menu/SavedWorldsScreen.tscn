@@ -175,13 +175,35 @@ layout_mode = 2
 size_flags_vertical = 3
 horizontal_scroll_mode = 0
 
-[node name="SaveList" type="GridContainer" parent="Layout/Stack/ScrollArea"]
-unique_name_in_owner = true
+; CENTERED GRID. The save rows are fixed-width (220px, set in `saved_worlds_screen.gd`), so a
+; three-column grid is ~700px wide no matter how wide the window is — left-aligned it drifted
+; off to one side on a big screen. The two expanding spacers split whatever width is left over
+; and push the grid to the middle. They collapse to zero when there is no leftover, so on a
+; narrow window the grid falls back to starting at the left edge rather than being centred into
+; an overflow that the (horizontally non-scrolling) ScrollArea would clip on both sides.
+[node name="GridRow" type="HBoxContainer" parent="Layout/Stack/ScrollArea"]
 layout_mode = 2
 size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_constants/separation = 0
+
+[node name="LeftSpacer" type="Control" parent="Layout/Stack/ScrollArea/GridRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="SaveList" type="GridContainer" parent="Layout/Stack/ScrollArea/GridRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 0
 theme_override_constants/h_separation = 16
 theme_override_constants/v_separation = 16
 columns = 3
+
+[node name="RightSpacer" type="Control" parent="Layout/Stack/ScrollArea/GridRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
 
 [node name="EmptyLabel" type="Label" parent="Layout/Stack"]
 unique_name_in_owner = true

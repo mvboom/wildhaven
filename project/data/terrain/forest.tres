@@ -184,12 +184,22 @@
 ; or putting a second pack back into Forest, which is what the standardisation removed.
 ; Pine1.tscn and its import stay on disk, unwired.
 ;
-; THE RED PAIR IS DELIBERATE (human ruling, same pass): TwistedTree1 and BushCommon both draw
-; `Leaves_TwistedTree_C.png`, which is rgb(167,23,23) RED, and TwistedTree1 additionally carries
-; a GREY `Bark_TwistedTree` trunk where every other variant is brown. Kept as an AUTUMN ACCENT
-; after seeing them in context — 2 of 5 variants reading as autumn trees scattered through green
-; forest. This is a decision, not an oversight: do not "fix" the red, and do not tint the grey
-; bark, without a fresh human ruling.
+; THE RED PAIR WAS SPLIT (human ruling, 2026-09-08 second eyeball pass: "the Bush needs to be
+; green not red. there is just too much red with this. The twisted tree being red is ok"). Both
+; variants used to draw `Leaves_TwistedTree_C.png`, rgb(167,23,23) RED, kept as an autumn accent.
+; Two of five reading as autumn was one too many, so BUSHCOMMON IS NOW GREEN and TwistedTree1 is
+; the sole autumn accent.
+;
+; HOW THE BUSH WENT GREEN: the MegaKit ships Bush_Common.gltf pointing at the twisted tree's leaf
+; atlas — that is the pack's own wiring, not an import slip. Every leaf texture in this kit is a
+; FLAT SINGLE COLOUR plus an alpha cutout, so the recolour is exact and lossless: the bush's local
+; copy is now `assets/terrain/bush_common/Leaves_Bush_C.png`, the identical 302938-pixel alpha mask
+; with its RGB set to rgb(88,123,0) — the pack's OWN `Leaves_NormalTree_C` green, already worn by
+; CommonTree1/2/3, so the bush is not a new colour value. The gltf's image + material names were
+; renamed to match. TwistedTree1 keeps its own untouched red copy of the original texture.
+;
+; STILL DELIBERATE, DO NOT "FIX": TwistedTree1's RED leaves and its GREY `Bark_TwistedTree` trunk,
+; where every other variant is brown. That half of the original ruling stands.
 [gd_resource type="Resource" script_class="TerrainDefinition" load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scripts/definitions/terrain_definition.gd" id="1_schema"]
