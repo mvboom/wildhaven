@@ -170,6 +170,40 @@ func _refresh_building_visual(origin: Vector2i) -> void:
 	_building_visuals[origin] = node
 
 
+## Repaints whatever `category`'s style default governs, after `WorldRoot.set_style_default()`
+## has written the new value. The dispatch mirrors where each category is actually resolved:
+##
+## - A real TERRAIN id (forest, wild_grass) is resolved per tile by `TerrainChunkLod`, so its
+##   tiles are what have to be rebuilt.
+## - A PLACEABLE id with a picker (today only "house") is resolved per placed building by
+##   `_resolve_building_variant()`, so the standing visuals for THAT id are rebuilt. Scoped by
+##   `def.id` so choosing a house look does not needlessly re-instantiate every barn and silo.
+## - Anything else — `WorldRoot.TERRAIN_GROUP_ID` ("grass_family") and "farm_building" — is a
+##   HOTBAR key, not a look: it decides which terrain/placeable the next tap paints, and
+##   changes nothing about tiles already on the ground. Correctly repaints nothing.
+##
+## `_refresh_building_visual()` deliberately returns early when a live visual already exists
+## (it is the tile-changed path, where the building has not changed), so a restyle has to free
+## the old node first — otherwise the new style would not be picked up until the building was
+## removed and rebuilt, which is this whole function's bug in miniature.
+func restyle_category(category: String) -> void:
+	if _grid == null:
+		return
+	if _grid.terrain_definition(category) != null:
+		if _chunk_lod != null:
+			_chunk_lod.restyle_terrain(category)
+		return
+	for origin: Vector2i in _building_visuals.keys():
+		var def: PlaceableDefinition = _grid.get_building(origin.x, origin.y)
+		if def == null or def.id != category:
+			continue
+		var existing: Node3D = _building_visuals.get(origin, null) as Node3D
+		if existing != null and is_instance_valid(existing):
+			existing.queue_free()
+		_building_visuals.erase(origin)
+		_refresh_building_visual(origin)
+
+
 func _on_tile_changed(x: int, z: int) -> void:
 	_chunk_lod.refresh_tile(x, z)
 	var origin: Vector2i = _grid.get_building_origin(x, z)

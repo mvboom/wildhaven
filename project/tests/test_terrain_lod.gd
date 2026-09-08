@@ -56,6 +56,8 @@ func _process(_delta: float) -> bool:
 	_check_update_camera_bounds_rebuilds_per_call()
 	_check_forest_style_default_resolves_variant()
 	_check_rock_ignores_style_defaults()
+	_check_style_change_repaints_existing_tiles()
+	_check_far_tier_preserves_variant_variety()
 
 	finish()
 	return true
@@ -222,14 +224,35 @@ func _check_far_tier_batches_into_multimesh() -> void:
 	# under `chunk_lod`: `TerrainView._process()`'s throttled `update_camera()` could in
 	# principle have demoted some other chunk by now, and a partly-painted chunk's batch
 	# would have a different instance_count. Same scoping the far->near check below uses.
+	# RE-POINTED, NOT RELAXED (2026-09-08): this asserted `instance_count == 64` on every
+	# batch, which encoded the invariant the far tier used to have — one batch per terrain,
+	# holding every tile of it, because every tile was drawn from `model_scenes[0]`. That is
+	# exactly the behaviour this pass removed (see `_rebuild_chunk_far()`'s own header): rock
+	# ships 6 `model_scenes` variants and `pick_variant()` spreads the chunk's 64 tiles across
+	# them, so a batch now holds one variant's share, not the whole chunk. The claim this check
+	# actually makes — tiles collapse into batches instead of one node per tile — is unchanged,
+	# and is now asserted on coverage and on the batch count instead of on a per-batch equality
+	# that only held while variety was being discarded.
+	var instances_total: int = 0
 	for child in chunk_lod.get_children():
 		if child is MultiMeshInstance3D and (child as MultiMeshInstance3D).name.begins_with("Far_rock_2_2_"):
 			multimeshes += 1
-			check_eq(
-				(child as MultiMeshInstance3D).multimesh.instance_count, 64,
-				"every far-tier MultiMeshInstance3D for this chunk has one instance per tile"
+			var count: int = (child as MultiMeshInstance3D).multimesh.instance_count
+			instances_total += count
+			check(
+				count >= 1 and count <= 64,
+				"each far-tier batch for this chunk holds between 1 and 64 tiles (holds %d)" % count
 			)
 	check(multimeshes >= 1, "chunk (2,2) batches into at least one MultiMeshInstance3D (rock's multi-piece asset produces more than one, correctly — see C1's fix)")
+	check(
+		instances_total >= 64,
+		"every one of the chunk's 64 tiles is drawn by some batch (%d instances across %d batches)"
+			% [instances_total, multimeshes]
+	)
+	check(
+		multimeshes < 64,
+		"the chunk is still BATCHED, not one node per tile (%d batches for 64 tiles)" % multimeshes
+	)
 	check_eq(individual_containers, 0, "no near-tier containers remain for chunk (2,2)'s tiles once it's far-tier (I3b: proves _free_chunk_near actually ran)")
 
 
@@ -383,3 +406,153 @@ func _check_update_camera_bounds_rebuilds_per_call() -> void:
 		+ "proves it's a bounded DRAIN, not a permanent cap that never finishes")
 		% changed_second_call
 	)
+
+
+## THE REPORTED BUG, HALF ONE (2026-09-08): picking a tree style repainted nothing.
+##
+## `WorldRoot.set_style_default()` was a bare `style_defaults[category] = style_id` write, and
+## `GameHud._on_style_picker_style_selected()` followed it with hotbar-button work only. Nothing
+## called back into the view, so ALREADY-BUILT near-tier tiles kept the visual they were holding
+## — the new style only took effect for tiles rebuilt later, which in practice meant "when you
+## zoomed far enough out and back in". Reported as: change the style, zoom out, zoom back in,
+## and only THEN does every tree flip to the chosen one.
+##
+## Asserted on the tiles' REAL instantiated children (`scene_file_path` on each container's
+## visual), not on `resolve_style_scene()` — the resolver was always correct; it was the repaint
+## that never happened, so a resolver-level assertion would have passed against the bug.
+func _check_style_change_repaints_existing_tiles() -> void:
+	var chunk_lod: TerrainChunkLod = _world.view._chunk_lod
+	# `mixed` FIRST, then paint: an earlier check in this file leaves "birch_tree" stored, and
+	# painting under that would build 64 identical tiles and hand this check a false green.
+	_world.set_style_default("forest", WorldRoot.MIXED_STYLE_ID)
+	for x in range(80, 88):
+		for z in range(80, 88):
+			_world.paint_tile(x, z, "forest")
+	chunk_lod.set_chunk_tier(Vector2i(10, 10), true)
+
+	var mixed_paths: Dictionary = _visible_scene_paths(80, 88)
+	check(
+		mixed_paths.size() > 1,
+		"setup: painted under `mixed`, these forest tiles show several models (%d distinct)"
+			% mixed_paths.size()
+	)
+
+	# The fix under test: this write alone must repaint, with NO tier flip and no camera move.
+	_world.set_style_default("forest", "birch_tree")
+	var chosen_paths: Dictionary = _visible_scene_paths(80, 88)
+	check(
+		chosen_paths.size() == 1,
+		"choosing a style repaints every already-built forest tile immediately (%d distinct "
+			% chosen_paths.size() + "models still on screen)",
+		"THE REPORTED BUG: >1 means the old visuals are still standing and will only flip "
+		+ "once a zoom rebuilds them"
+	)
+	if chosen_paths.size() == 1:
+		check(
+			(chosen_paths.keys()[0] as String).contains("BirchTree"),
+			"...and the model they repainted to is the one the player picked"
+		)
+
+	# `mixed` must repaint back the same way, or the picker is a one-way door in practice even
+	# though `get_style_default()` happily stores the id.
+	_world.set_style_default("forest", WorldRoot.MIXED_STYLE_ID)
+	check(
+		_visible_scene_paths(80, 88).size() > 1,
+		"choosing `mixed` back again repaints the variety in without a zoom"
+	)
+
+
+## THE REPORTED BUG, HALF TWO (2026-09-08): the far tier flattened every tile of a terrain onto
+## `model_scenes[0]`.
+##
+## `_mesh_pieces_for_terrain()` batched from `terrain.model_scenes[0]` unconditionally, so a
+## far-tier forest chunk drew CommonTree1 on all 64 tiles no matter what the near tier showed —
+## exactly the "when we flip all the trees to Common Tree 1" the human observed on zooming out,
+## and it made a CHOSEN style wrong at range too, not just `mixed`. The far tier now groups tiles
+## by the same `_resolve_variant()` answer the near tier uses, so the two cannot disagree.
+##
+## MEASURED ON `instance_count` AND MESH IDENTITY, NOT ON INSTANCE TRANSFORMS: the headless
+## rendering driver returns an identity transform from `MultiMesh.get_instance_transform()` (it
+## reads back as (0,0,0) for every instance, verified with a throwaway probe), so a
+## "which tiles are covered" assertion written that way passes or fails for reasons that have
+## nothing to do with this fix. `instance_count` and `multimesh.mesh` both read back correctly.
+func _check_far_tier_preserves_variant_variety() -> void:
+	var chunk_lod: TerrainChunkLod = _world.view._chunk_lod
+	_world.set_style_default("forest", WorldRoot.MIXED_STYLE_ID)
+	chunk_lod.set_chunk_tier(Vector2i(10, 10), false)
+
+	var mixed_meshes: Dictionary = {}
+	var mixed_total: int = 0
+	var mixed_max: int = 0
+	for mmi: MultiMeshInstance3D in _far_batches("Far_forest_10_10_"):
+		mixed_meshes[mmi.multimesh.mesh] = true
+		mixed_total += mmi.multimesh.instance_count
+		mixed_max = maxi(mixed_max, mmi.multimesh.instance_count)
+	check(mixed_total > 0, "setup: chunk (10,10) built far-tier batches under `mixed`")
+	check(
+		mixed_max < 64,
+		"under `mixed`, no single far-tier batch holds all 64 of the chunk's tiles "
+			+ "(largest holds %d)" % mixed_max,
+		"THE REPORTED BUG: a batch of 64 means every tile collapsed onto one variant "
+		+ "the moment the chunk went far-tier"
+	)
+
+	# The same chunk under a CHOSEN style is the control: one variant, so every batch is the
+	# full 64 and the distinct-mesh count collapses to that one scene's own pieces. Comparing
+	# the two states is what makes the `mixed` numbers above mean something — a bare
+	# "more than one mesh" check would pass on the broken code too, since CommonTree1 alone
+	# contributes several mesh pieces (trunk/canopy, slab, blotch patches).
+	_world.set_style_default("forest", "birch_tree")
+	var chosen_meshes: Dictionary = {}
+	var chosen_batches: int = 0
+	for mmi: MultiMeshInstance3D in _far_batches("Far_forest_10_10_"):
+		chosen_meshes[mmi.multimesh.mesh] = true
+		chosen_batches += 1
+		check_eq(
+			mmi.multimesh.instance_count, 64,
+			"with one style chosen, each far-tier batch covers all 64 tiles of the chunk"
+		)
+	check(chosen_batches > 0, "setup: chunk (10,10) rebuilt its far-tier batches after the style change")
+	check(
+		mixed_meshes.size() > chosen_meshes.size(),
+		"`mixed` batches strictly more distinct meshes at range than a single chosen style "
+			+ "does (%d vs %d) — the variety survives the near/far flip"
+				% [mixed_meshes.size(), chosen_meshes.size()],
+		"equal counts mean the far tier is drawing the same one variant in both states"
+	)
+	_world.set_style_default("forest", WorldRoot.MIXED_STYLE_ID)
+
+
+## Every far-tier `MultiMeshInstance3D` whose node name starts with `prefix`. Scoped by name so
+## an unrelated chunk demoted by `TerrainView._process()`'s throttled `update_camera()` can't
+## leak into a count — the same scoping the rock checks above use.
+func _far_batches(prefix: String) -> Array[MultiMeshInstance3D]:
+	var out: Array[MultiMeshInstance3D] = []
+	for child in _world.view._chunk_lod.get_children():
+		var mmi: MultiMeshInstance3D = child as MultiMeshInstance3D
+		if mmi != null and mmi.name.begins_with(prefix) and mmi.multimesh != null:
+			out.append(mmi)
+	return out
+
+
+## Every near-tier container's instantiated visual, keyed by the `.tscn` it came from. Reads
+## `scene_file_path` off the container's child rather than re-resolving through the world, so
+## this measures WHAT IS ON SCREEN and not what the resolver would say if asked again.
+func _visible_scene_paths(from: int, to: int) -> Dictionary:
+	var chunk_lod: TerrainChunkLod = _world.view._chunk_lod
+	var paths: Dictionary = {}
+	for x in range(from, to):
+		for z in range(from, to):
+			var container: Node3D = chunk_lod._tile_containers.get(Vector2i(x, z), null) as Node3D
+			if container == null or container.get_child_count() == 0:
+				continue
+			# SKIP THE OUTGOING CHILD. `_refresh_near_tile()` swaps a tile's visual with
+			# `queue_free()` + `add_child()`, and `queue_free()` only takes effect at the end
+			# of the frame — so mid-frame the container legitimately holds BOTH the old visual
+			# and the new one, oldest first. Reading `get_child(0)` therefore reports the model
+			# that is on its way out and makes a successful repaint look like no repaint at all.
+			for visual: Node in container.get_children():
+				if visual.is_queued_for_deletion() or visual.scene_file_path == "":
+					continue
+				paths[visual.scene_file_path] = true
+	return paths

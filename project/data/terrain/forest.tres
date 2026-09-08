@@ -83,7 +83,23 @@
 ; BushBerries' berry-detail legibility at scale). All 3 existing trees are UNCHANGED and
 ; still live; this adds variety, it does not replace anything. All 8 variants are equal
 ; weight in pick_variant() — no ordering/priority intended.
-[gd_resource type="Resource" script_class="TerrainDefinition" load_steps=11 format=3]
+;
+; 2 VARIANTS REMOVED (2026-09-08, human eyeball ruling), taking model_scenes from 8 back to
+; 6: DeadTree.tscn and PineTree2.tscn are both UNWIRED. The ruling was explicit and was not
+; about either asset's own quality — "Remove the Dead Tree" outright, and "The Pine Tree 2
+; does not match the style of the other" — so this is a STYLE-CONSISTENCY cull, the same
+; kind of call that culled Cactus/Palm out of wild_grass.tres. Both were the only two
+; entries sourced from the Textured Stylized Trees pack, so that pack now contributes
+; nothing to this terrain; quaternius_textured_stylized_trees.tres is left in place and its
+; assets_used list is UNCHANGED, because the .tscn wrappers and their imported source files
+; are still in the repo (unwired, not deleted — same disposition wild_grass.tres's
+; WildGrassCactus/WildGrassPalm have). Do not re-add either without a fresh human ruling.
+; The 6 survivors still span three packs and are NOT yet style-consistent with each other —
+; the human has flagged that CommonTree1/CommonTree2 (Stylized Nature MegaKit, textured)
+; and BirchTree/Bush/BushBerries (Ultimate Nature Pack, flat-shaded) "are not even close to
+; being similar", with a single-pack standardisation pass still to come. This edit is only
+; the removal half of that; it does not close the consistency question.
+[gd_resource type="Resource" script_class="TerrainDefinition" load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://scripts/definitions/terrain_definition.gd" id="1_schema"]
 [ext_resource type="PackedScene" path="res://assets/terrain/common_tree_1/CommonTree1.tscn" id="2_model"]
@@ -91,8 +107,6 @@
 [ext_resource type="PackedScene" path="res://assets/terrain/common_tree_2/CommonTree2.tscn" id="4_model"]
 [ext_resource type="PackedScene" path="res://assets/terrain/pine_tree/PineTree.tscn" id="5_model"]
 [ext_resource type="PackedScene" path="res://assets/terrain/birch_tree/BirchTree.tscn" id="6_model"]
-[ext_resource type="PackedScene" path="res://assets/terrain/dead_tree/DeadTree.tscn" id="7_model"]
-[ext_resource type="PackedScene" path="res://assets/terrain/pine_tree_2/PineTree2.tscn" id="8_model"]
 [ext_resource type="PackedScene" path="res://assets/terrain/bush/Bush.tscn" id="9_model"]
 [ext_resource type="PackedScene" path="res://assets/terrain/bush_berries/BushBerries.tscn" id="10_model"]
 
@@ -103,5 +117,5 @@ display_name = "Forest"
 emitted_tags = Array[String](["forest"])
 cost = 0
 blocks_movement = true
-model_scenes = Array[PackedScene]([ExtResource("2_model"), ExtResource("4_model"), ExtResource("5_model"), ExtResource("6_model"), ExtResource("7_model"), ExtResource("8_model"), ExtResource("9_model"), ExtResource("10_model")])
+model_scenes = Array[PackedScene]([ExtResource("2_model"), ExtResource("4_model"), ExtResource("5_model"), ExtResource("6_model"), ExtResource("9_model"), ExtResource("10_model")])
 harvestable = ExtResource("3_harvest")

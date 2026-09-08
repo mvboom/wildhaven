@@ -126,7 +126,7 @@ var _tile_containers: Dictionary = {}       # Vector2i(x, z) -> Node3D (near-tie
 var _chunk_tiles: Dictionary = {}           # Vector2i chunk -> Array[Vector2i] tiles
 var _chunk_tiers: Dictionary = {}           # Vector2i chunk -> bool (true = near); default near
 var _far_multimeshes: Dictionary = {}       # Vector2i chunk -> Array[MultiMeshInstance3D]
-var _mesh_cache: Dictionary = {}            # String terrain_id -> Array[Dictionary] mesh pieces
+var _mesh_cache: Dictionary = {}            # String variant key -> Array[Dictionary] mesh pieces
 var _last_camera_focus: Vector3 = Vector3.ZERO
 var _last_zoom_tiles: float = 0.0
 var _has_camera_state: bool = false
@@ -269,71 +269,142 @@ func _free_chunk_far(chunk: Vector2i) -> void:
 
 
 ## Rebuilds `chunk`'s far-tier representation from scratch: one `MultiMeshInstance3D` per
-## mesh piece per terrain type present in the chunk (see the file header — a terrain scene
-## can have more than one mesh piece).
+## mesh piece per RESOLVED VARIANT per terrain type present in the chunk (see the file header
+## — a terrain scene can have more than one mesh piece).
+##
+## GROUPED BY VARIANT, NOT JUST BY TERRAIN (2026-09-08 bug fix). This used to batch every tile
+## of a terrain from `model_scenes[0]`, so a far chunk drew CommonTree1 on all 64 forest tiles
+## regardless of what the near tier showed — reported by the human as "when we flip all the
+## trees to Common Tree 1" on zooming out, and it made an explicitly CHOSEN style wrong at
+## range too, not only `mixed`. Grouping on `_resolve_variant()` — the SAME call
+## `_refresh_near_tile()` makes — means the two tiers cannot disagree by construction: a
+## `mixed` forest keeps its per-tile mix at distance, and a chosen style is honoured at
+## distance.
+##
+## COST: a chunk now builds one batch per (variant x mesh piece) rather than per mesh piece,
+## so a fully-mixed 8x8 forest chunk draws up to `model_scenes.size()`x the batches it used
+## to. That is still a small constant per chunk and still vastly fewer draw calls than the 64
+## individual scenes the near tier would build — the batching win is intact.
 func _rebuild_chunk_far(chunk: Vector2i) -> void:
 	_free_chunk_far(chunk)
 	var tiles: Array = _chunk_tiles.get(chunk, [])
 	if tiles.is_empty():
 		return
 
-	var by_terrain: Dictionary = {}  # String terrain_id -> Array[Vector2i]
+	var by_terrain: Dictionary = {}     # String terrain_id -> {String variant key -> Array[Vector2i]}
+	var scene_for_key: Dictionary = {}  # String variant key -> PackedScene
 	for tile: Vector2i in tiles:
 		var terrain_id: String = _grid.get_terrain_id(tile.x, tile.y)
 		if terrain_id.is_empty():
 			continue
+		var terrain: TerrainDefinition = _grid.get_terrain(tile.x, tile.y)
+		if terrain == null:
+			continue
+		var variant: PackedScene = _resolve_variant(terrain, tile.x, tile.y)
+		if variant == null:
+			continue
+		var key: String = _variant_key(variant)
 		if not by_terrain.has(terrain_id):
-			by_terrain[terrain_id] = []
-		by_terrain[terrain_id].append(tile)
+			by_terrain[terrain_id] = {}
+		var groups: Dictionary = by_terrain[terrain_id]
+		if not groups.has(key):
+			groups[key] = []
+			scene_for_key[key] = variant
+		groups[key].append(tile)
 
 	var built: Array = []
 	for terrain_id: String in by_terrain:
-		var pieces: Array = _mesh_pieces_for_terrain(terrain_id)
-		if pieces.is_empty():
-			continue
-		var tile_list: Array = by_terrain[terrain_id]
-		for piece_index in pieces.size():
-			var piece: Dictionary = pieces[piece_index]
-			var mm := MultiMesh.new()
-			mm.transform_format = MultiMesh.TRANSFORM_3D
-			mm.mesh = piece["mesh"]
-			mm.instance_count = tile_list.size()
-			for i in tile_list.size():
-				var t: Vector2i = tile_list[i]
-				var tile_origin := Transform3D(Basis(), _grid.tile_to_world(t.x, t.y))
-				mm.set_instance_transform(i, tile_origin * (piece["transform"] as Transform3D))
-			var mmi := MultiMeshInstance3D.new()
-			mmi.name = "Far_%s_%d_%d_%d" % [terrain_id, chunk.x, chunk.y, piece_index]
-			mmi.multimesh = mm
-			if piece["material"] != null:
-				mmi.material_override = piece["material"]
-			add_child(mmi)
-			built.append(mmi)
+		var groups: Dictionary = by_terrain[terrain_id]
+		# ONE running index across every variant of this terrain, so the node name keeps its
+		# `Far_<terrain_id>_<cx>_<cy>_<n>` shape — `test_terrain_lod.gd` scopes its far-tier
+		# counts with `begins_with("Far_rock_2_2_")` and must keep matching.
+		var name_index: int = 0
+		for key: String in groups:
+			var pieces: Array = _mesh_pieces_for_scene(scene_for_key[key] as PackedScene)
+			if pieces.is_empty():
+				continue
+			var tile_list: Array = groups[key]
+			for piece: Dictionary in pieces:
+				var mm := MultiMesh.new()
+				mm.transform_format = MultiMesh.TRANSFORM_3D
+				mm.mesh = piece["mesh"]
+				mm.instance_count = tile_list.size()
+				for i in tile_list.size():
+					var t: Vector2i = tile_list[i]
+					var tile_origin := Transform3D(Basis(), _grid.tile_to_world(t.x, t.y))
+					mm.set_instance_transform(i, tile_origin * (piece["transform"] as Transform3D))
+				var mmi := MultiMeshInstance3D.new()
+				mmi.name = "Far_%s_%d_%d_%d" % [terrain_id, chunk.x, chunk.y, name_index]
+				name_index += 1
+				mmi.multimesh = mm
+				if piece["material"] != null:
+					mmi.material_override = piece["material"]
+				add_child(mmi)
+				built.append(mmi)
 	_far_multimeshes[chunk] = built
 
 
-## Every mesh piece (mesh + material + accumulated local transform) in `terrain_id`'s first
-## `model_scenes` variant — cached after the first extraction. A terrain scene can have
-## multiple mesh pieces (e.g. rock's ground slab plus several boulder chunks); far-tier
-## batching needs all of them, not just the first, or most of a terrain's silhouette
-## vanishes. Reusing the real variant's pieces means no new `TerrainDefinition` field and
-## no content-pipeline change; per-tile visual VARIETY (which of several `model_scenes`
-## variants a tile would otherwise show) is lost at range, which is fine since far tiles
-## are visually small — but every tile still shows its terrain's actual look, correctly
-## materialed and positioned, just always the same (first) variant.
-func _mesh_pieces_for_terrain(terrain_id: String) -> Array:
-	if _mesh_cache.has(terrain_id):
-		return _mesh_cache[terrain_id]
-	var terrain: TerrainDefinition = _grid.terrain_definition(terrain_id)
-	if terrain == null or terrain.model_scenes.is_empty():
-		_mesh_cache[terrain_id] = []
+## Re-resolves every tile of `terrain_id` against the world's CURRENT style default and
+## repaints it in place — the call that makes choosing a style take effect immediately.
+##
+## WHY THIS EXISTS: `WorldRoot.set_style_default()` used to be a bare dictionary write. The
+## resolvers were always correct, but nothing told the view to redraw, so tiles already built
+## kept the visual they were holding until something else happened to rebuild them. Zooming
+## out and back in was that something — which is why the human saw the trees flip only after
+## a zoom round-trip, and read it as the zoom causing the change rather than finally applying
+## it.
+##
+## Touches only the tiles that actually carry `terrain_id`; a chunk with none of it is left
+## completely alone, near or far. Near-tier tiles go through `_refresh_near_tile()`, which
+## REUSES the tile container and swaps only its child, so this cannot trip the node-rename
+## race `set_chunk_tier()`'s own SAFETY note describes.
+func restyle_terrain(terrain_id: String) -> void:
+	if _grid == null:
+		return
+	for chunk: Vector2i in _chunk_tiles.keys():
+		var near: bool = _chunk_tiers.get(chunk, true)
+		var affected: bool = false
+		for tile: Vector2i in _chunk_tiles[chunk]:
+			if _grid.get_terrain_id(tile.x, tile.y) != terrain_id:
+				continue
+			affected = true
+			if near:
+				_refresh_near_tile(tile)
+		if affected and not near:
+			_rebuild_chunk_far(chunk)
+
+
+## Stable cache/grouping key for a variant scene. `resource_path` for anything loaded from
+## disk (every shipped variant); an instance-id fallback for a `PackedScene` built at runtime,
+## which has an empty path — without the fallback two such scenes would collide on "" and be
+## batched as if they were the same model.
+static func _variant_key(scene: PackedScene) -> String:
+	var path: String = scene.resource_path
+	return path if not path.is_empty() else "iid:%d" % scene.get_instance_id()
+
+
+## Every mesh piece (mesh + material + accumulated local transform) in ONE variant scene —
+## cached per variant after the first extraction. A terrain scene can have multiple mesh
+## pieces (e.g. rock's ground slab plus several boulder chunks); far-tier batching needs all
+## of them, not just the first, or most of a terrain's silhouette vanishes.
+##
+## KEYED BY VARIANT, NOT BY TERRAIN (2026-09-08). The previous version took a terrain id and
+## always extracted `model_scenes[0]`, which is what flattened every far tile onto the first
+## variant — see `_rebuild_chunk_far()`'s own header. Caching per variant scene means the
+## cache stays valid across a style change with no invalidation step: a different style is
+## simply a different key.
+func _mesh_pieces_for_scene(scene: PackedScene) -> Array:
+	if scene == null:
 		return []
-	var sample: Node3D = terrain.model_scenes[0].instantiate() as Node3D
+	var key: String = _variant_key(scene)
+	if _mesh_cache.has(key):
+		return _mesh_cache[key]
+	var sample: Node3D = scene.instantiate() as Node3D
 	var pieces: Array = []
 	if sample != null:
 		_collect_mesh_pieces(sample, sample, pieces)
 		sample.queue_free()
-	_mesh_cache[terrain_id] = pieces
+	_mesh_cache[key] = pieces
 	return pieces
 
 

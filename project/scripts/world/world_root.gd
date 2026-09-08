@@ -753,8 +753,28 @@ func get_style_default(category: String) -> String:
 	return valid_ids[0] if not valid_ids.is_empty() else ""
 
 
+## Stores `category`'s chosen style AND repaints what is already on screen.
+##
+## THE REPAINT IS THE 2026-09-08 BUG FIX. This was a bare dictionary write. Every resolver
+## downstream (`get_style_default()`, `resolve_style_scene()`) was correct, and
+## `TerrainChunkLod`/`TerrainView` both re-resolve at build time — but nothing told them to
+## rebuild, so tiles and buildings already standing kept the look they were holding. The
+## change then landed only when something else happened to rebuild them, which in practice was
+## a near/far LOD flip: the human reported picking a tree style, seeing nothing change, then
+## zooming out and back in and finding every tree switched. The zoom was not causing that; it
+## was the only thing applying it.
+##
+## Guarded on an actual change, because `GameHud._on_style_picker_style_selected()` fires on a
+## re-pick of the style that is already current (see `_rebuild_rows()`'s own header) and that
+## should cost nothing. `WorldSnapshot.text_or()` for the read, not a bare cast, for the same
+## reason `get_style_default()` uses it — this dictionary round-trips through hand-editable
+## save JSON and a corrupted entry must not raise here.
 func set_style_default(category: String, style_id: String) -> void:
+	if WorldSnapshot.text_or(style_defaults.get(category, ""), "") == style_id:
+		return
 	style_defaults[category] = style_id
+	if view != null:
+		view.restyle_category(category)
 
 
 ## Every valid style id for `category`, in the order a fresh save's "first entry" default

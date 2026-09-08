@@ -9,4 +9,4 @@ extends RefCounted
 ## BUILD_TIMESTAMP from inside an actual exported build; an editor/dev run just reads
 ## whatever the last export wrote here, if any.
 
-const BUILD_TIMESTAMP: String = "2026-09-08 12:26 UTC"
+const BUILD_TIMESTAMP: String = "2026-09-08 13:09 UTC"
