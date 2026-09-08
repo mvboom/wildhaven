@@ -21,8 +21,17 @@ The goal is two things the player can feel:
 2. **Painting more of a species' terrain visibly widens where it roams.** The reward for
    terraforming is that the world's animals spread into what you made. This is the half that
    matters — it turns terraforming into something animals answer.
+3. **A region-equipped roamer ranges further than before, full stop.** `WANDER_RADIUS_TILES`
+   (3 tiles) stops being the binding radius; a resident with a usable region instead ranges up
+   to `min(effective_capacity_radius, site.radius)` — 8 tiles for twelve of the fifteen shipped
+   species, 10 for deer, 12 for fox and stag. That is a 3–4× widening of both visible roam
+   range and walk-leg length over the old uniform 3-tile disc, independent of terrain quality.
+   Approved by the human during design (§6's constants table).
 
-Neither is a new mechanic the player must learn. Both are the existing world reacting.
+Neither of the first two is a new mechanic the player must learn. Both are the existing world
+reacting. The third is a direct, intended consequence of buying the first two: roaming a wider
+neighbourhood is what lets an animal answer terrain painted more than 3 tiles from its home at
+all.
 
 ---
 
@@ -120,8 +129,18 @@ to stand on its own home.
 `WorldGrid` gains a monotonic `terrain_version: int`, bumped in `_refresh_tag_mask()` —
 whose own comment already reads *"called by every writer that changes what a tile holds"*,
 making it the one seam no writer can bypass. `RoamRegion` records the version it built at
-and rebuilds inside `pick_point()` when the two differ. Missed invalidation is structurally
-impossible: it is an integer compare, not bookkeeping.
+and rebuilds when the two differ.
+
+**Terrain is not the whole predicate, though (§4.2): walkability is the other half, and it has
+its own seam.** A den reservation (`WorldNavigation.set_den_tile_blocked()`, used when a
+resident moves in) changes what `is_tile_walkable()` returns without touching
+`WorldGrid.terrain_version` at all — deliberately: a den reservation is not a terrain edit, and
+`set_den_tile_blocked()` only calls `mark_dirty()`, the navmesh's own staleness flag. So
+`RoamRegion` also records `WorldNavigation.rebuilds_run` — the same exact-work counter the
+navmesh coalescing already exposes — and rebuilds when EITHER it or `terrain_version` has moved.
+Two staleness inputs, not one; each an integer compare, so the steady-state cost is still
+nothing and invalidation is still structural rather than a promise anyone has to remember to
+keep — it is just two compares now, not one.
 
 ### 4.5 Picking a point, and how avoids survive
 
@@ -164,6 +183,8 @@ species whose terrain has been painted away from collapsing into a stationary an
 | `project/scripts/world/resident_roamer.gd` | Optional trailing `roam_region`; `_pick_waypoint()` delegates or falls back |
 | `project/scripts/world/resident_presentation.gd` | Constructs the region — it already resolves the species and holds the grid |
 | `project/tests/test_roam_region.gd` | **New.** See §8 |
+| `project/tests/test_terrain_version.gd` | **New.** Pins `WorldGrid.terrain_version`'s bump contract in isolation — every writer that changes what a tile holds, and no-op writes don't move it |
+| `project/tests/test_tile_walkable.gd` | **New.** Pins `WorldNavigation.is_tile_walkable()` against every `_tile_blocked()` cause (occupied, den reservation, `blocks_movement`) plus out-of-bounds and a null grid |
 
 ---
 
@@ -175,14 +196,21 @@ Per `.claude/CLAUDE.md`, agents propose with sources and the human decides. Both
 | Constant | Proposed | Reasoning |
 |---|---|---|
 | `RoamRegion.AVOID_BIAS_SAMPLES` | 8 | Candidate tiles drawn before giving up on the away-from-threats cone (§4.5). Enough that a cone covering half the region is almost always hit, small enough to stay free. |
-| `RoamRegion.MIN_REGION_TILES` | 6 | The fox measured 3 tiles on a randomly-mixed probe grid (§7) — an animal that small is effectively stationary. 6 gives a resident somewhere to actually go before the disc fallback takes over. |
+| `RoamRegion.MIN_REGION_TILES` | 6 | The fox measured 3 tiles on a randomly-mixed probe grid (§7, Table A) — an animal that small is effectively stationary. 6 gives a resident somewhere to actually go before the disc fallback takes over. Still comfortably below Table B's contiguous fox figures (1 tile embedded, 25 tiles on the fringe): a fox with no usable region genuinely has nowhere better to go than the disc fallback. |
 | `ResidentRoamer.WANDER_RADIUS_TILES` | 3.0, unchanged | Stops being the binding constant for a region-equipped roamer and survives only as the fallback disc's radius. |
 
 ---
 
 ## 7. Measured cost
 
-One `RoamRegion` build, 128×128 grid, measured headless 2026-09-08 with the algorithm above:
+`RoamRegion.rebuild()` visits every tile it *tests* — up to five `tile_tag_mask` reads plus one
+`is_tile_walkable` per tile — whether or not that tile ends up qualifying, so build cost tracks
+region size (and its boundary), not the other way around: **a larger region is a slower
+build**, never a faster one.
+
+**Table A — uniformly-random terrain (the original measurement).** One `RoamRegion` build,
+128×128 grid, every tile independently assigned one of the nine terrains at random, measured
+headless 2026-09-08:
 
 | Species | `habitat_needs` | Radius | Build | Region |
 |---|---|---|---|---|
@@ -191,14 +219,65 @@ One `RoamRegion` build, 128×128 grid, measured headless 2026-09-08 with the alg
 | stag | `forest, rocks` | 12 | 0.32 ms | 85 tiles |
 | fox | `forest` | 12 | 0.02 ms | 3 tiles |
 
-**Steady state is zero** — the version does not move, so nothing rebuilds. During an active
-paint drag every roamer rebuilds once per wander cycle: ~0.34 ms/frame at the full
-`ROAMER_BUDGET` of 256, against the 2.4 ms the navmesh rebuild already spends per painted
-tile. Memory is under 700 bytes per roamer.
+A uniform random mix scatters each terrain into small, disconnected specks, so the connected
+fill (§3.3) runs out of qualifying neighbours almost immediately. **This is the shape that
+minimises the fill's own cost, not a representative one** — real player-painted terrain is
+laid down in contiguous patches (a meadow, a quarry, a forest), and a contiguous patch of liked
+terrain is exactly what does NOT run out of neighbours. Table A therefore *understates* both
+build cost and region size for terrain as it is actually painted in play, in some cases by an
+order of magnitude. It is kept here as a data point, not as the figure that matters.
 
-The measurement grid mixes all nine terrains uniformly at random, which is the *pessimal*
-shape for a connected fill — real player-painted terrain is contiguous, so regions in play
-should be larger and builds no slower.
+**Table B — contiguous terrain (the figure that matters).** One `RoamRegion` build per species,
+grid large enough to hold the whole capacity-radius disc, measured headless 2026-09-08. Rabbit
+and deer: the full radius disc painted `grass` (`open_grass`). Stag: the full radius disc
+painted `rock` (`rocks` — one of its two OR'd needs, and walkable, unlike `forest`). Fox: a
+large contiguous `forest` block with home on the walkable fringe tile just outside it — the
+"belongs at the forest edge" scenario §3.2 is written for, run contiguous instead of random:
+
+| Species | Paint | Radius | Build | Region | Bytes (tiles × 8) |
+|---|---|---|---|---|---|
+| rabbit | full-disc `grass` | 8 | 0.51 ms | 197 tiles | 1,576 B |
+| deer | full-disc `grass` | 10 | 0.78 ms | 317 tiles | 2,536 B |
+| stag | full-disc `rock` | 12 | 1.12 ms | 441 tiles | 3,528 B |
+| fox | forest-edge fringe | 12 | 0.21 ms | 25 tiles | 200 B |
+
+Stag is the honest worst case among the shipped roster: ~1.1 ms and ~450 tiles at radius 12,
+roughly the area of the full radius-12 disc (π·12² ≈ 452) — a completely rock-covered
+neighbourhood is walkable and liked everywhere, so almost nothing is excluded. Grid size does
+not materially affect any of this: the fill is bounded by `radius`, not by world size, so a
+128×128 grid and the smaller grid actually used here cost the same.
+
+Fox is the interesting exception, and worth stating plainly. Table B's fox row places home on
+the fringe, just outside the trees — the scenario §3.2 is written for. A second run of the same
+probe placing home several tiles INSIDE a solid forest patch instead (still contiguous, still
+`forest`, nothing else changed) measured a region of **one tile** at 0.01 ms: home only, forced
+in by §4.3's unconditional seed. Because `forest` is the fox's only need tag and Forest blocks
+movement, the connected fill cannot cross the blocked interior to reach any walkable ground,
+even though such ground exists just past the trees. Painting more forest around a fox that is
+already inside it does not widen its region; it can only shrink it further. The fox's growth
+story is about the *edge* being reachable and lengthening, not about the interior being
+roamable — consistent with §3.2's own reasoning for why the fox needs the adjacency rule at all.
+
+**Steady state is still zero** — no version moves, so nothing rebuilds; this holds regardless of
+which table applies.
+
+**During an active paint drag**, each `RoamRegion` rebuilds at most once per wander cycle
+(§3.4), not once per edit — a burst of edits between two wander cycles still costs one rebuild,
+the same coalescing the navmesh already does. A wander cycle is `PAUSE_MIN/MAX_SECONDS`
+(2–6 s, mean 4 s = 240 frames at 60 fps), so at the full `ROAMER_BUDGET` of 256 residents, on
+average `256 / 240 ≈ 1.1` roamers complete a cycle — and therefore pay a rebuild, if the world
+changed since their last one — on any given frame. At Table B's worst per-rebuild cost (stag,
+1.12 ms), that is **≈1.2 ms/frame added during an active drag**, alongside the 2.4 ms the
+navmesh rebuild already spends per painted tile: **≈3.6 ms of a 16.7 ms frame budget (~22%),
+comfortably inside it**, with headroom for the rest of a frame's normal work. This is worse
+than the previous (random-grid-derived) ~0.34 ms/frame estimate by roughly 3–4×, which is the
+direct consequence of Table A having understated region size.
+
+**Memory is per-region, not a flat per-roamer figure**, and scales with the same contiguity
+Table B measures: 200 B (fox, forest-edge) to 3,528 B (stag, full rock disc) per roamer holding
+a region, against Table A's un-corrected "under 700 bytes" claim. At `ROAMER_BUDGET` = 256, a
+population entirely of Table B's worst case (stag, 3,528 B each) is 256 × 3,528 B ≈ 882 KB; a
+roster-mixed population is well under that.
 
 ---
 
@@ -214,10 +293,20 @@ should be larger and builds no slower.
 - a version bump rebuilds; no bump does not
 - **the growth property, stated as the player feels it**: paint liked terrain adjacent to an
   existing region, assert the region grows to include it
+- **a den reservation invalidates the region on its own**, with no `WorldGrid.terrain_version`
+  bump and nobody calling `rebuild()` explicitly — `WorldNavigation.set_den_tile_blocked()` on a
+  tile already in the region removes it, proving §4.4's second staleness input actually works
+- a null `WorldNavigation` degrades to "everything is walkable" — pinned so a future change to
+  that fallback fails a test rather than surfacing as an animal wandering into trees
+- **a region-equipped roamer never picks a waypoint outside its region** (this lives in
+  `test_roam_region.gd`, not `test_resident_wander.gd` — see below)
 
-`test_resident_wander.gd`, extended: a region-equipped roamer never picks a waypoint outside
-its region. Its existing assertions are untouched — every roamer it builds passes no region
-and therefore still takes the disc path.
+`test_resident_wander.gd` was **not** extended for this row — despite an earlier draft of this
+doc claiming it was. The equivalent coverage instead landed as
+`test_roam_region.gd::_check_roamer_uses_the_region()`, which builds a real
+`RoamRegion`-equipped `ResidentRoamer` and asserts every waypoint it picks lands inside the
+region. `test_resident_wander.gd`'s own assertions are genuinely untouched: every roamer it
+builds passes no region and therefore still takes the disc path.
 
 ---
 
