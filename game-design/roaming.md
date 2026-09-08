@@ -3,7 +3,7 @@
 Owns how a resident chooses **where** it may walk. The motion itself (waypoint cadence,
 pathing, separation, animation) stays `ResidentRoamer`'s and is not restated here.
 
-Status: designed 2026-09-08, not yet built. Tier 1 row 6's "Roam quality" depth bucket
+Status: built 2026-09-08. Tier 1 row 6's "Roam quality" depth bucket
 (`spec.md` line 182), so this is a scoped purchase, not new scope.
 
 ---
