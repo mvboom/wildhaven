@@ -185,7 +185,7 @@ only spill-checks `model_scenes[0]`, and index 0 used to be a different model.
 
 Full list and resolution paths: [spec.md](spec.md) → Open Questions.
 
-- **#8** Cost-table values — House cost, starting stockpile sizing
-- **#16** Refund/grace tuning — exact grace-window seconds and recycle percentage
-- **#18** Footprints & world dimensions — final House footprint sizes
-- **#26** Starting Wood stockpile — exact value (sized to cover the House plus a small field)
+- **#8** Cost-table values — House cost, and the nine proposed costs beyond it
+- **#16** Refund/grace tuning — exact grace-window seconds and recycle percentage (shipped: 12 s, 50%)
+- ~~**#18** Footprints~~ — **closed 2026-09-08 (→ D-60)**; what remains under #18 is world start size and cap, plus a human eye pass on facing
+- **#26** Starting Wood stockpile — **the value is decided (100 Wood, → D-62)**; what is open is the *sizing principle*, since 100 covers several builds rather than the nudge's first one

@@ -54,6 +54,23 @@ const VILLAGER_SPECIES_ID: String = "human"
 ## on the cycle that follows, leaving the whole roster in the pool.
 const NO_FOREST_ID: String = "__no_forest__"
 
+## DECIDED 2026-09-08 by the human (-> D-63, amended). The stockpile below which a zero-Forest
+## world is worth mentioning. ABOVE it the report stays quiet even with no tree in sight.
+##
+## WHY THE REPORT IS GATED ON WOOD AND NOT ON TIME: a brand-new world starts at
+## `WoodLedger.STARTING_WOOD` (100), which is several builds — the player is not stuck, they
+## are solvent, and the feed's job in that first stretch is to point them at a villager or an
+## animal to build FOR, not at a supply problem they do not have yet. Gating on the balance
+## makes that fall out with no new state and no "is this a new game" flag to keep in sync: a
+## fresh world holds the gate shut by itself until the player has actually spent, and a LOADED
+## save sitting at 5 Wood with no trees hears about it on the very next cycle, which is the
+## case that genuinely needs saying.
+##
+## 30 IS TWO HOUSES' WORTH, and deliberately not the House price itself: the report should
+## arrive while there is still one more build in the bank, as a heads-up, rather than after
+## the player is already stalled and wondering why the counter stopped.
+const LOW_WOOD_FLOOR: int = 30
+
 ## [COPY] — content-writer's, PROPOSED. Kids 6-10, plain vocabulary, upbeat, one sentence
 ## (spec.md -> the fact-card checklist, which News Report copy reuses). Says the state and the
 ## fix in the player's own verbs, and never scolds: the woodpile is not empty, it is waiting.

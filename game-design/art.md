@@ -40,7 +40,7 @@ Picture-book rules bind **every** asset, new or sourced:
 - **The warmth is in the LIGHTING, not in the materials** (D-55). Scene light is a warm,
   bright fill over a lower key — `Main.tscn` Environment `ambient_light_color`
   (0.78, 0.74, 0.66) at 0.95 energy, `DirectionalLight3D.light_energy` 0.75. That ~2:1
-  key-to-fill ratio is deliberate: under the fixed ~45° camera most of any model is shaded, so
+  key-to-fill ratio is deliberate: under the fixed isometric camera most of any model is shaded, so
   the fill is what most of the screen is actually lit by, and a cold or dim one makes every
   asset read grey no matter what its albedo says. **Do not compensate for a cold render by
   warming an asset's albedo** — imported packs are typically authored neutral (the Quaternius
@@ -60,10 +60,14 @@ Picture-book rules bind **every** asset, new or sourced:
 **Technical constraints that shape the art pass** (full detail: gdd.md → Player Interface &
 Controls, World Structure, Performance):
 
-- Camera is fixed ~45° pitch, four fixed 90°-apart headings (D-44) — models/textures must
-  read well from all four, never top-down or a free player-controlled orbit.
-- Zoom-distance LOD: full detail near the camera, terrain simplifies and animals collapse
-  into "paw badges" at far zoom — budget LOD/impostor work accordingly.
+- Camera is orthographic at a fixed **pitch of ≈26.6° below horizontal with a 45° yaw** — the
+  isometric convention, not a 45° pitch — across four fixed 90°-apart headings (D-44).
+  Models/textures must read well from all four, never top-down or a free player-controlled orbit.
+- Zoom-distance LOD: full detail near the camera, terrain simplifying further out.
+  **Built for terrain only** — `terrain_chunk_lod.gd` batches far chunks into
+  `MultiMeshInstance3D`. **The "animals collapse into paw badges" half was never built**;
+  residents render at full detail at every zoom. Budget impostor work accordingly if it is
+  ever wanted.
 - 3D asset creation is the acknowledged weak spot (no in-house art), mitigated entirely by
   the asset-pack-first strategy below; mesh work (re-topo, re-proportion, cute-ification) is
   **not** available in the pipeline. Out-of-the-box silhouettes ship as-is — pick assets
@@ -195,8 +199,10 @@ correctly in code. Full detail in
 | **Cultivated field** (`cultivated`) | Nature Crops Pack — Wheat, Corn, Carrot, Beet, Lettuce, Tomato, Pumpkin, Watermelon, Rice, with growth stages (`_Crop`/`_Harvested`); RTS `Farm_*` modeled plots | Villager need |
 | **Grass** (`open_grass`) | MegaKit Grass_Common/Wispy, Nature Pack Grass, Crops Grass, Clover, Fern | |
 | **Water** (`water`) | Surface is a shader/plane, no model | Dress edges with Nature Pack `Lilypad`, reeds |
-| **Sand** (depth) | Cactus, PalmTree, Coconut | Not in v1 floor |
-| **Flowers** (`flowers`, no v1 consumer) | Crops Flower_1..4, MegaKit Flower/Petals, `Bush_Common_Flowers` | Free to keep in vocabulary; no species reads it yet |
+| **Sand** (designed, **never built**) | Cactus, PalmTree, Coconut | No `TerrainDefinition` exists and nothing is wired — the assets are available, the terrain is not |
+| **Meadow** (`open_grass` · `flowers`) | Stylized Nature MegaKit flowers, ferns, bushes, tall grass — already imported and cleared | Shipped 2026-09-04. Gave `flowers` its first source; Rabbit's warren tier is its consumer |
+| **Scrub** (`browse` · `rocks`) | Same MegaKit bushes/tall grass | Shipped 2026-09-04. The browser/grazer split — Donkey and Deer's herd tier read `browse` |
+| **Snowfield** (`snow`) | Ultimate Nature Pack snow variants — already imported and cleared | Shipped 2026-09-04. Husky habitat; may border grass, no climate adjacency gating |
 | **Move-in props** (den/burrow/nest) | No dedicated CC0 model found | Compose from existing Quaternius pieces (mossy log + rock + bush = a den). Decoration only, low risk |
 | **Ambient life** (deferred — future.md "Charm layer": songbird flocks, butterflies, fish ripples, dragonflies, fireflies) | Gap in Quaternius; **Synty POLYGON Nature Pack's particle effects (butterflies, fireflies, sunrays, falling leaves) are a good stylistic match** if/when the Charm layer is built | Deferred with the layer itself — not a v1 need |
 
@@ -209,15 +215,18 @@ Buildings.
 
 | Building | Assets available |
 |---|---|
-| **House** (v1 2×2 / floor 1×1, grass only) | RTS `Houses_FirstAge_*` (FirstAge cottages read most picture-book — imported as `Houses_FirstAge_1_Level1`, facing not yet eyeball-confirmed), Farm Buildings `Silo_House` |
-| **Farm/village flavor** (not v1 buildings — dressing) | Quaternius Farm Buildings — Barn, Coop, Silo, Windmill, Well, WaterTower, Fence (for the fenced field) — available now, free |
+| **House** (2×2, grass only — the floor, → D-60) | Ships **three** looks from the `Houses_SecondAge_1_Level{1,2,3}` sub-family, relabelled House - Large / Medium / Small. The look pool was cut 18 → 3 (2026-09-07); the other fifteen wrappers stay on disk unwired. Facing still not eyeball-confirmed |
+| **Farmhouse** (3×3, grass only) | `assets/buildings/house1/House1.tscn`, from Quaternius "Buildings Pack - Jan 2019" (CC0 1.0, its own attribution entry) — its own model since D-60, so `large_house` out-reads `house` on sight and not only on tile count |
+| **The eight farm buildings** — Small Barn, Large Barn, Open Barn, Chicken Coop, Silo, Windmill, Well, Water Tower | Quaternius Farm Buildings, free, imported. **These are real v1 buildables, not dressing** — D-52 gave all eight `emitted_tags` and a job in the habitat system. Fence remains unwired dressing |
 
 **Deferred placeables** (future.md — priced but not v1 scope):
 
 - **Fence & Birdhouse** — "leaning toward any land terrain except water — final list still
   open." Fence asset already available free (Farm Buildings, above); Birdhouse not yet sourced.
-- **Shed** — reuses the House's 1×1 thin-form asset once the House deepens to 2×2, so this is
-  asset-free (already in hand).
+- **Shed** — **no longer asset-free.** The plan was to reuse the House's 1×1 asset once the
+  House deepened to 2×2; D-60 instead kept the House's meshes and simply made it bigger, so
+  there is no retired asset to inherit. The Shed is a 1×1 placeable in its own right and needs
+  its own source.
 - **Species amenities** (Well/School/Market for villagers, "exactly as a birdhouse is for
   birds") — Well asset available free (Farm Buildings); School/Market not sourced, post-class only.
 
@@ -242,7 +251,10 @@ Per-item pipeline status (what's done vs. blocked) is tracked in
 [content-pipeline-status.md](content-pipeline-status.md); this list is the narrative
 task queue behind those blockers.
 
-- ~~Import Human~~ — ✅ **done** (5 look variants imported; see roster table above).
+- ~~Import Human~~ — ✅ **done** (**18** look variants wired: the 5 originals plus a 13-model
+  character-pack batch, CC0 confirmed per pack, animations verified per model. `Male_Suit` and
+  `Smooth_Male_Suit` were held out against the no-pure-black palette rule — see
+  [content-pipeline-status.md](content-pipeline-status.md) → `human`).
 - ~~Import Deer, Stag, Horse, Donkey, Cow, Bull, Alpaca, Husky, Shiba Inu~~ — ✅ **done**
   (2026-07-26; all 9 from Quaternius Ultimate Animated Animal Pack, same source as Fox —
   `project/assets/animals/<name>/`). **These nine are the cleared pool** — roster candidates

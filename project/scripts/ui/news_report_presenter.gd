@@ -165,6 +165,14 @@ func compose_next_report() -> String:
 	# with no Forest earns no Wood at all, and Forest is free, so this is the only stalled
 	# state in v1 the player cannot read off the HUD.
 	#
+	# BUT ONLY ONCE THE STOCKPILE HAS RUN DOWN (`LOW_WOOD_FLOOR`; operator ruling, 2026-09-08).
+	# No trees is not the same as stuck: a brand-new world holds 100 Wood, several builds'
+	# worth, and the feed's job in that first stretch is to point the player at a villager or
+	# an animal to build FOR. Reading the live balance is what makes "new game" need no flag,
+	# no timer and no saved state — a fresh world keeps this branch shut by itself until the
+	# player has actually spent, while a loaded save down at 5 Wood with no trees qualifies on
+	# the very next cycle.
+	#
 	# IT PRE-EMPTS, BUT ONLY EVERY OTHER CYCLE, and the alternation costs no new state: writing
 	# `NO_FOREST_ID` into `_last_species_id` makes the existing no-repeat rule do the work.
 	# Operator ruling, 2026-09-08. An unconditional pre-empt would replay one identical
@@ -180,6 +188,7 @@ func compose_next_report() -> String:
 	if (
 		_world.grid != null
 		and _world.grid.forest_tile_count() == 0
+		and _world.get_wood() < NewsReportContent.LOW_WOOD_FLOOR
 		and _last_species_id != NewsReportContent.NO_FOREST_ID
 	):
 		_last_species_id = NewsReportContent.NO_FOREST_ID

@@ -1000,6 +1000,11 @@ func _check_presenter_fires_a_composed_hint() -> void:
 ## The feed says so, and ALTERNATES rather than repeating: spec.md §10.1 requires an idle
 ## stretch to read as "the world talking about different animals, not as one nag repeated".
 ##
+## IT IS ALSO GATED ON THE STOCKPILE (`NewsReportContent.LOW_WOOD_FLOOR`), which is the half
+## this check leans on hardest: a brand-new world starts at 100 Wood and is NOT stuck, so the
+## feed must spend that first stretch pointing at villagers and animals to build for. The
+## first assertion below is that a barren world at full pockets says nothing about trees.
+##
 ## Uses its own world and presenter: this strips every Forest tile off the grid, which the
 ## shared `_world`'s later checks (and its terrain bias) have every right to expect intact.
 func _check_zero_forest_report_alternates_with_species_hints() -> void:
@@ -1021,8 +1026,27 @@ func _check_zero_forest_report_alternates_with_species_hints() -> void:
 		bare_world.free()
 		return
 
+	# A NEW WORLD IS SOLVENT, NOT STUCK. 100 Wood is several builds; the report must stay quiet.
+	check_eq(bare_world.get_wood(), WoodLedger.STARTING_WOOD,
+		"the fresh world holds its full starting stockpile")
+	check(WoodLedger.STARTING_WOOD >= NewsReportContent.LOW_WOOD_FLOOR,
+		"...which is at or above the floor, so this half of the check is not vacuous")
+	var solvent: bool = true
+	for _i in 6:
+		if presenter.compose_next_report() == NewsReportContent.NO_FOREST_REPORT:
+			solvent = false
+			break
+	check(solvent,
+		"a BRAND-NEW barren world says nothing about trees for six reports running — with 100 "
+		+ "Wood in hand the player is solvent, and the feed's job is to point at something to "
+		+ "build, not at a supply problem they do not have yet")
+
+	# Spent down. NOW it is worth saying.
+	bare_world.wood.reset(NewsReportContent.LOW_WOOD_FLOOR - 1)
+	_last_report_species_reset(presenter)
 	check_eq(presenter.compose_next_report(), NewsReportContent.NO_FOREST_REPORT,
-		"with no forest anywhere, the next report says so")
+		"once the stockpile is spent down below the floor, with no forest anywhere, the next "
+		+ "report says so")
 	var second: String = presenter.compose_next_report()
 	check(second != NewsReportContent.NO_FOREST_REPORT and not second.is_empty(),
 		"...the one after it is an ordinary species hint, not the same line again: '%s'" % second)
@@ -1044,6 +1068,10 @@ func _check_zero_forest_report_alternates_with_species_hints() -> void:
 	# how much forest the player has — the moment Wood can accrue at all, there is nothing to say.
 	bare_world.grid.set_terrain(0, 0, "forest")
 	check_eq(bare_world.grid.forest_tile_count(), 1, "one forest tile is painted back")
+	bare_world.wood.reset(0)
+	check(bare_world.get_wood() < NewsReportContent.LOW_WOOD_FLOOR,
+		"...with the stockpile held at rock bottom, so the FOREST is what silences the report "
+		+ "below and not the wood gate standing in for it")
 	var quiet: bool = true
 	for _i in 6:
 		if presenter.compose_next_report() == NewsReportContent.NO_FOREST_REPORT:
@@ -1054,6 +1082,13 @@ func _check_zero_forest_report_alternates_with_species_hints() -> void:
 	presenter.free()
 	bare_world.free()
 	GameplaySettings.reset_for_test()
+
+
+## Clears the presenter's no-repeat latch. The zero-forest report and the species hints share
+## `_last_species_id`, so a check that composed a hint immediately before asserting the
+## zero-forest one would be measuring the ALTERNATION, not the wood gate it means to test.
+func _last_report_species_reset(presenter: NewsReportPresenter) -> void:
+	presenter._last_species_id = ""
 
 
 ## THE FIRST INTERVAL OF A LOADED SESSION. Whole-branch review finding: `bind()` armed the

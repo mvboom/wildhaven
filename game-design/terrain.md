@@ -10,8 +10,11 @@
 
 ## What Terrain Is
 
-Terrain is the tile-level surface type covering the world grid — grass, water,
-forest, rock, sand, cultivated fields, and (behind the mist) wild grass. The player
+Terrain is the tile-level surface type covering the world grid. **Eight paintable types ship** —
+grass, water, forest, rock, cultivated field, meadow, scrub and snowfield — plus wild grass,
+which is what sits behind the mist and is never painted deliberately. **Sand was designed but
+never built:** it has no `TerrainDefinition` and no asset wired, so the `sand` tag has no
+source. It is a depth item with nothing behind it, not a ninth shipped terrain. The player
 paints it directly in **Terraform Mode**: pick a terrain, **one tap converts one tile**
 (#17 closed — drag-to-paint is depth). **Each tile carries the habitat tags its own
 terrain emits — tags do not spread to neighbouring tiles** (the v1 tag model, → D-25;
@@ -22,9 +25,10 @@ the substrate everything else builds on: buildings occupy terrain footprints (se
 [buildings.md](buildings.md)), and the roster's habitat needs are satisfied by terrain
 tags (see [roster.md](roster.md)).
 
-**The one pricing rule:** *"Nature is free; construction costs materials."* Natural
-terrains (grass, water, forest, sand, rock) are free to paint; cultivated fields cost
-Wood — see Economy in gdd.md for the full resource narrative.
+**The one pricing rule:** *"Nature is free; construction costs materials."* Every natural
+terrain (grass, water, forest, rock, meadow, scrub, snowfield) is free to paint; the
+cultivated field is the only terrain that costs Wood — 2 per tile. See Economy in gdd.md for
+the full resource narrative.
 
 ## Attributes Required
 
@@ -47,7 +51,8 @@ never hardcoded, which is impossible while the mapping exists only as prose.
 | `id`, `display_name` | identity |
 | `emitted_tags` | tags emitted — empty for wild grass, and legitimately so |
 | `cost` | Wood per tile (0 for natural terrain) |
-| `model_scene` | model reference |
+| `model_scenes` | `Array[PackedScene]` — one or more interchangeable visuals (→ D-42; was the single-scene `model_scene`). A tile picks one **stably** via `pick_variant(x, z)`, hashing the tile coordinates with the terrain's `id`, so no per-tile choice is stored in save data. Shipped counts: `cultivated_field` 26, `rock` 6, `forest` 5, `grass` 4, `water`/`meadow`/`scrub`/`snowfield` 3 each, **`wild_grass` exactly 1 (→ D-56)** |
+| `blocks_movement` | bool — whether a resident may walk this tile. Read by `WorldNavigation`; affects roaming only, never tags, capacity, or placement |
 | `harvestable` | optional `HarvestableTileDefinition`, or null |
 
 Adding a new terrain type is the **Add-a-Terrain** pipeline (gdd.md → AI Architecture →
@@ -72,8 +77,8 @@ One per resource-producing tile (ground truth: [spec.md](spec.md) → Data Schem
 
 | Action | Cost | Notes |
 |---|---|---|
-| Paint natural terrain (grass, water, sand, rock, forest) | Free | the recovery guarantee |
-| Paint cultivated field | ~2 Wood / tile | fencing & tools |
+| Paint natural terrain (grass, water, rock, forest, meadow, scrub, snowfield) | Free | the recovery guarantee |
+| Paint cultivated field | 2 Wood / tile | fencing & tools |
 
 Removal/refund follows the uniform grace-window policy shared with buildings — see
 Controls in gdd.md.
@@ -100,9 +105,10 @@ but no consumer — Fox moved to `forest`/`open_grass`/`water`, Rabbit to
 which Donkey, Alpaca, Shiba Inu and Stag all need, so Rock's place is unchanged and there
 is no gameplay effect.
 
-**Two tags still have no consuming species:** `sand` (no shipped terrain emits it) and
-`coop` (emitted by the Chicken Coop, but Chicken has no `AnimalDefinition` — its asset was
-never purchased). Both are deliberate, not oversights.
+**Two tags still have no consuming species:** `sand` — which is worse off than that, since no
+shipped terrain *emits* it either, there being no sand terrain — and `coop` (emitted by the
+Chicken Coop, but Chicken has no `AnimalDefinition` — its asset was never purchased). Both are
+deliberate, not oversights.
 
 **Tag-source mapping** (decided — and with #5 closed, this table *is* the complete
 emission model; per-tag "counts as met" thresholds under #6 are likewise not part of v1):
@@ -116,7 +122,7 @@ emission model; per-tag "counts as met" thresholds under #6 are likewise not par
 | Water | `water` |
 | Forest | `forest` |
 | Rock | `rocks` |
-| Sand | `sand` |
+| ~~Sand~~ *(never built — no `TerrainDefinition`)* | *would be* `sand` |
 | Cultivated field | `cultivated` |
 | Wild grass *(untouched revealed land)* | *nothing — tag-inert* |
 | *Buildings* — every placeable emits `built` plus its own tags | see [buildings.md](buildings.md) |
@@ -153,15 +159,17 @@ neighborhood's carrying capacity on its own (the inert-land invariant, gdd.md �
 Structure). One free Terraform tap converts it to true grass. Visual treatment for how
 it reads as "wild" without reading as broken is Open Question #29.
 
-**Floor terrain (Tier 1):** five of the six v1 terrains — grass, water, forest, rock,
-cultivated (sand is depth). Cultivated ships at the floor because capacity reads
+**Floor terrain (Tier 1):** five terrains — grass, water, forest, rock, cultivated.
+**The shipped build is three past that floor** (meadow, scrub, snowfield, added 2026-09-04),
+and sand — the sixth the floor was once counted against — was never built. Cultivated ships at the floor because capacity reads
 cultivated tiles in radius, which the villager move-in needs; rock is the `rocks` source
 (Open Question #5 resolved), consumed by Donkey, Alpaca, Shiba Inu and Stag — see gdd.md →
 Scope, row 3.
 
 **Tag-vocabulary note:** `flowers` gained a source on 2026-09-04 (Meadow) and a consumer
-(Rabbit's warren tier). `sand` and `coop` remain sourced-or-emitted with no consuming
-species — free to keep, and a natural first post-class addition. `quiet` was retired
+(Rabbit's warren tier). `coop` is emitted with no consuming species, and `sand` has neither
+a source nor a consumer — both free to keep in the vocabulary, and each a natural first
+post-class addition. `quiet` was retired
 entirely; see the vocabulary block above for why.
 
 ## Open Questions Touching Terrain

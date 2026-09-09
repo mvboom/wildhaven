@@ -31,7 +31,7 @@ One `AnimalDefinition` per species, villagers included (ground truth: [spec.md](
 | `display_name` | player-facing name |
 | `tiers` | **the live habitat data** (2026-09-04, → D-52) — an ordered `Array[HabitatTier]`. Capacity is the `max` over them. Empty is legal and means "synthesise one tier from the legacy flat fields below" |
 | `emits_tags` | tags a **resident** of this species contributes to the tile it lives on, counted per individual. Only Human (`people`) and Deer (`deer`) emit anything |
-| `habitat_needs` | **legacy, now inert** — `effective_tiers()` prefers `tiers` when non-empty. Retained on all 15 species so a rollback is a one-line edit rather than a re-authoring |
+| `habitat_needs` | **superseded by `tiers` for capacity, but NOT inert** — `effective_tiers()` prefers `tiers`, yet `RoamRegion` reads this field live as the OR-predicate for which tiles a resident may walk (see [roaming.md](roaming.md)). It is now the species' **roam-tag** list, authored on all 15, and it may legitimately diverge from `tiers`: Fox carries `["forest"]` here against tiers of `forest`/`open_grass`/`water`. Editing it moves animals |
 | `personality` | `Shy` \| `Bold` — a **visibility trait only**, stored as a String so the `.tres` self-documents; never gates whether an animal moves in |
 | `avoids` | animal ids to keep mutual distance from (optional; symmetric). Stored as ids, never resource references — a bad id degrades to inert text rather than a hard load failure, which is behaviorally correct since avoids never gates a move-in |
 | `farm_tolerant` | bool — can live on cultivated land |
@@ -39,15 +39,17 @@ One `AnimalDefinition` per species, villagers included (ground truth: [spec.md](
 | `capacity_radius` | tiles; default `CAPACITY_RADIUS_FOLLOWS_SCOUT` (0) meaning "equal to `scout_radius`", expressed as the relation rather than a copied number |
 | `tiles_per_individual` | **legacy, now inert** — the per-need divisor lives on `HabitatNeed` instead. No lower clamp, so `capacity = 0` is still expressible |
 
+| `max_individuals` | hard per-home-site cap — a readability bound, never the normal-play limit |
+| `model_scenes` | `Array[PackedScene]` — one or more interchangeable look variants, stably picked per resident by `pick_variant(index)` (2026-08-26; was the single-scene `model_scene`). `human.tres` ships **18** equal-weight villager looks — 5 original plus a 13-model character-pack batch; every other species ships one. See spec.md → Data Schemas for the stability contract |
+| `fact_text_pool` | `Array[String]` — the fact-card copy pool (→ D-47; was the single-string `fact_text`). The game currently reads index 0; no rotation UI exists yet |
+| `news_reports`, `discovery_openings` | `Array[String]` each — this species' own News Report lines and the opening clauses they may lead with (D-61's counted build hints). Empty falls back to the shared pool |
+
 **A tier** (`HabitatTier`) carries `needs`, `limits`, its own `max_individuals`, and its own
 `arrival_group_size`. **A need** (`HabitatNeed`) carries `tag`, its own `radius` (0 = follow
 the species) and its own `tiles_per_individual` (**0 = gate-only**: must be present,
 contributes no population cap — which is what stops a one-tile Stable from capping a herd at
 one horse). **A limit** (`HabitatLimit`) carries `tag`, `radius` and `max_count`: limits
 **gate**, they never scale, so a violated limit zeroes its whole tier.
-| `max_individuals` | hard per-home-site cap — a readability bound, never the normal-play limit |
-| `model_scenes` | `Array[PackedScene]` — one or more interchangeable look variants, stably picked per resident by `pick_variant(index)` (2026-08-26; was the single-scene `model_scene`). `human.tres` ships 5 equal-weight villager looks; every other species ships one. See spec.md → Data Schemas for the stability contract |
-| `fact_text` | fact-card copy |
 
 *(No field holds the model's world scale or footprint: scale lives in the model's own
 wrapper scene, and animals occupy no tiles.)*
@@ -61,8 +63,10 @@ explicit number.
 
 *Superseded floor placeholders, kept for history* (#6 #20 #23): `capacity_radius` =
 `scout_radius`; `tiles_per_individual` — **Human 1**, Fox 5, Rabbit 4; `max_individuals` ~6. Human's
-divisor is 1 because the House is the scarce need and the floor House is a single
-tile; the 2×2 form supports up to four families, given fields to match.
+divisor is 1 because the House is the scarce need. **That rationale predates D-60**: the House
+was a single tile when it was written and is 2×2 now, but a building emits its tags **once, at
+its centre tile**, so a House still contributes exactly one `house` tile and the divisor still
+means what it meant. Footprint and habitat meaning are independent by construction.
 
 ### Personality: Shy vs. Bold
 
@@ -104,7 +108,8 @@ the Add-an-Animal pipeline whenever a species gains an `avoids` entry.
 
 Another entry in the animal system, no separate people/economy simulation. A villager
 needs `house` plus carrying capacity: cultivated tiles in radius set how many families
-a house supports (the 1×1 House supports one; a **Farmhouse** lets a broad farm
+a house supports (the House — **2×2 since D-60** — supports one; a **Farmhouse** at 3×3
+emits `large_house`, which the villager *family* tier gates on, and lets a broad farm
 support several — see [buildings.md](buildings.md)). **No hunger, starvation, or
 consumption mechanic** — the requirement is static, read when a family moves in or
 out, never a draining stock (Pillar 1 intact). **Towns are emergent, not a system:**
@@ -228,7 +233,7 @@ convention (#23 still open).
 Full list and resolution paths: [spec.md](spec.md) → Open Questions.
 
 - **#4** Final starter roster — Human's audit gate; step-3 proposals for the cleared pool
-- **#7** Instance counts — individuals per species; Village Population vs. House count
+- ~~**#7** Instance counts~~ — **closed 2026-09-04 (→ D-52):** group size is `HabitatTier.arrival_group_size`, per tier, and a group arrives **partially** — three into room for two lands two
 - **#9** Avoids tuning — personal-space distance; avoidance-failure relocation threshold
 - **#20** Home-site tuning — per-species suitability radius
 - **#23** Capacity radius per species — per-species values, divergence from scout radius

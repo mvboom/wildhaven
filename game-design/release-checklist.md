@@ -28,8 +28,10 @@ This gate is why the checklist exists. **Attribution is a license obligation, no
 - [ ] `test_attribution.gd` passes.
 - [ ] Every license text is present on disk under `project/assets/licenses/` — a link can
       rot, and a compliance review must be answerable offline.
-- [ ] **The in-game Credits screen exists and renders the required notice.** ⚠️ **This is
-      the release blocker.** The rabbit model ships under **CC BY 3.0**, whose attribution
+- [x] **The in-game Credits screen exists and renders the required notice.** Built —
+      `scenes/menu/CreditsScreen.tscn`, reached from the Title screen (D-50), listing every
+      attribution source rather than only the binding one (D-51). ⚠️ **This was the release
+      blocker; verify the rendered screen at ship time, do not take this checkbox on trust.** The rabbit model ships under **CC BY 3.0**, whose attribution
       condition requires the credit be visible **to the player**. A complete `CREDITS.md`
       does **not** satisfy it. Tracked as Tier-1 row 15; owned by
       [ui-engineer](../.claude/agents/ui-engineer.md). The screen must read the same
@@ -58,11 +60,19 @@ This gate is why the checklist exists. **Attribution is a license obligation, no
 
 ## Gate 5 — Builds
 
-- [ ] Export builds produced for **Linux, Windows, and Mac** (gdd.md → Target Release).
-- [ ] Each build launches to the title screen on a clean machine.
+- [ ] The **Web (Single-threaded)** export builds and is copied into `web/game/` — this is
+      the shipping build (gdd.md → Target Release). `/deploy-game` runs it.
+- [ ] The web build loads to the title screen in a clean browser profile, on the actual
+      hosting path, not only from a local file server.
+- [ ] The **Desktop (Linux)** export builds and launches to the title screen. It is a
+      developer convenience, not a shipping target.
+- [ ] ⚠️ **Windows and Mac presets do not exist.** If either is ever required, it is new
+      work plus its own export validation — not a checkbox here.
 - [ ] Performance smoke test holds **30 fps minimum at 1080p** on the reference target — a
       ~5-year-old mid-range laptop with integrated graphics — against a synthetic
-      full-size world at the ~128×128 cap.
+      full-size world at the ~128×128 cap. **Measured in the browser on the shipping web
+      build**, which is single-threaded and runs the GL Compatibility renderer; a desktop
+      export's numbers do not stand in for it.
 - [ ] ⚠️ **Human-run, not delegable:** the render validation over that full-size world.
       The headless harness cannot see a windowed run; QA's smoke test is the regression net
       *after* the human baseline exists, never a substitute for it.

@@ -1253,7 +1253,21 @@ func activate_palette_entry(kind: String, id: String) -> void:
 
 ## Remove is a fixed tool button outside the catalog — reachable regardless of what was
 ## active last, never itself assignable.
+##
+## LEAVES INSPECT, exactly as picking a catalog entry does (`activate_palette_entry()` calls
+## `set_mode()` for the same reason). Erase is a Terraform/Build tool — `TapRouter._tap_remove()`
+## is "the remove tool's tap, in either Terraform or Build" — so holding it in Inspect was a
+## state nothing downstream was written for: `TapRouter` kept asking residents first (a tap on an
+## animal's tile opened its fact card instead of removing), the neighbourhood preview stayed
+## suppressed, the crosshair answered from its Inspect branch before it ever reached
+## `is_remove_selected()`, and `_refresh_mode_buttons()` left Info lit beside a lit Erase — which
+## is what a playtester read as "the Erase button does not work".
+##
+## `set_mode()` FIRST, then the flag: entering a mode deliberately clears the remove tool (see
+## its own note), so setting `_remove_selected` before the switch would immediately be undone.
 func activate_remove() -> void:
+	if _mode == Mode.INSPECT:
+		set_mode(_last_content_mode)
 	_remove_selected = true
 	palette_changed.emit()
 

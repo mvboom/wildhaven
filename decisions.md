@@ -2046,6 +2046,17 @@ off the counter.
 take `WoodLedger.add()` and are **not** metered: a refund is the player's own Wood coming back,
 and trickling it in at 1/min would read as the game eating it.
 
+**The report is gated on the stockpile, not on time (amended same day, same ruling).** No
+trees is not the same as stuck. A brand-new world starts at 100 Wood — several builds — and in
+that first stretch the feed's job is to point the player at a villager or an animal to build
+*for*, not at a supply problem they do not have yet. So the report fires only below
+`NewsReportContent.LOW_WOOD_FLOOR` = **30** (two Houses' worth: early enough that there is still
+one build in the bank, so it reads as a heads-up rather than an explanation of why the counter
+already stopped). Reading the live balance is what makes "new game" need **no flag, no timer and
+no saved state**: a fresh world holds the branch shut by itself until the player has actually
+spent, and a *loaded* save down at 5 Wood with no trees qualifies on the very next cycle — which
+is the case that genuinely needed saying.
+
 **Why the zero-Forest report.** The mirror failure: a world with no Forest earns **nothing,
 ever** — `tick()` returns immediately on a zero count — and the HUD shows only a Wood counter
 that never moves, with nothing to explain why. It is the one genuinely stalled state in v1, it
@@ -2062,7 +2073,8 @@ alternation needs no new state: the report writes a pseudo-id into the presenter
 rules the behaviour, not the sentence.
 
 **Touched:** `project/scripts/economy/wood_ledger.gd` (both constants and `_accrual_gain()`),
-`project/scripts/ui/news_report_content.gd` (`NO_FOREST_ID`, `NO_FOREST_REPORT`),
+`project/scripts/ui/news_report_content.gd` (`NO_FOREST_ID`, `NO_FOREST_REPORT`,
+`LOW_WOOD_FLOOR`),
 `project/scripts/ui/news_report_presenter.gd` (`compose_next_report()`'s pre-empt),
 `project/tests/test_economy_rules.gd`, `project/tests/test_news_report.gd`, gdd.md → Economy,
 spec.md (the balancing table's passive-rate row and §10.1's general-report note),

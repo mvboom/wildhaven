@@ -74,6 +74,7 @@ func _process(delta: float) -> bool:
 	_check_button_chrome_icon_number_name()
 	_check_activate_sets_mode_implicitly()
 	_check_activate_remove()
+	_check_erase_pressed_in_inspect_leaves_inspect()
 	_check_palette_changed_signal_fires()
 	_check_number_key_activates_entry()
 	_check_number_key_zero_toggles_inspect()
@@ -362,6 +363,36 @@ func _check_activate_remove() -> void:
 	_hud.activate_palette_entry("terrain", "grass")
 	_hud.activate_remove()
 	check(_hud.is_remove_selected(), "activate_remove() selects the Remove tool")
+
+
+## PLAYTEST BUG: Erase pressed while Info was selected did nothing visible — Info stayed lit
+## next to a lit Erase, and the tap kept taking Inspect's path (resident first, no removal on
+## an animal's own tile; no neighbourhood preview; the crosshair's Inspect branch answering
+## before it ever asked `is_remove_selected()`). Erase is a Terraform/Build tool — see
+## `TapRouter._tap_remove()`'s own header, "the remove tool's tap, in either Terraform or
+## Build" — so picking it leaves Inspect for the remembered content mode, exactly as every
+## catalog entry already does through `activate_palette_entry()`.
+func _check_erase_pressed_in_inspect_leaves_inspect() -> void:
+	_hud.activate_palette_entry("terrain", "grass")
+	_hud.set_mode(GameHud.Mode.INSPECT)
+	_hud.activate_remove()
+	check_eq(
+		_hud.mode(), GameHud.Mode.TERRAFORM, "Erase pressed in Inspect returns to the content mode"
+	)
+	check(_hud.is_remove_selected(), "...and leaves the Erase tool selected, not cleared")
+
+	# The Build half of the same rule: the mode Erase returns to is whichever content mode was
+	# last used, not a hardcoded Terraform.
+	_hud.activate_palette_entry("placeable", "house")
+	_hud.set_mode(GameHud.Mode.INSPECT)
+	_hud.activate_remove()
+	check_eq(_hud.mode(), GameHud.Mode.BUILD, "...remembering Build when Build was last used")
+	check(_hud.is_remove_selected(), "...still holding Erase")
+
+	# Pressed from a content mode it is a pure tool pick — the mode must not move.
+	_hud.activate_palette_entry("terrain", "grass")
+	_hud.activate_remove()
+	check_eq(_hud.mode(), GameHud.Mode.TERRAFORM, "Erase pressed in Terraform stays in Terraform")
 
 
 func _check_palette_changed_signal_fires() -> void:

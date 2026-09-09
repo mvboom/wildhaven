@@ -38,6 +38,10 @@ const SETTINGS_SCENE: String = "res://scenes/menu/SettingsScreen.tscn"
 ## CheckBox's tick/empty-box glyphs so the box sits to the right of this label.
 const SPEAKING_LABEL: String = "Parent Sound Sanity:"
 
+## The label alone doesn't say which way the tick points, so the hover spells it out for the
+## parent doing the ticking — same inverted reading as `SPEAKING_LABEL`'s note above.
+const SPEAKING_TOOLTIP: String = "Checked means no sound! You want this checked!"
+
 @onready var _new_game_button: Button = %NewGameButton
 @onready var _load_game_button: Button = %LoadGameButton
 @onready var _settings_button: Button = %SettingsButton
@@ -60,6 +64,7 @@ func _ready() -> void:
 	_build_tag.text = "Build %s" % BuildInfo.BUILD_TIMESTAMP
 
 	_speaking_check.text = SPEAKING_LABEL
+	_speaking_check.tooltip_text = SPEAKING_TOOLTIP
 	# Borrow CheckBox's tick/empty-box icons: a checkmark when the parent has silenced
 	# narration, an empty box when it's on. CheckButton's own switch graphic doesn't read as
 	# "checked", and CheckButton (unlike CheckBox) keeps the glyph on the RIGHT, past the label.
