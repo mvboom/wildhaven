@@ -1940,8 +1940,13 @@ find the Field Guide on their own:
 3. **What makes hints rarer over time?** **Species-hosted count** (`species_hosted_count()`) — a
    report about a species the player has never hosted stays likely; one about a species they
    already host many of fades toward rare, never zero.
-4. **Early-game focus?** **Villager first** (nothing hosted at all ⇒ Villager, unconditionally),
-   then the ordinary ranking — cheapest species not yet hosted. This reopens the human ruling
+4. **Early-game focus?** **Villager first** (nothing hosted at all ⇒ Villager), then the
+   ordinary ranking — cheapest species not yet hosted. **Narrowed in the same session's final
+   review:** the gate yields to the no-repeat rule, so it does not fire when the Villager was
+   the previous pick. Written here as "unconditionally" at first, which shipped as one
+   identical sentence looping at a new player every 30 s — the "hints never repeat with
+   urgency" failure Pillar 1 forbids. The ruling stands; its scope is narrower than first
+   recorded. This reopens the human ruling
    that pinned Rabbit as the tutorial's first species (`HabitatRecipe.PINNED_STARTER_SPECIES_ID`)
    for this path only; the onboarding coach still reads that constant unchanged and is untouched
    here.
