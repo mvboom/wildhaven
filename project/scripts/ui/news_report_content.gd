@@ -65,6 +65,31 @@ static func species_weight(species: AnimalDefinition, world: WorldRoot) -> float
 	return WEIGHT_PLENTY_HOSTED
 
 
+## THE TAGS THE REPORT WILL ACTUALLY NAME — the starter tier's needs, read through the same
+## `HabitatRecipe.starter_tier()` seam `hint_line()` composes its sentence from.
+##
+## NEVER `species.habitat_needs`. `HabitatRecipe`'s own header records that the flat fields are
+## legacy and that no live display path reads them any more; they disagree with the tier data
+## for 8 of the 15 shipped species, and for Husky the two sets share nothing at all (flat
+## `house`/`open_grass` against the starter tier's `snow`/`people`). Ranking on one generation
+## of the data while composing the sentence from the other is what silently broke gdd.md ->
+## Discovery's promise that a species whose land the player already has floats up: the bias was
+## weighing terrain the report would never go on to mention. The disagreement was inert only
+## while `candidates_with_pools()` limited selection to three species; opening selection to the
+## whole roster made this the one ordering signal beneath the hosted-tier multiplier.
+static func starter_tags(species: AnimalDefinition) -> Array[String]:
+	var tags: Array[String] = []
+	if species == null:
+		return tags
+	var tier: HabitatTier = HabitatRecipe.starter_tier(species)
+	if tier == null:
+		return tags
+	for need: HabitatNeed in tier.needs:
+		if need != null and not need.tag.is_empty():
+			tags.append(need.tag)
+	return tags
+
+
 ## Tallies every habitat tag over the WHOLE revealed grid, one pass, into `{tag: String ->
 ## count: int}`. `AnimalDefinition.HABITAT_TAGS` order is not assumed; a tag nobody's roster
 ## needs is counted and simply never read back.
@@ -116,9 +141,29 @@ static func pick_species(
 	if candidates.is_empty():
 		return null
 
-	# THE EARLY GATE — one branch. Nothing hosted at all means the player has not yet seen
-	# the loop work once, so the hint names the cheapest thing in the game and nothing else.
-	if world != null and world.species_hosted_count() == 0:
+	# THE EARLY GATE — one branch. Nothing hosted at all means the player has not yet seen the
+	# loop work once, so the hint names the Villager first. That is the OPERATOR'S RULING
+	# (D-61 #4, "Villager first"), which reopened the pinned tutorial starter for this path
+	# only — it is NOT a cost claim, and this comment used to make one it could not support:
+	# the Villager is a 15-wood House plus a 2-wood cultivated tile (17 wood), against
+	# Rabbit's 4 free wild-grass tiles plus 4 cultivated (8 wood). The ruling stands on its
+	# own; the arithmetic never backed it.
+	#
+	# THE GATE YIELDS TO THE NO-REPEAT RULE BELOW, and that exception is the whole reason it
+	# is written as a condition rather than an unconditional branch. Nothing-hosted is the
+	# state a new player sits in LONGEST and the one with the least variety available: the
+	# shortest interval in `HintPacer`, no authored `discovery_openings` anywhere in the
+	# roster, and needs that render deterministically. An unconditional gate there replays one
+	# identical sentence every cycle — the exact inverse of spec.md §10.1's requirement that
+	# "an idle stretch reads as the world talking about different animals, not as one nag
+	# repeated." Falling through hands the pick to the ordinary ranking, which the filter just
+	# below has already stripped the Villager out of, so the feed alternates instead of looping
+	# — and the gate's purpose survives intact, because every other cycle still lands on it.
+	if (
+		world != null
+		and world.species_hosted_count() == 0
+		and last_species_id != VILLAGER_SPECIES_ID
+	):
 		for species: AnimalDefinition in candidates:
 			if species.id == VILLAGER_SPECIES_ID:
 				return species
@@ -143,7 +188,10 @@ static func pick_species(
 		if not near_miss_summary.is_empty():
 			weight += maxf(0.0, float(near_miss_summary.get(species.id, 0.0)))
 		else:
-			for tag: String in species.habitat_needs:
+			# `starter_tags()`, never the flat `habitat_needs` — see that function's own header
+			# for why ranking on the other generation of the data made this bias a claim about
+			# terrain the composed report would never go on to name.
+			for tag: String in starter_tags(species):
 				weight += float(tag_counts.get(tag, 0))
 		weight *= species_weight(species, world)
 		weights.append(weight)

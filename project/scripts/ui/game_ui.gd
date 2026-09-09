@@ -197,11 +197,27 @@ func bind_world() -> void:
 		_coach.configure(_world.is_new_world, GameplaySettings.hints_enabled())
 		_news_report_presenter.set_coach(_coach)
 		coach_chip.dismissed.connect(func() -> void: _coach.dismiss(); coach_chip.hide_chip())
-		# Activity reaches the pacer from the SAME call site the coach already uses (Task 7) —
-		# one input path, not two, so a future edit that changes what "activity" means cannot
-		# update one and forget the other.
+		# Activity reaches the pacer from the SAME call site the coach already uses (Task 7),
+		# rather than through a private route of its own, so a future edit that changes what
+		# "activity" means cannot update one and forget the other. TWO SIGNALS, not one input:
+		# `TapRouter` reports terraform painting and building placement separately, and both
+		# are placements — see the block just below.
 		tap_router.tile_painted.connect(
 			func() -> void: _coach.notice_painted(); _news_report_presenter.notice_activity()
+		)
+		# THE OTHER HALF OF "the player is building". `TapRouter` emits `building_placed`, NOT
+		# `tile_painted`, for a house/barn/silo — so while this line was missing, a player laying
+		# down buildings (the most literal reading of the word) scored as idle and got the faster
+		# feed meant for someone who is stuck. `HintPacer.notice_activity()`'s own contract is
+		# "Any placement", and a placement is exactly what this signal reports.
+		#
+		# The PACER only — deliberately not `_coach.notice_painted()` alongside it, the way the
+		# lambda above pairs them. That call is `OnboardingCoach._finish()`: it ends the whole
+		# coach, and the beat it satisfies is "the first paint" specifically. Whether placing a
+		# building should also retire the coach is a separate design question about the coach's
+		# progression, not a pacing bug, and is left where it is rather than changed in passing.
+		tap_router.building_placed.connect(
+			func() -> void: _news_report_presenter.notice_activity()
 		)
 		hud.mode_changed.connect(func(_m: GameHud.Mode) -> void: _coach.notice_activity())
 		hud.palette_changed.connect(func() -> void: _coach.notice_activity())

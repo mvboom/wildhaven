@@ -37,6 +37,10 @@ const WORLD_PATH: String = "res://scenes/Main.tscn"
 const FOX_PATH: String = "res://data/animals/fox.tres"
 const RABBIT_PATH: String = "res://data/animals/rabbit.tres"
 const HUMAN_PATH: String = "res://data/animals/human.tres"
+## The clearest case of the two generations of habitat data disagreeing: Husky's flat
+## `habitat_needs` (`house`, `open_grass`) and its starter tier (`snow`, `people`) share no tag
+## at all, so a ranking reading the wrong one is measurable rather than merely different.
+const HUSKY_PATH: String = "res://data/animals/husky.tres"
 
 ## A fixed seed so the cadence rolls this suite pins are reproducible.
 const SEED: int = 20260809
@@ -92,6 +96,7 @@ func _process(_delta: float) -> bool:
 	_check_content_tag_tile_counts()
 	_check_content_candidates_and_lines()
 	_check_content_terrain_bias()
+	_check_bias_reads_the_tier_the_hint_renders()
 	# ORDER MATTERS: `_check_nothing_hosted_names_the_villager()` MUST run before any check that
 	# calls `restore_hosted()`. `HomeSiteRegistry.restore_hosted()` is additive-only — it can
 	# never clear an entry (gdd.md -> Economy: "Species Hosted (all-time, never decreases)") — so
@@ -99,6 +104,7 @@ func _process(_delta: float) -> bool:
 	# back to `species_hosted_count() == 0` for the rest of this run. The villager gate only has
 	# anything to prove while the count is still genuinely zero.
 	_check_nothing_hosted_names_the_villager()
+	_check_no_repeat_survives_the_villager_gate()
 	_check_hosted_count_survives_a_round_trip()
 	_check_ranking_prefers_species_not_yet_hosted()
 	_check_the_same_species_is_never_picked_twice_running()
@@ -110,6 +116,7 @@ func _process(_delta: float) -> bool:
 	_check_toast_behaviour()
 	_check_wiring_on_the_real_scene()
 	_check_presenter_fires_a_composed_hint()
+	_check_first_interval_after_a_load_knows_what_is_hosted()
 	_check_activity_reaches_the_pacer()
 	_check_coach_wiring_is_idempotent()
 	_check_is_new_world()
@@ -428,6 +435,73 @@ func _check_content_terrain_bias() -> void:
 	grid.free()
 
 
+## THE BIAS MUST READ THE SAME GENERATION OF DATA THE HINT RENDERS. Whole-branch review
+## finding: `pick_species()` biased on the flat legacy `habitat_needs` while `hint_line()`
+## composed its sentence from `HabitatRecipe.starter_tier()`. The two disagree for 8 of the 15
+## shipped species, so gdd.md -> Discovery's "the ones whose land the player already has float
+## up" was being decided by terrain the report would never mention.
+##
+## HUSKY IS THE PROOF because the two sets are DISJOINT: flat `house`/`open_grass` against the
+## starter tier's `snow`/`people`. On an all-snowfield grid the tier reading gives it every tile
+## and the flat reading gives it none, so the assertion below genuinely fails on the old
+## behaviour rather than merely shifting a probability — verified by reasoning the weights
+## through: tier reading 25:1 for husky, flat reading a flat 1:1 coin toss against the decoy.
+##
+## `world` LEFT NULL (the default) on purpose: that keeps `species_weight()` returning the same
+## multiplier for both candidates and the early gate silent, so terrain bias is the only signal
+## the outcome can be attributed to.
+func _check_bias_reads_the_tier_the_hint_renders() -> void:
+	var husky: AnimalDefinition = load(HUSKY_PATH) as AnimalDefinition
+	if not check(husky != null, "husky.tres loads"):
+		return
+
+	var tier_tags: Array[String] = NewsReportContent.starter_tags(husky)
+	check(tier_tags.has("snow") and tier_tags.has("people"),
+		"husky's starter tier needs snow and people (%s)" % [tier_tags])
+	var flat_tags: String = str(husky.habitat_needs)
+	for tag: String in tier_tags:
+		check(not husky.habitat_needs.has(tag),
+			"fixture: the two generations really are disjoint — starter tag '%s' against flat %s"
+				% [tag, flat_tags])
+
+	# A decoy carrying only flat fields, which `effective_tiers()` synthesises a legacy tier from
+	# — so BOTH readings agree about the decoy, and the husky is the only thing that can move the
+	# result.
+	var decoy := AnimalDefinition.new()
+	decoy.id = "decoy"
+	decoy.habitat_needs = ["open_grass"] as Array[String]
+	check_eq(NewsReportContent.starter_tags(decoy).size(), 1,
+		"fixture: a flat-only species still yields one starter tag, via the legacy tier")
+
+	# All snow, no grass and no buildings: `snow` is plentiful, and every tag either reading
+	# could otherwise credit (`house`, `open_grass`, `people`) is at zero.
+	var grid := WorldGrid.new()
+	grid.build(TerrainDefinition.load_all(), 6, 4)
+	for x in range(6):
+		for z in range(4):
+			grid.set_terrain(x, z, "snowfield")
+
+	var candidates: Array[AnimalDefinition] = [husky, decoy]
+	var rng := RandomNumberGenerator.new()
+	rng.seed = SEED
+	var husky_picks: int = 0
+	var decoy_picks: int = 0
+	const TRIALS: int = 200
+	for i in range(TRIALS):
+		var picked: AnimalDefinition = NewsReportContent.pick_species(candidates, grid, rng)
+		if picked == husky:
+			husky_picks += 1
+		elif picked == decoy:
+			decoy_picks += 1
+	check_eq(husky_picks + decoy_picks, TRIALS, "every trial picked one of the two candidates")
+	check(husky_picks > decoy_picks * 5,
+		"a snowfield world floats the species whose STARTER TIER wants snow, not the one its "
+		+ "legacy flat field happens to name — the old behaviour credited husky none of these "
+		+ "tiles and landed near an even split (husky=%d, decoy=%d)"
+			% [husky_picks, decoy_picks])
+	grid.free()
+
+
 ## THE RANKING. Never-hosted outranks hosted-a-little; hosted-a-little outranks
 ## hosted-at-or-past-`PLENTY_THRESHOLD`; and the bottom tier NEVER reaches zero —
 ## `BASELINE_WEIGHT` already documents why (gdd.md: "a hint is an invitation, not an
@@ -502,10 +576,13 @@ func _check_ranking_prefers_species_not_yet_hosted() -> void:
 		])
 
 
-## THE EARLY GATE, ruled 2026-09-08: one branch, not a two-stage sequence. With nothing
-## hosted the hint names the Villager, the cheapest thing in the game (a 15-wood house plus
-## one farm tile). After that the ordinary ranking runs unmodified, and "then whatever is
-## cheapest" falls out of it via the existing terrain bias rather than needing its own state.
+## THE EARLY GATE, ruled 2026-09-08 (D-61 #4, "Villager first"): one branch, not a two-stage
+## sequence. With nothing hosted the hint names the Villager because the OPERATOR RULED THAT IT
+## DOES — not because it is cheapest. This comment used to claim it was, and the arithmetic does
+## not support that: a Villager is a 15-wood House plus a 2-wood cultivated tile (17 wood),
+## against Rabbit's 4 free wild-grass tiles plus 4 cultivated (8 wood), and Rabbit is the species
+## the human pinned as the tutorial starter. The ruling is untouched; only its stated
+## justification was wrong. After the gate the ordinary ranking runs unmodified.
 ##
 ## MUST RUN BEFORE ANY CHECK THAT CALLS `restore_hosted()` (see the call-order comment in
 ## `_process()` above) — `HomeSiteRegistry.restore_hosted()` is additive-only per its own doc
@@ -525,6 +602,49 @@ func _check_nothing_hosted_names_the_villager() -> void:
 		if not check_eq(picked.id, NewsReportContent.VILLAGER_SPECIES_ID,
 			"with nothing hosted the pick is always the villager (attempt %d)" % i):
 			return
+
+
+## THE NO-REPEAT RULE IN THE STATE A REAL NEW PLAYER IS IN. `_check_the_same_species_is_never_
+## picked_twice_running()` further down hosts the Villager on its very first line, which switches
+## the early gate OFF before it runs — so the no-repeat rule was only ever tested in the state
+## where it is not needed, and the whole-branch review found exactly the defect that hid there:
+## the gate returned before the filter, so a brand-new player heard one identical sentence every
+## 30 s. Nothing-hosted is the worst case for repetition, not the mildest — shortest interval
+## band, no authored `discovery_openings` anywhere in the roster, deterministic needs.
+##
+## ASSERTS BOTH HALVES, because either alone can be satisfied by a broken fix: no two consecutive
+## picks alike (the rule), AND the Villager still named repeatedly across the run (the gate's
+## purpose, which a fix that simply deleted the gate would fail).
+##
+## MUST RUN BEFORE ANY CHECK THAT CALLS `restore_hosted()`, for the additive-only reason
+## `_check_nothing_hosted_names_the_villager()` documents directly above.
+func _check_no_repeat_survives_the_villager_gate() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = SEED
+	check_eq(_world.species_hosted_count(), 0, "fixture: the world still hosts nothing")
+	var previous: String = ""
+	var distinct: Dictionary = {}
+	var villager_picks: int = 0
+	const ATTEMPTS: int = 20
+	for i in range(ATTEMPTS):
+		var picked: AnimalDefinition = NewsReportContent.pick_species(
+			_world.roster.species(), _world.grid, rng, _world, {}, previous
+		)
+		if not check(picked != null, "a species is picked on attempt %d" % i):
+			return
+		if not check(picked.id != previous,
+			"attempt %d named '%s' twice running with NOTHING hosted" % [i, picked.id]):
+			return
+		if picked.id == NewsReportContent.VILLAGER_SPECIES_ID:
+			villager_picks += 1
+		distinct[picked.id] = true
+		previous = picked.id
+	check(distinct.size() > 1,
+		"an idle stretch with nothing hosted names more than one species (%d distinct in %d)"
+			% [distinct.size(), ATTEMPTS])
+	check(villager_picks > 0,
+		"...and the gate still does its job — the villager is named repeatedly (%d of %d)"
+			% [villager_picks, ATTEMPTS])
 
 
 ## SPEC §11's ROUND-TRIP CHECK. The decay driver was chosen over a wall clock precisely
@@ -858,21 +978,91 @@ func _check_presenter_fires_a_composed_hint() -> void:
 	check(not line.contains("_"), "...with no raw tag: '%s'" % line)
 
 
-## Activity reaches the pacer from the same call site the coach already uses
-## (`TapRouter.tile_painted`), so there is no second input path to keep in sync. Fires the
-## REAL signal — `_ui.tap_router.tile_painted.emit()` — rather than calling
+## THE FIRST INTERVAL OF A LOADED SESSION. Whole-branch review finding: `bind()` armed the
+## cadence (via `retire_nudge()` -> `_next_cadence()`) while the scheduler's hosted count was
+## still its `0` default, because the count was only pushed from `_process()`. A returning
+## player with a full haven got their first hint on the LEARNING band — the shortest in the
+## game, meant for someone who has attracted nothing — and the mistake only corrected itself
+## after that first report had already fired.
+##
+## Uses a SEPARATE world, not this suite's `_world`: `restore_hosted()` is additive-only, and
+## `_check_nothing_hosted_names_the_villager()` needs the shared world's count to stay at 0.
+##
+## The expected value is derived from a reference `HintPacer`, never hardcoded — all four bands
+## and both multipliers are PROPOSED constants the human still owns, and this check must survive
+## them being retuned. The second assertion is what keeps the first non-vacuous: it fails if the
+## two bands ever collapse to the same number, which would make agreement prove nothing.
+func _check_first_interval_after_a_load_knows_what_is_hosted() -> void:
+	GameplaySettings.reset_for_test()
+	var packed: PackedScene = load(WORLD_PATH) as PackedScene
+	var loaded_world: WorldRoot = packed.instantiate() as WorldRoot
+	root.add_child(loaded_world)
+	loaded_world.registry.restore_hosted(
+		["rabbit", "fox", "deer", "human", "cow", "pig", "sheep", "husky"] as Array[String]
+	)
+	var hosted: int = loaded_world.species_hosted_count()
+	if not check(hosted > HintPacer.SETTLED_MAX_HOSTED,
+		"fixture: the loaded world hosts enough species to be past every band but the last (%d)"
+			% hosted):
+		loaded_world.free()
+		return
+
+	var reference := HintPacer.new()
+	if not check(reference.next_interval(hosted) != reference.next_interval(0),
+		"fixture: the band for %d hosted differs from the learning band, so agreeing with one "
+		% hosted + "genuinely rules out the other"):
+		loaded_world.free()
+		return
+
+	var presenter := NewsReportPresenter.new()
+	root.add_child(presenter)
+	presenter.bind(loaded_world, _ui.news_report_toast)
+	check_eq(presenter._scheduler.report_remaining(), reference.next_interval(hosted),
+		"a loaded save's FIRST interval is armed on its real hosted count, not on the 0-hosted "
+		+ "learning band")
+
+	presenter.free()
+	loaded_world.free()
+
+
+## BOTH OF `TapRouter`'s PLACEMENT SIGNALS REACH THE PACER. Fires the REAL signals —
+## `_ui.tap_router.tile_painted.emit()` / `.building_placed.emit()` — rather than calling
 ## `presenter.notice_activity()` directly, because a direct call only proves the presenter's
 ## own method chain works; it cannot catch `game_ui.gd`'s wiring being dropped or its closure
-## capturing a stale presenter. Round-1 fix (2026-09-08): confirmed non-vacuous by temporarily
-## deleting the `notice_activity()` call from `game_ui.gd`'s `tile_painted` lambda, seeing this
-## check fail, then restoring it — see task-7-report.md.
+## capturing a stale presenter.
+##
+## `building_placed` WAS THE WHOLE-BRANCH REVIEW'S FINDING: `TapRouter` emits it, not
+## `tile_painted`, for a house/barn/silo, and it was connected to NOTHING anywhere in the
+## project — so a player laying down buildings scored as idle and got the faster feed meant for
+## someone stuck, against `HintPacer.notice_activity()`'s own stated contract ("Any placement").
+##
+## DRAINING THE PACER BETWEEN THE TWO HALVES is what makes the second assertion mean anything:
+## `built_recently()` is already true from the paint above, so without advancing the pacer past
+## `BUILT_RECENTLY_SECONDS` first, the `building_placed` check would pass on the paint's residue
+## with the new connection deleted.
+##
+## Confirmed non-vacuous twice by deliberate sabotage: round 1 (2026-09-08) by deleting the
+## `notice_activity()` call from `game_ui.gd`'s `tile_painted` lambda; final fix wave, same day,
+## by deleting the whole `tap_router.building_placed.connect(...)` block — this check failed on
+## "a BUILDING placement counts as building too" both times, and both edits were reverted.
 func _check_activity_reaches_the_pacer() -> void:
 	var presenter: NewsReportPresenter = _ui.news_report_presenter()
 	if not check(presenter != null, "GameUI exposes its presenter"):
 		return
 	_ui.tap_router.tile_painted.emit()
 	check(presenter.built_recently(),
-		"a placement marks the player as building for pacing purposes")
+		"a terraform paint marks the player as building for pacing purposes")
+
+	# Past the window, so the pacer reads idle again and the next assertion has to be earned.
+	presenter._pacer.advance(HintPacer.BUILT_RECENTLY_SECONDS + 1.0)
+	if not check(not presenter.built_recently(),
+		"fixture: the pacer has gone idle again before the second half of this check"):
+		return
+
+	_ui.tap_router.building_placed.emit()
+	check(presenter.built_recently(),
+		"a BUILDING placement counts as building too — the signal a house/barn/silo actually "
+		+ "emits, which shipped connected to nothing")
 
 
 ## TASK 7's RE-ENTRANCY GUARD. `GameUI._process()` calls `bind_world()` every frame until both
@@ -899,6 +1089,7 @@ func _check_coach_wiring_is_idempotent() -> void:
 	var wires: Array = [
 		[_ui.coach_chip.dismissed, "CoachChip.dismissed"],
 		[_ui.tap_router.tile_painted, "TapRouter.tile_painted"],
+		[_ui.tap_router.building_placed, "TapRouter.building_placed"],
 		[_ui.hud.mode_changed, "GameHud.mode_changed"],
 		[_ui.hud.palette_changed, "GameHud.palette_changed"],
 		[_ui.hud.help_pressed, "GameHud.help_pressed"],

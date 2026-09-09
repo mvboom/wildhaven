@@ -49,6 +49,14 @@ func bind(world: WorldRoot, toast: NewsReportToast) -> void:
 	_scheduler = NewsReportScheduler.new()
 	_pacer = HintPacer.new()
 	_scheduler.set_pacer(_pacer)
+	# BEFORE ANYTHING BELOW CAN ARM AN INTERVAL. Both `set_hints_enabled(false)` and
+	# `retire_nudge()` roll `_next_cadence()`, which asks the pacer for a band keyed on the
+	# hosted count — and until this call the scheduler's count is still its `0` default. Pushing
+	# it only from `_process()` meant a returning save with eight species hosted armed its FIRST
+	# interval in the learning band (the shortest one in the game) and only corrected itself
+	# after that first report had already fired. One misfire per load is still a misfire on the
+	# beat spec.md §11 exists to get right, so the count is now current before the clock starts.
+	_push_hosted_count()
 	_scheduler.set_hints_enabled(GameplaySettings.hints_enabled())
 	if not world.is_new_world:
 		# Only a brand-new save gets the first-time nudge (gdd.md -> Player Interface &
@@ -86,13 +94,27 @@ func _process(delta: float) -> void:
 		return
 	if _pacer != null:
 		_pacer.advance(delta)
-		_scheduler.set_hosted_count(_world.species_hosted_count())
+	# OUTSIDE the pacer guard on purpose. The hosted count is the SCHEDULER's input, not the
+	# pacer's — nesting the push inside `if _pacer != null` coupled it to an object that has no
+	# say in it, so a scheduler running on the D-37 fallback path (or one whose pacer was
+	# detached mid-session by `set_pacer(null)`, a supported call) would quietly stop being told
+	# how many species are hosted and hand a stale count back the moment a pacer returned.
+	_push_hosted_count()
 	match _scheduler.advance(delta):
 		NewsReportScheduler.EVENT_NUDGE:
 			if _coach != null:
 				_coach.notice_nudge_due()
 		NewsReportScheduler.EVENT_REPORT:
 			_fire_report()
+
+
+## The scheduler's view of how many species are hosted, refreshed from the live world. One
+## place, called from both `bind()` and `_process()`, so "the count the cadence is keyed on" can
+## never be current in one path and stale in the other.
+func _push_hosted_count() -> void:
+	if _scheduler == null or _world == null:
+		return
+	_scheduler.set_hosted_count(_world.species_hosted_count())
 
 
 ## Any placement. Fed from `GameUI`'s existing paint route — the same call site that already
