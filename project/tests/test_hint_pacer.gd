@@ -15,6 +15,7 @@ func _initialize() -> void:
 	_check_idleness_shortens_and_activity_lengthens_the_interval()
 	_check_the_idle_boost_cannot_compound()
 	_check_activity_expires()
+	_check_first_hint_one_shot()
 	finish()
 
 
@@ -150,3 +151,30 @@ func _check_activity_expires() -> void:
 	pacer.advance(HintPacer.BUILT_RECENTLY_SECONDS + 1.0)
 	check(not pacer.built_recently(),
 		"...and that lapses once the window passes, without a second placement")
+
+
+## PACER-LEVEL ISOLATION of the ruling `NewsReportPresenter.bind()`/`arm_first_hint()`
+## exercises end to end in `test_news_report.gd`. Proves the one-shot itself, independent of
+## any scheduler or world: unarmed, the flag never fires; armed, it fires exactly once and the
+## bands/multipliers below it are untouched on the call before AND the call after.
+func _check_first_hint_one_shot() -> void:
+	var unarmed := HintPacer.new()
+	check_eq(unarmed.next_interval(0), HintPacer.BAND_LEARNING * HintPacer.IDLE_MULTIPLIER,
+		"a pacer that was never armed never returns FIRST_HINT_SECONDS")
+
+	var armed := HintPacer.new()
+	armed.arm_first_hint()
+	check_eq(armed.next_interval(9), HintPacer.FIRST_HINT_SECONDS,
+		"an armed pacer's very next interval is FIRST_HINT_SECONDS, regardless of hosted_count")
+	check_eq(armed.next_interval(9), HintPacer.BAND_RARE * HintPacer.IDLE_MULTIPLIER,
+		"...and the call right after that is the ordinary band — the one-shot spent, not sticky")
+
+	# Arming twice in a row is still exactly one shot — the second `arm_first_hint()` call
+	# before any `next_interval()` call must not queue a second use.
+	var armed_twice := HintPacer.new()
+	armed_twice.arm_first_hint()
+	armed_twice.arm_first_hint()
+	check_eq(armed_twice.next_interval(0), HintPacer.FIRST_HINT_SECONDS,
+		"arming twice in a row still yields FIRST_HINT_SECONDS on the first call")
+	check_eq(armed_twice.next_interval(0), HintPacer.BAND_LEARNING * HintPacer.IDLE_MULTIPLIER,
+		"...and only the first call — the second is the ordinary band, not a second FIRST_HINT_SECONDS")

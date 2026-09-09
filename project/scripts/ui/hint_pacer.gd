@@ -45,6 +45,29 @@ const IDLE_MULTIPLIER: float = 0.5
 ## happens to be a duration too.
 const BUILT_RECENTLY_SECONDS: float = 30.0
 
+## PROPOSED — human owns this. Seconds until a brand-new world's FIRST hint, used exactly once
+## in place of the ordinary bands above. Operator ruling, 2026-09-08: "For a new game, the
+## first suggested villager build should come even faster than the first 30-60s" — a direction,
+## not a number, so 12.0 is proposed here awaiting the operator's own figure. Today the first
+## ambient report is armed at `BAND_LEARNING` (30 s, idle) once the ~3 s nudge fires, landing
+## the first hint ~33 s in; 12.0 would land it ~15 s in.
+const FIRST_HINT_SECONDS: float = 12.0
+
+## One-shot latch for `FIRST_HINT_SECONDS`. Default OFF: a pacer nobody arms behaves exactly as
+## it always has — only `arm_first_hint()` can ever set this true, and only `next_interval()`
+## can ever clear it again, once, on the very next call. See that method's own note for why the
+## bands and multipliers above are never touched by this at all.
+var _first_hint_armed: bool = false
+
+## Arms the one-shot: the VERY NEXT `next_interval()` call returns `FIRST_HINT_SECONDS` instead
+## of the ordinary band, then the latch clears and every call after behaves exactly as it does
+## today, forever. Call this ONLY for a brand-new world (`WorldRoot.is_new_world`) — see
+## `NewsReportPresenter.bind()`'s own note on where in that method this has to happen, and why
+## a loaded save must never call it.
+func arm_first_hint() -> void:
+	_first_hint_armed = true
+
+
 ## Seconds since the last placement. Clamped at `BUILT_RECENTLY_SECONDS` as hygiene, so an
 ## internal counter does not grow without bound across a long session — that is all this
 ## clamp is. It is NOT where the Pillar 1 "cannot compound" guarantee lives: once
@@ -78,7 +101,14 @@ func built_recently() -> bool:
 ## never accumulated across calls and never summed with the other. That exclusivity — not
 ## the saturation of `_since_activity` — is what keeps the boost from stacking toward an
 ## arbitrarily fast rate. spec §10.1: "the idle boost is capped, not compounding."
+##
+## THE ONE-SHOT IS CHECKED FIRST AND RETURNS EARLY, before the bands or multiplier below are
+## even read — so an armed first hint touches neither, and every call after this one (the
+## latch having cleared) computes the band/multiplier exactly as it always has.
 func next_interval(hosted_count: int) -> float:
+	if _first_hint_armed:
+		_first_hint_armed = false
+		return FIRST_HINT_SECONDS
 	var band: float = BAND_RARE
 	if hosted_count <= 0:
 		band = BAND_LEARNING

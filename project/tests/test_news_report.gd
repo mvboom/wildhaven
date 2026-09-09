@@ -117,6 +117,7 @@ func _process(_delta: float) -> bool:
 	_check_wiring_on_the_real_scene()
 	_check_presenter_fires_a_composed_hint()
 	_check_first_interval_after_a_load_knows_what_is_hosted()
+	_check_first_hint_interval_for_a_new_world()
 	_check_activity_reaches_the_pacer()
 	_check_coach_wiring_is_idempotent()
 	_check_is_new_world()
@@ -1022,6 +1023,75 @@ func _check_first_interval_after_a_load_knows_what_is_hosted() -> void:
 		+ "learning band")
 
 	presenter.free()
+	loaded_world.free()
+
+
+## RULING 2026-09-08: "For a new game, the first suggested villager build should come even
+## faster than the first 30-60s." `HintPacer.arm_first_hint()`/`FIRST_HINT_SECONDS` is a
+## one-shot, and `NewsReportPresenter.bind()` must arm it for a genuinely new world, only.
+##
+## Uses `GameSession.request_new()`, the same fixture idiom `_check_is_new_world()` uses below,
+## for the "new" half — a `WorldRoot.is_new_world` of `true` requires going through that path,
+## not just instancing `Main.tscn` directly (which is what this suite's own `_world`, and every
+## "loaded"-shaped fixture elsewhere in this file, already is).
+##
+## Drives the SCHEDULER, not the presenter's `_process()` — `advance()` is the exact call that
+## rolls the pacer's `_next_cadence()` when the real nudge fires at `NUDGE_DELAY_SECONDS`,
+## which is where the one-shot is actually meant to be consumed (see `bind()`'s own trace).
+func _check_first_hint_interval_for_a_new_world() -> void:
+	GameSession.request_new(WorldPreset.default_preset(), "First Hint Test", "", SEED)
+	var packed: PackedScene = load(WORLD_PATH) as PackedScene
+	var new_world: WorldRoot = packed.instantiate() as WorldRoot
+	root.add_child(new_world)
+	if not check(new_world.is_new_world,
+		"fixture: a world opened through GameSession.request_new() is new"):
+		new_world.free()
+		GameSession.clear()
+		return
+
+	var presenter := NewsReportPresenter.new()
+	root.add_child(presenter)
+	presenter.bind(new_world, _ui.news_report_toast)
+
+	# t=0 -> ~3s: the nudge fires. That is the FIRST real call into `_next_cadence()` for a new
+	# world (bind() never calls `retire_nudge()` when `is_new_world` is true), so it is the call
+	# that must read the one-shot.
+	presenter._scheduler.advance(NewsReportScheduler.NUDGE_DELAY_SECONDS + 0.01)
+	check_eq(presenter._scheduler.report_remaining(), HintPacer.FIRST_HINT_SECONDS,
+		"a new world's FIRST interval is FIRST_HINT_SECONDS, not the ordinary band (%.1f)"
+			% presenter._scheduler.report_remaining())
+
+	# The report itself now fires FIRST_HINT_SECONDS later, and its own `_next_cadence()` call
+	# — the SECOND ever made on this pacer — must be back on the ordinary band, one-shot spent.
+	var reference := HintPacer.new()
+	var expected_second: float = reference.next_interval(new_world.species_hosted_count())
+	presenter._scheduler.advance(HintPacer.FIRST_HINT_SECONDS + 0.01)
+	check_eq(presenter._scheduler.report_remaining(), expected_second,
+		"...and its SECOND interval is the ordinary band (%.1f), the one-shot spent"
+			% expected_second)
+
+	presenter.free()
+	new_world.free()
+	GameSession.clear()
+
+	# A LOADED SAVE. A directly-instantiated `Main.tscn` is NOT new (`_check_is_new_world()`
+	# proves this for exactly this fixture shape) — its presenter must never arm the one-shot,
+	# so its first interval is the ordinary band, same as before this ruling landed.
+	var loaded_world: WorldRoot = packed.instantiate() as WorldRoot
+	root.add_child(loaded_world)
+	check_eq(loaded_world.is_new_world, false,
+		"fixture: a directly-instantiated Main.tscn is not a new world")
+
+	var loaded_presenter := NewsReportPresenter.new()
+	root.add_child(loaded_presenter)
+	loaded_presenter.bind(loaded_world, _ui.news_report_toast)
+
+	var loaded_reference := HintPacer.new()
+	check_eq(loaded_presenter._scheduler.report_remaining(),
+		loaded_reference.next_interval(loaded_world.species_hosted_count()),
+		"a loaded world's first interval is the ordinary band — the one-shot was never armed")
+
+	loaded_presenter.free()
 	loaded_world.free()
 
 

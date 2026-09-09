@@ -49,6 +49,29 @@ func bind(world: WorldRoot, toast: NewsReportToast) -> void:
 	_scheduler = NewsReportScheduler.new()
 	_pacer = HintPacer.new()
 	_scheduler.set_pacer(_pacer)
+	# ARM THE FIRST-HINT ONE-SHOT BEFORE ANYTHING ELSE BELOW CAN CONSUME IT. Operator ruling,
+	# 2026-09-08: "For a new game, the first suggested villager build should come even faster
+	# than the first 30-60s" — see `HintPacer.FIRST_HINT_SECONDS`. Gated on `is_new_world` only
+	# — a loaded save must be completely unaffected.
+	#
+	# WHY IT HAS TO GO HERE AND NOT AFTER `set_hints_enabled()` BELOW: `set_hints_enabled(false)`
+	# itself calls `retire_nudge()`, which calls `_next_cadence()` — the exact call that consumes
+	# the one-shot. `GameplaySettings.hints_enabled()` is a GLOBAL setting that outlives any one
+	# world, so a player who turned Hints off in a previous session and then starts a BRAND-NEW
+	# world still has it off here. Arming after that call would mean the one-shot gets spent by
+	# `retire_nudge()`'s cadence roll — on an interval nobody will ever see sped up, since Hints
+	# are off — rather than by the real nudge-driven roll in `NewsReportScheduler.advance()` at
+	# ~3 s, which is the call this design actually means to speed up. Arming first means that
+	# even in this edge case the one-shot survives to fire on the first report the player
+	# actually sees, whenever Hints are turned back on.
+	#
+	# THE OTHER TRAP THIS SAME ORDERING AVOIDS: `retire_nudge()`, called several lines below
+	# (only reached for a NON-new world), ALSO calls `_next_cadence()`. Gating the arm call on
+	# `is_new_world` — not just placing it early — is what keeps a loaded save from ever
+	# touching the pacer's one-shot at all; `_first_hint_armed` starts `false` and nothing here
+	# sets it true unless this world is genuinely brand-new.
+	if world.is_new_world:
+		_pacer.arm_first_hint()
 	# BEFORE ANYTHING BELOW CAN ARM AN INTERVAL. Both `set_hints_enabled(false)` and
 	# `retire_nudge()` roll `_next_cadence()`, which asks the pacer for a band keyed on the
 	# hosted count — and until this call the scheduler's count is still its `0` default. Pushing
@@ -62,7 +85,9 @@ func bind(world: WorldRoot, toast: NewsReportToast) -> void:
 		# Only a brand-new save gets the first-time nudge (gdd.md -> Player Interface &
 		# Controls: "every brand-new save shows one dismissable popup"). A loaded save, or a
 		# scene opened directly (tests, F6 in the editor), starts straight into the ambient
-		# cadence.
+		# cadence. `_pacer._first_hint_armed` is still `false` here — the guard above never set
+		# it for this world — so this `retire_nudge()`'s own `_next_cadence()` call rolls the
+		# ordinary band, exactly as it always has.
 		_scheduler.retire_nudge()
 	set_process(true)
 
