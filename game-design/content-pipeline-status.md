@@ -788,3 +788,20 @@ out of tech-art's lane).
 | `validation_status` | **pass (2026-08-26)** — `test_farm_buildings_schema.gd`, same checks as `barn`'s row above, adapted to this entry's own proposed values. `WorldRoot.placeable_options()` confirmed to include `well`. Full suite green (87/87, zero SCRIPT ERROR) |
 | `human_signoff` | **not yet started.** Cost/footprint proposal, scale fit, and facing (identity, unconfirmed) all await a human eye pass |
 | `status` | 🚧 — asset imported and attributed, data entry landed and schema-validated. Copy (step 5), re-validation after copy (step 6), and human sign-off (step 8) are all still open |
+
+### `farmhouse` — model swap to House1 (2026-09-08)
+
+| Field | Value |
+|---|---|
+| `category_attributes` | unchanged — cost 30, allowed_terrain `["grass"]`, emitted_tags `["built", "house", "large_house"]`, hotbar_category `farm_building`. `footprint` moved 2×2 → 3×3 the same day by human ruling (see `farmhouse.tres` header); this row records the MODEL, not those values |
+| `source` | Quaternius, "Buildings Pack - Jan 2019" — CC0-1.0 (License.txt read at import; preserved at `res://assets/licenses/Quaternius_BuildingsPack_License.txt`). NEW pack for this project |
+| `pre_import_audit` | done (2026-09-08) — licence cleared CC0-1.0; 0 animation clips (static building); albedo_texture null on all 4 surfaces, colour is flat per-material Kd, no maps. **OBJ chosen over the pack's FBX**: the FBX sets `vertex_color_use_as_albedo` on a mesh carrying no COLOR array (the DeadTree/PineTree2 tell), the OBJ does not and matches the `.mtl`'s Kd values to 4dp. Both give a byte-identical AABB. Silhouette/style fit DEFERRED to human sign-off — note House1 is a white/grey house from a different pack than the red-roofed Fantasy RTS family every other house here comes from |
+| `project_location` | `project/assets/buildings/house1/House1.tscn` |
+| `data_entry_location` | `project/data/buildings/farmhouse.tres` — REPOINTED, not newly created. This closes the shared-mesh coupling with `house_medium/HouseMedium.tscn` that buildings.md flagged as "raised, not decided" |
+| `copy_content_location` | n/a — `farmhouse.tres`'s existing `fact_text` is unchanged by a mesh swap |
+| `attribution_status` | **done (2026-09-08)** — `project/attribution/sources/quaternius_buildings_pack.tres` (assets_used = ["House1"]); `project/CREDITS.md` regenerated from the `.tres` entries (14 sources); `test_attribution.gd` ratchet 13 → 14 |
+| `validation_status` | see the suite run recorded with this change |
+| `human_signoff` | **not yet.** Outstanding: the silhouette/style fit above, facing (identity, unconfirmed), and the 3×3 footprint itself — spec.md Open Question #18 is still open |
+| `status` | 🚧 — asset imported, attributed and wired to the Farmhouse. Human sign-off on look and footprint still open |
+
+**Pipeline note.** `scripts/asset_pipeline.py` run `20260908-house1-6032` was taken to its checkpoint, ruled, resumed, and then **abandoned** (evidence kept at `runs/20260908-house1-6032`). `--as building` means "import as a NEW buildable", so it wrote an eleventh buildable duplicating the Farmhouse field-for-field rather than repointing it; the swap was completed by hand instead. The run's licence audit, attribution entry and CREDITS row were carried across and are real. Two things it surfaced are worth keeping: its generated fidelity suite baked `SRC_BASE_COLORS` at exactly 1.25× the `.mtl`'s real Kd values and so failed against a faithful import, and its format ranking prefers FBX over OBJ for a pack where only the OBJ is faithful.

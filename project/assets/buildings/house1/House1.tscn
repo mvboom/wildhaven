@@ -1,0 +1,52 @@
+; House1 — the Farmhouse's own model (2026-09-08). Replaces the mesh the Farmhouse was SHARING
+; with the House buildable (HouseMedium.tscn), which buildings.md had already flagged as "the same
+; mesh at two footprints ... raised, not decided". With the House at 2x2 and the Farmhouse at 3x3,
+; `large_house` needed a silhouette of its own, not just a bigger plot under the same house.
+;
+; Source: Quaternius, "Buildings Pack - Jan 2019" (FBX), House1.fbx — CC0 1.0 Universal.
+; License.txt read before import and preserved at res://assets/licenses/Quaternius_BuildingsPack_License.txt.
+; NEW PACK for this project — recorded in project/attribution/sources/quaternius_buildings_pack.tres.
+;
+; FORMAT: FBX, and the OBJ was TRIED AND REJECTED — record this, because the raw numbers argue the
+; wrong way and cost a wrong turn on the first pass.
+;   * The pack's House1.mtl states four flat materials as LINEAR Kd: White 0.400000, Brown
+;     0.152139/0.121322/0.073125, Grey 0.087197/0.092843/0.095419, DarkGrey 0.026481. No map_Kd.
+;   * Godot's OBJ importer writes those linear numbers straight into `albedo_color`, which is an
+;     sRGB slot. So albedo_color READS as an exact match for the .mtl while RENDERING at
+;     sRGB->linear(0.4) = 0.1329 — about 3x too dark. On screen the house came out near-black.
+;   * Godot's FBX importer converts: it stores White 0.6652, Brown 0.4264, Grey 0.3268, DarkGrey
+;     0.1773, and sRGB->linear of each is 0.4000 / 0.1521 / 0.0872 / 0.0265 — the .mtl's own values
+;     to 4dp on all four. The FBX is the faithful one.
+; MEASURING `albedo_color` ALONE CANNOT TELL THESE APART, because the two importers use different
+; colour-space conventions for the same field. The eye test is what caught it; the arithmetic above
+; is what confirmed it. Both formats give a byte-identical AABB, so nothing else differs.
+; The .blend was NOT used: it is the same data, and routing through Blender would add a hard build
+; dependency to fix nothing.
+;
+; KNOWN, ACCEPTED: `vertex_color_use_as_albedo` imports as TRUE on all four surfaces while the mesh
+; carries NO COLOR array at all. Normally that is the DeadTree/PineTree2 tell; here it is a no-op,
+; because Godot's shader multiplies albedo by a COLOR attribute that defaults to white when absent —
+; confirmed by the render. Left as imported rather than papered over with a material_override, which
+; at wrapper level would collapse all four materials into one and actually break the look.
+;
+; SCALE: 0.673950 — HUMAN RULING (2026-09-08), taken at asset-pipeline checkpoint
+; 20260908-house1-6032. Raw AABB measured on the unmodified source: footprint 2.556878 x 3.869614
+; (x, z) tile-units, height 3.179442. The long horizontal axis (z) is scaled to 2.607927 — 3x the
+; House batch's original 0.869309 1x1 margin, the same 3x3 target Barn.tscn uses. Scaled result:
+; 1.7232 x 2.1428 x 2.6079 (x, y, z): a ~2.14-unit house against a 1.00-unit villager, two storeys,
+; which suits a `large_house` gating a family of four.
+;
+; RECENTRED, a measurement and not a judgment call. The scaled mesh centres on
+; (0.001152, _, 0.109674) rather than on (0, 0); the translation below is exactly its negation.
+; X and Z only — Y is untouched because the model already sits on the ground plane.
+;
+; FACING: left as authored (no rotation) — unconfirmed by a human eye pass, same posture as every
+; other placement judgment call here. FLAG FOR HUMAN SIGN-OFF.
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" uid="uid://dchna4kplcla8" path="res://assets/buildings/house1/House1.fbx" id="1_model"]
+
+[node name="House1" type="Node3D"]
+
+[node name="Model" parent="." instance=ExtResource("1_model")]
+transform = Transform3D(0.67395, 0, 0, 0, 0.67395, 0, 0, 0, 0.67395, -0.001152, 0, -0.109674)

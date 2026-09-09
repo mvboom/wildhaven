@@ -63,10 +63,47 @@
 ; (CC0 1.0) as the Farmhouse's own model, which the human has asked for; that import is blocked
 ; until this trial is committed, because scripts/asset_pipeline.py's preflight requires a clean tree.
 ;
+; MODEL SWAPPED 2026-09-08 — HouseMedium.tscn -> House1.tscn, closing the shared-mesh coupling
+; the header below describes and buildings.md flagged as "raised, not decided". The Farmhouse no
+; longer borrows a House look: it has its own silhouette, from Quaternius's "Buildings Pack -
+; Jan 2019" (House1.obj, CC0 1.0, new attribution source quaternius_buildings_pack.tres).
+;
+; This is what made the 3x3 ruling legible. While Farmhouse and House rendered the SAME mesh, a
+; bigger footprint just meant the same house standing in more space; `large_house` has to out-read
+; `house` on sight, not only on tile count. House1 is ~2.14 units tall against the House's
+; 1.41-1.82 and a 1.00-unit villager — two storeys, which is what a family of four should live in.
+;
+; SCALE (0.673950) IS THE HUMAN'S RULING, taken at asset-pipeline checkpoint 20260908-house1-6032.
+; That run was ABANDONED, deliberately, and this swap was done by hand instead: `--as building`
+; means "import as a NEW buildable", so the pipeline wrote an eleventh buildable that duplicated
+; this one field-for-field (same cost, footprint, terrain, tags, category) rather than repointing
+; this file's model. Its evidence is kept at runs/20260908-house1-6032. The licence audit,
+; attribution entry and CREDITS row that run produced were carried across by hand and are real;
+; the duplicate `house1.tres` buildable was not.
+;
+; FORMAT: the pack's FBX. The OBJ was tried first and REJECTED — Godot's OBJ importer writes the
+; .mtl's LINEAR Kd values into the sRGB `albedo_color` slot, so the house rendered about 3x too dark
+; while its raw numbers looked like an exact source match. The FBX converts correctly (its stored
+; sRGB maps to the .mtl's linear values to 4dp on all four materials). Full measurement, and the
+; reason `albedo_color` alone cannot distinguish the two, are in House1.tscn's own header.
+;
+; The three HouseMedium/HouseLarge/HouseSmall wrappers are UNTOUCHED and still belong to the House
+; buildable; nothing about the House changes here.
+;
+; NO FIDELITY SUITE, and that is the project's existing convention, not an omission. A
+; `; Source:` line here would enrol this file in scripts/content_fidelity.py, and every one of the
+; twelve assets that declares one is an ANIMAL — no building in this project has a fidelity suite,
+; including the House and all eight farm buildings. Two further reasons it would not work if tried:
+; `.obj` has no manifest path in fingerprint.py at all (only .gltf/.glb/.blend/.fbx), and the blend-vs-export
+; comparison is systematically off — Blender's exporter applies a 0.8 diffuse factor, so the .blend
+; reads White = 0.5 while BOTH the .fbx and the .obj export it as 0.4. That 1.25x is exactly what
+; made the abandoned run's generated suite fail against a faithful import. Recorded so nobody
+; rediscovers it; the import itself is correct.
+;
 [gd_resource type="Resource" script_class="PlaceableDefinition" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/definitions/placeable_definition.gd" id="1_schema"]
-[ext_resource type="PackedScene" path="res://assets/buildings/house_medium/HouseMedium.tscn" id="2_model"]
+[ext_resource type="PackedScene" path="res://assets/buildings/house1/House1.tscn" id="2_model"]
 
 [resource]
 script = ExtResource("1_schema")

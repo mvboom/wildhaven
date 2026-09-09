@@ -1990,3 +1990,32 @@ window, and `PLENTY_THRESHOLD`. All eight ship in code marked `## PROPOSED — h
 sourced in spec `2026-09-08-news-report-hints-design.md` §9. Per project rule, agents propose
 with sources and the human decides; this entry logs the four rulings and the correction of the
 stale D-40 premise above, nothing more.
+
+### D-62 · The starting Wood stockpile is 100, and #26's settled half and open half swap places
+**Decision (human, 2026-09-08):** `WoodLedger.STARTING_WOOD` = **100**, raised from 50.
+
+**Why:** D-60 re-cut every footprint upward — House, Small Barn, Open Barn, Silo, Windmill and
+Water Tower to 2×2, Farmhouse and Large Barn to 3×3 — and deliberately did **not** move a single
+cost, so wood-per-tile-claimed fell. That entry recorded the consequence and named #8/#26 as the
+questions that would have to absorb it. This is #26 absorbing it, on the stockpile side; the
+costs themselves are untouched and remain #8's.
+
+**What this does NOT settle, and the reason it is written down rather than smoothed over.**
+#26 was previously "sizing principle decided, exact value open": the principle was that the
+stockpile *covers the first-time nudge's suggested build only*, and is **deliberately not a
+buffer** — "covering several builds would make Wood decorative, so pacing begins at the *second*
+build" (gdd.md → Economy). At House = 15 Wood, 100 is roughly six Houses. **The value now
+decided is not an instance of the principle that was decided; it contradicts it.** So the two
+halves of #26 have swapped: the value is closed, the sizing principle is open. It is left open
+rather than rewritten here because rewriting it would mean authoring a pacing rationale on the
+human's behalf, and the pillar-level claim underneath it — that Wood paces rather than decorates
+— is exactly the kind of thing that gets answered by watching a kid play, not by an agent
+restating it to match the constant. #26 in spec.md now tracks that open half.
+
+**Not reopened here:** the passive rate (1 Wood per Forest tile per 60 s, #8, → D-29), the
+floor ~35 in gdd.md, and every building cost.
+
+**Touched:** `project/scripts/economy/wood_ledger.gd` (the constant and its comment, which no
+longer calls itself a placeholder), `project/tests/test_economy_rules.gd`
+(`EXPECTED_STARTING_WOOD`), gdd.md → Economy, spec.md (#26 and the House-cost pacing row),
+tier1-status.md row 8's `constants` cell.
