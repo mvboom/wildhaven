@@ -16,10 +16,13 @@ extends Node
 ## prop is parented to a plain visual root outside the tile grid, `Den.tscn` is three meshes
 ## with no collider, and `release()` frees it.
 ##
-## **Villagers get no den.** A House *is* a villager's home site and its own prop
-## (buildings.md), so a burrow beside a house would be a second home for one family. The rule
-## is expressed against the DATA, not against the species: a home site that is a structure
-## already has its prop standing on it. Nothing here knows what a villager is.
+## **ONLY WILD ANIMALS GET A DEN**, and it takes two gates to say that (see
+## `_spawn_home_prop()`). A House *is* a villager's home site and its own prop (buildings.md),
+## so a burrow beside a house would be a second home for one family — that one is expressed
+## against the DATA, and nothing here knows what a villager is. The second gate reads
+## `AnimalDefinition.category()`, because a farm animal can settle on open ground too: Husky,
+## Pig and Sheep each have one tier that gates on no building, and each was getting a mossy-log
+## burrow on somebody's farm.
 ##
 ## **MINIMAL AVOIDS (row 9, D-29)** also lives here, because this is the one place that already
 ## holds every live `ResidentRoamer` — the roamer itself does not and should not know about the
@@ -29,8 +32,8 @@ extends Node
 ## `_nearby_avoid_positions()`, which is the only place the symmetric union of two species'
 ## `avoids` lists is actually resolved.
 
-## The move-in prop. One scene for every species at the floor; per-species props (a nest for a
-## bird, a burrow for a rabbit) are content, not a system, and are not scoped here.
+## The move-in prop. One scene for every WILD species at the floor; per-species props (a nest
+## for a bird, a burrow for a rabbit) are content, not a system, and are not scoped here.
 const HOME_PROP_SCENE: String = "res://assets/props/den/Den.tscn"
 
 ## PLACEHOLDER — the human owns this. **A PURE PERFORMANCE BACKSTOP, NEVER A DESIGN TOOL**
@@ -91,17 +94,20 @@ func attach(
 
 
 ## Called by `HabitatSimulation` the moment a resident node exists. Gives it a wander and, for
-## a non-structure home, a den.
+## a wild species' non-structure home, a den.
+##
+## THE SPECIES IS RESOLVED FIRST because the prop now depends on it (`_spawn_home_prop()`), not
+## only the roamer's avoids and region.
 func present(resident: Node3D, site: HomeSite) -> void:
 	if site == null:
 		return
-	_spawn_home_prop(site)
-	if resident == null or not is_instance_valid(resident):
-		return
-
 	var species: AnimalDefinition = null
 	if _roster != null:
 		species = _roster.by_id(site.species_id)
+	_spawn_home_prop(site, species)
+	if resident == null or not is_instance_valid(resident):
+		return
+
 	# NOT a ternary: `Array[String]` on one side and a bare `[]` on the other silently
 	# resolves to plain `Array`, which then fails at runtime assigning into a typed variable.
 	var avoid_ids: Array[String] = []
@@ -154,13 +160,17 @@ func present(resident: Node3D, site: HomeSite) -> void:
 func release(site: HomeSite) -> void:
 	if site == null:
 		return
+	var had_prop: bool = _props.has(site)
 	var prop: Node3D = _props.get(site, null) as Node3D
 	if prop != null and is_instance_valid(prop):
 		prop.queue_free()
 	_props.erase(site)
-	# Only a den (never a structure home, which has no reservation to begin with — see
-	# `_spawn_home_prop()`'s `site.is_structure()` guard) needs its reservation cleared.
-	if _navigation != null and not site.is_structure():
+	# KEYED ON WHETHER A PROP WAS ACTUALLY SPAWNED, not on `site.is_structure()`. The two
+	# agreed while a structure home was the only thing that skipped the prop; now that a
+	# non-wild species skips it too, re-deriving the condition here would clear a reservation
+	# this site never made — and `set_den_tile_blocked(pos, false)` on a tile some OTHER den
+	# holds would hand a neighbour's home tile back to the pathfinder.
+	if _navigation != null and had_prop:
 		_navigation.set_den_tile_blocked(site.position, false)
 
 	var home: Vector3 = _home_world(site)
@@ -293,10 +303,33 @@ func _walkable_bounds() -> Rect2:
 	)
 
 
-## One prop per home site, and **none at all for a structure home site** — a House is already
-## its own prop.
-func _spawn_home_prop(site: HomeSite) -> void:
+## One prop per home site, and **only for a WILD species living outside a structure**.
+##
+## TWO GATES, and they exclude different things:
+##
+##   * `site.is_structure()` — a House or a Barn IS its own prop, so a burrow beside it would
+##     be a second home for one family.
+##   * `species.category() != CATEGORY_WILD` — a den beside the farm was the same mistake one
+##     step out. Husky, Pig and Sheep each carry ONE tier that gates on no building
+##     (`companion`, `sty`, `base`), so they could found a home on open ground and got a
+##     mossy-log den for it, which reads as a wild animal's burrow on a farm animal. Only
+##     `CATEGORY_WILD` — Fox, Rabbit, Deer, Stag, Donkey — moves into a den.
+##
+## READ FROM `category()`, NOT FROM A NEW FIELD, deliberately: the taxonomy already exists and
+## is already derived from each species' own tiers, so nothing new has to be authored per
+## species and nothing can drift out of step with the habitat data. The cost is that the line
+## is drawn at wild-vs-not, not at size — a Deer gets the same den a Rabbit does. A per-species
+## prop (a nest for a bird, a burrow for a rabbit) is the finer-grained version of this and is
+## still content, not a system; it would replace this gate rather than sit beside it.
+##
+## AN UNRESOLVED SPECIES GETS NO PROP. `attach()`'s roster is optional and a caller that omits
+## it still gets working roamers, but it cannot get a den — the rule above is unanswerable
+## without the species, and guessing "yes" would put the old behaviour back for exactly the
+## callers that cannot see it. `WorldRoot` always passes the roster.
+func _spawn_home_prop(site: HomeSite, species: AnimalDefinition) -> void:
 	if _props_root == null or site.is_structure() or _props.has(site):
+		return
+	if species == null or species.category() != AnimalDefinition.CATEGORY_WILD:
 		return
 	var packed: PackedScene = load(HOME_PROP_SCENE) as PackedScene
 	if packed == null:

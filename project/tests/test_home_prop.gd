@@ -16,10 +16,14 @@ extends QATestCase
 ##     itself, so nothing but the prop is in the frame.
 ##   GONE IF THE HOME RELOCATES. `release()` drops the prop and the roamers anchored to it.
 ##
-## THE RULE IS EXPRESSED AGAINST THE DATA, NOT AGAINST THE SPECIES (`site.is_structure()`),
-## and this suite asserts it that way: a synthetic structure site gets no prop even though
-## nothing about it is a villager. A rule written as `if species_id == "human"` would pass a
-## villager-shaped test and fail the first time a second building becomes a home.
+## TWO GATES, ASSERTED SEPARATELY.
+##   1. `site.is_structure()` — expressed against the DATA, not against the species, and this
+##      suite asserts it that way: a synthetic structure site gets no prop even though nothing
+##      about it is a villager. A rule written as `if species_id == "human"` would pass a
+##      villager-shaped test and fail the first time a second building becomes a home.
+##   2. `species.category() == CATEGORY_WILD` (2026-09-08) — because gate 1 alone still let a
+##      farm animal that CAN settle outside a building earn a burrow. See
+##      `_check_only_a_wild_species_gets_a_den()`.
 ##
 ## Run:
 ##   $GODOT_PATH --headless --path project --import
@@ -73,6 +77,7 @@ func _process(_delta: float) -> bool:
 	_check_the_prop_scene_is_pure_decoration()
 	_check_prop_changes_nothing_about_the_tile()
 	_check_structure_home_gets_no_prop_and_wild_home_does()
+	_check_only_a_wild_species_gets_a_den()
 	_check_release_drops_the_prop()
 	_check_counts_in_the_real_world()
 
@@ -151,7 +156,9 @@ func _check_prop_changes_nothing_about_the_tile() -> void:
 	root.add_child(props_root)
 
 	var presentation := ResidentPresentation.new()
-	presentation.attach(grid, props_root, SEED)
+	# THE ROSTER IS LOAD-BEARING NOW: `_spawn_home_prop()` reads
+	# `AnimalDefinition.category()`, so a fixture that omits it gets no den at all.
+	presentation.attach(grid, props_root, SEED, _world.roster)
 
 	var registry := HomeSiteRegistry.new()
 	var rabbit: AnimalDefinition = _world.roster.by_id("rabbit")
@@ -223,7 +230,9 @@ func _check_structure_home_gets_no_prop_and_wild_home_does() -> void:
 	var props_root := Node3D.new()
 	root.add_child(props_root)
 	var presentation := ResidentPresentation.new()
-	presentation.attach(grid, props_root, SEED)
+	# THE ROSTER IS LOAD-BEARING NOW: `_spawn_home_prop()` reads
+	# `AnimalDefinition.category()`, so a fixture that omits it gets no den at all.
+	presentation.attach(grid, props_root, SEED, _world.roster)
 	var registry := HomeSiteRegistry.new()
 
 	check_eq(presentation.prop_count(), 0, "no home, no prop")
@@ -262,6 +271,63 @@ func _check_structure_home_gets_no_prop_and_wild_home_does() -> void:
 	grid.free()
 
 
+## THE SECOND GATE (2026-09-08). `site.is_structure()` alone said "anyone living outside a
+## building gets a den", and Husky, Pig and Sheep each carry one tier that gates on no building
+## (`companion`, `sty`, `base`) — so each could found a home on open ground and got a wild
+## animal's mossy-log burrow on somebody's farm. The prop now also requires
+## `category() == CATEGORY_WILD`.
+##
+## Driven through `present()` on real roster species rather than by calling `category()`
+## directly, for the same reason the structure half above is: the assertion is about what
+## appears in the world, not about what a predicate returns.
+func _check_only_a_wild_species_gets_a_den() -> void:
+	var grid := WorldGrid.new()
+	grid.build(TerrainDefinition.load_all(), 36, 36)
+	root.add_child(grid)
+	var props_root := Node3D.new()
+	root.add_child(props_root)
+	var presentation := ResidentPresentation.new()
+	presentation.attach(grid, props_root, SEED, _world.roster)
+	var registry := HomeSiteRegistry.new()
+
+	# THE OFFENDERS, each on a plain non-structure site — the exact shape that used to earn a
+	# den. Their `category()` is asserted first so a future retune of their tiers fails HERE,
+	# naming the reason, instead of silently handing the den back.
+	var offenders: Array[String] = ["husky", "pig", "sheep"]
+	var tile_z: int = 4
+	for id: String in offenders:
+		var species: AnimalDefinition = _world.roster.by_id(id)
+		if not check(species != null, "SETUP: `%s` is in the roster" % id):
+			continue
+		check(species.category() != AnimalDefinition.CATEGORY_WILD,
+			"SETUP: %s is not a wild species (category `%s`)" % [id, species.category()])
+		var site: HomeSite = registry.register(Vector2i(6, tile_z), id, 8)
+		check_eq(site.is_structure(), false,
+			"SETUP: %s's home site here is a plain wild site, not a structure" % id)
+		presentation.present(_stub(grid, 6, tile_z), site)
+		tile_z += 6
+	check_eq(presentation.prop_count(), 0,
+		"NO DEN FOR A FARM ANIMAL — husky, pig and sheep all moved into non-structure homes "
+		+ "and not one of them got a burrow")
+	check_eq(presentation.roamer_count(), offenders.size(),
+		"...but all three still wander: no prop is not no presentation")
+
+	# THE CONTROL, through the identical call: the gate is species-shaped, not a dead counter.
+	var rabbit_site: HomeSite = registry.register(Vector2i(24, 24), "rabbit", 8)
+	presentation.present(_stub(grid, 24, 24), rabbit_site)
+	check_eq(presentation.prop_count(), 1,
+		"CONTROL: a Rabbit on the same kind of site DOES get a den (0 -> 1)")
+
+	# `release()` must clear the reservation this site actually made, and only that one. A
+	# propless site releasing would otherwise unblock a tile it never blocked.
+	presentation.release(rabbit_site)
+	check_eq(presentation.prop_count(), 0, "releasing the Rabbit's home drops its den")
+
+	presentation.free()
+	props_root.free()
+	grid.free()
+
+
 func _check_release_drops_the_prop() -> void:
 	var grid := WorldGrid.new()
 	grid.build(TerrainDefinition.load_all(), 36, 36)
@@ -269,7 +335,9 @@ func _check_release_drops_the_prop() -> void:
 	var props_root := Node3D.new()
 	root.add_child(props_root)
 	var presentation := ResidentPresentation.new()
-	presentation.attach(grid, props_root, SEED)
+	# THE ROSTER IS LOAD-BEARING NOW: `_spawn_home_prop()` reads
+	# `AnimalDefinition.category()`, so a fixture that omits it gets no den at all.
+	presentation.attach(grid, props_root, SEED, _world.roster)
 	var registry := HomeSiteRegistry.new()
 
 	var keep: HomeSite = registry.register(Vector2i(10, 10), "rabbit", 8)

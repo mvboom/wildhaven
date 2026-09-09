@@ -92,8 +92,9 @@ extends Node
 ## anyone special-casing a species. gdd.md decides that copy in the document ("a displaced
 ## villager family is never described as losing a home, only as finding one"), and the
 ## condition it actually keys off in the floor is structural: the home is a House. Nothing
-## here knows what a villager is, which is the same rule `ResidentPresentation` uses to decide
-## a House gets no den.
+## here knows what a villager is, which is the same rule `ResidentPresentation` uses as the
+## FIRST of its two reasons a House gets no den. (Its second, `category() == CATEGORY_WILD`, is
+## about farm animals settling on open ground and has no bearing on this voice.)
 signal displacement_warned(warning: Dictionary)
 
 ## A home actually moved. Fires once per relocated home, after the warning.

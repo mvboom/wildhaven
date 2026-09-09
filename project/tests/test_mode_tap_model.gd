@@ -693,23 +693,19 @@ func _check_live_neighborhood_preview() -> void:
 		"the preview says NOTHING in Inspect mode")
 	check(not _hud.neighborhood_preview_visible(), "...and its panel is not on screen")
 
-	# 2. In Terraform it reads the land — qualitatively.
+	# 2. In Terraform it reads the land — qualitatively, and on untouched land it says nothing.
+	#    RE-POINTED 2026-09-08 (the human ruled the `wild` band silent): this used to assert the
+	#    panel was ON screen here. A fresh world is `wild_grass` almost everywhere, so that line
+	#    stood under nearly every cursor position for the whole opening; the band is still
+	#    computed and still `wild`, it simply renders nothing.
 	_hud.set_mode(GameHud.Mode.TERRAFORM)
 	var wild_band: String = _router.refresh_preview(screen)
 	check_eq(wild_band, NeighborhoodPreview.BAND_WILD,
 		"untouched land reads as wild — nobody could settle here yet")
-	check(_hud.neighborhood_preview_visible(), "...and the preview panel is on screen")
+	check(not _hud.neighborhood_preview_visible(),
+		"...and the preview panel is NOT on screen: the `wild` band has no line")
 	var wild_text: String = _hud.neighborhood_preview_text()
-
-	# THE #27 ASSERTION. "never an `X / Y` fraction, which a child reads as a container to
-	# fill." Asserted as an absence of digits AND of a slash, so no numeric form can creep in.
-	var digits: String = ""
-	for digit: String in ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]:
-		if wild_text.contains(digit):
-			digits += digit
-	check(digits == "", "the preview shows NO digit at all (#27: qualitative ships)",
-		"text: %s / digits found: %s" % [wild_text, digits])
-	check(not wild_text.contains("/"), "...and no fraction")
+	check_eq(wild_text, "", "...and no line is being held behind the hidden panel")
 
 	# 3. It changes as the land is painted — beat 4 of the First 60 Seconds, and proof that
 	#    `WorldRoot.tile_changed` really does invalidate a read under a cursor that has not
@@ -749,9 +745,23 @@ func _check_live_neighborhood_preview() -> void:
 	var settled_band: String = _router.refresh_preview(screen)
 	check_eq(settled_band, NeighborhoodPreview.BAND_WELCOMING,
 		"THE SAME CURSOR now reads as welcoming — the preview followed the player's edit")
-	check(_hud.neighborhood_preview_text() != wild_text,
-		"...and the line on screen actually changed",
-		"before: %s / after: %s" % [wild_text, _hud.neighborhood_preview_text()])
+	var settled_text: String = _hud.neighborhood_preview_text()
+	check(_hud.neighborhood_preview_visible() and settled_text != wild_text,
+		"...and a line APPEARED where there was none — the panel is a positive signal now, "
+		+ "up only once the land has become something",
+		"before: %s / after: %s" % [wild_text, settled_text])
+
+	# THE #27 ASSERTION, on the line that is actually rendered. "never an `X / Y` fraction,
+	# which a child reads as a container to fill." Asserted as an absence of digits AND of a
+	# slash, so no numeric form can creep in. MOVED HERE 2026-09-08 from the `wild` step above,
+	# which now renders no text at all and would make this check vacuous.
+	var digits: String = ""
+	for digit: String in ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]:
+		if settled_text.contains(digit):
+			digits += digit
+	check(digits == "", "the preview shows NO digit at all (#27: qualitative ships)",
+		"text: %s / digits found: %s" % [settled_text, digits])
+	check(not settled_text.contains("/"), "...and no fraction")
 
 	# 4. THE COST BOUND (gdd.md -> Performance: "touching only home sites whose capacity radius
 	#    contains the cursor … never a re-scan"). Measured, not assumed.
