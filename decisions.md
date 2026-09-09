@@ -2019,3 +2019,51 @@ floor ~35 in gdd.md, and every building cost.
 longer calls itself a placeholder), `project/tests/test_economy_rules.gd`
 (`EXPECTED_STARTING_WOOD`), gdd.md → Economy, spec.md (#26 and the House-cost pacing row),
 tier1-status.md row 8's `constants` cell.
+
+### D-63 · Passive Wood is throttled to 1/min above 1000, and a zero-Forest world is told so
+**Decision (human, 2026-09-08):** two rulings, one problem — Wood's supply has no upper bound
+and no lower one, and both ends break the pacer.
+
+1. **`WoodLedger.THROTTLE_THRESHOLD_WOOD` = 1000, `THROTTLED_SECONDS_PER_WOOD` = 60.** Above
+   1000 Wood, passive accrual pays **1 Wood per 60 s total**, whatever the forest.
+2. **A world with zero Forest tiles gets a News Report saying so**, alternating with the
+   ordinary species hints.
+
+**Why the throttle.** Forest is free to paint — that is the free-Forest recovery guarantee
+(Pillar 1, no dead ends) and it is not up for revision — and it pays *per tile*, so a player
+who paints a hundred Forest tiles earns a hundred Wood a minute. Past that point every cost in
+the game is decorative and Wood has stopped being "a pacer, not an economy" (gdd.md → Economy)
+in the only way that matters. The threshold is the ceiling that keeps the pacer a pacer. It
+takes nothing away and refuses no edit: the world still pays above 1000, just at a rate a large
+forest cannot out-scale.
+
+**Deliberately a cliff, not a taper.** A ramp reads better on a graph and is invisible in play —
+nobody watching the HUD can tell a 40 %-throttled rate from an untuned one — so it would cost a
+constant nobody could ever check the game against. One threshold is a number the human can read
+off the counter.
+
+**The throttle is passive accrual only.** Removal refunds (and the future tap-to-tend burst)
+take `WoodLedger.add()` and are **not** metered: a refund is the player's own Wood coming back,
+and trickling it in at 1/min would read as the game eating it.
+
+**Why the zero-Forest report.** The mirror failure: a world with no Forest earns **nothing,
+ever** — `tick()` returns immediately on a zero count — and the HUD shows only a Wood counter
+that never moves, with nothing to explain why. It is the one genuinely stalled state in v1, it
+is reachable in normal play (the shipped **Barren** preset starts there by design), and the fix
+is free. So the feed says it, in the same invitation register as every other report: no warning
+colour, no error state, same toast.
+
+**It alternates rather than repeating.** An unconditional pre-empt would replay one identical
+sentence for as long as the player had no trees, which spec.md §10.1 rules out — "an idle
+stretch reads as the world talking about different animals, not as one nag repeated". The
+alternation needs no new state: the report writes a pseudo-id into the presenter's existing
+`_last_species_id`, and the no-repeat rule already there does the work. Copy is
+`NewsReportContent.NO_FOREST_REPORT`, PROPOSED and the content-writer's to overrule; this entry
+rules the behaviour, not the sentence.
+
+**Touched:** `project/scripts/economy/wood_ledger.gd` (both constants and `_accrual_gain()`),
+`project/scripts/ui/news_report_content.gd` (`NO_FOREST_ID`, `NO_FOREST_REPORT`),
+`project/scripts/ui/news_report_presenter.gd` (`compose_next_report()`'s pre-empt),
+`project/tests/test_economy_rules.gd`, `project/tests/test_news_report.gd`, gdd.md → Economy,
+spec.md (the balancing table's passive-rate row and §10.1's general-report note),
+tier1-status.md rows 5 and 12.

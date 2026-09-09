@@ -35,6 +35,33 @@ const BASELINE_WEIGHT: float = 1.0
 ## its `display_name` is "Villager".
 const VILLAGER_SPECIES_ID: String = "human"
 
+## THE ZERO-FOREST REPORT — the one report in the feed that names no species at all.
+## spec.md:100 already scopes the pool as "a per-animal (or GENERAL) text pool"; this is the
+## first general entry.
+##
+## WHY IT EARNS A SLOT IN A FEED THAT IS OTHERWISE ALL INVITATIONS: a world with no Forest
+## tiles earns no Wood, ever — `WoodLedger.tick()` returns immediately on a zero count — and
+## Forest is free to paint, so the fix costs the player nothing but knowing. That is the only
+## state in v1 where the loop is genuinely stalled and the player has no way to read why off
+## the HUD, which shows a Wood counter that simply never moves. It stays an invitation in
+## register (gdd.md -> Discovery: "a hint is an invitation, not an assignment"): no warning
+## colour, no error state, same toast as every other report.
+##
+## `NO_FOREST_ID` IS NOT A SPECIES AND MUST NEVER MATCH ONE. It is written into the
+## presenter's `_last_species_id` after this line shows, which is what makes the feed
+## ALTERNATE — see `NewsReportPresenter.compose_next_report()`. Double-underscored so no
+## roster `.tres` id can collide with it; the ordinary no-repeat filter simply matches nothing
+## on the cycle that follows, leaving the whole roster in the pool.
+const NO_FOREST_ID: String = "__no_forest__"
+
+## [COPY] — content-writer's, PROPOSED. Kids 6-10, plain vocabulary, upbeat, one sentence
+## (spec.md -> the fact-card checklist, which News Report copy reuses). Says the state and the
+## fix in the player's own verbs, and never scolds: the woodpile is not empty, it is waiting.
+const NO_FOREST_REPORT: String = (
+	"Nobody has spotted a tree in a while — plant a patch of forest and the woodpile will "
+	+ "start growing again."
+)
+
 ## PROPOSED — human owns this. The population at which a species stops being worth hinting
 ## at: the player has visibly succeeded and does not need telling again.
 const PLENTY_THRESHOLD: int = 3

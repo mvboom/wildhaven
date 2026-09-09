@@ -159,6 +159,32 @@ func built_recently() -> bool:
 func compose_next_report() -> String:
 	if _world == null or _world.roster == null:
 		return ""
+
+	# THE ZERO-FOREST REPORT, AHEAD OF THE ROSTER — the one general (non-species) entry in the
+	# pool (`NewsReportContent.NO_FOREST_REPORT`, whose header carries the reasoning). A world
+	# with no Forest earns no Wood at all, and Forest is free, so this is the only stalled
+	# state in v1 the player cannot read off the HUD.
+	#
+	# IT PRE-EMPTS, BUT ONLY EVERY OTHER CYCLE, and the alternation costs no new state: writing
+	# `NO_FOREST_ID` into `_last_species_id` makes the existing no-repeat rule do the work.
+	# Operator ruling, 2026-09-08. An unconditional pre-empt would replay one identical
+	# sentence for as long as the player has no trees, which is exactly what spec.md §10.1
+	# rules out — "an idle stretch reads as the world talking about different animals, not as
+	# one nag repeated." Alternating still names the problem every other report while the feed
+	# stays a feed.
+	#
+	# `NO_FOREST_ID` matches no roster id, so the cycle AFTER this one filters nothing out and
+	# picks from the whole roster as usual. It is deliberately NOT recorded in
+	# `_hinted_species_ids`, which means "a species a report has named" and feeds a future
+	# Field Guide column.
+	if (
+		_world.grid != null
+		and _world.grid.forest_tile_count() == 0
+		and _last_species_id != NewsReportContent.NO_FOREST_ID
+	):
+		_last_species_id = NewsReportContent.NO_FOREST_ID
+		return NewsReportContent.NO_FOREST_REPORT
+
 	var species: AnimalDefinition = NewsReportContent.pick_species(
 		_world.roster.species(), _world.grid, _content_rng, _world, {}, _last_species_id
 	)

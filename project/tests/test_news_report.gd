@@ -116,6 +116,7 @@ func _process(_delta: float) -> bool:
 	_check_toast_behaviour()
 	_check_wiring_on_the_real_scene()
 	_check_presenter_fires_a_composed_hint()
+	_check_zero_forest_report_alternates_with_species_hints()
 	_check_first_interval_after_a_load_knows_what_is_hosted()
 	_check_first_hint_interval_for_a_new_world()
 	_check_activity_reaches_the_pacer()
@@ -972,11 +973,87 @@ func _check_presenter_fires_a_composed_hint() -> void:
 	var presenter: NewsReportPresenter = _ui.news_report_presenter()
 	if not check(presenter != null, "GameUI exposes its presenter"):
 		return
+
+	# ONE FOREST TILE FIRST, AND IT IS NOT A FIXTURE CONVENIENCE. This suite builds its world
+	# with no `GameSession` preset (`_initialize()` calls `GameSession.clear()`), so its grid is
+	# entirely wild grass and `forest_tile_count()` is 0 — the same state the shipped **Barren**
+	# preset genuinely starts a player in. In that state the correct next report is the
+	# zero-forest one, which is asserted in full next door in
+	# `_check_zero_forest_report_alternates_with_species_hints()`. This check owns the OTHER
+	# path — that an ordinary cycle composes a live build hint — so it puts the world in the
+	# state that path describes rather than asserting against a world that has something more
+	# urgent to say. Painted after every terrain-bias check above has already run.
+	_world.grid.set_terrain(0, 0, "forest")
+	check_eq(_world.grid.forest_tile_count(), 1,
+		"the preset-less test world is barren, so a forest tile is painted for this check")
+
 	var line: String = presenter.compose_next_report()
 	check(not line.is_empty(), "the presenter composes a report")
 	check(line.contains("tiles of") or line.contains("a house") or line.contains("villager"),
 		"...and it is a build hint, not a bare flavour line: '%s'" % line)
 	check(not line.contains("_"), "...with no raw tag: '%s'" % line)
+
+
+## THE ZERO-FOREST REPORT (operator ruling, 2026-09-08). A world with no Forest tiles earns no
+## Wood at all — `WoodLedger.tick()` returns immediately on a zero count — and Forest is free
+## to paint, so the only thing standing between the player and a working economy is knowing.
+## The feed says so, and ALTERNATES rather than repeating: spec.md §10.1 requires an idle
+## stretch to read as "the world talking about different animals, not as one nag repeated".
+##
+## Uses its own world and presenter: this strips every Forest tile off the grid, which the
+## shared `_world`'s later checks (and its terrain bias) have every right to expect intact.
+func _check_zero_forest_report_alternates_with_species_hints() -> void:
+	GameplaySettings.reset_for_test()
+	var packed: PackedScene = load(WORLD_PATH) as PackedScene
+	var bare_world: WorldRoot = packed.instantiate() as WorldRoot
+	root.add_child(bare_world)
+	var presenter := NewsReportPresenter.new()
+	root.add_child(presenter)
+	presenter.bind(bare_world, _ui.news_report_toast)
+
+	for x in bare_world.grid.width:
+		for z in bare_world.grid.depth:
+			if bare_world.grid.get_terrain_id(x, z) == WorldGrid.FOREST_TERRAIN_ID:
+				bare_world.grid.set_terrain(x, z, "grass")
+	if not check_eq(bare_world.grid.forest_tile_count(), 0,
+			"the test world has been stripped of every forest tile"):
+		presenter.free()
+		bare_world.free()
+		return
+
+	check_eq(presenter.compose_next_report(), NewsReportContent.NO_FOREST_REPORT,
+		"with no forest anywhere, the next report says so")
+	var second: String = presenter.compose_next_report()
+	check(second != NewsReportContent.NO_FOREST_REPORT and not second.is_empty(),
+		"...the one after it is an ordinary species hint, not the same line again: '%s'" % second)
+	check_eq(presenter.compose_next_report(), NewsReportContent.NO_FOREST_REPORT,
+		"...and the one after THAT names the missing forest again — it alternates, it does not "
+		+ "repeat and it does not fire once and give up")
+
+	# The pseudo-id is bookkeeping for the no-repeat rule, not a species anything can host.
+	check(not presenter.hinted_species_ids().has(NewsReportContent.NO_FOREST_ID),
+		"the zero-forest pseudo-id is never recorded as a species a report has named")
+	check(NewsReportContent.NO_FOREST_ID.begins_with("__"),
+		"...and cannot collide with a roster id")
+	for species: AnimalDefinition in bare_world.roster.species():
+		if not check(species.id != NewsReportContent.NO_FOREST_ID,
+				"no roster species carries the zero-forest pseudo-id"):
+			break
+
+	# ONE FOREST TILE IS ENOUGH TO SILENCE IT. The report is about a stalled economy, not about
+	# how much forest the player has — the moment Wood can accrue at all, there is nothing to say.
+	bare_world.grid.set_terrain(0, 0, "forest")
+	check_eq(bare_world.grid.forest_tile_count(), 1, "one forest tile is painted back")
+	var quiet: bool = true
+	for _i in 6:
+		if presenter.compose_next_report() == NewsReportContent.NO_FOREST_REPORT:
+			quiet = false
+			break
+	check(quiet, "with even one forest tile, six reports running are all ordinary hints")
+
+	presenter.free()
+	bare_world.free()
+	GameplaySettings.reset_for_test()
 
 
 ## THE FIRST INTERVAL OF A LOADED SESSION. Whole-branch review finding: `bind()` armed the

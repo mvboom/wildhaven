@@ -71,6 +71,7 @@ func _process(_delta: float) -> bool:
 	_check_costs_are_debited()
 	_check_unaffordable_edit_is_a_no_op_with_no_error_state()
 	_check_passive_accrual_scales_with_forest()
+	_check_accrual_throttles_above_the_threshold()
 	_check_wild_grass_converts_implicitly_on_placement()
 
 	note_expected_pending(
@@ -314,6 +315,102 @@ func _check_passive_accrual_scales_with_forest() -> void:
 	ledger.reset(0)
 	ledger.tick(600.0)
 	check_eq(ledger.get_wood(), 0, "...and accrual stops with it")
+
+	ledger.free()
+	scratch.free()
+
+
+# --- 4. The rich-world throttle (D-63) ----------------------------------------------------------
+
+## PASSIVE ACCRUAL IS CAPPED ONCE THE STOCKPILE IS LARGE. Forest is free to paint and pays
+## per tile, so supply is unbounded upward: a player who paints a hundred Forest tiles earns a
+## hundred Wood a minute and every cost in the game stops meaning anything. Past
+## `WoodLedger.THROTTLE_THRESHOLD_WOOD` the world still pays — nothing is taken away and no
+## edit is ever refused (Pillar 1) — but at a trickle a large forest cannot out-scale.
+##
+## The measurements start the ledger ALREADY above the threshold rather than accruing up to
+## it, per `tick()`'s own header: the rate is sampled once per call, so a single synthetic
+## 60 s delta that CROSSES the threshold would pay the pre-crossing rate for the whole span.
+func _check_accrual_throttles_above_the_threshold() -> void:
+	check_eq(WoodLedger.THROTTLE_THRESHOLD_WOOD, 1000,
+		"the throttle threshold is 1000 Wood (D-63)")
+	check_eq(WoodLedger.THROTTLED_SECONDS_PER_WOOD, 60.0,
+		"...above which the world pays 1 Wood per 60 s, whatever the forest (D-63)")
+
+	var scratch := WorldGrid.new()
+	scratch.build(TerrainDefinition.load_all(), 8, 8)
+	var ledger := WoodLedger.new()
+	ledger.attach(scratch)
+
+	# A forest far larger than the throttled rate, so "capped" and "unchanged" are different
+	# numbers by a wide margin rather than by a rounding error.
+	var big_forest: int = FOREST_BATCH * 4
+	for i in big_forest:
+		scratch.set_terrain(i % 8, i / 8, "forest")
+	check_eq(scratch.forest_tile_count(), big_forest,
+		"%d forest tiles for the throttle measurements" % big_forest)
+
+	ledger.reset(WoodLedger.THROTTLE_THRESHOLD_WOOD - big_forest)
+	ledger.tick(60.0)
+	check_eq(ledger.get_wood(), WoodLedger.THROTTLE_THRESHOLD_WOOD,
+		"BELOW the threshold the rate is untouched: %d forest tiles pay %d Wood over 60 s"
+		% [big_forest, big_forest])
+
+	ledger.reset(WoodLedger.THROTTLE_THRESHOLD_WOOD)
+	ledger.tick(60.0)
+	check_eq(ledger.get_wood(), WoodLedger.THROTTLE_THRESHOLD_WOOD + 1,
+		"AT the threshold the same forest pays 1 Wood over 60 s, not %d" % big_forest)
+
+	ledger.reset(WoodLedger.THROTTLE_THRESHOLD_WOOD * 2)
+	ledger.tick(600.0)
+	check_eq(ledger.get_wood(), WoodLedger.THROTTLE_THRESHOLD_WOOD * 2 + 10,
+		"ten minutes at twice the threshold pays 10 Wood — the trickle does not decay further")
+
+	# THE CARRY SURVIVES THE THROTTLED PATH TOO. Without it, a tick worth 1/6 of a Wood would
+	# round to nothing and a throttled world would pay literally never.
+	#
+	# The trailing 1 ms tick is not padding and is not a rounding fudge in the code: six
+	# additions of `10.0 / 60.0` in IEEE doubles sum to a hair UNDER 1.0, so the payout lands a
+	# few nanoseconds the far side of the 60 s mark. That is invisible at frame deltas and is
+	# left alone deliberately — clamping it away would mean an epsilon inside `tick()` on the
+	# hot path, to buy exactness only a test can see. What the assertion still pins is the part
+	# that matters: 60 s of throttled accrual pays exactly 1 Wood, not 0 and not `big_forest`.
+	ledger.reset(WoodLedger.THROTTLE_THRESHOLD_WOOD)
+	for _i in 6:
+		ledger.tick(10.0)
+	ledger.tick(0.001)
+	check_eq(ledger.get_wood(), WoodLedger.THROTTLE_THRESHOLD_WOOD + 1,
+		"the fractional carry is not lost on the throttled path either")
+
+	# THE THROTTLE IS A CEILING, NEVER A FLOOR. One Forest tile already pays 1 Wood / 60 s, so
+	# a naive rate REPLACEMENT would leave it unchanged here — and would pay a small forest
+	# more for being rich the moment the two constants were ever tuned apart.
+	for i in big_forest:
+		scratch.set_terrain(i % 8, i / 8, "grass")
+	scratch.set_terrain(0, 0, "forest")
+	check_eq(scratch.forest_tile_count(), 1, "one forest tile left")
+	ledger.reset(WoodLedger.THROTTLE_THRESHOLD_WOOD * 5)
+	ledger.tick(600.0)
+	check_eq(ledger.get_wood(), WoodLedger.THROTTLE_THRESHOLD_WOOD * 5 + 10,
+		"a ONE-tile forest is never paid more for being rich — the cap only ever slows accrual")
+
+	# SPENDING BACK UNDER RESUMES FULL RATE, with no latch to reset: the throttle reads the
+	# live balance, so recovery is automatic.
+	for i in big_forest:
+		scratch.set_terrain(i % 8, i / 8, "forest")
+	ledger.reset(WoodLedger.THROTTLE_THRESHOLD_WOOD)
+	check(ledger.spend(1), "spending drops the balance under the threshold")
+	ledger.tick(60.0)
+	check_eq(ledger.get_wood(), WoodLedger.THROTTLE_THRESHOLD_WOOD - 1 + big_forest,
+		"...and the very next tick pays the full rate again — no latch, no cooldown")
+
+	# REFUNDS AND BURSTS ARE NOT THROTTLED (operator ruling, 2026-09-08). `add()` is the path a
+	# removal refund and the future tap-to-tend burst both take; metering it would read as the
+	# game eating Wood the player just got back.
+	ledger.reset(WoodLedger.THROTTLE_THRESHOLD_WOOD * 3)
+	ledger.add(50)
+	check_eq(ledger.get_wood(), WoodLedger.THROTTLE_THRESHOLD_WOOD * 3 + 50,
+		"a refund pays in full and instantly, however large the stockpile")
 
 	ledger.free()
 	scratch.free()
