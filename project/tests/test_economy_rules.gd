@@ -24,7 +24,7 @@ extends QATestCase
 const WORLD_PATH: String = "res://scenes/Main.tscn"
 
 ## gdd.md -> Economy's cost table, and the constants the human still owns (#8, #26).
-const EXPECTED_STARTING_WOOD: int = 50
+const EXPECTED_STARTING_WOOD: int = 100
 const EXPECTED_CULTIVATED_COST: int = 2
 const EXPECTED_HOUSE_COST: int = 15
 ## Includes the habitat-tiers ruling's 3 additions (Meadow, Scrub, Snowfield —

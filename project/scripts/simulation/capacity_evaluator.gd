@@ -170,7 +170,7 @@ static func tag_counts(
 			# loop. Most of a world is exactly this tile.
 			if tile_mask & tier_mask == 0 and not tile_has_site:
 				continue
-			if not _tile_counts_for(registry, tile, origin, d_squared, self_site, species):
+			if not _tile_counts_for(grid, registry, tile, origin, d_squared, self_site, species):
 				continue
 			# Resident-emitted tags, counted PER INDIVIDUAL. A house holding four villagers
 			# contributes people=4. Counting this per-tile instead would silently turn
@@ -227,20 +227,21 @@ static func tag_counts(
 ##
 ## THE ONE CARVE-OUT (2026-08-17): a genuinely PROSPECTIVE candidate (`self_site == null`) is,
 ## by construction, never itself structure-associated — `HabitatSimulation._site_for()` only
-## ever resolves a non-null structure `self_site` when the candidate sits exactly ON that
-## structure's own tile (`registry.vacant_site_at(position)`), so `self_site == null` proves
-## this query is NOT a structure. Its scope therefore resolves to its own species, never
+## ever resolves a non-null structure `self_site` when the candidate sits somewhere ON that
+## structure's own FOOTPRINT (`registry.vacant_site_at(grid.home_site_anchor(position))`), so
+## `self_site == null` proves this query is NOT a structure. Its scope therefore resolves to its own species, never
 ## `STRUCTURE_SCOPE` — which means, unguarded, it would never see a structure's otherwise-
 ## unbeatable (distance 0) ownership of ITS OWN tile, and could freely read that tile's tag
 ## (e.g. `house`) as if unclaimed. The old, unscoped ownership map closed this for free (the
 ## structure was always the global nearest owner of its own tile); scoping reopens it, so it
 ## is closed back up explicitly here: a prospective candidate never counts a STRUCTURE'S OWN
-## tile, full stop, regardless of species-scope ownership. This is deliberately narrower than
-## "never counts anything a structure owns" — `structure_site_at()` is a tile-EXACT check, so a
-## field or a patch of grass a structure merely happens to be the nearest STRUCTURE_SCOPE
-## owner of (within its radius, not its own footprint) stays freely shareable with a wild
-## species that has no use for `house` at all.
+## footprint, full stop, regardless of species-scope ownership. This is deliberately narrower
+## than "never counts anything a structure owns" — the check is FOOTPRINT-exact, so a field or
+## a patch of grass a structure merely happens to be the nearest STRUCTURE_SCOPE owner of
+## (within its radius, but off its footprint) stays freely shareable with a wild species that
+## has no use for `house` at all.
 static func _tile_counts_for(
+	grid: WorldGrid,
 	registry: HomeSiteRegistry,
 	tile: Vector2i,
 	origin: Vector2i,
@@ -255,7 +256,15 @@ static func _tile_counts_for(
 		if self_site != null and self_site.is_structure()
 		else species.id
 	)
-	if self_site == null and registry.structure_site_at(tile) != null:
+	# THROUGH THE FOOTPRINT ANCHOR, NOT THE BARE TILE. A building's home site sits at its
+	# ORIGIN while its tags are emitted at its CENTRE, so on any footprint wider than 2x2 the
+	# tag tile is not the site tile and a bare `structure_site_at(tile)` shielded the wrong
+	# one — a prospective candidate then read a 3x3 Farmhouse's `large_house` off the centre
+	# tile as if unclaimed. `home_site_anchor()` maps every footprint tile back to the one
+	# site, so the shield covers the whole footprint however wide it gets.
+	if self_site == null and registry.structure_site_at(
+		grid.home_site_anchor(tile.x, tile.y) if grid != null else tile
+	) != null:
 		return false
 	var owner: HomeSite = registry.owner_at(tile, scope_key)
 	if owner == null or owner == self_site:
@@ -313,6 +322,14 @@ static func evaluate(
 ) -> Dictionary:
 	var result: Dictionary = {"capacity": 0, "tier": null}
 	if species == null:
+		return result
+	# A BUILDING'S FOOTPRINT IS ITS OWN HOME'S GROUND. A candidate that resolved no
+	# `self_site` cannot claim the building standing on it (`HabitatSimulation._site_for()`
+	# would have handed back its structure site if the building were a home for this species),
+	# so founding a home site here would put a wild site — and its den prop — inside somebody
+	# else's barn. Observed with pigs and pugs, which need `people` and so qualified on the
+	# villagers living in the Farmhouse they were standing on.
+	if self_site == null and grid != null and grid.is_occupied(origin.x, origin.y):
 		return result
 	var best: int = 0
 	var winner: HabitatTier = null

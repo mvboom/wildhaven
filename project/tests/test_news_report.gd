@@ -16,6 +16,9 @@ extends QATestCase
 ##      terrain-bias weighting is measurably more likely to name a species whose habitat
 ##      already exists more of, without ever letting a species with none of it go completely
 ##      unreachable (gdd.md -> Discovery: "a hint is an invitation, not an assignment").
+##      `hint_line()` then composes the report itself: an authored (or generic) opening plus
+##      needs derived live from `HabitatRecipe`, so a divisor retune updates every report with
+##      no copy edit, and no rendered report ever carries an imperative or a raw tag.
 ##   4. THE SETTING PERSISTS. `GameplaySettings` defaults ON, round-trips through its own
 ##      `user://` file independently of any world save, and `SettingsOverlay` reads/writes it
 ##      rather than keeping a second copy of the value.
@@ -34,6 +37,10 @@ const WORLD_PATH: String = "res://scenes/Main.tscn"
 const FOX_PATH: String = "res://data/animals/fox.tres"
 const RABBIT_PATH: String = "res://data/animals/rabbit.tres"
 const HUMAN_PATH: String = "res://data/animals/human.tres"
+## The clearest case of the two generations of habitat data disagreeing: Husky's flat
+## `habitat_needs` (`house`, `open_grass`) and its starter tier (`snow`, `people`) share no tag
+## at all, so a ranking reading the wrong one is measurable rather than merely different.
+const HUSKY_PATH: String = "res://data/animals/husky.tres"
 
 ## A fixed seed so the cadence rolls this suite pins are reproducible.
 const SEED: int = 20260809
@@ -77,18 +84,41 @@ func _process(_delta: float) -> bool:
 	_ui.bind_world()
 
 	_check_schema_field_exists()
+	_check_discovery_openings_field_exists()
 	_check_floor_roster_pools()
 	_check_scheduler_nudge_timing()
 	_check_scheduler_cadence_timing()
 	_check_scheduler_hints_toggle_suppresses_live()
 	_check_scheduler_hints_off_retires_nudge_forever()
+	_check_scheduler_without_a_pacer_is_unchanged()
+	_check_scheduler_with_a_pacer_uses_its_interval()
+	_check_hints_off_silences_the_feed_at_every_pacer_state()
 	_check_content_tag_tile_counts()
 	_check_content_candidates_and_lines()
 	_check_content_terrain_bias()
+	_check_bias_reads_the_tier_the_hint_renders()
+	# ORDER MATTERS: `_check_nothing_hosted_names_the_villager()` MUST run before any check that
+	# calls `restore_hosted()`. `HomeSiteRegistry.restore_hosted()` is additive-only — it can
+	# never clear an entry (gdd.md -> Economy: "Species Hosted (all-time, never decreases)") — so
+	# once ANY check below hosts a species on this suite's shared `_world`, there is no way to get
+	# back to `species_hosted_count() == 0` for the rest of this run. The villager gate only has
+	# anything to prove while the count is still genuinely zero.
+	_check_nothing_hosted_names_the_villager()
+	_check_no_repeat_survives_the_villager_gate()
+	_check_hosted_count_survives_a_round_trip()
+	_check_ranking_prefers_species_not_yet_hosted()
+	_check_the_same_species_is_never_picked_twice_running()
+	_check_hint_line_composes_opening_and_needs()
+	_check_authored_opening_is_preferred()
+	_check_toast_and_card_state_the_same_numbers()
 	_check_gameplay_settings_persistence()
 	_check_settings_overlay_reads_and_writes_the_one_source_of_truth()
 	_check_toast_behaviour()
 	_check_wiring_on_the_real_scene()
+	_check_presenter_fires_a_composed_hint()
+	_check_first_interval_after_a_load_knows_what_is_hosted()
+	_check_first_hint_interval_for_a_new_world()
+	_check_activity_reaches_the_pacer()
 	_check_coach_wiring_is_idempotent()
 	_check_is_new_world()
 	_check_help_button_opens_field_guide()
@@ -120,6 +150,24 @@ func _check_schema_field_exists() -> void:
 	fresh.fact_text_pool = ["A critter fact."]
 	check(fresh.validate().is_empty(),
 		"validate() is clean with news_reports left at its empty default — the field is optional")
+
+
+## The opening pool is a SEPARATE field from `news_reports`, not a re-purposing of it.
+## `fox.tres` mixes three discovery lines with six flavour lines in one flat array today —
+## the exact interleaving `fox-news-report-pool.md` said "must not be drawn
+## interchangeably". Composing a build list onto "A fox was spotted curled up in a sunbeam"
+## is incoherent, so the registers get their own fields rather than one shared one.
+func _check_discovery_openings_field_exists() -> void:
+	var fox: AnimalDefinition = load(FOX_PATH) as AnimalDefinition
+	if not check(fox != null, "fox.tres loads"):
+		return
+	check(fox.discovery_openings is Array, "`discovery_openings` exists and is an Array")
+	check(fox.discovery_openings.is_empty(),
+		"...and starts empty — authoring openings is follow-on work, outside this plan")
+	check(not fox.news_reports.is_empty(),
+		"...while `news_reports` keeps its existing flavour copy untouched")
+	check_eq(fox.validate().size(), 0,
+		"a species with an empty `discovery_openings` still validates clean")
 
 
 func _check_floor_roster_pools() -> void:
@@ -251,6 +299,56 @@ func _check_scheduler_hints_off_retires_nudge_forever() -> void:
 		"pausing mid-cadence and resuming leaves the SAME remaining wait — a pause, not a reset")
 
 
+## THE FALLBACK IS THE POINT. A scheduler with no pacer must behave EXACTLY as it does
+## today — that is what keeps every pre-existing cadence assertion in this suite a real
+## check rather than one quietly rewritten to match new behaviour. D-37's decided constants
+## are not deleted; they stop being the ambient rule and become the no-pacer answer.
+func _check_scheduler_without_a_pacer_is_unchanged() -> void:
+	var scheduler := NewsReportScheduler.new(SEED)
+	scheduler.advance(NewsReportScheduler.NUDGE_DELAY_SECONDS + 0.01)
+	var remaining: float = scheduler.report_remaining()
+	check(remaining >= NewsReportScheduler.CADENCE_MIN_SECONDS,
+		"the no-pacer cadence still lands at or above D-37's floor (%.1f)" % remaining)
+	check(remaining <= NewsReportScheduler.CADENCE_MAX_SECONDS,
+		"...and at or below its ceiling (%.1f)" % remaining)
+
+
+## With a pacer attached, the hosted count drives the interval instead.
+func _check_scheduler_with_a_pacer_uses_its_interval() -> void:
+	var scheduler := NewsReportScheduler.new(SEED)
+	var pacer := HintPacer.new()
+	scheduler.set_pacer(pacer)
+	scheduler.set_hosted_count(0)
+	scheduler.advance(NewsReportScheduler.NUDGE_DELAY_SECONDS + 0.01)
+	var learning: float = scheduler.report_remaining()
+	check_eq(learning, pacer.next_interval(0),
+		"the learning band drives the interval verbatim (%.1f)" % learning)
+
+	var settled := NewsReportScheduler.new(SEED)
+	settled.set_pacer(HintPacer.new())
+	settled.set_hosted_count(9)
+	settled.advance(NewsReportScheduler.NUDGE_DELAY_SECONDS + 0.01)
+	check(settled.report_remaining() > learning,
+		"a player hosting nine species waits longer than one hosting none")
+
+
+## PILLAR INVARIANT. The Hints toggle silences the feed regardless of pacer state — the
+## pacer sits BELOW that gate and changes the interval, never whether an event may fire.
+func _check_hints_off_silences_the_feed_at_every_pacer_state() -> void:
+	for hosted: int in [0, 2, 4, 9]:
+		var scheduler := NewsReportScheduler.new(SEED)
+		scheduler.set_pacer(HintPacer.new())
+		scheduler.set_hosted_count(hosted)
+		scheduler.set_hints_enabled(false)
+		var fired: bool = false
+		for i in range(2000):
+			if scheduler.advance(1.0) != NewsReportScheduler.EVENT_NONE:
+				fired = true
+				break
+		check(not fired,
+			"hints off fires nothing at hosted_count %d, over 2000 simulated seconds" % hosted)
+
+
 # --- 3. The pick -------------------------------------------------------------------------------
 
 func _check_content_tag_tile_counts() -> void:
@@ -336,6 +434,412 @@ func _check_content_terrain_bias() -> void:
 		+ "assignment toward only the land the player already has (rich=%d, scarce=%d)"
 			% [rich_picks, scarce_picks])
 	grid.free()
+
+
+## THE BIAS MUST READ THE SAME GENERATION OF DATA THE HINT RENDERS. Whole-branch review
+## finding: `pick_species()` biased on the flat legacy `habitat_needs` while `hint_line()`
+## composed its sentence from `HabitatRecipe.starter_tier()`. The two disagree for 8 of the 15
+## shipped species, so gdd.md -> Discovery's "the ones whose land the player already has float
+## up" was being decided by terrain the report would never mention.
+##
+## HUSKY IS THE PROOF because the two sets are DISJOINT: flat `house`/`open_grass` against the
+## starter tier's `snow`/`people`. On an all-snowfield grid the tier reading gives it every tile
+## and the flat reading gives it none, so the assertion below genuinely fails on the old
+## behaviour rather than merely shifting a probability — verified by reasoning the weights
+## through: tier reading 25:1 for husky, flat reading a flat 1:1 coin toss against the decoy.
+##
+## `world` LEFT NULL (the default) on purpose: that keeps `species_weight()` returning the same
+## multiplier for both candidates and the early gate silent, so terrain bias is the only signal
+## the outcome can be attributed to.
+func _check_bias_reads_the_tier_the_hint_renders() -> void:
+	var husky: AnimalDefinition = load(HUSKY_PATH) as AnimalDefinition
+	if not check(husky != null, "husky.tres loads"):
+		return
+
+	var tier_tags: Array[String] = NewsReportContent.starter_tags(husky)
+	check(tier_tags.has("snow") and tier_tags.has("people"),
+		"husky's starter tier needs snow and people (%s)" % [tier_tags])
+	var flat_tags: String = str(husky.habitat_needs)
+	for tag: String in tier_tags:
+		check(not husky.habitat_needs.has(tag),
+			"fixture: the two generations really are disjoint — starter tag '%s' against flat %s"
+				% [tag, flat_tags])
+
+	# A decoy carrying only flat fields, which `effective_tiers()` synthesises a legacy tier from
+	# — so BOTH readings agree about the decoy, and the husky is the only thing that can move the
+	# result.
+	var decoy := AnimalDefinition.new()
+	decoy.id = "decoy"
+	decoy.habitat_needs = ["open_grass"] as Array[String]
+	check_eq(NewsReportContent.starter_tags(decoy).size(), 1,
+		"fixture: a flat-only species still yields one starter tag, via the legacy tier")
+
+	# All snow, no grass and no buildings: `snow` is plentiful, and every tag either reading
+	# could otherwise credit (`house`, `open_grass`, `people`) is at zero.
+	var grid := WorldGrid.new()
+	grid.build(TerrainDefinition.load_all(), 6, 4)
+	for x in range(6):
+		for z in range(4):
+			grid.set_terrain(x, z, "snowfield")
+
+	var candidates: Array[AnimalDefinition] = [husky, decoy]
+	var rng := RandomNumberGenerator.new()
+	rng.seed = SEED
+	var husky_picks: int = 0
+	var decoy_picks: int = 0
+	const TRIALS: int = 200
+	for i in range(TRIALS):
+		var picked: AnimalDefinition = NewsReportContent.pick_species(candidates, grid, rng)
+		if picked == husky:
+			husky_picks += 1
+		elif picked == decoy:
+			decoy_picks += 1
+	check_eq(husky_picks + decoy_picks, TRIALS, "every trial picked one of the two candidates")
+	check(husky_picks > decoy_picks * 5,
+		"a snowfield world floats the species whose STARTER TIER wants snow, not the one its "
+		+ "legacy flat field happens to name — the old behaviour credited husky none of these "
+		+ "tiles and landed near an even split (husky=%d, decoy=%d)"
+			% [husky_picks, decoy_picks])
+	grid.free()
+
+
+## THE RANKING. Never-hosted outranks hosted-a-little; hosted-a-little outranks
+## hosted-at-or-past-`PLENTY_THRESHOLD`; and the bottom tier NEVER reaches zero —
+## `BASELINE_WEIGHT` already documents why (gdd.md: "a hint is an invitation, not an
+## assignment"), and a species that can never be named again reads as a closed door.
+##
+## THE THIRD TIER NEEDS A REAL POPULATION, NOT JUST `restore_hosted()`. Fix round 1 finding 1:
+## `HomeSiteRegistry.restore_hosted()` only ever sets `_ever_hosted` (its own doc comment: it
+## exists for the half of Species Hosted with no home site left) — it never touches
+## `population_of()`, which stays 0 forever after it, always below `PLENTY_THRESHOLD`. A check
+## that reaches the "hosted" tier only via `restore_hosted()` can therefore never observe
+## `WEIGHT_PLENTY_HOSTED` or the `<` boundary at `PLENTY_THRESHOLD` at all — a
+## `WEIGHT_FEW_HOSTED`/`WEIGHT_PLENTY_HOSTED` swap, or a `<` flipped to `<=`, would pass
+## silently. `HomeSiteRegistry.register()` plus appending directly to `site.residents` is the
+## same fixture idiom `test_capacity_formula.gd`
+## (`site.residents.append(null)  # population 1, with no model needed`) and
+## `test_resident_tags.gd` already use to give a site a real population without routing
+## through the full move-in simulation — `null` residents are enough because `population()`
+## only ever reads `residents.size()`.
+func _check_ranking_prefers_species_not_yet_hosted() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = SEED
+	var roster: Array[AnimalDefinition] = _world.roster.species()
+
+	var never: float = NewsReportContent.species_weight(roster[0], _world)
+	check(never > 0.0, "a never-hosted species carries real weight")
+
+	# Host one via `restore_hosted()` alone (population stays 0) — the FEW tier.
+	_world.registry.restore_hosted([roster[0].id] as Array[String])
+	var few: float = NewsReportContent.species_weight(roster[0], _world)
+	check(few < never,
+		"hosting a species demotes it (%.2f < %.2f)" % [few, never])
+	check(few > 0.0,
+		"...but never to zero — the door stays open (%.2f)" % few)
+
+	# A DIFFERENT species, driven to a REAL population of exactly `PLENTY_THRESHOLD` — the
+	# PLENTY tier, genuinely exercised rather than inferred from the constants alone.
+	var plenty_species: AnimalDefinition = roster[1]
+	var site: HomeSite = _world.registry.register(
+		Vector2i(1, 1), plenty_species.id, plenty_species.scout_radius
+	)
+	for i in range(NewsReportContent.PLENTY_THRESHOLD):
+		site.residents.append(null)
+	check_eq(_world.population_of(plenty_species.id), NewsReportContent.PLENTY_THRESHOLD,
+		"fixture: the species has really reached PLENTY_THRESHOLD, not merely been hosted")
+
+	var plenty: float = NewsReportContent.species_weight(plenty_species, _world)
+	check(plenty < few,
+		"a species AT the plenty threshold ranks below one merely hosted (%.2f < %.2f)"
+			% [plenty, few])
+	check(plenty > 0.0,
+		"...but never to zero here either — the door stays open (%.2f)" % plenty)
+
+	# THE `<` BOUNDARY ITSELF. One resident short of `PLENTY_THRESHOLD` must still rank as
+	# FEW, not PLENTY — a `<` flipped to `<=` in `species_weight()` would pass every assertion
+	# above (both populations tested so far sit strictly on one side of the boundary) but
+	# fail this one.
+	site.residents.pop_back()
+	check_eq(_world.population_of(plenty_species.id), NewsReportContent.PLENTY_THRESHOLD - 1,
+		"fixture: one resident short of the threshold")
+	var just_under: float = NewsReportContent.species_weight(plenty_species, _world)
+	check_eq(just_under, NewsReportContent.WEIGHT_FEW_HOSTED,
+		"PLENTY_THRESHOLD - 1 residents still ranks as FEW, not PLENTY (%.2f)" % just_under)
+
+	# THE FULL ORDERING, on the constants themselves.
+	check(NewsReportContent.WEIGHT_NEVER_HOSTED > NewsReportContent.WEIGHT_FEW_HOSTED
+			and NewsReportContent.WEIGHT_FEW_HOSTED > NewsReportContent.WEIGHT_PLENTY_HOSTED
+			and NewsReportContent.WEIGHT_PLENTY_HOSTED > 0.0,
+		"the full ordering holds: never (%.2f) > few (%.2f) > plenty (%.2f) > 0" % [
+			NewsReportContent.WEIGHT_NEVER_HOSTED,
+			NewsReportContent.WEIGHT_FEW_HOSTED,
+			NewsReportContent.WEIGHT_PLENTY_HOSTED,
+		])
+
+
+## THE EARLY GATE, ruled 2026-09-08 (D-61 #4, "Villager first"): one branch, not a two-stage
+## sequence. With nothing hosted the hint names the Villager because the OPERATOR RULED THAT IT
+## DOES — not because it is cheapest. This comment used to claim it was, and the arithmetic does
+## not support that: a Villager is a 15-wood House plus a 2-wood cultivated tile (17 wood),
+## against Rabbit's 4 free wild-grass tiles plus 4 cultivated (8 wood), and Rabbit is the species
+## the human pinned as the tutorial starter. The ruling is untouched; only its stated
+## justification was wrong. After the gate the ordinary ranking runs unmodified.
+##
+## MUST RUN BEFORE ANY CHECK THAT CALLS `restore_hosted()` (see the call-order comment in
+## `_process()` above) — `HomeSiteRegistry.restore_hosted()` is additive-only per its own doc
+## comment ("Species Hosted (all-time, never decreases)"), so once another check hosts a
+## species on this suite's shared `_world`, `species_hosted_count()` can never return to 0
+## again for the rest of this run and this check's own fixture assertion below would fail.
+func _check_nothing_hosted_names_the_villager() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = SEED
+	check_eq(_world.species_hosted_count(), 0, "the fixture world hosts nothing yet")
+	for i in range(12):
+		var picked: AnimalDefinition = NewsReportContent.pick_species(
+			_world.roster.species(), _world.grid, rng, _world
+		)
+		if not check(picked != null, "a species is picked"):
+			return
+		if not check_eq(picked.id, NewsReportContent.VILLAGER_SPECIES_ID,
+			"with nothing hosted the pick is always the villager (attempt %d)" % i):
+			return
+
+
+## THE NO-REPEAT RULE IN THE STATE A REAL NEW PLAYER IS IN. `_check_the_same_species_is_never_
+## picked_twice_running()` further down hosts the Villager on its very first line, which switches
+## the early gate OFF before it runs — so the no-repeat rule was only ever tested in the state
+## where it is not needed, and the whole-branch review found exactly the defect that hid there:
+## the gate returned before the filter, so a brand-new player heard one identical sentence every
+## 30 s. Nothing-hosted is the worst case for repetition, not the mildest — shortest interval
+## band, no authored `discovery_openings` anywhere in the roster, deterministic needs.
+##
+## ASSERTS BOTH HALVES, because either alone can be satisfied by a broken fix: no two consecutive
+## picks alike (the rule), AND the Villager still named repeatedly across the run (the gate's
+## purpose, which a fix that simply deleted the gate would fail).
+##
+## MUST RUN BEFORE ANY CHECK THAT CALLS `restore_hosted()`, for the additive-only reason
+## `_check_nothing_hosted_names_the_villager()` documents directly above.
+func _check_no_repeat_survives_the_villager_gate() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = SEED
+	check_eq(_world.species_hosted_count(), 0, "fixture: the world still hosts nothing")
+	var previous: String = ""
+	var distinct: Dictionary = {}
+	var villager_picks: int = 0
+	const ATTEMPTS: int = 20
+	for i in range(ATTEMPTS):
+		var picked: AnimalDefinition = NewsReportContent.pick_species(
+			_world.roster.species(), _world.grid, rng, _world, {}, previous
+		)
+		if not check(picked != null, "a species is picked on attempt %d" % i):
+			return
+		if not check(picked.id != previous,
+			"attempt %d named '%s' twice running with NOTHING hosted" % [i, picked.id]):
+			return
+		if picked.id == NewsReportContent.VILLAGER_SPECIES_ID:
+			villager_picks += 1
+		distinct[picked.id] = true
+		previous = picked.id
+	check(distinct.size() > 1,
+		"an idle stretch with nothing hosted names more than one species (%d distinct in %d)"
+			% [distinct.size(), ATTEMPTS])
+	check(villager_picks > 0,
+		"...and the gate still does its job — the villager is named repeatedly (%d of %d)"
+			% [villager_picks, ATTEMPTS])
+
+
+## SPEC §11's ROUND-TRIP CHECK. The decay driver was chosen over a wall clock precisely
+## because it already survives a save; that is only true if the restored count actually
+## reaches the pacer. `restore_hosted()` is the same path `world_snapshot.gd` uses on load.
+##
+## `expected` is computed from a PRE-restore snapshot of `species_hosted_ids()`, never from a
+## post-restore read of `species_hosted_count()` — reading both sides of the comparison off
+## the same post-restore call was tautological (fixed 2026-09-08, round-1 review):
+## `HintPacer.next_interval()` is deterministic on `(hosted_count, _since_activity)` with no
+## RNG, so two schedulers fed the SAME number always agree with each other whether or not
+## `restore_hosted()` actually worked — a broken restore that silently left the count at 0
+## would still pass. Deriving `expected` independently of the post-restore state is what lets
+## this check actually fail when restore misbehaves.
+##
+## MUST RUN AFTER `_check_nothing_hosted_names_the_villager()` (see that check's own ordering
+## note) — `restore_hosted()` is additive-only, so this check must not run before the villager
+## gate's own `species_hosted_count() == 0` fixture assertion.
+##
+## THE IDS BELOW MUST STAY DISJOINT FROM WHATEVER `_check_ranking_prefers_species_not_yet_
+## hosted()` PICKS UP BY POSITION (`roster[0]`/`roster[1]` off `_world.roster.species()`,
+## filename-sorted — `alpaca`/`bull` today): that check relies on those two species going from
+## unhosted to hosted, so if this check's `ids` ever collided with them first, that check's
+## `few == never` comparison would fail — loudly, since `species_weight()` returns discrete
+## tier constants rather than degrading quietly. This check still has to run first regardless,
+## because of the villager-gate ordering above; this note exists so a future reorder finds the
+## constraint here instead of rediscovering it from a failing assertion.
+func _check_hosted_count_survives_a_round_trip() -> void:
+	var before_ids: Array[String] = _world.species_hosted_ids()
+	var ids: Array[String] = ["human", "rabbit", "fox", "deer"] as Array[String]
+	var newly_hosted: int = 0
+	for id: String in ids:
+		if not before_ids.has(id):
+			newly_hosted += 1
+	var expected: int = before_ids.size() + newly_hosted
+
+	_world.registry.restore_hosted(ids)
+	check_eq(_world.species_hosted_count(), expected,
+		"restoring %d never-before-hosted ids raises the count from %d to %d (observed %d)"
+			% [newly_hosted, before_ids.size(), expected, _world.species_hosted_count()])
+
+	var from_memory := NewsReportScheduler.new(SEED)
+	from_memory.set_pacer(HintPacer.new())
+	from_memory.set_hosted_count(expected)
+	from_memory.advance(NewsReportScheduler.NUDGE_DELAY_SECONDS + 0.01)
+
+	var from_restore := NewsReportScheduler.new(SEED)
+	from_restore.set_pacer(HintPacer.new())
+	from_restore.set_hosted_count(_world.species_hosted_count())
+	from_restore.advance(NewsReportScheduler.NUDGE_DELAY_SECONDS + 0.01)
+
+	check_eq(from_restore.report_remaining(), from_memory.report_remaining(),
+		"the restored count paces identically to the same count held in memory")
+
+
+## The Pillar 1 mitigation for the idle multiplier: an idle stretch must read as the world
+## talking about different animals, not one nag repeated.
+func _check_the_same_species_is_never_picked_twice_running() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = SEED
+	_world.registry.restore_hosted([NewsReportContent.VILLAGER_SPECIES_ID] as Array[String])
+	var previous: String = ""
+	for i in range(30):
+		var picked: AnimalDefinition = NewsReportContent.pick_species(
+			_world.roster.species(), _world.grid, rng, _world, {}, previous
+		)
+		if not check(picked != null, "a species is picked on attempt %d" % i):
+			return
+		if not check(picked.id != previous,
+			"attempt %d picked '%s' twice running" % [i, picked.id]):
+			return
+		previous = picked.id
+
+
+## THE COMPOSER. An authored opening plus needs derived live, so a divisor retune updates
+## every report with no copy edit. A species with NO authored opening still produces a whole,
+## grammatical report — which is what lets the hint layer cover all fifteen species today: zero
+## species carry `discovery_openings` copy yet (that field is separate from, and much sparser
+## than, the `news_reports` ambient-flavour pool three species already carry), so every hint
+## line rendered right now runs through `GENERIC_OPENING`, and the composer has to make that
+## fallback read as a whole sentence on its own.
+func _check_hint_line_composes_opening_and_needs() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = SEED
+
+	var fox: AnimalDefinition = load(FOX_PATH) as AnimalDefinition
+	if not check(fox != null, "fox.tres loads"):
+		return
+	var line: String = NewsReportContent.hint_line(fox, _world, rng)
+	check(not line.is_empty(), "a species with no authored opening still yields a report")
+	check(line.contains("fox"), "the report names the species: '%s'" % line)
+	check(line.contains("4 tiles of forest"), "...and carries the real divisor: '%s'" % line)
+	check(line.contains("far from any buildings"),
+		"...and the starter tier's limit: '%s'" % line)
+	check(line.ends_with("."), "the report is a finished sentence: '%s'" % line)
+
+	# The register rules from the spec, on real roster data. Word-boundary regexes, not
+	# substring checks — five species (deer, donkey, fox, rabbit, stag) render the limit
+	# phrase "away from buildings" / "far from any buildings", and a plain
+	# `.contains("build")` substring check flags the NOUN "buildings" as if it were the
+	# imperative verb "build". `\bbuild\b` / `\btap\b` catch the verb without ever matching
+	# inside a longer word.
+	var imperative_patterns: Dictionary = {
+		"build": RegEx.new(),
+		"tap": RegEx.new(),
+	}
+	for word: String in imperative_patterns:
+		(imperative_patterns[word] as RegEx).compile("\\b%s\\b" % word)
+
+	for species: AnimalDefinition in _world.roster.species():
+		var rendered: String = NewsReportContent.hint_line(species, _world, rng)
+		check(not rendered.is_empty(), "%s renders a report" % species.id)
+		check(not rendered.contains("_"),
+			"%s's report leaks no raw tag: '%s'" % [species.id, rendered])
+		var lowered: String = rendered.to_lower()
+		for word: String in imperative_patterns:
+			var pattern: RegEx = imperative_patterns[word]
+			check(pattern.search(lowered) == null,
+				"%s's report carries no imperative ('%s'): '%s'" % [species.id, word, rendered])
+		check(not lowered.contains("you should"),
+			"%s's report carries no imperative ('you should'): '%s'" % [species.id, rendered])
+
+
+## An authored opening is used verbatim as the first half; the generic one is used only when
+## the species has none.
+func _check_authored_opening_is_preferred() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = SEED
+	var ghost := AnimalDefinition.new()
+	ghost.id = "ghost"
+	ghost.display_name = "Ghost"
+	ghost.discovery_openings = ["Word has it a ghost is looking for somewhere quiet"] as Array[String]
+	var tier := HabitatTier.new()
+	tier.id = "only"
+	tier.max_individuals = 4
+	var need := HabitatNeed.new()
+	need.tag = "open_grass"
+	need.tiles_per_individual = 5
+	tier.needs = [need]
+	ghost.tiers = [tier]
+
+	var line: String = NewsReportContent.hint_line(ghost, _world, rng)
+	check(line.begins_with("Word has it a ghost is looking for somewhere quiet"),
+		"the authored opening leads the sentence verbatim: '%s'" % line)
+	check(line.contains("5 tiles of open grass"),
+		"...and the derived half follows it: '%s'" % line)
+
+
+## THE PROPERTY THE WHOLE DESIGN RESTS ON. The toast and the Field Guide card must state the
+## SAME number for the same need, because they are two renderings of one derivation. If this
+## ever fails, someone has added a second source of truth for a divisor — the exact defect
+## the counted-tile rewrite paid for once already.
+##
+## Anchors on the DATA, not on a rebuilt sentence: for each starter-tier need, the divisor in
+## `tiles_per_individual` must appear in front of that need's noun in BOTH surfaces. Rebuild
+## a sentence and compare, and the test passes by construction while proving nothing.
+##
+## Does not host anything, so it has no ordering dependency on `_check_nothing_hosted_names_
+## the_villager()`'s `species_hosted_count() == 0` fixture assertion — but it is placed after
+## it anyway, alongside the rest of the composer checks it belongs with.
+func _check_toast_and_card_state_the_same_numbers() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = SEED
+	for species: AnimalDefinition in _world.roster.species():
+		var tier: HabitatTier = HabitatRecipe.starter_tier(species)
+		if tier == null:
+			continue
+		var toast: String = NewsReportContent.hint_line(species, _world, rng)
+		var card_lines: Array[String] = HabitatRecipe.describe_tiers(species, _world)
+		if not check(not card_lines.is_empty(), "%s renders a card" % species.id):
+			continue
+		var card: String = card_lines[0]
+		for need: HabitatNeed in tier.needs:
+			if need.is_gate_only():
+				continue
+			var noun: String = HabitatRecipe.need_noun(need.tag, _world)
+			if noun.is_empty():
+				continue
+			var expected: String = "%d %s" % [need.tiles_per_individual, noun]
+			var expected_tiles: String = "%d tiles of %s" % [need.tiles_per_individual, noun]
+			var expected_one: String = "1 tile of %s" % noun
+			var wanted: bool = (
+				toast.contains(expected)
+				or toast.contains(expected_tiles)
+				or toast.contains(expected_one)
+			)
+			check(wanted,
+				"%s's toast states %s's real divisor (%d): '%s'"
+				% [species.id, noun, need.tiles_per_individual, toast])
+			check(
+				card.contains(expected)
+				or card.contains(expected_tiles)
+				or card.contains(expected_one),
+				"...and %s's card states the same one: '%s'" % [species.id, card])
 
 
 # --- 4. The setting persists ---------------------------------------------------------------
@@ -434,7 +938,7 @@ func _check_toast_behaviour() -> void:
 func _check_wiring_on_the_real_scene() -> void:
 	check(_ui.news_report_toast is NewsReportToast, "GameUI carries a NewsReportToast")
 	check(_ui.menu_window is MenuWindow, "GameUI carries a MenuWindow")
-	check(_ui.news_report_presenter is NewsReportPresenter, "GameUI carries a NewsReportPresenter")
+	check(_ui.news_report_presenter() is NewsReportPresenter, "GameUI carries a NewsReportPresenter")
 
 	# Settings moved off MenuWindow entirely (2026-08-25) onto its own Title-screen-reachable
 	# page — there is no in-game SettingsOverlay instance left for the live presenter to listen
@@ -461,6 +965,176 @@ func _check_wiring_on_the_real_scene() -> void:
 	GameplaySettings.reset_for_test()
 
 
+## END TO END ON THE REAL SCENE. The presenter must compose a hint (not a flavour line),
+## keep the pacer fed with the live hosted count, and remember the last species so the
+## no-repeat rule has something to work with.
+func _check_presenter_fires_a_composed_hint() -> void:
+	var presenter: NewsReportPresenter = _ui.news_report_presenter()
+	if not check(presenter != null, "GameUI exposes its presenter"):
+		return
+	var line: String = presenter.compose_next_report()
+	check(not line.is_empty(), "the presenter composes a report")
+	check(line.contains("tiles of") or line.contains("a house") or line.contains("villager"),
+		"...and it is a build hint, not a bare flavour line: '%s'" % line)
+	check(not line.contains("_"), "...with no raw tag: '%s'" % line)
+
+
+## THE FIRST INTERVAL OF A LOADED SESSION. Whole-branch review finding: `bind()` armed the
+## cadence (via `retire_nudge()` -> `_next_cadence()`) while the scheduler's hosted count was
+## still its `0` default, because the count was only pushed from `_process()`. A returning
+## player with a full haven got their first hint on the LEARNING band — the shortest in the
+## game, meant for someone who has attracted nothing — and the mistake only corrected itself
+## after that first report had already fired.
+##
+## Uses a SEPARATE world, not this suite's `_world`: `restore_hosted()` is additive-only, and
+## `_check_nothing_hosted_names_the_villager()` needs the shared world's count to stay at 0.
+##
+## The expected value is derived from a reference `HintPacer`, never hardcoded — all four bands
+## and both multipliers are PROPOSED constants the human still owns, and this check must survive
+## them being retuned. The second assertion is what keeps the first non-vacuous: it fails if the
+## two bands ever collapse to the same number, which would make agreement prove nothing.
+func _check_first_interval_after_a_load_knows_what_is_hosted() -> void:
+	GameplaySettings.reset_for_test()
+	var packed: PackedScene = load(WORLD_PATH) as PackedScene
+	var loaded_world: WorldRoot = packed.instantiate() as WorldRoot
+	root.add_child(loaded_world)
+	loaded_world.registry.restore_hosted(
+		["rabbit", "fox", "deer", "human", "cow", "pig", "sheep", "husky"] as Array[String]
+	)
+	var hosted: int = loaded_world.species_hosted_count()
+	if not check(hosted > HintPacer.SETTLED_MAX_HOSTED,
+		"fixture: the loaded world hosts enough species to be past every band but the last (%d)"
+			% hosted):
+		loaded_world.free()
+		return
+
+	var reference := HintPacer.new()
+	if not check(reference.next_interval(hosted) != reference.next_interval(0),
+		"fixture: the band for %d hosted differs from the learning band, so agreeing with one "
+		% hosted + "genuinely rules out the other"):
+		loaded_world.free()
+		return
+
+	var presenter := NewsReportPresenter.new()
+	root.add_child(presenter)
+	presenter.bind(loaded_world, _ui.news_report_toast)
+	check_eq(presenter._scheduler.report_remaining(), reference.next_interval(hosted),
+		"a loaded save's FIRST interval is armed on its real hosted count, not on the 0-hosted "
+		+ "learning band")
+
+	presenter.free()
+	loaded_world.free()
+
+
+## RULING 2026-09-08: "For a new game, the first suggested villager build should come even
+## faster than the first 30-60s." `HintPacer.arm_first_hint()`/`FIRST_HINT_SECONDS` is a
+## one-shot, and `NewsReportPresenter.bind()` must arm it for a genuinely new world, only.
+##
+## Uses `GameSession.request_new()`, the same fixture idiom `_check_is_new_world()` uses below,
+## for the "new" half — a `WorldRoot.is_new_world` of `true` requires going through that path,
+## not just instancing `Main.tscn` directly (which is what this suite's own `_world`, and every
+## "loaded"-shaped fixture elsewhere in this file, already is).
+##
+## Drives the SCHEDULER, not the presenter's `_process()` — `advance()` is the exact call that
+## rolls the pacer's `_next_cadence()` when the real nudge fires at `NUDGE_DELAY_SECONDS`,
+## which is where the one-shot is actually meant to be consumed (see `bind()`'s own trace).
+func _check_first_hint_interval_for_a_new_world() -> void:
+	GameSession.request_new(WorldPreset.default_preset(), "First Hint Test", "", SEED)
+	var packed: PackedScene = load(WORLD_PATH) as PackedScene
+	var new_world: WorldRoot = packed.instantiate() as WorldRoot
+	root.add_child(new_world)
+	if not check(new_world.is_new_world,
+		"fixture: a world opened through GameSession.request_new() is new"):
+		new_world.free()
+		GameSession.clear()
+		return
+
+	var presenter := NewsReportPresenter.new()
+	root.add_child(presenter)
+	presenter.bind(new_world, _ui.news_report_toast)
+
+	# t=0 -> ~3s: the nudge fires. That is the FIRST real call into `_next_cadence()` for a new
+	# world (bind() never calls `retire_nudge()` when `is_new_world` is true), so it is the call
+	# that must read the one-shot.
+	presenter._scheduler.advance(NewsReportScheduler.NUDGE_DELAY_SECONDS + 0.01)
+	check_eq(presenter._scheduler.report_remaining(), HintPacer.FIRST_HINT_SECONDS,
+		"a new world's FIRST interval is FIRST_HINT_SECONDS, not the ordinary band (%.1f)"
+			% presenter._scheduler.report_remaining())
+
+	# The report itself now fires FIRST_HINT_SECONDS later, and its own `_next_cadence()` call
+	# — the SECOND ever made on this pacer — must be back on the ordinary band, one-shot spent.
+	var reference := HintPacer.new()
+	var expected_second: float = reference.next_interval(new_world.species_hosted_count())
+	presenter._scheduler.advance(HintPacer.FIRST_HINT_SECONDS + 0.01)
+	check_eq(presenter._scheduler.report_remaining(), expected_second,
+		"...and its SECOND interval is the ordinary band (%.1f), the one-shot spent"
+			% expected_second)
+
+	presenter.free()
+	new_world.free()
+	GameSession.clear()
+
+	# A LOADED SAVE. A directly-instantiated `Main.tscn` is NOT new (`_check_is_new_world()`
+	# proves this for exactly this fixture shape) — its presenter must never arm the one-shot,
+	# so its first interval is the ordinary band, same as before this ruling landed.
+	var loaded_world: WorldRoot = packed.instantiate() as WorldRoot
+	root.add_child(loaded_world)
+	check_eq(loaded_world.is_new_world, false,
+		"fixture: a directly-instantiated Main.tscn is not a new world")
+
+	var loaded_presenter := NewsReportPresenter.new()
+	root.add_child(loaded_presenter)
+	loaded_presenter.bind(loaded_world, _ui.news_report_toast)
+
+	var loaded_reference := HintPacer.new()
+	check_eq(loaded_presenter._scheduler.report_remaining(),
+		loaded_reference.next_interval(loaded_world.species_hosted_count()),
+		"a loaded world's first interval is the ordinary band — the one-shot was never armed")
+
+	loaded_presenter.free()
+	loaded_world.free()
+
+
+## BOTH OF `TapRouter`'s PLACEMENT SIGNALS REACH THE PACER. Fires the REAL signals —
+## `_ui.tap_router.tile_painted.emit()` / `.building_placed.emit()` — rather than calling
+## `presenter.notice_activity()` directly, because a direct call only proves the presenter's
+## own method chain works; it cannot catch `game_ui.gd`'s wiring being dropped or its closure
+## capturing a stale presenter.
+##
+## `building_placed` WAS THE WHOLE-BRANCH REVIEW'S FINDING: `TapRouter` emits it, not
+## `tile_painted`, for a house/barn/silo, and it was connected to NOTHING anywhere in the
+## project — so a player laying down buildings scored as idle and got the faster feed meant for
+## someone stuck, against `HintPacer.notice_activity()`'s own stated contract ("Any placement").
+##
+## DRAINING THE PACER BETWEEN THE TWO HALVES is what makes the second assertion mean anything:
+## `built_recently()` is already true from the paint above, so without advancing the pacer past
+## `BUILT_RECENTLY_SECONDS` first, the `building_placed` check would pass on the paint's residue
+## with the new connection deleted.
+##
+## Confirmed non-vacuous twice by deliberate sabotage: round 1 (2026-09-08) by deleting the
+## `notice_activity()` call from `game_ui.gd`'s `tile_painted` lambda; final fix wave, same day,
+## by deleting the whole `tap_router.building_placed.connect(...)` block — this check failed on
+## "a BUILDING placement counts as building too" both times, and both edits were reverted.
+func _check_activity_reaches_the_pacer() -> void:
+	var presenter: NewsReportPresenter = _ui.news_report_presenter()
+	if not check(presenter != null, "GameUI exposes its presenter"):
+		return
+	_ui.tap_router.tile_painted.emit()
+	check(presenter.built_recently(),
+		"a terraform paint marks the player as building for pacing purposes")
+
+	# Past the window, so the pacer reads idle again and the next assertion has to be earned.
+	presenter._pacer.advance(HintPacer.BUILT_RECENTLY_SECONDS + 1.0)
+	if not check(not presenter.built_recently(),
+		"fixture: the pacer has gone idle again before the second half of this check"):
+		return
+
+	_ui.tap_router.building_placed.emit()
+	check(presenter.built_recently(),
+		"a BUILDING placement counts as building too — the signal a house/barn/silo actually "
+		+ "emits, which shipped connected to nothing")
+
+
 ## TASK 7's RE-ENTRANCY GUARD. `GameUI._process()` calls `bind_world()` every frame until both
 ## `_camera` and `_world` resolve — the setup at the top of this suite already made ONE such
 ## call (line `_ui.bind_world()` above). `OnboardingCoach` construction and every signal
@@ -485,6 +1159,7 @@ func _check_coach_wiring_is_idempotent() -> void:
 	var wires: Array = [
 		[_ui.coach_chip.dismissed, "CoachChip.dismissed"],
 		[_ui.tap_router.tile_painted, "TapRouter.tile_painted"],
+		[_ui.tap_router.building_placed, "TapRouter.building_placed"],
 		[_ui.hud.mode_changed, "GameHud.mode_changed"],
 		[_ui.hud.palette_changed, "GameHud.palette_changed"],
 		[_ui.hud.help_pressed, "GameHud.help_pressed"],

@@ -1,9 +1,25 @@
 # Fox — News Report copy pool
 
-**Status: written and checklist-passed, but HOMELESS.** `AnimalDefinition` has no field for
-News Report copy (gdd.md describes a per-animal text pool "reusing the fact-card pipeline",
-but no schema row exists). This file exists so pilot 3's step-5 output is not lost. Move it
-into data once the schema gains a field — see "GDD gaps" in `costs.md`.
+**Status: written, checklist-passed, and imported (corrected 2026-09-08 — this header was
+stale).** `AnimalDefinition.news_reports` now exists and `project/data/animals/fox.tres`
+carries **9** of these lines: the three Discovery/hint lines below plus six of the seven
+Ambient/flavor lines (the "tumbling in the leaves all morning" line stays excluded — the
+verification flag on it below was never cleared). Move-in, Avoidance-relocation and
+Symmetric-avoids were **not** imported into `news_reports`; those fire on different triggers
+row 12's cadence never reaches. This header previously read "HOMELESS" and said to move this
+file into data "once the schema gains a field" — the schema gained the field and the move
+happened some time ago; the header was simply never updated, and that staleness once misled
+another design document into asserting this pool was still empty (see `2026-09-08-news-
+report-hints-design.md` §1 and `tier1-status.md` row 12).
+
+**The import flattened the sub-pool structure below, which this file itself says must be
+preserved.** `fox.tres`'s `news_reports` array holds the three Discovery/hint lines followed
+by the six Ambient/flavor lines in one flat array, drawn from uniformly — exactly the
+"drawn interchangeably" the "Sub-pools" section below warns against. That flattening is why
+`discovery_openings`, a second, separate field carrying openings only, had to be added
+rather than reusing this one (`2026-09-08-news-report-hints-design.md` §7.3–§7.4): a
+composed News Report needs to reliably pull an opening, not whichever of the nine lines
+`news_reports` happens to hand back.
 
 Produced by `content-writer` during the pilot-3 Add-a-Fox pipeline run, 2026-07-20.
 

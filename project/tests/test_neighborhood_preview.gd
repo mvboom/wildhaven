@@ -145,11 +145,14 @@ func _process(_delta: float) -> bool:
 		+ "available API."
 	)
 	note_expected_pending(
-		"THE THREE BAND STRINGS ARE A DECISION, NOT COPY — and two of three are `[COPY]` stubs",
-		"`GameHud.PREVIEW_TEXT_WILD` and `PREVIEW_TEXT_HOME` literally begin `[COPY]`, so a "
-		+ "playtester would read \"[COPY] wild, open land\" on screen today. That is the same "
-		+ "shape as #31's placeholder fact text: the schema working, and content-writer's to "
-		+ "close. `PREVIEW_TEXT_WELCOMING` is gdd.md's own exemplar verbatim."
+		"THERE ARE ONLY TWO BAND STRINGS LEFT — `wild` was retired, not rewritten",
+		"This note used to report `PREVIEW_TEXT_WILD` and `PREVIEW_TEXT_HOME` as `[COPY]` "
+		+ "stubs; both were closed by content-writer on 2026-07-28 and that half is stale. What "
+		+ "IS live: on 2026-09-08 the human ruled the `wild` band silent, so the const is gone "
+		+ "and the panel hides instead (asserted in check 1). `PREVIEW_TEXT_WELCOMING` is "
+		+ "gdd.md's own exemplar verbatim and `PREVIEW_TEXT_HOME` matches its cadence. The open "
+		+ "content question is now row 12's: when the near-miss summary splits `BAND_WILD` into "
+		+ "\"nearly\" and \"not at all\", the \"nearly\" half needs words written for it."
 	)
 
 	finish()
@@ -186,7 +189,6 @@ func _check_no_number_can_reach_the_screen() -> void:
 	ui.bind_world()
 	var hud: GameHud = ui.hud
 	var rendered: Dictionary = {
-		NeighborhoodPreview.BAND_WILD: GameHud.PREVIEW_TEXT_WILD,
 		NeighborhoodPreview.BAND_WELCOMING: GameHud.PREVIEW_TEXT_WELCOMING,
 		NeighborhoodPreview.BAND_HOME: GameHud.PREVIEW_TEXT_HOME,
 	}
@@ -199,6 +201,21 @@ func _check_no_number_can_reach_the_screen() -> void:
 			"text: %s / digits: %s" % [text, _digits_in(text)])
 		check(not text.contains("/"), "...and no fraction slash")
 		check(not text.contains("%"), "...and no percentage")
+
+	# THE `wild` BAND IS SILENT (human ruling, 2026-09-08) and so is absent from the map above.
+	# It is asserted here as a HIDE, not as an empty string, because "the panel is not on
+	# screen" is the thing the player experiences: a fresh world is `wild_grass` nearly
+	# everywhere, so a `wild` line would be up under almost every cursor position for the whole
+	# opening. Driven through `show_neighborhood_preview()` from a VISIBLE state, so this
+	# measures the band actually taking the panel down rather than finding it already down.
+	hud.show_neighborhood_preview(NeighborhoodPreview.BAND_WELCOMING)
+	check(hud.neighborhood_preview_visible(), "SETUP: the panel is up on the `welcoming` band")
+	hud.show_neighborhood_preview(NeighborhoodPreview.BAND_WILD)
+	check(not hud.neighborhood_preview_visible(),
+		"THE `wild` BAND TAKES THE PANEL DOWN — untouched land says nothing at all, rather "
+		+ "than standing a permanent line over a world that is wild grass almost everywhere")
+	check_eq(hud.neighborhood_preview_text(), "",
+		"...and it leaves no stale line behind it either")
 
 	hud.show_neighborhood_preview("some_band_nobody_wrote_copy_for")
 	check(not hud.neighborhood_preview_visible(),

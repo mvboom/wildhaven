@@ -15,11 +15,12 @@ extends Node
 signal wood_changed(new_amount: int)
 
 
-## PLACEHOLDER / GDD baseline — the human owns this (Open Question #26). gdd.md -> Economy:
-## "The starting stockpile is ~50 Wood (floor ~35, sized to the 1x1 House plus a small
-## field) and deliberately not a buffer". Sized to cover the first-time nudge's suggested
-## build only; pacing begins at the second build.
-const STARTING_WOOD: int = 50
+## DECIDED 2026-09-08 by the human (-> D-62), raised from the GDD's ~50 baseline. Open
+## Question #26's *value* is settled; its stated sizing principle ("covers the nudge's first
+## build only ... pacing begins at the second build") is NOT what 100 buys and is left open
+## for the human to restate -- see decisions.md D-62. The raise answers D-60: footprints grew
+## to 2x2/3x3 while costs stayed put, so wood-per-tile-claimed fell.
+const STARTING_WOOD: int = 100
 
 ## PLACEHOLDER / GDD baseline — the human owns this (Open Question #8). gdd.md -> Economy
 ## names this "v1's most load-bearing constant": "~1 Wood per Forest tile per 60 s".

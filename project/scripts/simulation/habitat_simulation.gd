@@ -286,13 +286,24 @@ func _drain(budget: int) -> void:
 ## candidate. A vacant structure site counts only for a species the structure is a home for
 ## (`serves()`), so a rabbit cannot take a House's home site by qualifying on the grass
 ## around it.
+##
+## RESOLVED THROUGH `WorldGrid.home_site_anchor()`, so ANY tile of a building's footprint
+## answers with that building's one home site. A tile-exact lookup was right only while every
+## buildable was 1x1: a 3x3 Farmhouse's home site sits at its origin, so its other eight tiles
+## resolved to null, and a villager evaluating one of them founded a second, WILD site on the
+## house's own footprint — den prop and all — rather than moving in. Anchoring here is also
+## what makes the several footprint tiles the dirty queue evaluates converge on one site
+## instead of racing to register several.
 func _site_for(position: Vector2i, species: AnimalDefinition) -> HomeSite:
 	if _registry == null or species == null:
 		return null
-	var settled: HomeSite = _registry.settled_site_at(position, species.id)
+	var anchor: Vector2i = position
+	if _grid != null:
+		anchor = _grid.home_site_anchor(position.x, position.y)
+	var settled: HomeSite = _registry.settled_site_at(anchor, species.id)
 	if settled != null:
 		return settled
-	var vacant: HomeSite = _registry.vacant_site_at(position)
+	var vacant: HomeSite = _registry.vacant_site_at(anchor)
 	if vacant != null and vacant.serves(species):
 		return vacant
 	return null
@@ -390,7 +401,11 @@ func _move_in(position: Vector2i, species: AnimalDefinition) -> void:
 	# Derived, not persisted -- re-copied here and in `restore_site()` so a retuned `.tres`
 	# takes effect immediately instead of being frozen into an old save.
 	site.resident_tags = species.emits_tags.duplicate()
-	var world_position: Vector3 = _grid.tile_to_world(position.x, position.y)
+	# THE SITE'S TILE, NOT THE CANDIDATE'S. They differ only when the candidate was some other
+	# tile of a building's footprint that `_site_for()` anchored back to the building's home
+	# site; spawning at `position` there would stand a villager on whichever footprint corner
+	# the dirty queue happened to evaluate rather than at the home it just moved into.
+	var world_position: Vector3 = _grid.tile_to_world(site.position.x, site.position.y)
 
 	# WHICH LOOK THIS VILLAGER WEARS. Dealt from the per-species shuffle bag, so every look in
 	# `model_scenes` appears before any look repeats (the human's stated requirement).
@@ -406,7 +421,7 @@ func _move_in(position: Vector2i, species: AnimalDefinition) -> void:
 	if variant != null:
 		node = variant.instantiate() as Node3D
 	if node != null:
-		node.name = "%s_%d_%d_%d" % [species.id, position.x, position.y, site.population()]
+		node.name = "%s_%d_%d_%d" % [species.id, site.position.x, site.position.y, site.population()]
 		node.position = world_position
 		# Tagged BEFORE the tree add so the node is never briefly in the world untagged —
 		# `WorldSnapshot.capture()` can run on any frame, including this one.

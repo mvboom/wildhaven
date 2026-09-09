@@ -450,6 +450,21 @@ func get_building_origin(x: int, z: int) -> Vector2i:
 	return _building_origins[_index(x, z)]
 
 
+## THE HOME-SITE ANCHOR of a tile: the footprint's own anchor where a building covers this
+## tile, otherwise the tile itself.
+##
+## EXISTS BECAUSE A FOOTPRINT IS ONE HOME, NOT N. `HabitatSimulation` registers a building's
+## home site at its ORIGIN, while `get_tile_tags()` above emits the building's tags at its
+## CENTRE — for every footprint wider than 2x2 those are different tiles (3x3 -> origin+(1,1)),
+## and any code that asks "which home site is this tile's?" tile-exactly gets `null` for eight
+## of a 3x3 building's nine tiles. That gap let a villager found a SECOND, wild home site on a
+## Farmhouse's own footprint — with a den prop beside the house — instead of moving into it.
+## Routing every such lookup through here makes the whole footprint answer with the one site.
+func home_site_anchor(x: int, z: int) -> Vector2i:
+	var origin: Vector2i = get_building_origin(x, z)
+	return Vector2i(x, z) if origin.x < 0 else origin
+
+
 func is_occupied(x: int, z: int) -> bool:
 	return get_building(x, z) != null
 

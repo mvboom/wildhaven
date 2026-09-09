@@ -279,7 +279,7 @@ species**, per the resume rule.
   fifteen rows are built thin, and leftover hours buy depth. If the estimate is wrong, what
   shrinks is purchased depth — not the ship date, and not the pillar invariants.
 - The accepted worst case is already written down and is genuinely shippable: three species,
-  five terrains, a 1×1 house, untuned camera feel — passing the complete-loop test and every
+  five terrains, one house buildable, untuned camera feel — passing the complete-loop test and every
   pillar obligation.
 
 **The single highest-value thing you can do this week is get one systems row through the

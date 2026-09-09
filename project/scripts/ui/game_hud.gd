@@ -177,18 +177,32 @@ const REMOVE_ENTRY_LABEL: String = "Erase"
 ## read true, but the beat has shifted later than the document imagined it.
 const PREVIEW_TEXT_WELCOMING: String = "this spot is getting cozy for someone"
 
-## CONTENT-WRITER'S, approved 2026-07-28 — `docs/content/displacement-copy.md` -> Appendix,
-## `PREVIEW_TEXT_WILD`, the ranked recommendation, verbatim. Deliberately plain: warmer drafts
-## failed in both directions and both failures were prompts — "still wild"/"wild for now" reads
-## as *not yet* (a deficiency and an instruction), "wild, just as it is" reads as *leave it
-## alone* (the opposite instruction). A band that fires on "nobody could live here" says what is
-## true of the place and stops.
+## THE `wild` BAND HAS NO LINE AT ALL (human ruling, 2026-09-08). There is deliberately no
+## `PREVIEW_TEXT_WILD` const: `_preview_text()` returns `""` for that band and the panel hides.
 ##
-## **AND IT KEEPS THE TAG-WORD RULE.** None of the ten habitat-tag words — `open`, `grass`,
-## `quiet`, `cover`, `rocks`, `flowers`, `house`, `water`, `sand`, `forest` — may appear in a
-## preview line, even innocently, or the preview starts teaching a vocabulary the player is never
-## meant to manage. That is why the earlier stub's "wild, open land" could not ship: `open`.
-const PREVIEW_TEXT_WILD: String = "this land is wild"
+## WHY THE COPY WAS RETIRED RATHER THAN REWRITTEN. It read "this land is wild", and the words
+## were fine — content-writer's, approved 2026-07-28, the ranked recommendation from
+## `docs/content/displacement-copy.md` -> Appendix. The problem was never the sentence, it was
+## the FREQUENCY: a fresh world is `wild_grass` almost everywhere (`WorldGrid.START_TERRAIN_ID`),
+## so `wild` is the band under nearly every cursor position for the whole opening, and a panel
+## that is up permanently saying the same six words is furniture, not a preview. Hiding on the
+## band turns the panel into a positive signal — it appears exactly when the land has started
+## becoming something — which is what "it tracks a state" (`show_neighborhood_preview()`) was
+## always supposed to mean.
+##
+## RECORDED SO IT IS NOT RE-LITIGATED, because rewriting was tried first and every draft failed
+## the same way: warmer forms are all prompts. "still wild"/"wild for now" read as *not yet* — a
+## deficiency and an instruction; "wild, just as it is" reads as *leave it alone* — the opposite
+## instruction. Silence is the only form of this band that is not a nudge, which is Pillar 1.
+##
+## AND THE TAG-WORD RULE STILL BINDS whatever goes here next. None of the ten habitat-tag words
+## — `open`, `grass`, `quiet`, `cover`, `rocks`, `flowers`, `house`, `water`, `sand`, `forest` —
+## may appear in a preview line, even innocently, or the preview starts teaching a vocabulary the
+## player is never meant to manage. (The pre-approval stub's "wild, open land" died on `open`.)
+##
+## WHEN THIS COMES BACK: row 12's near-miss summary splits `BAND_WILD` into "nearly" and "not at
+## all" (see `NeighborhoodPreview`'s header). The "nearly" half is the interesting one and will
+## want words; the "not at all" half should stay silent for the reason above.
 
 ## CONTENT-WRITER'S, approved 2026-07-28 — same source, `PREVIEW_TEXT_HOME`, verbatim. Chosen to
 ## match the middle band's cadence exactly ("this spot is getting cozy for someone" / "this spot
@@ -1440,8 +1454,14 @@ func tile_readout_visible() -> bool:
 ## Renders one band of `NeighborhoodPreview` as its line of copy.
 ##
 ## **No timer.** Unlike the Inspect readout, this panel stays up as long as the cursor is over
-## land in Terraform or Build, and disappears the moment it is not — it tracks a state, it does
-## not announce an event, so there is nothing for a countdown to be measuring.
+## land the preview has words for, and disappears the moment it is not — it tracks a state, it
+## does not announce an event, so there is nothing for a countdown to be measuring.
+##
+## A BAND WITH NO LINE HIDES THE PANEL, and that is now a designed outcome rather than only a
+## defensive one: `BAND_WILD` renders `""` (2026-09-08), so on a fresh world — `wild_grass`
+## almost everywhere — the preview is silent until the player has actually made somewhere into
+## something. The empty-text path below is what implements that; it is the same path an unknown
+## band takes, because in both cases the honest thing on screen is nothing.
 func show_neighborhood_preview(band: String) -> void:
 	if _preview_panel == null:
 		return
@@ -1453,9 +1473,14 @@ func show_neighborhood_preview(band: String) -> void:
 	_preview_panel.visible = true
 
 
+## Clears the LINE as well as the panel. A hidden panel still holding its last line would make
+## `neighborhood_preview_text()` report something that is not on screen — which was harmless
+## while every band had words, and is not now that `wild` deliberately has none.
 func hide_neighborhood_preview() -> void:
 	if _preview_panel != null:
 		_preview_panel.visible = false
+	if _preview_label != null:
+		_preview_label.text = ""
 
 
 func neighborhood_preview_text() -> String:
@@ -1471,7 +1496,11 @@ func neighborhood_preview_visible() -> bool:
 func _preview_text(band: String) -> String:
 	match band:
 		NeighborhoodPreview.BAND_WILD:
-			return PREVIEW_TEXT_WILD
+			# WORDLESS ON PURPOSE, not an oversight and not an unwritten string — see the
+			# retired-copy note above `PREVIEW_TEXT_HOME`. Spelled as its own arm
+			# rather than left to fall through to `_` so that "deliberately silent" and
+			# "band nobody wrote copy for" stay distinguishable here.
+			return ""
 		NeighborhoodPreview.BAND_WELCOMING:
 			return PREVIEW_TEXT_WELCOMING
 		NeighborhoodPreview.BAND_HOME:

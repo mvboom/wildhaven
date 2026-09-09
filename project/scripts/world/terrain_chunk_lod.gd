@@ -208,6 +208,33 @@ func set_chunk_tier(chunk: Vector2i, near: bool) -> void:
 		_rebuild_chunk_far(chunk)
 
 
+## The stable per-tile ground orientation, in quarter turns. Both tiers apply this and only
+## this, so near and far can never disagree about how a tile is turned.
+##
+## WHY THIS EXISTS. A terrain draws the same scene on every tile it covers, so without a
+## per-tile transform every tile of a terrain is byte-identical in the same positions and the
+## ground reads as a visible lattice — the human's 2026-09-08 wild-grass report ("looks very
+## repetitive", "the grass is repetitive too"). Density and scatter changes inside a tile scene
+## can only make that repeating unit harder to RESOLVE; they cannot remove it. Variants are the
+## other way out and D-56 closed that for `wild_grass` specifically, so rotation is the lever
+## that actually breaks the match: four orientations multiply the apparent variety of every
+## terrain at zero asset cost.
+##
+## QUARTER TURNS ONLY, NOT A FREE ANGLE. Every terrain scene is built around a 1.0 x 0.2 x 1.0
+## square slab (the 1.0 width is itself the cross-tile seam-gap fix — see any terrain scene's
+## header). A square is only invariant under multiples of 90 degrees; at any other angle the
+## slab's corners swing outside the tile and its edges pull inside it, opening wedge-shaped gaps
+## along every seam. So this quantises, and must keep quantising.
+##
+## Hashed on `(x, z)` alone, deliberately NOT on the terrain id: a tile keeps its orientation
+## when its terrain changes under it, so terraforming one tile never spins its neighbours'
+## apparent alignment. Stable across saves and across rebuilds because it is a pure function of
+## the coordinates.
+static func tile_orientation(x: int, z: int) -> Basis:
+	var turns: int = absi(hash("%d_%d" % [x, z])) % 4
+	return Basis(Vector3.UP, float(turns) * PI * 0.5)
+
+
 ## Reuse-or-create `tile`'s near-tier container (Task 1's structural requirement: a
 ## persistent node per tile, never freed-and-recreated in the same call, so
 ## a name-based lookup could never race a pending `queue_free()`). Only
@@ -217,7 +244,9 @@ func _refresh_near_tile(tile: Vector2i) -> void:
 	if container == null or not is_instance_valid(container):
 		container = Node3D.new()
 		container.name = "Tile_%d_%d" % [tile.x, tile.y]
-		container.position = _grid.tile_to_world(tile.x, tile.y)
+		container.transform = Transform3D(
+			tile_orientation(tile.x, tile.y), _grid.tile_to_world(tile.x, tile.y)
+		)
 		if _near_visual_parent != null:
 			_near_visual_parent.add_child(container)
 		else:
@@ -350,7 +379,9 @@ func _rebuild_chunk_far(chunk: Vector2i) -> void:
 				mm.instance_count = tile_list.size()
 				for i in tile_list.size():
 					var t: Vector2i = tile_list[i]
-					var tile_origin := Transform3D(Basis(), _grid.tile_to_world(t.x, t.y))
+					var tile_origin := Transform3D(
+						tile_orientation(t.x, t.y), _grid.tile_to_world(t.x, t.y)
+					)
 					mm.set_instance_transform(i, tile_origin * (piece["transform"] as Transform3D))
 				var mmi := MultiMeshInstance3D.new()
 				mmi.name = "Far_%s_%d_%d_%d" % [terrain_id, chunk.x, chunk.y, name_index]

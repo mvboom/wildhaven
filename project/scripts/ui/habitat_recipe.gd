@@ -49,7 +49,7 @@ extends RefCounted
 ## sentence, which doesn't care whether its object carries an article or not — so some
 ## entries got one baked in ("a house", "a farm field") and others didn't ("open grass",
 ## "woods"). `describe_tiers()`'s templates DO care: `_gate_line()` puts an article in front
-## of what it gets (`_with_article()`), so a baked-in one produced two ("needs an a house"),
+## of what it gets (`with_article()`), so a baked-in one produced two ("needs an a house"),
 ## and `_need_line()` puts a NUMBER in front of it, where an article is simply wrong.
 ## Same root cause both times: THE GRAMMAR IS THIS FILE'S JOB, NOT THE CONTENT WRITER'S — a
 ## phrase here is a noun, full stop, and each template decides for itself what belongs in
@@ -261,7 +261,7 @@ static func describe(species: AnimalDefinition, world: WorldRoot) -> String:
 			# `SOURCE_PHRASES`, not code.
 			phrase = (entry["display_name"] as String).to_lower()
 		phrases.append(phrase)
-	return DESCRIBE_LEAD + _join_and(phrases) + "."
+	return DESCRIBE_LEAD + join_and(phrases) + "."
 
 
 ## ---------------------------------------------------------------------------------------
@@ -516,7 +516,7 @@ static func _describe_tier(
 
 	var lead: String = LEAD_ALT
 	if previous == null:
-		lead = LEAD % _with_article(noun)
+		lead = LEAD % with_article(noun)
 
 	var block: Array[String] = [lead]
 	block.append_array(gates)
@@ -526,7 +526,7 @@ static func _describe_tier(
 	for limit: HabitatLimit in tier.limits:
 		limit_phrases.append(_describe_limit(limit))
 	if not limit_phrases.is_empty():
-		block.append(LIMIT_SENTENCE % _join_and(limit_phrases))
+		block.append(LIMIT_SENTENCE % join_and(limit_phrases))
 
 	if tier.max_individuals == 1:
 		block.append(CAP_ONE % noun)
@@ -597,7 +597,7 @@ static func _gate_line(tag: String, world: WorldRoot, seen: Dictionary) -> Strin
 		if not names.has(display):
 			names.append(display)
 	if not all_placeable or names.size() < 2:
-		return _with_article(resolved["phrase"] as String)
+		return with_article(resolved["phrase"] as String)
 
 	var shared: String = names[0].get_slice(" ", names[0].get_slice_count(" ") - 1)
 	for display: String in names:
@@ -605,11 +605,11 @@ static func _gate_line(tag: String, world: WorldRoot, seen: Dictionary) -> Strin
 			shared = ""
 			break
 	if not shared.is_empty():
-		return "%s (any kind)" % _with_article(shared)
+		return "%s (any kind)" % with_article(shared)
 
 	var articled: Array[String] = []
 	for display: String in names:
-		articled.append(_with_article(display))
+		articled.append(with_article(display))
 	return _join_or(articled)
 
 
@@ -754,12 +754,16 @@ static func _bare_noun(phrase: String) -> String:
 
 
 ## "a stable", "an open barn", "an alpaca" — the indefinite article a gate-only need, or a
-## lead-in's species name, reads with. A plain first-letter-is-a-vowel heuristic, adequate
-## for the tag and roster vocabulary this reads over; not a general-purpose English rule
-## (it would say "an hour" wrong, and "a unicorn" wrong the other way — neither is a word
-## this file can reach). Safe to apply unconditionally: every phrase it receives has already
-## passed through `_resolve_need()`'s `_bare_noun()` normalization.
-static func _with_article(phrase: String) -> String:
+## lead-in's species name, reads with. PUBLIC, not private: `NewsReportContent.hint_line()`
+## articles a species' display name for `GENERIC_OPENING` the same way this file already
+## articles a gate noun, so the two files share the one heuristic rather than each growing
+## their own. A plain first-letter-is-a-vowel heuristic, adequate for the tag and roster
+## vocabulary this reads over; not a general-purpose English rule (it would say "an hour"
+## wrong, and "a unicorn" wrong the other way — neither is a word this file can reach). Safe
+## to apply unconditionally to this file's own callers: every phrase THEY pass has already
+## gone through `_resolve_need()`'s `_bare_noun()` normalization; a caller outside this file
+## is responsible for its own input.
+static func with_article(phrase: String) -> String:
 	if phrase.is_empty():
 		return phrase
 	var first: String = phrase.substr(0, 1).to_lower()
@@ -881,6 +885,50 @@ static func starter_tier(species: AnimalDefinition) -> HabitatTier:
 	return tiers[0]
 
 
+## THE SHARED SEAM — the starter tier's needs as bare prose phrases, for a caller that wants
+## the card's numbers in a sentence rather than a bullet list (`NewsReportContent`).
+##
+## Reads `starter_tier()` — the cheapest way in — never a herd tier, because a hint's job is
+## to name a reachable first step, not the best possible outcome.
+##
+## `shows_each` is FALSE: "4 tiles of forest for each fox, 5 tiles of open grass for each
+## fox, 6 tiles of water for each fox" is technically the same information and unreadable as
+## one sentence. The divisor is identical to the card's; only the suffix differs.
+##
+## `seen` threads through exactly as `_describe_tier()` does it, so Cow's `barn` and `silo`
+## — two different buildings behind one palette button — both survive here too.
+static func starter_need_phrases(species: AnimalDefinition, world: WorldRoot) -> Array[String]:
+	var out: Array[String] = []
+	if species == null:
+		return out
+	var tier: HabitatTier = starter_tier(species)
+	if tier == null:
+		return out
+	var noun: String = species.display_name.to_lower()
+	var seen: Dictionary = {}
+	for need: HabitatNeed in tier.needs:
+		var phrase: String = _need_line(need, noun, false, world, seen)
+		if not phrase.is_empty():
+			out.append(phrase)
+	return out
+
+
+## The starter tier's exclusions, as the same phrases the card's limit sentence is built
+## from ("away from buildings", "far from any buildings"). Returned bare, WITHOUT
+## `LIMIT_SENTENCE`'s "Pick a spot %s." wrapper, so a caller can fold them into a sentence
+## of its own shape.
+static func starter_limit_phrases(species: AnimalDefinition) -> Array[String]:
+	var out: Array[String] = []
+	if species == null:
+		return out
+	var tier: HabitatTier = starter_tier(species)
+	if tier == null:
+		return out
+	for limit: HabitatLimit in tier.limits:
+		out.append(_describe_limit(limit))
+	return out
+
+
 ## `recipe_for()`'s exact shape (satisfiable + deduped, palette-button-keyed entries), over
 ## a TIER's `needs` instead of a species' flat fields. Deliberately ignores `HabitatLimit`s,
 ## the same scope `recipe_for()` has always had — a "what to place" answer, not a "where not
@@ -936,7 +984,7 @@ static func describe_tier_needs(tier: HabitatTier, world: WorldRoot) -> String:
 		if phrase.is_empty():
 			phrase = (entry["display_name"] as String).to_lower()
 		phrases.append(phrase)
-	return DESCRIBE_LEAD + _join_and(phrases) + "."
+	return DESCRIBE_LEAD + join_and(phrases) + "."
 
 
 ## The cheapest species to invite, ranked over each species' OWN starter tier —
@@ -1013,8 +1061,11 @@ static func starter_species(world: WorldRoot) -> AnimalDefinition:
 
 
 ## "a", "a and b", "a, b and c" — Oxford-comma-free, matching the register of the rest of the
-## player-facing copy.
-static func _join_and(parts: Array[String]) -> String:
+## player-facing copy. PUBLIC, not private: `NewsReportContent.hint_line()` joins its own
+## needs and limit lists with the exact same joiner (fix round 1 finding #2 — the spec's
+## binding principle is one derivation, two renderers, so a second file growing its own
+## byte-for-byte copy of this was the defect, not a style choice).
+static func join_and(parts: Array[String]) -> String:
 	if parts.is_empty():
 		return ""
 	if parts.size() == 1:
@@ -1023,7 +1074,7 @@ static func _join_and(parts: Array[String]) -> String:
 	return ", ".join(head) + " and " + parts[parts.size() - 1]
 
 
-## `_join_and()`'s other half — "a house or a farmhouse". A gate need with several
+## `join_and()`'s other half — "a house or a farmhouse". A gate need with several
 ## interchangeable sources is an OR, and rendering it with "and" would tell a child to build
 ## every one of them.
 static func _join_or(parts: Array[String]) -> String:

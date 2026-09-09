@@ -1838,3 +1838,184 @@ ground plane would have opened a hole in the world) and is now a grouping conven
 behaviour attached — kept because every terrain scene is built around it and removing it would
 restructure all 33 for nothing. Every one of those scenes carries a stamped note saying so, since
 their headers still describe the exemption mechanism as if it were live.
+
+### D-60 · Buildings are sized to the people in them; a building emits its tags once
+**Decision:** Three things, ruled together on 2026-09-08 because each one only makes sense with
+the others.
+
+1. **Footprints re-cut.** Chicken Coop and Well stay 1×1. House, Small Barn, Open Barn, Silo,
+   Windmill and Water Tower go to 2×2. Farmhouse and Large Barn go to 3×3. Each building's model
+   is rescaled to fill its plot. **Costs are unchanged.**
+2. **A building emits its `emitted_tags` once, at its footprint's centre tile.** Every other tile
+   it covers is occupied and terrain-suppressed but emits nothing.
+3. **The Farmhouse gets its own model** — `House1` from Quaternius's "Buildings Pack - Jan 2019"
+   (CC0 1.0) — instead of sharing `house_medium`'s mesh with the House.
+
+**Why (1): the sizes were never measured against a person.** Every 1×1 building had been scaled by
+a convention inherited from the first House batch — normalise the long horizontal axis to 0.869309
+tile-units — and that number was a margin, not a measurement of anything. Against the villager,
+who *is* measured (`Man.tscn` normalises to exactly 1.0 tile height, gdd.md → Level & world
+design), the result was that **every House look stood shorter than the person living in it**
+(0.772, 0.909, 0.706), the Small Barn (0.687) was shorter than the 0.734 cow, and the Open Barn —
+the stable — was 0.667 against a 0.965 horse. The concern that opened this was "a person would
+never actually fit into a house"; it was correct and it was measurable.
+
+**Why costs did not move:** the ruling was about how the world reads, and changing two variables at
+once would make the playtest unreadable. The consequence is real and recorded rather than hidden —
+wood-per-tile-claimed fell, and #8/#26 now have to settle against the new ladder.
+
+**Why (2), and this is the load-bearing half.** A tag count is a count of **tiles**. That was
+invisible while every buildable was 1×1 and wrong the moment they were not: a 2×2 house would have
+contributed four `built` tiles and a 3×3 barn nine. Measured consequences, not predicted ones —
+rabbit's `built ≤ 2` ("a distant cottage is fine, a village is not") became *exclusion by a single
+building*; deer's and donkey's `≤ 1` tiers became unreachable near any building at all; Well and
+Water Tower emit `water`, which is a **scaling** need (cow 3/individual, horse 2, fox 6), so a 2×2
+tower counted as four ponds. Worst, and caught only by running it: a scout founds a home site on
+any tile whose tags satisfy a tier, so all four tiles of a 2×2 House passed the `house` gate and
+**one house seated two villagers** (`capacity_at(28,28)` and `capacity_at(29,28)` each read 1).
+
+Emitting once restores 1×1 semantics for every count at every footprint. **No ruled constant had to
+move, and none has to move the next time a footprint does** — which is the property actually being
+bought, given this was the second footprint change in one day.
+
+**Centre, not origin.** The emitting tile is what a radius is measured *to*. The origin is a corner:
+on a 3×3 barn that sits ~1.41 tiles off the building's visual centre — enough to fall outside the
+horse's radius-5 `stable` need while the barn plainly looks inside it. Integer division lands on
+the true centre at odd sizes and on the origin at even ones (2×2 has no centre tile; the residual
+is 0.71 tiles against radii of 5–16).
+
+**Why (3): `large_house` has to out-read `house` on sight.** Farmhouse and House rendered the same
+mesh — buildings.md had already flagged this as "raised, not decided" — so a bigger footprint just
+meant the same house standing in more space. Once every former 1×1 reached 2×2, Farmhouse and House
+were also the same *size*, and the distinction collapsed entirely. The 3×3 ruling and the new model
+are the same fix from two directions.
+
+**Rejected — retuning the numbers instead of the emission.** The obvious response to (2) was to
+raise every `built` ceiling to match the new areas (rabbit 2 → 8, deer 1 → 4, …). Rejected on three
+counts: the multiplier is not uniform (a coop is 1 tile, a house 4, a large barn 9), so there is no
+single factor; `built ≤ 8` stops meaning anything a human can reason about, which defeats the point
+of a ceiling that was deliberately set at "a distant cottage is fine"; and it has to be redone every
+time a footprint moves. It also would not have fixed one-house-two-villagers at all.
+
+**Rejected — deduplicating in the counter rather than the emitter.** Counting distinct building
+origins inside `CapacityEvaluator` would have fixed the ceilings and the `water` inflation, and is
+the same size of change. It was rejected because it leaves every footprint tile still *emitting*
+`house`, so a scout would still found a second home site on the same building. Changing the emitter
+fixes all three symptoms; changing the counter fixes two.
+
+**Rejected — leaving the footprints alone and only rescaling the models.** Tried first, as the
+cheaper probe: a mesh can overhang its plot with no simulation consequence, since only
+`test_building_footprint_alignment.gd`'s spill assertion objects and that is a convention rather
+than a requirement. Rejected on the human's call — an overhanging building reads as a bug, and the
+grid claim should match what the eye sees a building occupying.
+
+**A note on how (3) was imported, because it is a live trap.** `scripts/asset_pipeline.py` run
+`20260908-house1-6032` was taken to its checkpoint, ruled, resumed, and then **abandoned**
+(evidence at `runs/20260908-house1-6032`): `--as building` means "import as a NEW buildable", so it
+wrote an eleventh buildable duplicating the Farmhouse field-for-field rather than repointing it.
+The swap was completed by hand; the run's licence audit, attribution entry and CREDITS row were
+carried across and are real. Two further findings are recorded in
+[content-pipeline-status.md](content-pipeline-status.md): the pipeline ranks FBX above OBJ, and for
+this pack **only the FBX is faithful** — Godot's OBJ importer writes the `.mtl`'s *linear* Kd values
+into the sRGB `albedo_color` slot, so the house rendered ~3× too dark while its raw numbers looked
+like an exact source match. Comparing `albedo_color` alone cannot distinguish the two importers;
+the eye test caught it and the arithmetic confirmed it.
+
+### D-61 · News Reports carry the Field Guide's counted build hints; D-40's premise was already stale; cadence tuning left open
+
+**Note on numbering:** this decision was drafted as "D-60" against a plan written before D-60
+above (buildings sized to the people in them) was ruled, also on 2026-09-08. That entry claimed
+the number first; this one is D-61. Any reference elsewhere to "(D-60)" for the News Report
+build-hints work means this entry.
+
+**Decision:** Four operator rulings, taken together on 2026-09-08 (spec `2026-09-08-news-report-
+hints-design.md` §2), on how a first-time player learns what an animal needs without having to
+find the Field Guide on their own:
+
+1. **Which surface carries the count-bearing hints?** The **News Report feed**, not the
+   onboarding coach.
+2. **Is every report an instruction, or a mix?** **An authored opening plus derived needs**,
+   composed into one report — the opening comes from a new `discovery_openings` pool, the needs
+   are read live off `HabitatRecipe`, the same source the Field Guide card renders from.
+3. **What makes hints rarer over time?** **Species-hosted count** (`species_hosted_count()`) — a
+   report about a species the player has never hosted stays likely; one about a species they
+   already host many of fades toward rare, never zero.
+4. **Early-game focus?** **Villager first** (nothing hosted at all ⇒ Villager), then the
+   ordinary ranking — cheapest species not yet hosted. **Narrowed in the same session's final
+   review:** the gate yields to the no-repeat rule, so it does not fire when the Villager was
+   the previous pick. Written here as "unconditionally" at first, which shipped as one
+   identical sentence looping at a new player every 30 s — the "hints never repeat with
+   urgency" failure Pillar 1 forbids. The ruling stands; its scope is narrower than first
+   recorded. This reopens the human ruling
+   that pinned Rabbit as the tutorial's first species (`HabitatRecipe.PINNED_STARTER_SPECIES_ID`)
+   for this path only; the onboarding coach still reads that constant unchanged and is untouched
+   here.
+
+Ruling 1 was taken with its costs named and accepted, not discovered afterward: the bulletin
+voice now hands out tasks in substance, which is why gdd.md → Discovery is amended alongside this
+entry; a Field Guide payload loss was named as one of those costs at the time, but see the
+correction below — that cost was never real, because the reveal it presumed no longer existed as
+of 2026-08-31; and D-37's fixed cadence becomes activity-driven rather than a flat random
+interval.
+
+**Correction (fix round 1, same day): there was no D-40 reveal left to demote.** This entry
+originally recorded, following spec §8.2, that a report "still reveals the species' Field Guide
+entry, but the entry's remaining payload is now the cap, the alternate tiers, and the avoids
+line." That was already false when written. `project/scripts/ui/field_guide.gd`'s own header
+records a superseding change that shipped **2026-08-31**, a full week before this feature
+existed: every roster species has rendered its real `display_name` and its **full** recipe
+unconditionally since that date, discovered or not — `_make_species_card()` gates on nothing,
+and `species_row_texts()`'s own comment confirms "there is no longer a silhouette state to
+distinguish." D-40's existence-gate (the thing that used to make a hint or a move-in the trigger
+that "revealed" a species' entry) was already overturned before spec §8.2 was drafted. There was
+therefore nothing left for this feature to demote: a report now simply points the player at a
+species whose Field Guide recipe was already visible unconditionally. The paragraph above is left
+in place rather than deleted, corrected here instead, because it is more useful to record that
+the design was built on a stale premise than to quietly restate that premise as fact.
+
+**Open gap, not filled here: the 2026-08-31 Field Guide change was never entered in
+`decisions.md`.** `field_guide.gd`'s header claims its superseding decision is "logged as
+`decisions.md` (amending D-40, which amended D-34 #5 and #6)" — no such entry exists; this
+paragraph is not it. A real design decision shipped in code without ever being ratified or
+recorded here. The full reasoning for it lives in `field_guide.gd`'s own header comment (top of
+the file) — that is the source to read, not a paraphrase of it as though it were already a
+ruling. This gap is recorded so it is visible and findable, not authored on the human's behalf:
+it still awaits the human's ratification as its own decision entry, whatever number is next free
+when that happens.
+
+**The eight tuning constants are NOT decided here and remain PROPOSED, awaiting a human
+ruling — do not read this entry as settling them:** the base cadence per hosted-count band (0,
+1–2, 3–5, 6+ hosted), the built-recently and idle cadence multipliers, the "recently built"
+window, and `PLENTY_THRESHOLD`. All eight ship in code marked `## PROPOSED — human owns this.`,
+sourced in spec `2026-09-08-news-report-hints-design.md` §9. Per project rule, agents propose
+with sources and the human decides; this entry logs the four rulings and the correction of the
+stale D-40 premise above, nothing more.
+
+### D-62 · The starting Wood stockpile is 100, and #26's settled half and open half swap places
+**Decision (human, 2026-09-08):** `WoodLedger.STARTING_WOOD` = **100**, raised from 50.
+
+**Why:** D-60 re-cut every footprint upward — House, Small Barn, Open Barn, Silo, Windmill and
+Water Tower to 2×2, Farmhouse and Large Barn to 3×3 — and deliberately did **not** move a single
+cost, so wood-per-tile-claimed fell. That entry recorded the consequence and named #8/#26 as the
+questions that would have to absorb it. This is #26 absorbing it, on the stockpile side; the
+costs themselves are untouched and remain #8's.
+
+**What this does NOT settle, and the reason it is written down rather than smoothed over.**
+#26 was previously "sizing principle decided, exact value open": the principle was that the
+stockpile *covers the first-time nudge's suggested build only*, and is **deliberately not a
+buffer** — "covering several builds would make Wood decorative, so pacing begins at the *second*
+build" (gdd.md → Economy). At House = 15 Wood, 100 is roughly six Houses. **The value now
+decided is not an instance of the principle that was decided; it contradicts it.** So the two
+halves of #26 have swapped: the value is closed, the sizing principle is open. It is left open
+rather than rewritten here because rewriting it would mean authoring a pacing rationale on the
+human's behalf, and the pillar-level claim underneath it — that Wood paces rather than decorates
+— is exactly the kind of thing that gets answered by watching a kid play, not by an agent
+restating it to match the constant. #26 in spec.md now tracks that open half.
+
+**Not reopened here:** the passive rate (1 Wood per Forest tile per 60 s, #8, → D-29), the
+floor ~35 in gdd.md, and every building cost.
+
+**Touched:** `project/scripts/economy/wood_ledger.gd` (the constant and its comment, which no
+longer calls itself a placeholder), `project/tests/test_economy_rules.gd`
+(`EXPECTED_STARTING_WOOD`), gdd.md → Economy, spec.md (#26 and the House-cost pacing row),
+tier1-status.md row 8's `constants` cell.

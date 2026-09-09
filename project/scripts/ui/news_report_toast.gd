@@ -30,12 +30,21 @@ extends Control
 signal shown(text: String)
 signal dismissed()
 
-## PROPOSED — human owns this. How long one line holds before auto-dismissing, in seconds.
-## Sized the same way `DisplacementNotice.MOMENT_SECONDS` (4.5 s) was, then given headroom: a
-## News Report line runs longer than a consequence line (the Discovery/hint lines in
-## `docs/content/*-news-report-pool.md` run to two clauses), for a fluent 8-year-old reading it
-## once while still glancing back at the world.
-const DISPLAY_SECONDS: float = 7.0
+## DECIDED — operator ruling, 2026-09-08: "When a hint pops up, it should stay visible twice
+## as long." 7.0 -> 14.0.
+##
+## THIS SUPERSEDES D-37'S 2026-08-09 SIZING FOR THIS SURFACE. D-37's 7.0 was gated against
+## one-line flavour copy ("sized for a fluent 8-year-old") and approved on screen with no
+## retune — a justification that stopped being true the moment this row grew a second kind of
+## line. A composed build hint ("Word has it a villager is looking for a home — it'd want a
+## house or a farmhouse and 1 tile of farm field.") runs 21-28 words, ~137 characters for the
+## longest today (Fox) — roughly twice the flavour copy D-37 was sized against, not a fluent
+## 8-year-old's one clause. This is also the ONE surface in the whole UI with no Read-Aloud
+## button (spec.md defers wider coverage — see the header note above), and the target audience
+## spans ages 6-10, which includes pre-fluent readers who need the extra time D-37 never
+## budgeted for. 14.0 doubles the old value directly, per the operator's own words, rather than
+## re-deriving a number from the character count.
+const DISPLAY_SECONDS: float = 14.0
 
 var _queue: Array[String] = []
 var _clock: float = 0.0
